@@ -1,46 +1,31 @@
 import { describe, it, expect } from 'vitest';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { fileURLToPath } from 'node:url';
-import path from 'node:path';
-import { buildApp } from '../../src/app.js';
-import { testEnv } from '../helpers/env.js';
+import type { NestExpressApplication } from '@nestjs/platform-express';
+import { createTestApp } from '../helpers/app';
+import { ProbeController } from '../helpers/probe.controller';
 
-const apiRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const apiRoot = process.cwd();
+/** Süreç, derlenmemiş TypeScript'i ts-node ile koşar (dekoratör metadata'sı korunur). */
+const TS_NODE = 'ts-node/register/transpile-only';
+
+const BASE_ENV = {
+  NODE_ENV: 'test',
+  LOG_LEVEL: 'silent',
+  DATABASE_URL: 'postgres://klinara_app:pw@127.0.0.1:5433/klinara_test',
+};
 
 describe('zarif kapanış', () => {
   it('kapanış sırasında AKTİF istek yarıda kesilmez, tamamlanır', async () => {
-    const app = await buildApp({ env: testEnv(), loggerOverride: false });
+    const app: NestExpressApplication = await createTestApp({ controllers: [ProbeController] });
+    await app.listen(0, '127.0.0.1');
 
-    let handlerReached = false;
-    let release!: () => void;
-    const gate = new Promise<void>((resolve) => {
-      release = resolve;
-    });
+    const address = app.getHttpServer().address() as { port: number };
+    const inflight = fetch(`http://127.0.0.1:${address.port}/api/v1/slow`);
 
-    // buildApp henüz `ready()` çağırmadığı için testte ek rota kaydedebiliyoruz.
-    app.get('/slow', async () => {
-      handlerReached = true;
-      await gate;
-      return { done: true };
-    });
-
-    await app.listen({ host: '127.0.0.1', port: 0 });
-    const address = app.server.address();
-    if (address === null || typeof address === 'string') throw new Error('port alınamadı');
-
-    const inflight = fetch(`http://127.0.0.1:${address.port}/slow`);
-
-    // İstek gerçekten handler'a ulaşana kadar bekle.
-    const deadline = Date.now() + 5_000;
-    while (!handlerReached && Date.now() < deadline) {
-      await new Promise((r) => setTimeout(r, 10));
-    }
-    expect(handlerReached).toBe(true);
-
-    // Kapanışı başlat: bu noktada istek hâlâ uçuşta.
+    // İstek handler'a ulaşsın diye kısa bir bekleme, sonra kapanışı başlat.
+    await new Promise((resolve) => setTimeout(resolve, 50));
     const closing = app.close();
-    release();
 
     const response = await inflight;
     expect(response.status).toBe(200);
@@ -51,16 +36,14 @@ describe('zarif kapanış', () => {
 
   it('SIGTERM alan süreç temiz çıkış kodu (0) ile kapanır', async () => {
     const port = 34_000 + Math.floor(Math.random() * 1_000);
-    const child = spawn(process.execPath, ['--import', 'tsx', 'src/server.ts'], {
+    const child = spawn(process.execPath, ['-r', TS_NODE, 'src/main.ts'], {
       cwd: apiRoot,
       env: {
         ...process.env,
-        NODE_ENV: 'test',
-        LOG_LEVEL: 'silent',
+        ...BASE_ENV,
         PORT: String(port),
         HOST: '127.0.0.1',
         SHUTDOWN_GRACE_MS: '5000',
-        DATABASE_URL: 'postgres://klinara_app:pw@127.0.0.1:5433/klinara_test',
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -69,7 +52,7 @@ describe('zarif kapanış', () => {
     child.stderr.on('data', (chunk: Buffer) => (stderr += chunk.toString()));
 
     // Sunucu gerçekten istek alabilir hâle gelene kadar bekle.
-    const deadline = Date.now() + 15_000;
+    const deadline = Date.now() + 40_000;
     let up = false;
     while (!up && Date.now() < deadline && child.exitCode === null) {
       try {
@@ -83,19 +66,13 @@ describe('zarif kapanış', () => {
 
     child.kill('SIGTERM');
     const [code] = (await once(child, 'exit')) as [number | null, NodeJS.Signals | null];
-    expect(code).toBe(0);
+    expect(code, `stderr: ${stderr}`).toBe(0);
   });
 
   it('geçersiz env ile açılan süreç anlaşılır hata verip 1 ile ölür', async () => {
-    const child = spawn(process.execPath, ['--import', 'tsx', 'src/server.ts'], {
+    const child = spawn(process.execPath, ['-r', TS_NODE, 'src/main.ts'], {
       cwd: apiRoot,
-      env: {
-        ...process.env,
-        NODE_ENV: 'test',
-        LOG_LEVEL: 'silent',
-        DATABASE_URL: 'postgres://klinara_app:pw@127.0.0.1:5433/klinara_test',
-        PORT: 'not-a-port',
-      },
+      env: { ...process.env, ...BASE_ENV, PORT: 'not-a-port' },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
 

@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { isPgError, pgConstraintName, pgErrorCode, PG_ERROR } from '../../src/lib/db-errors.js';
+import {
+  isPgError,
+  pgConstraintName,
+  pgErrorCode,
+  PG_ERROR,
+} from '../../src/common/errors/db-errors';
 
 describe('PostgreSQL hata kodu çıkarımı', () => {
   it('doğrudan hatadan kodu okur', () => {

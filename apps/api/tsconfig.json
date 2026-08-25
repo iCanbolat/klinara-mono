@@ -1,8 +1,9 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "noEmit": true,
-    "types": ["node"]
+    "rootDir": ".",
+    "outDir": "./dist",
+    "baseUrl": "."
   },
-  "include": ["src/**/*.ts", "test/**/*.ts", "*.config.ts"]
+  "include": ["src/**/*.ts", "test/**/*.ts", "*.config.ts", "*.config.mts"]
 }

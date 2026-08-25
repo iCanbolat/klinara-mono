@@ -1,14 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { parseEnv, corsOrigins, EnvValidationError } from '../../src/config/env.js';
+import { EnvValidationError, corsOrigins, validateEnv } from '../../src/config/env.validation';
 
 /** Doğrulamayı geçen en küçük ortam. */
 const MINIMAL = { DATABASE_URL: 'postgres://u:p@localhost:5432/db' };
 
 describe('env doğrulama', () => {
   it('zorunlu DATABASE_URL yoksa açılışta ölür', () => {
-    expect(() => parseEnv({})).toThrow(EnvValidationError);
+    expect(() => validateEnv({})).toThrow(EnvValidationError);
     try {
-      parseEnv({});
+      validateEnv({});
       expect.unreachable();
     } catch (error) {
       expect((error as EnvValidationError).issues.join()).toContain('DATABASE_URL');
@@ -16,29 +16,30 @@ describe('env doğrulama', () => {
   });
 
   it('postgres olmayan DATABASE_URL reddedilir', () => {
-    expect(() => parseEnv({ DATABASE_URL: 'mysql://u:p@localhost/db' })).toThrow(
+    expect(() => validateEnv({ DATABASE_URL: 'mysql://u:p@localhost/db' })).toThrow(
       EnvValidationError,
     );
   });
 
   it('zorunlu alanlar verildiğinde güvenli varsayılanlarla açılır', () => {
-    const env = parseEnv(MINIMAL);
+    const env = validateEnv(MINIMAL);
     expect(env.NODE_ENV).toBe('development');
     expect(env.PORT).toBe(3000);
     expect(env.SHUTDOWN_GRACE_MS).toBe(10_000);
     expect(env.DATABASE_POOL_MAX).toBe(20);
+    expect(env.AUTH_DEV_MODE).toBe(false);
   });
 
   it('PORT değerini sayıya çevirir', () => {
-    const env = parseEnv({ ...MINIMAL, PORT: '8080' });
+    const env = validateEnv({ ...MINIMAL, PORT: '8080' });
     expect(env.PORT).toBe(8080);
     expect(typeof env.PORT).toBe('number');
   });
 
   it('geçersiz PORT için anlaşılır hata fırlatır', () => {
-    expect(() => parseEnv({ ...MINIMAL, PORT: 'seksen' })).toThrow(EnvValidationError);
+    expect(() => validateEnv({ ...MINIMAL, PORT: 'seksen' })).toThrow(EnvValidationError);
     try {
-      parseEnv({ ...MINIMAL, PORT: '70000' });
+      validateEnv({ ...MINIMAL, PORT: '70000' });
       expect.unreachable('geçersiz PORT kabul edilmemeliydi');
     } catch (error) {
       expect(error).toBeInstanceOf(EnvValidationError);
@@ -48,27 +49,29 @@ describe('env doğrulama', () => {
   });
 
   it('geçersiz NODE_ENV reddedilir', () => {
-    expect(() => parseEnv({ ...MINIMAL, NODE_ENV: 'staging' })).toThrow(
-      EnvValidationError,
-    );
+    expect(() => validateEnv({ ...MINIMAL, NODE_ENV: 'staging' })).toThrow(EnvValidationError);
   });
 
   it('birden çok hatayı tek seferde bildirir', () => {
     try {
-      parseEnv({ ...MINIMAL, PORT: 'x', LOG_LEVEL: 'verbose', NODE_ENV: 'nope' });
+      validateEnv({ ...MINIMAL, PORT: 'x', LOG_LEVEL: 'verbose', NODE_ENV: 'nope' });
       expect.unreachable();
     } catch (error) {
       expect((error as EnvValidationError).issues.length).toBeGreaterThanOrEqual(3);
     }
   });
 
+  it('bilinmeyen ortam değişkenleri yapılandırmaya SIZMAZ', () => {
+    const env = validateEnv({ ...MINIMAL, KLINARA_BILINMEYEN: 'sizinti' });
+    expect(Object.keys(env)).not.toContain('KLINARA_BILINMEYEN');
+  });
+
   it('env nesnesi dondurulmuştur (kazara mutasyona kapalı)', () => {
-    const env = parseEnv(MINIMAL);
-    expect(Object.isFrozen(env)).toBe(true);
+    expect(Object.isFrozen(validateEnv(MINIMAL))).toBe(true);
   });
 
   it('CORS_ORIGINS listesini ayrıştırır ve boşlukları temizler', () => {
-    const env = parseEnv({
+    const env = validateEnv({
       ...MINIMAL,
       CORS_ORIGINS: 'https://a.klinara.app, https://b.klinara.app ,',
     });
@@ -76,6 +79,31 @@ describe('env doğrulama', () => {
   });
 
   it('CORS_ORIGINS boşsa boş liste döner (çapraz origin kapalı)', () => {
-    expect(corsOrigins(parseEnv(MINIMAL))).toEqual([]);
+    expect(corsOrigins(validateEnv(MINIMAL))).toEqual([]);
+  });
+});
+
+describe('üretime özgü kurallar', () => {
+  const PROD = {
+    ...MINIMAL,
+    NODE_ENV: 'production',
+    METRICS_TOKEN: 'yeterince-uzun-metrik-tokeni',
+    CORS_ORIGINS: 'https://app.klinara.app',
+  };
+
+  it('geçerli üretim yapılandırması kabul edilir', () => {
+    expect(() => validateEnv(PROD)).not.toThrow();
+  });
+
+  it('üretimde METRICS_TOKEN zorunludur', () => {
+    expect(() => validateEnv({ ...PROD, METRICS_TOKEN: 'kisa' })).toThrow(/METRICS_TOKEN/);
+  });
+
+  it('üretimde CORS_ORIGINS zorunludur', () => {
+    expect(() => validateEnv({ ...PROD, CORS_ORIGINS: '' })).toThrow(/CORS_ORIGINS/);
+  });
+
+  it('AUTH_DEV_MODE üretimde açılamaz', () => {
+    expect(() => validateEnv({ ...PROD, AUTH_DEV_MODE: 'true' })).toThrow(/AUTH_DEV_MODE/);
   });
 });

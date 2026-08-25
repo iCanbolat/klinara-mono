@@ -1,78 +1,184 @@
-import { z } from 'zod';
+// Dekoratör metadata'sı için polyfill. Bu modül `main.ts`in yanı sıra CLI
+// betiklerinden de (db:migrate, db:seed) yükleniyor; polyfill'i burada garanti
+// altına alıyoruz.
+import 'reflect-metadata';
+import { Expose, Transform, Type, plainToInstance } from 'class-transformer';
+import {
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Matches,
+  Max,
+  Min,
+  validateSync,
+} from 'class-validator';
 
 /**
  * Ortam değişkenleri — süreç açılışında doğrulanır.
  *
  * Kural: `process.env`e uygulama kodunun herhangi bir yerinden DOĞRUDAN
- * erişilmez. Tek giriş noktası burasıdır; böylece hem tipler güvenlidir hem de
- * eksik yapılandırma üretimde değil, açılışta fark edilir.
+ * erişilmez. Tek giriş noktası burasıdır; okuma `ConfigService` üzerinden
+ * yapılır. Böylece hem tipler güvenlidir hem de eksik yapılandırma üretimde
+ * değil, açılışta fark edilir.
  */
-const PostgresUrl = z
-  .string()
-  .regex(/^postgres(ql)?:\/\//, 'postgres:// veya postgresql:// ile başlamalı');
 
-const EnvSchema = z.object({
-  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  HOST: z.string().min(1).default('0.0.0.0'),
-  PORT: z.coerce.number().int().min(1).max(65535).default(3000),
-  LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
+const POSTGRES_URL = /^postgres(ql)?:\/\//;
+
+/** `'true'` / `'false'` metnini boolean'a çevirir; tanımsızsa dokunmaz. */
+function toBoolean() {
+  return Transform(({ value }: { value: unknown }) =>
+    value === undefined ? undefined : value === 'true' || value === true,
+  );
+}
+
+export class EnvironmentVariables {
+  @Expose()
+  @IsIn(['development', 'test', 'production'], {
+    message: 'development, test veya production olmalı',
+  })
+  NODE_ENV: 'development' | 'test' | 'production' = 'development';
+
+  @Expose()
+  @IsString()
+  @IsNotEmpty()
+  HOST: string = '0.0.0.0';
+
+  @Expose()
+  @Type(() => Number)
+  @IsInt({ message: 'geçerli bir port numarası olmalı' })
+  @Min(1)
+  @Max(65_535)
+  PORT: number = 3000;
+
+  @Expose()
+  @IsIn(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
+  LOG_LEVEL: string = 'info';
 
   /** SIGTERM sonrası in-flight isteklere tanınan süre; sonunda süreç zorla kapanır. */
-  SHUTDOWN_GRACE_MS: z.coerce.number().int().positive().default(10_000),
+  @Expose()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  SHUTDOWN_GRACE_MS: number = 10_000;
 
-  BODY_LIMIT_BYTES: z.coerce.number().int().positive().default(1_048_576),
+  @Expose()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  BODY_LIMIT_BYTES: number = 1_048_576;
 
-  RATE_LIMIT_MAX: z.coerce.number().int().positive().default(300),
-  RATE_LIMIT_WINDOW: z.string().min(1).default('1 minute'),
+  @Expose()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  RATE_LIMIT_MAX: number = 300;
+
+  /** Hız sınırı penceresi (ms). Fastify'ın `'1 minute'` metin biçimi değil. */
+  @Expose()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1_000)
+  RATE_LIMIT_WINDOW_MS: number = 60_000;
 
   /** Virgülle ayrılmış origin listesi. Boşsa tarayıcı kaynaklı çapraz istek kabul edilmez. */
-  CORS_ORIGINS: z.string().default(''),
+  @Expose()
+  @IsString()
+  CORS_ORIGINS: string = '';
 
   // --- Veritabanı ---
   /**
    * Uygulama bağlantısı. Bu rol NOBYPASSRLS olmalıdır; kiracı izolasyonunun
    * veritabanı seviyesinde zorlanması buna bağlıdır.
    */
-  DATABASE_URL: PostgresUrl,
+  @Expose()
+  @IsString({ message: 'zorunludur' })
+  @Matches(POSTGRES_URL, { message: 'postgres:// veya postgresql:// ile başlamalı' })
+  DATABASE_URL: string;
+
   /**
    * Migration bağlantısı (tabloların sahibi, RLS'i bypass eder).
    * Yalnız `db:migrate` için gerekir; API süreci bunu kullanmaz.
    */
-  DATABASE_MIGRATION_URL: PostgresUrl.optional(),
-  DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(200).default(20),
-  DATABASE_STATEMENT_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
+  @Expose()
+  @IsOptional()
+  @Matches(POSTGRES_URL, { message: 'postgres:// veya postgresql:// ile başlamalı' })
+  DATABASE_MIGRATION_URL?: string;
+
+  @Expose()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(200)
+  DATABASE_POOL_MAX: number = 20;
+
+  @Expose()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  DATABASE_STATEMENT_TIMEOUT_MS: number = 10_000;
 
   // --- Gözlemlenebilirlik ---
-  SERVICE_NAME: z.string().min(1).default('klinara-api'),
-  SERVICE_VERSION: z.string().min(1).default('0.0.0'),
+  @Expose()
+  @IsString()
+  @IsNotEmpty()
+  SERVICE_NAME: string = 'klinara-api';
+
+  @Expose()
+  @IsString()
+  @IsNotEmpty()
+  SERVICE_VERSION: string = '0.0.0';
+
   /** Tanımlıysa OpenTelemetry açılır; boşsa telemetri hiç kurulmaz. */
-  OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
+  @Expose()
+  @IsOptional()
+  @IsString()
+  OTEL_EXPORTER_OTLP_ENDPOINT?: string;
+
   /** Tanımlıysa Sentry açılır. */
-  SENTRY_DSN: z.string().optional(),
-  SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0.1),
+  @Expose()
+  @IsOptional()
+  @IsString()
+  SENTRY_DSN?: string;
+
+  @Expose()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(1)
+  SENTRY_TRACES_SAMPLE_RATE: number = 0.1;
+
   /**
    * `/metrics` ucunu koruyan bearer token. Üretimde ZORUNLU — aksi hâlde
-   * iç metrikler herkese açık olur (env doğrulamasında ayrıca kontrol edilir).
+   * iç metrikler herkese açık olur (aşağıdaki ortam bazlı kurallara bakın).
    */
-  METRICS_TOKEN: z.string().optional(),
+  @Expose()
+  @IsOptional()
+  @IsString()
+  METRICS_TOKEN?: string;
 
   // --- Geçici kimlik köprüsü (Faz 1'de kaldırılacak) ---
   /**
    * Platform yönetimi uçları (`/platform/*`) için bearer token.
    * Faz 1.2'de gerçek JWT kimliğine devredilecek.
    */
-  PLATFORM_ADMIN_TOKEN: z.string().optional(),
+  @Expose()
+  @IsOptional()
+  @IsString()
+  PLATFORM_ADMIN_TOKEN?: string;
+
   /**
    * Açıkken kiracı context'i `X-Tenant-Id` / `X-User-Id` başlıklarından okunur.
    * ÜRETİMDE YASAKTIR — env doğrulaması buna izin vermez.
    */
-  AUTH_DEV_MODE: z
-    .enum(['true', 'false'])
-    .default('false')
-    .transform((v) => v === 'true'),
-});
-
-export type Env = Readonly<z.infer<typeof EnvSchema>>;
+  @Expose()
+  @toBoolean()
+  @IsBoolean()
+  AUTH_DEV_MODE: boolean = false;
+}
 
 export class EnvValidationError extends Error {
   constructor(public readonly issues: string[]) {
@@ -81,51 +187,55 @@ export class EnvValidationError extends Error {
   }
 }
 
-export function parseEnv(source: NodeJS.ProcessEnv = process.env): Env {
-  const result = EnvSchema.safeParse(source);
-  if (!result.success) {
-    const issues = result.error.issues.map((issue) => {
-      const key = issue.path.join('.') || '(kök)';
-      return `${key}: ${issue.message}`;
-    });
-    throw new EnvValidationError(issues);
-  }
+/** Şema ile ifade edilemeyen, ortama bağlı kurallar. */
+function crossFieldIssues(env: EnvironmentVariables): string[] {
+  const issues: string[] = [];
+  if (env.NODE_ENV !== 'production') return issues;
 
-  // Şema ile ifade edilemeyen, ortama bağlı kurallar.
-  const crossFieldIssues: string[] = [];
-  if (result.data.NODE_ENV === 'production') {
-    if (result.data.METRICS_TOKEN === undefined || result.data.METRICS_TOKEN.length < 16) {
-      crossFieldIssues.push(
-        'METRICS_TOKEN: üretimde zorunlu ve en az 16 karakter olmalı (/metrics ucu korunmalı)',
-      );
-    }
-    if (result.data.CORS_ORIGINS.trim() === '') {
-      crossFieldIssues.push('CORS_ORIGINS: üretimde açıkça tanımlanmalı');
-    }
-    if (result.data.AUTH_DEV_MODE) {
-      crossFieldIssues.push(
-        'AUTH_DEV_MODE: üretimde açık olamaz — kimlik doğrulamasını başlıkla atlatır',
-      );
-    }
-    if (result.data.PLATFORM_ADMIN_TOKEN !== undefined && result.data.PLATFORM_ADMIN_TOKEN.length < 32) {
-      crossFieldIssues.push('PLATFORM_ADMIN_TOKEN: üretimde en az 32 karakter olmalı');
-    }
+  if (env.METRICS_TOKEN === undefined || env.METRICS_TOKEN.length < 16) {
+    issues.push(
+      'METRICS_TOKEN: üretimde zorunlu ve en az 16 karakter olmalı (/metrics ucu korunmalı)',
+    );
   }
-  if (crossFieldIssues.length > 0) throw new EnvValidationError(crossFieldIssues);
-
-  return Object.freeze(result.data);
+  if (env.CORS_ORIGINS.trim() === '') {
+    issues.push('CORS_ORIGINS: üretimde açıkça tanımlanmalı');
+  }
+  if (env.AUTH_DEV_MODE) {
+    issues.push('AUTH_DEV_MODE: üretimde açık olamaz — kimlik doğrulamasını başlıkla atlatır');
+  }
+  if (env.PLATFORM_ADMIN_TOKEN !== undefined && env.PLATFORM_ADMIN_TOKEN.length < 32) {
+    issues.push('PLATFORM_ADMIN_TOKEN: üretimde en az 32 karakter olmalı');
+  }
+  return issues;
 }
 
-export function corsOrigins(env: Env): string[] {
+/**
+ * `ConfigModule.forRoot({ validate })` bunu çağırır; dönen nesne
+ * `ConfigService`in tek gerçek kaynağıdır (ham `process.env` değil).
+ *
+ * Bilinmeyen anahtarlar KASITLI olarak elenir (`excludeExtraneousValues`):
+ * yapılandırmaya yalnızca burada tanımlanmış değişkenler girer.
+ */
+export function validateEnv(source: Record<string, unknown> = process.env): EnvironmentVariables {
+  const env = plainToInstance(EnvironmentVariables, source, {
+    excludeExtraneousValues: true,
+    exposeDefaultValues: true,
+  });
+
+  const errors = validateSync(env, { skipMissingProperties: false, whitelist: false });
+  const issues = errors.flatMap((error) =>
+    Object.values(error.constraints ?? {}).map((message) => `${error.property}: ${message}`),
+  );
+  if (issues.length > 0) throw new EnvValidationError(issues);
+
+  const crossIssues = crossFieldIssues(env);
+  if (crossIssues.length > 0) throw new EnvValidationError(crossIssues);
+
+  return Object.freeze(env);
+}
+
+export function corsOrigins(env: Pick<EnvironmentVariables, 'CORS_ORIGINS'>): string[] {
   return env.CORS_ORIGINS.split(',')
-    .map((o) => o.trim())
-    .filter((o) => o.length > 0);
-}
-
-let cached: Env | undefined;
-
-/** Süreç genelinde tek kez doğrulanan env. Testler `parseEnv` kullanmalıdır. */
-export function getEnv(): Env {
-  cached ??= parseEnv();
-  return cached;
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
 }

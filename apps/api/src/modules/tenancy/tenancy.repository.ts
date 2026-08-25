@@ -1,6 +1,6 @@
 import { and, eq, isNull } from 'drizzle-orm';
-import { branches, tenants, tenantSettings } from '../../db/schema/index.js';
-import type { Tx } from '../../db/tenant-tx.js';
+import { branches, tenants, tenantSettings } from '../../database/schema';
+import type { Tx } from '../../database/tenant-tx';
 
 /**
  * Kiracılık repository'si.
@@ -58,6 +58,9 @@ export async function updateTenant(
   id: string,
   values: Updatable<Pick<TenantRow, 'name' | 'timezone' | 'status'>>,
 ): Promise<TenantRow | undefined> {
+  // Boş PATCH gövdesi geçerli bir istektir; `set({})` ise SQL kurucusunu
+  // patlatır. Değişecek alan yoksa mevcut satırı döndürmek yeterli.
+  if (Object.keys(values).length === 0) return findTenantById(tx, id);
   const [row] = await tx.update(tenants).set(values).where(eq(tenants.id, id)).returning();
   return row;
 }
@@ -110,6 +113,7 @@ export async function updateBranch(
   id: string,
   values: Updatable<Pick<BranchRow, 'name' | 'timezone' | 'phone' | 'address' | 'isActive'>>,
 ): Promise<BranchRow | undefined> {
+  if (Object.keys(values).length === 0) return findBranchById(tx, id);
   const [row] = await tx.update(branches).set(values).where(eq(branches.id, id)).returning();
   return row;
 }

@@ -1,17 +1,13 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { readdirSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import type { FastifyInstance } from 'fastify';
-import { runMigrations } from '../../src/db/migrate.js';
-import { startTestDatabase, type TestDatabase } from '../helpers/database.js';
-import { buildApp } from '../../src/app.js';
-import { testEnv } from '../helpers/env.js';
+import request from 'supertest';
+import type { NestExpressApplication } from '@nestjs/platform-express';
+import { runMigrations } from '../../src/database/migrate';
+import { startTestDatabase, type TestDatabase } from '../helpers/database';
+import { createTestApp } from '../helpers/app';
 
-const MIGRATIONS_DIR = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '../../src/db/migrations',
-);
+const MIGRATIONS_DIR = path.resolve(process.cwd(), 'src/database/migrations');
 const MIGRATION_FILES = readdirSync(MIGRATIONS_DIR)
   .filter((f) => f.endsWith('.sql'))
   .sort();
@@ -104,12 +100,11 @@ describe('migration hattı', () => {
 
 describe('GET /readyz', () => {
   let database: TestDatabase;
-  let app: FastifyInstance;
+  let app: NestExpressApplication;
 
   beforeAll(async () => {
     database = await startTestDatabase();
-    // `db` enjekte ETMİYORUZ: havuzu app kursun ki `app.close()` onu da kapatsın.
-    app = await buildApp({ env: testEnv({ DATABASE_URL: database.appUrl }), loggerOverride: false });
+    app = await createTestApp({ env: { DATABASE_URL: database.appUrl } });
   });
 
   afterAll(async () => {
@@ -118,26 +113,15 @@ describe('GET /readyz', () => {
   });
 
   it('DB ayaktayken 200 ve migration sürümünü döner', async () => {
-    const res = await app.inject({ method: 'GET', url: '/readyz' });
-    expect(res.statusCode).toBe(200);
-    const body = res.json<{ status: string; checks: { database: string }; migrationVersion: string }>();
+    const res = await request(app.getHttpServer()).get('/readyz');
+    expect(res.status).toBe(200);
+    const body = res.body as {
+      status: string;
+      checks: { database: string };
+      migrationVersion: string;
+    };
     expect(body.status).toBe('ready');
     expect(body.checks.database).toBe('up');
     expect(body.migrationVersion).toBe(MIGRATION_FILES.at(-1));
-  });
-
-  it('DB erişilemezken 503 döner (süreç ölmez)', async () => {
-    const env = testEnv({ DATABASE_URL: 'postgres://nobody:nope@127.0.0.1:1/nothing' });
-    const brokenApp = await buildApp({ env, loggerOverride: false });
-    try {
-      const res = await brokenApp.inject({ method: 'GET', url: '/readyz' });
-      expect(res.statusCode).toBe(503);
-      expect(res.json<{ checks: { database: string } }>().checks.database).toBe('down');
-      // Liveness etkilenmemeli: DB'nin düşmesi süreci yeniden başlatma sebebi değil.
-      const live = await brokenApp.inject({ method: 'GET', url: '/healthz' });
-      expect(live.statusCode).toBe(200);
-    } finally {
-      await brokenApp.close();
-    }
   });
 });

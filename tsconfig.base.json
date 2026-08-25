@@ -3,18 +3,25 @@
   "compilerOptions": {
     "target": "ES2023",
     "lib": ["ES2023"],
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "commonjs",
+    "moduleResolution": "node",
     "types": ["node"],
 
+    // NestJS'in bağımlılık enjeksiyonu `design:paramtypes` metadata'sına dayanır;
+    // ikisi de açık olmadan DI çalışmaz.
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+
     "strict": true,
+    // DTO ve entity alanları dekoratörlerle doldurulur, constructor'da atanmaz.
+    // NestJS'in standart yapılandırması bu kontrolü kapatır.
+    "strictPropertyInitialization": false,
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "exactOptionalPropertyTypes": true,
-    "verbatimModuleSyntax": true,
 
     "declaration": true,
     "declarationMap": true,
@@ -23,6 +30,8 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
+    // SWC/esbuild dosya-bazlı derleme yapar; bu bayrak o modelde bozulacak
+    // yazımları (tip re-export gibi) derleme anında yakalar.
     "isolatedModules": true
   }
 }

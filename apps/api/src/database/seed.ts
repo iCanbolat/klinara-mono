@@ -1,5 +1,5 @@
 import pg from 'pg';
-import { getEnv } from '../config/env.js';
+import { loadEnvOrExit } from '../config/load-env';
 
 /**
  * Geliştirme ortamı hazırlığı.
@@ -11,7 +11,7 @@ import { getEnv } from '../config/env.js';
  * Üretimde çalıştırılamaz.
  */
 async function seed(): Promise<void> {
-  const env = getEnv();
+  const env = loadEnvOrExit();
 
   if (env.NODE_ENV === 'production') {
     process.stderr.write('[seed] Üretim ortamında seed çalıştırılamaz.\n');
@@ -25,7 +25,10 @@ async function seed(): Promise<void> {
     process.exit(1);
   }
 
-  const client = new pg.Client({ connectionString: migrationUrl, application_name: 'klinara-seed' });
+  const client = new pg.Client({
+    connectionString: migrationUrl,
+    application_name: 'klinara-seed',
+  });
   await client.connect();
 
   try {
@@ -61,7 +64,7 @@ async function seed(): Promise<void> {
   }
 }
 
-await seed().catch((error: unknown) => {
+seed().catch((error: unknown) => {
   process.stderr.write(`[seed] BAŞARISIZ\n${String(error)}\n`);
   process.exit(1);
 });

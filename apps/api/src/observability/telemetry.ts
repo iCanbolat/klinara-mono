@@ -2,24 +2,21 @@ import { NodeSDK } from '@opentelemetry/sdk-node';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { resourceFromAttributes } from '@opentelemetry/resources';
-import {
-  ATTR_SERVICE_NAME,
-  ATTR_SERVICE_VERSION,
-} from '@opentelemetry/semantic-conventions';
+import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
 import * as Sentry from '@sentry/node';
-import type { Env } from './config/env.js';
+import type { EnvironmentVariables } from '../config/env.validation';
 
 let sdk: NodeSDK | undefined;
 
 /**
- * Telemetriyi başlatır. `server.ts`te İLK import olmalıdır — OpenTelemetry
+ * Telemetriyi başlatır. `main.ts`te İLK import olmalıdır — OpenTelemetry
  * modülleri yüklenirken yamalar (pg, http, fastify), dolayısıyla enstrümante
  * edeceği modüller ondan SONRA import edilmelidir.
  *
  * Her ikisi de opt-in: ilgili env değişkeni yoksa hiç kurulmaz. Böylece yerel
  * geliştirme ve testler ek altyapı gerektirmez.
  */
-export function initTelemetry(env: Env): void {
+export function initTelemetry(env: EnvironmentVariables): void {
   if (env.OTEL_EXPORTER_OTLP_ENDPOINT !== undefined) {
     sdk = new NodeSDK({
       resource: resourceFromAttributes({

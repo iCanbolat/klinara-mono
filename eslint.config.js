@@ -14,10 +14,13 @@ export default tseslint.config(
       },
     },
     rules: {
-      '@typescript-eslint/consistent-type-imports': 'error',
+      // NestJS'in DI'ı `emitDecoratorMetadata` ile üretilen tip bilgisine dayanır.
+      // `import type` ile alınan bir sınıf metadata'ya YAZILMAZ ve enjeksiyon
+      // "Nest can't resolve dependencies" ile patlar; bu yüzden bu kural kapalı.
+      '@typescript-eslint/consistent-type-imports': 'off',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
-      // Fastify'da `async` handler/plugin imzası sözleşmenin parçasıdır; içinde
-      // `await` olmaması bir hata değildir.
+      // NestJS'te `async` controller/handler imzası sözleşmenin parçasıdır;
+      // içinde `await` olmaması bir hata değildir.
       '@typescript-eslint/require-await': 'off',
       'no-restricted-properties': [
         'error',
@@ -38,16 +41,16 @@ export default tseslint.config(
     // üzerinden koşan bir sorgu ya RLS yüzünden boş küme görür ya da — çok daha
     // kötüsü — havuzdan gelen bağlantıda başka bir kiracının context'iyle
     // çalışır. Kuralı yoruma bırakmıyoruz, lint'e bağlıyoruz.
-    files: ['**/src/modules/**/repository.ts'],
+    files: ['**/src/modules/**/*.repository.ts'],
     rules: {
       'no-restricted-imports': [
         'error',
         {
           patterns: [
             {
-              group: ['**/db/client.js', '**/db/client'],
+              group: ['**/database/database.constants', '**/database/database.module'],
               message:
-                'Repository global `db` handle\'ını kullanamaz. Fonksiyon imzasına `tx: Tx` ekleyin ve çağıranı `app.tenantTx(...)` içine alın.',
+                "Repository global `db` handle'ını kullanamaz. Fonksiyon imzasına `tx: Tx` ekleyin ve çağıranı `TenantTxService.run(...)` içine alın.",
             },
           ],
         },
@@ -61,7 +64,13 @@ export default tseslint.config(
   },
   {
     // env.ts, testler ve yapılandırma dosyaları process.env'i okumak zorunda.
-    files: ['**/src/config/env.ts', '**/test/**/*.ts', '**/*.config.ts', 'eslint.config.js'],
+    files: [
+      '**/src/config/*.ts',
+      '**/src/main.ts',
+      '**/test/**/*.ts',
+      '**/*.config.ts',
+      'eslint.config.js',
+    ],
     rules: { 'no-restricted-properties': 'off' },
   },
   prettier,

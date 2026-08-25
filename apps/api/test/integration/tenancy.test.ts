@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import type { FastifyInstance } from 'fastify';
+import request from 'supertest';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { sql } from 'drizzle-orm';
-import { buildApp } from '../../src/app.js';
-import { testEnv } from '../helpers/env.js';
-import { startTestDatabase, type TestDatabase } from '../helpers/database.js';
-import { createDb, type DbHandle } from '../../src/db/client.js';
-import { withTenantTx } from '../../src/db/tenant-tx.js';
+import pg from 'pg';
+import { createTestApp } from '../helpers/app';
+import { startTestDatabase, type TestDatabase } from '../helpers/database';
+import { DRIZZLE, PG_POOL, type Database } from '../../src/database/database.constants';
+import { withTenantTx } from '../../src/database/tenant-tx';
 
 const PLATFORM_TOKEN = 'platform-admin-test-tokeni-32-karakterden-uzun';
 
@@ -29,40 +30,36 @@ interface Problem {
 
 describe('kiracılık ve RLS', () => {
   let database: TestDatabase;
-  let app: FastifyInstance;
-  let dbHandle: DbHandle;
+  let app: NestExpressApplication;
+  let pool: pg.Pool;
+  let db: Database;
 
-  const platformHeaders = { authorization: `Bearer ${PLATFORM_TOKEN}` };
+  const http = () => request(app.getHttpServer());
 
   async function createTenant(slug: string, name: string) {
-    const res = await app.inject({
-      method: 'POST',
-      url: '/api/v1/platform/tenants',
-      headers: platformHeaders,
-      payload: {
-        slug,
-        name,
-        branch: { slug: 'merkez', name: 'Merkez Şube' },
-      },
-    });
-    expect(res.statusCode).toBe(201);
-    return res.json<{ tenant: TenantBody; branch: BranchBody }>();
+    const res = await http()
+      .post('/api/v1/platform/tenants')
+      .set('authorization', `Bearer ${PLATFORM_TOKEN}`)
+      .send({ slug, name, branch: { slug: 'merkez', name: 'Merkez Şube' } });
+    expect(res.status, JSON.stringify(res.body)).toBe(201);
+    return res.body as { tenant: TenantBody; branch: BranchBody };
   }
 
   beforeAll(async () => {
     database = await startTestDatabase();
-    const env = testEnv({
-      DATABASE_URL: database.appUrl,
-      AUTH_DEV_MODE: 'true',
-      PLATFORM_ADMIN_TOKEN: PLATFORM_TOKEN,
+    app = await createTestApp({
+      env: {
+        DATABASE_URL: database.appUrl,
+        AUTH_DEV_MODE: 'true',
+        PLATFORM_ADMIN_TOKEN: PLATFORM_TOKEN,
+      },
     });
-    dbHandle = createDb(env);
-    app = await buildApp({ env, loggerOverride: false, db: dbHandle });
+    pool = app.get<pg.Pool>(PG_POOL);
+    db = app.get<Database>(DRIZZLE);
   });
 
   afterAll(async () => {
     await app.close();
-    await dbHandle.close();
     await database.stop();
   });
 
@@ -80,136 +77,118 @@ describe('kiracılık ve RLS', () => {
       expect(tenant.timezone).toBe('Europe/Istanbul');
       expect(branch.tenantId).toBe(tenant.id);
 
-      const settings = await app.inject({
-        method: 'GET',
-        url: '/api/v1/tenant/settings',
-        headers: { 'x-tenant-id': tenant.id },
-      });
-      expect(settings.statusCode).toBe(200);
-      expect(settings.json<{ reminderHoursBefore: number[] }>().reminderHoursBefore).toEqual([
+      const settings = await http().get('/api/v1/tenant/settings').set('x-tenant-id', tenant.id);
+      expect(settings.status).toBe(200);
+      expect((settings.body as { reminderHoursBefore: number[] }).reminderHoursBefore).toEqual([
         24, 2,
       ]);
     });
 
     it('platform token olmadan kiracı oluşturulamaz', async () => {
-      const res = await app.inject({
-        method: 'POST',
-        url: '/api/v1/platform/tenants',
-        payload: { slug: 'izinsiz', name: 'İzinsiz', branch: { slug: 'merkez', name: 'Merkez' } },
-      });
-      expect(res.statusCode).toBe(403);
-      expect(res.json<Problem>().code).toBe('FORBIDDEN');
+      const res = await http()
+        .post('/api/v1/platform/tenants')
+        .send({ slug: 'izinsiz', name: 'İzinsiz', branch: { slug: 'merkez', name: 'Merkez' } });
+      expect(res.status).toBe(403);
+      expect((res.body as Problem).code).toBe('FORBIDDEN');
+    });
+
+    it('yetki kontrolü GÖVDE DOĞRULAMASINDAN ÖNCE koşar (şema sızmaz)', async () => {
+      // Gövde tamamen geçersiz; yine de 400 değil 403 dönmeli, aksi hâlde
+      // yetkisiz çağıran alan adlarını hata mesajlarından öğrenirdi.
+      const res = await http().post('/api/v1/platform/tenants').send({ tamamen: 'gecersiz' });
+      expect(res.status).toBe(403);
+      expect(res.text).not.toContain('slug');
     });
 
     it('aynı slug ikinci kez alınamaz', async () => {
       await createTenant('ayni-slug', 'Birinci');
-      const res = await app.inject({
-        method: 'POST',
-        url: '/api/v1/platform/tenants',
-        headers: platformHeaders,
-        payload: { slug: 'ayni-slug', name: 'İkinci', branch: { slug: 'merkez', name: 'Merkez' } },
-      });
-      expect(res.statusCode).toBe(409);
-      expect(res.json<Problem>().code).toBe('CONFLICT');
+      const res = await http()
+        .post('/api/v1/platform/tenants')
+        .set('authorization', `Bearer ${PLATFORM_TOKEN}`)
+        .send({ slug: 'ayni-slug', name: 'İkinci', branch: { slug: 'merkez', name: 'Merkez' } });
+      expect(res.status).toBe(409);
+      expect((res.body as Problem).code).toBe('CONFLICT');
     });
 
     it('rezerve edilmiş slug reddedilir', async () => {
-      const res = await app.inject({
-        method: 'POST',
-        url: '/api/v1/platform/tenants',
-        headers: platformHeaders,
-        payload: { slug: 'admin', name: 'Admin', branch: { slug: 'merkez', name: 'Merkez' } },
-      });
+      const res = await http()
+        .post('/api/v1/platform/tenants')
+        .set('authorization', `Bearer ${PLATFORM_TOKEN}`)
+        .send({ slug: 'admin', name: 'Admin', branch: { slug: 'merkez', name: 'Merkez' } });
       // DB check constraint'i ihlal edilir → 500 değil, anlamlı bir hata beklenir.
-      expect(res.statusCode).toBeGreaterThanOrEqual(400);
-      expect(res.statusCode).toBeLessThan(600);
+      expect(res.status).toBeGreaterThanOrEqual(400);
+      expect(res.status).toBeLessThan(600);
     });
 
     it('geçersiz saat dilimi reddedilir', async () => {
-      const res = await app.inject({
-        method: 'POST',
-        url: '/api/v1/platform/tenants',
-        headers: platformHeaders,
-        payload: {
+      const res = await http()
+        .post('/api/v1/platform/tenants')
+        .set('authorization', `Bearer ${PLATFORM_TOKEN}`)
+        .send({
           slug: 'tz-testi',
           name: 'TZ',
           timezone: 'Mars/Olympus',
           branch: { slug: 'merkez', name: 'Merkez' },
-        },
-      });
-      expect(res.statusCode).toBe(400);
-      expect(res.json<Problem>().code).toBe('VALIDATION_FAILED');
+        });
+      expect(res.status).toBe(400);
+      expect((res.body as Problem).code).toBe('VALIDATION_FAILED');
     });
   });
 
   // -------------------------------------------------------------------------
-  describe('kiracı izolasyonu (FAZ 0\'IN EN ÖNEMLİ TESTİ)', () => {
+  describe("kiracı izolasyonu (FAZ 0'IN EN ÖNEMLİ TESTİ)", () => {
     it('bir kiracı diğerinin şubelerini GÖREMEZ', async () => {
       const a = await createTenant('klinik-a', 'Klinik A');
       const b = await createTenant('klinik-b', 'Klinik B');
 
-      await app.inject({
-        method: 'POST',
-        url: '/api/v1/branches',
-        headers: { 'x-tenant-id': a.tenant.id },
-        payload: { slug: 'kadikoy', name: 'Kadıköy' },
-      });
+      await http()
+        .post('/api/v1/branches')
+        .set('x-tenant-id', a.tenant.id)
+        .send({ slug: 'kadikoy', name: 'Kadıköy' });
 
-      const listA = await app.inject({
-        method: 'GET',
-        url: '/api/v1/branches',
-        headers: { 'x-tenant-id': a.tenant.id },
-      });
-      const listB = await app.inject({
-        method: 'GET',
-        url: '/api/v1/branches',
-        headers: { 'x-tenant-id': b.tenant.id },
-      });
+      const listA = await http().get('/api/v1/branches').set('x-tenant-id', a.tenant.id);
+      const listB = await http().get('/api/v1/branches').set('x-tenant-id', b.tenant.id);
 
-      expect(listA.json<{ data: BranchBody[] }>().data).toHaveLength(2);
-      expect(listB.json<{ data: BranchBody[] }>().data).toHaveLength(1);
-      expect(
-        listB.json<{ data: BranchBody[] }>().data.map((x) => x.slug),
-      ).not.toContain('kadikoy');
+      expect((listA.body as { data: BranchBody[] }).data).toHaveLength(2);
+      expect((listB.body as { data: BranchBody[] }).data).toHaveLength(1);
+      expect((listB.body as { data: BranchBody[] }).data.map((x) => x.slug)).not.toContain(
+        'kadikoy',
+      );
     });
 
     it('bir kiracı diğerinin şubesini GÜNCELLEYEMEZ (varlığını bile sızdırmaz)', async () => {
       const a = await createTenant('klinik-c', 'Klinik C');
       const b = await createTenant('klinik-d', 'Klinik D');
 
-      const res = await app.inject({
-        method: 'PATCH',
-        url: `/api/v1/branches/${a.branch.id}`,
-        headers: { 'x-tenant-id': b.tenant.id },
-        payload: { name: 'ELE GEÇİRİLDİ' },
-      });
-      expect(res.statusCode).toBe(404);
+      const res = await http()
+        .patch(`/api/v1/branches/${a.branch.id}`)
+        .set('x-tenant-id', b.tenant.id)
+        .send({ name: 'ELE GEÇİRİLDİ' });
+      expect(res.status).toBe(404);
 
       // A'nın şubesi değişmemiş olmalı.
-      const check = await app.inject({
-        method: 'GET',
-        url: '/api/v1/branches',
-        headers: { 'x-tenant-id': a.tenant.id },
-      });
-      expect(check.json<{ data: BranchBody[] }>().data[0]?.name).toBe('Merkez Şube');
+      const check = await http().get('/api/v1/branches').set('x-tenant-id', a.tenant.id);
+      expect((check.body as { data: BranchBody[] }).data[0]?.name).toBe('Merkez Şube');
     });
 
     it('bir kiracı diğerinin kiracı kaydını okuyamaz', async () => {
       const a = await createTenant('klinik-e', 'Klinik E');
       await createTenant('klinik-f', 'Klinik F');
 
-      const res = await app.inject({
-        method: 'GET',
-        url: '/api/v1/tenant',
-        headers: { 'x-tenant-id': a.tenant.id },
-      });
-      expect(res.json<TenantBody>().slug).toBe('klinik-e');
+      const res = await http().get('/api/v1/tenant').set('x-tenant-id', a.tenant.id);
+      expect((res.body as TenantBody).slug).toBe('klinik-e');
     });
 
-    it('kiracı context\'i olmadan kiracı kapsamlı uç 401 döner', async () => {
-      const res = await app.inject({ method: 'GET', url: '/api/v1/branches' });
-      expect(res.statusCode).toBe(401);
-      expect(res.json<Problem>().code).toBe('TENANT_CONTEXT_MISSING');
+    it("kiracı context'i olmadan kiracı kapsamlı uç 401 döner", async () => {
+      const res = await http().get('/api/v1/branches');
+      expect(res.status).toBe(401);
+      expect((res.body as Problem).code).toBe('TENANT_CONTEXT_MISSING');
+    });
+
+    it('geçersiz x-tenant-id başlığı 400 ile reddedilir', async () => {
+      const res = await http().get('/api/v1/branches').set('x-tenant-id', 'uuid-degil');
+      expect(res.status).toBe(400);
+      expect((res.body as Problem).code).toBe('VALIDATION_FAILED');
     });
 
     it('RLS her kiracı tablosunda enable VE force olarak açıktır', async () => {
@@ -242,13 +221,9 @@ describe('kiracılık ve RLS', () => {
       // kapsamlı olmasaydı buradaki sonuçlar birbirine karışırdı.
       for (let i = 0; i < 12; i += 1) {
         const target = i % 2 === 0 ? a : b;
-        const res = await app.inject({
-          method: 'GET',
-          url: '/api/v1/tenant',
-          headers: { 'x-tenant-id': target.tenant.id },
-        });
-        expect(res.statusCode).toBe(200);
-        expect(res.json<TenantBody>().slug).toBe(target.tenant.slug);
+        const res = await http().get('/api/v1/tenant').set('x-tenant-id', target.tenant.id);
+        expect(res.status).toBe(200);
+        expect((res.body as TenantBody).slug).toBe(target.tenant.slug);
       }
     });
 
@@ -256,7 +231,7 @@ describe('kiracılık ve RLS', () => {
       const a = await createTenant('temizlik-a', 'Temizlik A');
 
       await withTenantTx(
-        dbHandle.db,
+        db,
         {
           tenantId: a.tenant.id,
           userId: null,
@@ -272,16 +247,14 @@ describe('kiracılık ve RLS', () => {
 
       // Aynı havuz, context YOK: RLS hiçbir satır döndürmemeli ve HATA da
       // fırlatmamalı (nullif sayesinde — bkz. 0002_helpers.sql).
-      const after = await dbHandle.pool.query<{ n: number }>(
-        'select count(*)::int as n from branches',
-      );
+      const after = await pool.query<{ n: number }>('select count(*)::int as n from branches');
       expect(after.rows[0]?.n).toBe(0);
     });
   });
 
   // -------------------------------------------------------------------------
   describe('denetim kaydı (audit log)', () => {
-    it('kiracı ve şube yazımları audit_log\'a düşer', async () => {
+    it("kiracı ve şube yazımları audit_log'a düşer", async () => {
       const a = await createTenant('denetim-a', 'Denetim A');
 
       const { rows } = await database.ownerPool.query<{
@@ -299,23 +272,19 @@ describe('kiracılık ve RLS', () => {
       expect(branchInsert?.tenant_id).toBe(a.tenant.id);
     });
 
-    it('actor_user_id ve request_id context\'ten doğru yazılır', async () => {
+    it("actor_user_id ve request_id context'ten doğru yazılır", async () => {
       const a = await createTenant('denetim-b', 'Denetim B');
-      // Gerçek bir RFC 9562 v4 UUID. Not: '1111...-4444-...' gibi uydurma diziler
-      // zod tarafından REDDEDİLİR — variant biti geçersizdir.
+      // Gerçek bir RFC 9562 v4 UUID. Not: '1111...-4444-...' gibi uydurma
+      // diziler doğrulamadan GEÇMEZ — variant biti geçersizdir.
       const actorId = '3f2504e0-4f89-41d3-9a0c-0305e82c3301';
 
-      const patch = await app.inject({
-        method: 'PATCH',
-        url: '/api/v1/tenant',
-        headers: {
-          'x-tenant-id': a.tenant.id,
-          'x-user-id': actorId,
-          'x-request-id': 'denetim-istegi-999',
-        },
-        payload: { name: 'Yeni Ad' },
-      });
-      expect(patch.statusCode).toBe(200);
+      const patch = await http()
+        .patch('/api/v1/tenant')
+        .set('x-tenant-id', a.tenant.id)
+        .set('x-user-id', actorId)
+        .set('x-request-id', 'denetim-istegi-999')
+        .send({ name: 'Yeni Ad' });
+      expect(patch.status).toBe(200);
 
       const { rows } = await database.ownerPool.query<{
         actor_user_id: string | null;
@@ -341,7 +310,7 @@ describe('kiracılık ve RLS', () => {
       );
     });
 
-    it('denetim trigger\'ı superuser OLMAYAN sahiple de yazabilmeli', async () => {
+    it("denetim trigger'ı superuser OLMAYAN sahiple de yazabilmeli", async () => {
       // Bu test gerçek bir üretim hatasını yakalamak için var.
       //
       // Test ortamında tabloların sahibi genelde SUPERUSER'dır ve superuser
@@ -375,22 +344,18 @@ describe('kiracılık ve RLS', () => {
           'select count(*)::int as n from audit_log',
         );
 
-        const res = await app.inject({
-          method: 'PATCH',
-          url: '/api/v1/tenant',
-          headers: { 'x-tenant-id': a.tenant.id },
-          payload: { name: 'Superuser Olmayan Sahip Testi' },
-        });
-        expect(res.statusCode, 'denetim yazımı işlemi bloke etmemeli').toBe(200);
+        const res = await http()
+          .patch('/api/v1/tenant')
+          .set('x-tenant-id', a.tenant.id)
+          .send({ name: 'Superuser Olmayan Sahip Testi' });
+        expect(res.status, 'denetim yazımı işlemi bloke etmemeli').toBe(200);
 
         const after = await database.ownerPool.query<{ n: number }>(
           'select count(*)::int as n from audit_log',
         );
         expect(after.rows[0]?.n).toBeGreaterThan(before.rows[0]?.n ?? 0);
       } finally {
-        await database.ownerPool.query(
-          'alter function audit_row_change() owner to klinara_owner',
-        );
+        await database.ownerPool.query('alter function audit_row_change() owner to klinara_owner');
       }
     });
 
@@ -399,7 +364,7 @@ describe('kiracılık ve RLS', () => {
       const b = await createTenant('denetim-e', 'Denetim E');
 
       const readAs = async (tenantId: string) => {
-        const client = await dbHandle.pool.connect();
+        const client = await pool.connect();
         try {
           await client.query('begin');
           await client.query(`select set_config('app.tenant_id', $1, true)`, [tenantId]);

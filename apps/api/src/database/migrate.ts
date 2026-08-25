@@ -1,10 +1,9 @@
 import { createHash } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 
-const MIGRATIONS_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'migrations');
+const MIGRATIONS_DIR = path.join(__dirname, 'migrations');
 
 /** Eş zamanlı deploy'ların aynı anda migrate etmesini engelleyen kilit anahtarı. */
 const ADVISORY_LOCK_KEY = 4_812_007;
@@ -114,32 +113,4 @@ export async function currentMigrationVersion(client: pg.Pool | pg.Client): Prom
     'select name from _klinara_migrations order by name desc limit 1',
   );
   return rows[0]?.name ?? null;
-}
-
-/** CLI: `pnpm db:migrate` */
-async function cli(): Promise<void> {
-  const { getEnv } = await import('../config/env.js');
-  const env = getEnv();
-  const url = env.DATABASE_MIGRATION_URL ?? env.DATABASE_URL;
-
-  if (env.DATABASE_MIGRATION_URL === undefined) {
-    process.stderr.write(
-      '[migrate] UYARI: DATABASE_MIGRATION_URL tanımlı değil, DATABASE_URL kullanılıyor.\n' +
-        '          Üretimde migration ayrı bir sahip rolüyle koşmalıdır.\n',
-    );
-  }
-
-  const result = await runMigrations(url);
-  for (const name of result.applied) process.stdout.write(`[migrate] uygulandı: ${name}\n`);
-  process.stdout.write(
-    `[migrate] tamamlandı — ${result.applied.length} uygulandı, ${result.skipped.length} zaten mevcut\n`,
-  );
-}
-
-// Doğrudan çalıştırıldığında CLI olarak davran (import edildiğinde değil).
-if (process.argv[1] !== undefined && import.meta.url.endsWith(path.basename(process.argv[1]))) {
-  cli().catch((error: unknown) => {
-    process.stderr.write(`[migrate] BAŞARISIZ\n${String(error)}\n`);
-    process.exit(1);
-  });
 }

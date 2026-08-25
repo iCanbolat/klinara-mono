@@ -1,1 +1,1 @@
-export * from './tenancy.js';
+export * from './tenancy';

@@ -1,6 +1,6 @@
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import pg from 'pg';
-import { runMigrations } from '../../src/db/migrate.js';
+import { runMigrations } from '../../src/database/migrate';
 
 export interface TestDatabase {
   /** Tablo sahibi rol — migration'lar ve fixture kurulumu için (RLS'i bypass eder). */
