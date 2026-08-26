@@ -2,3 +2,6 @@ export * from './tenancy';
 export * from './identity';
 export * from './auth';
 export * from './credentials';
+export * from './catalog';
+export * from './staff';
+export * from './scheduling';

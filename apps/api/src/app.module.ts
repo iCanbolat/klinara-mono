@@ -14,6 +14,9 @@ import { MailModule } from './lib/mail/mail.module';
 import { SmsModule } from './lib/sms/sms.module';
 import { HealthModule } from './modules/health/health.module';
 import { IdentityModule } from './modules/identity/identity.module';
+import { CatalogModule } from './modules/catalog/catalog.module';
+import { SchedulingModule } from './modules/scheduling/scheduling.module';
+import { StaffModule } from './modules/staff/staff.module';
 import { TenancyModule } from './modules/tenancy/tenancy.module';
 import { LoggingModule } from './observability/logging.module';
 import { MetricsModule } from './observability/metrics.module';
@@ -52,6 +55,9 @@ import { MetricsModule } from './observability/metrics.module';
     MailModule,
     HealthModule,
     IdentityModule,
+    CatalogModule,
+    StaffModule,
+    SchedulingModule,
     TenancyModule,
   ],
   providers: [

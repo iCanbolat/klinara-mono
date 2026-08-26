@@ -31,6 +31,11 @@ export const PERMISSIONS = {
   // --- Katalog ve kaynaklar ---
   SERVICE_READ: 'service:read',
   SERVICE_WRITE: 'service:write',
+  STAFF_READ: 'staff:read',
+  STAFF_WRITE: 'staff:write',
+  SCHEDULE_READ: 'schedule:read',
+  SCHEDULE_WRITE: 'schedule:write',
+  // Eski kapsamdan kalan anahtarlar. Yeni uçlar STAFF/SCHEDULE kullanır.
   RESOURCE_READ: 'resource:read',
   RESOURCE_WRITE: 'resource:write',
 
@@ -98,7 +103,8 @@ const OPERATIONS: Permission[] = [
   P.CUSTOMER_READ,
   P.CUSTOMER_WRITE,
   P.SERVICE_READ,
-  P.RESOURCE_READ,
+  P.STAFF_READ,
+  P.SCHEDULE_READ,
   P.PACKAGE_READ,
   P.CONSENT_READ,
 ];
@@ -134,7 +140,8 @@ export const ROLE_DEFINITIONS: RoleDefinition[] = [
       ...OPERATIONS,
       P.APPOINTMENT_REOPEN,
       P.SERVICE_WRITE,
-      P.RESOURCE_WRITE,
+      P.STAFF_WRITE,
+      P.SCHEDULE_WRITE,
       P.CUSTOMER_MEDICAL_READ,
       P.PACKAGE_WRITE,
       P.FINANCE_PAYMENT_READ,
@@ -195,7 +202,8 @@ export const ROLE_DEFINITIONS: RoleDefinition[] = [
       P.CUSTOMER_MEDICAL_READ,
       P.CUSTOMER_MEDICAL_WRITE,
       P.SERVICE_READ,
-      P.RESOURCE_READ,
+      P.STAFF_READ,
+      P.SCHEDULE_READ,
       P.PACKAGE_READ,
       P.CONSENT_READ,
     ],
