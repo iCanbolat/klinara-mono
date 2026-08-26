@@ -8,6 +8,13 @@ const ARGON2_ID = 2;
 
 const DEMO_OWNER_EMAIL = 'sahip@demo-klinik.test';
 const DEMO_PASSWORD = 'demo-parola-12345';
+/**
+ * Mobil giriş DOĞRULANMIŞ bir numara ister (bkz. 4.7): doğrulanmamış numara
+ * kimlik değil, yalnız bir iletişim alanıdır. Numarası olmayan demo hesabıyla
+ * iOS akışı telefon doğrulama adımında takılırdı; burada baştan doğrulanmış
+ * geliyor. Yalnız geliştirme ortamı — bu script üretimde koşmaz.
+ */
+const DEMO_OWNER_PHONE = '+905321234567';
 
 /**
  * Geliştirme ortamı hazırlığı.
@@ -76,12 +83,14 @@ async function seed(): Promise<void> {
     });
 
     const owner = await client.query<{ id: string }>(
-      `insert into users (email, full_name, password_hash)
-       values ($1, 'Demo Klinik Sahibi', $2)
+      `insert into users (email, full_name, password_hash, phone, phone_verified_at)
+       values ($1, 'Demo Klinik Sahibi', $2, $3, now())
        on conflict (email) where deleted_at is null
-       do update set password_hash = excluded.password_hash
+       do update set password_hash      = excluded.password_hash,
+                     phone              = excluded.phone,
+                     phone_verified_at  = coalesce(users.phone_verified_at, now())
        returning id`,
-      [DEMO_OWNER_EMAIL, passwordHash],
+      [DEMO_OWNER_EMAIL, passwordHash, DEMO_OWNER_PHONE],
     );
     const ownerId = owner.rows[0]?.id;
     if (ownerId === undefined) throw new Error('Demo kullanıcı oluşturulamadı');
@@ -110,6 +119,7 @@ async function seed(): Promise<void> {
     process.stdout.write(
       `[seed] Demo kiracı hazır: ${tenantId} (slug: demo-klinik)\n` +
         `[seed] Giriş: ${DEMO_OWNER_EMAIL} / ${DEMO_PASSWORD}\n` +
+        `[seed] Telefonla giriş (doğrulanmış): ${DEMO_OWNER_PHONE}\n` +
         `[seed] Bekleyen davet token'ı: ${invitationToken}\n`,
     );
   } finally {

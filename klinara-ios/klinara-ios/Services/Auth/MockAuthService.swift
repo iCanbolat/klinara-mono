@@ -56,11 +56,8 @@ final class MockAuthService: AuthService, @unchecked Sendable {
 
     // MARK: Yardımcılar
 
-    private static let decoder: JSONDecoder = {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return decoder
-    }()
+    /// Canlı istemciyle BİREBİR aynı çözücü — bkz. ``KlinaraCoding``.
+    private static let decoder = KlinaraCoding.decoder()
 
     private func decode<T: Decodable>(_ json: String) throws -> T {
         do {
@@ -208,7 +205,7 @@ final class MockAuthService: AuthService, @unchecked Sendable {
 
     func startPhoneVerification(phone: String) async throws -> PhoneVerificationStarted {
         await simulateLatency(0.5)
-        let expiry = ISO8601DateFormatter().string(from: Date().addingTimeInterval(300))
+        let expiry = KlinaraCoding.timestamp(Date().addingTimeInterval(300))
         return try decode("""
         { "phone": "\(phone)", "expiresAt": "\(expiry)", "delivered": true }
         """)
@@ -220,7 +217,7 @@ final class MockAuthService: AuthService, @unchecked Sendable {
             throw problem(.verificationFailed, status: 400, title: "Kod doğrulanamadı")
         }
         withLock { _phoneVerified = true }
-        let now = ISO8601DateFormatter().string(from: Date())
+        let now = KlinaraCoding.timestamp(Date())
         return try decode("""
         { "phone": "+905321234567", "verifiedAt": "\(now)" }
         """)

@@ -76,7 +76,7 @@ struct PasswordView: View {
 }
 
 #Preview {
-    let model = AuthFlowModel(auth: MockAuthService())
+    let model = AuthFlowModel(services: .mock())
     model.phoneE164 = "+905321234567"
     return PasswordView(model: model)
 }

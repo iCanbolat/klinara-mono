@@ -74,5 +74,5 @@ struct PasskeyEnrollOfferView: View {
 }
 
 #Preview {
-    PasskeyEnrollOfferView(model: AuthFlowModel(auth: MockAuthService()))
+    PasskeyEnrollOfferView(model: AuthFlowModel(services: .mock()))
 }

@@ -6,14 +6,17 @@ import SwiftUI
 /// yığını (`NavigationStack`) **bilinçli olarak kullanılmaz**: giriş akışı
 /// bir ağaç değil doğrusal bir durum makinesidir ve yığın, "2FA ekranından
 /// geri gidip yarım kimlikle takılma" gibi durumları davet eder.
+///
+/// Akış bittiğinde yerini ``AppShellView``'e bırakır — o noktadan sonra
+/// gezinme normal SwiftUI yığınlarıyla yapılır.
 struct RootView: View {
 
     @State private var model: AuthFlowModel
-    private let mock: MockAuthService?
+    private let services: ServiceContainer
 
-    init(auth: any AuthService, passkeys: (any PasskeyPerforming)? = nil) {
-        _model = State(wrappedValue: AuthFlowModel(auth: auth, passkeys: passkeys))
-        mock = auth as? MockAuthService
+    init(services: ServiceContainer, passkeys: (any PasskeyPerforming)? = nil) {
+        _model = State(wrappedValue: AuthFlowModel(services: services, passkeys: passkeys))
+        self.services = services
     }
 
     var body: some View {
@@ -33,6 +36,13 @@ struct RootView: View {
         .animation(KlinaraMetrics.stepTransition, value: model.step)
         .animation(KlinaraMetrics.feedback, value: model.overlayMessage)
         .task { await model.start() }
+        .task {
+            // Sunucu oturumu düşürdüğünde (yenileme de başarısız) kullanıcıyı
+            // giriş ekranına döndür. `APIClient` gezinme bilmez, yalnız haber verir.
+            await services.onSessionExpired { [weak model] in
+                Task { @MainActor in await model?.logout() }
+            }
+        }
     }
 
     @ViewBuilder
@@ -42,7 +52,7 @@ struct RootView: View {
             LaunchView()
 
         case .identifier:
-            IdentifierView(model: model, mock: mock)
+            IdentifierView(model: model, mock: services.mockAuth)
 
         case .password:
             PasswordView(model: model)
@@ -78,11 +88,17 @@ struct RootView: View {
             PasskeyEnrollOfferView(model: model)
 
         case .authenticated:
-            HomePlaceholderView(model: model, mock: mock)
+            if let session = model.session {
+                AppShellView(authFlow: model, session: session)
+            } else {
+                // `finishAuthentication` profil olmadan buraya geçmez;
+                // yine de tip düzeyinde bir boşluk bırakmıyoruz.
+                LaunchView()
+            }
         }
     }
 }
 
 #Preview("Akış") {
-    RootView(auth: MockAuthService())
+    RootView(services: .mock())
 }

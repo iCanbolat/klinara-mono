@@ -58,5 +58,5 @@ struct BackupCodeEntryView: View {
 }
 
 #Preview {
-    BackupCodeEntryView(model: AuthFlowModel(auth: MockAuthService()))
+    BackupCodeEntryView(model: AuthFlowModel(services: .mock()))
 }

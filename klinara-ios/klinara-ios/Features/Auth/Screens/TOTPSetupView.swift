@@ -119,5 +119,5 @@ struct TOTPSetupView: View {
 }
 
 #Preview {
-    TOTPSetupView(model: AuthFlowModel(auth: MockAuthService(scenario: .mfaRequiredNotConfigured)))
+    TOTPSetupView(model: AuthFlowModel(services: .mock(scenario: .mfaRequiredNotConfigured)))
 }

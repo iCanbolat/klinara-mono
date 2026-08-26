@@ -5,13 +5,16 @@ import Foundation
 /// İstemci **bu değerlere** göre dallanır; `title`/`detail` insan içindir ve
 /// sunucuda serbestçe değişebilir. Bilinmeyen bir kod gelirse `.unknown`'a
 /// düşer — yeni sunucu kodu eski istemciyi çökertmez.
-enum APIErrorCode: String, Decodable, Sendable {
+nonisolated enum APIErrorCode: String, Decodable, Sendable {
     // Genel
     case validationFailed = "VALIDATION_FAILED"
     case notFound = "NOT_FOUND"
     case internalError = "INTERNAL_ERROR"
     case rateLimited = "RATE_LIMITED"
     case serviceUnavailable = "SERVICE_UNAVAILABLE"
+    /// Tekillik çakışması — slug, e-posta, telefon zaten kullanımda.
+    /// Faz 2 katalog/personel uçlarının en sık döndürdüğü hata.
+    case conflict = "CONFLICT"
 
     // Kimlik & yetki
     case unauthenticated = "UNAUTHENTICATED"
@@ -33,6 +36,16 @@ enum APIErrorCode: String, Decodable, Sendable {
     case passkeyInvalid = "PASSKEY_INVALID"
     case credentialRequired = "CREDENTIAL_REQUIRED"
     case invitationInvalid = "INVITATION_INVALID"
+    /// Kendinden geniş yetkili bir rolü atama denemesi.
+    case roleEscalation = "ROLE_ESCALATION"
+    case tenantContextMissing = "TENANT_CONTEXT_MISSING"
+
+    // Takvim (Faz 3'te kullanılacak; kod sözleşmesi şimdiden burada)
+    case slotConflict = "SLOT_CONFLICT"
+    case resourceUnavailable = "RESOURCE_UNAVAILABLE"
+    case outsideWorkingHours = "OUTSIDE_WORKING_HOURS"
+    case invalidStatusTransition = "INVALID_STATUS_TRANSITION"
+    case versionConflict = "VERSION_CONFLICT"
 
     case unknown = "UNKNOWN"
 
@@ -42,17 +55,49 @@ enum APIErrorCode: String, Decodable, Sendable {
     }
 }
 
+/// Alan bazlı doğrulama hatası — `VALIDATION_FAILED` yanıtlarında gelir.
+///
+/// `path` sunucudaki DTO alan adıdır (`durationMinutes`, `branchOverrides.0.priceMinor`).
+/// Formlar hatayı bu ada göre ilgili alanın altına yerleştirir.
+nonisolated struct FieldError: Decodable, Sendable, Equatable {
+    let path: String
+    let message: String
+}
+
 /// RFC 9457 `application/problem+json` gövdesi.
-struct ProblemDetails: Decodable, Sendable {
+nonisolated struct ProblemDetails: Decodable, Sendable {
     let code: APIErrorCode
     let title: String
     let detail: String?
     let status: Int
     /// Destek talebinde kullanıcının bize verebileceği iz.
     let requestId: String?
+    /// Yalnız doğrulama hatalarında dolu.
+    let errors: [FieldError]?
+
+    init(
+        code: APIErrorCode,
+        title: String,
+        detail: String? = nil,
+        status: Int,
+        requestId: String? = nil,
+        errors: [FieldError]? = nil
+    ) {
+        self.code = code
+        self.title = title
+        self.detail = detail
+        self.status = status
+        self.requestId = requestId
+        self.errors = errors
+    }
 }
 
-enum AuthError: Error, Sendable {
+/// Sunucu ve taşıma katmanı hatalarının tek tipi.
+///
+/// Adı `AuthError` idi; Faz 2 ile katalog, personel ve takvim uçları da aynı
+/// sözleşmeyi kullandığı için genelleştirildi. Alt satırdaki `typealias`
+/// mevcut giriş ekranlarını kırmadan yaşatır.
+nonisolated enum APIError: Error, Sendable {
     /// Sunucu RFC 9457 hatası döndürdü.
     case problem(ProblemDetails)
     /// Bağlantı kurulamadı / zaman aşımı.
@@ -63,9 +108,12 @@ enum AuthError: Error, Sendable {
     case cancelled
 }
 
+/// Giriş akışı kodunun eski adı. Yeni kodda `APIError` kullanılır.
+typealias AuthError = APIError
+
 // MARK: - Kullanıcıya görünen metinler
 
-extension AuthError {
+extension APIError {
 
     /// Kullanıcıya gösterilecek Türkçe mesaj.
     ///
@@ -119,6 +167,22 @@ extension AuthError {
                 return "Servise şu anda ulaşılamıyor. Kısa süre sonra tekrar deneyin."
             case .validationFailed:
                 return "Girdiğiniz bilgileri kontrol edin."
+            case .conflict:
+                // Tek istisna: sunucunun kendi metni burada gerçekten ayırt
+                // edici ("Bu hizmet kodu zaten kullanımda") ve genel bir
+                // cümleden çok daha yardımcı. `AppError.conflict` mesajı
+                // `title`a yazar, `detail` boş gelir — canlı uçta doğrulandı.
+                return problem.detail ?? problem.title
+            case .notFound:
+                return "Kayıt bulunamadı. Liste güncellenmiş olabilir."
+            case .roleEscalation:
+                return "Kendinizden geniş yetkili bir rol atayamazsınız."
+            case .slotConflict:
+                return "Seçilen saat dolu. Başka bir saat seçin."
+            case .outsideWorkingHours:
+                return "Seçilen saat çalışma saatleri dışında."
+            case .versionConflict:
+                return "Bu kayıt siz düzenlerken başkası tarafından değiştirildi. Yenileyip tekrar deneyin."
             default:
                 return "Bir sorun oluştu. Lütfen tekrar deneyin."
             }
@@ -158,5 +222,27 @@ extension AuthError {
     var isSilent: Bool {
         if case .cancelled = self { return true }
         return false
+    }
+}
+
+// MARK: - Form yardımcıları
+
+extension APIError {
+
+    /// Alan bazlı doğrulama hataları — form alanlarının altına yerleştirilir.
+    var fieldErrors: [String: String] {
+        guard case .problem(let problem) = self, let errors = problem.errors else { return [:] }
+        // Aynı alan için birden çok kural kırılmışsa ilki gösterilir;
+        // kullanıcıya aynı anda beş cümle basmanın faydası yok.
+        return errors.reduce(into: [:]) { result, item in
+            if result[item.path] == nil { result[item.path] = item.message }
+        }
+    }
+
+    /// Hata gövdesi tamamen alan bazlıysa banner gösterilmez — mesaj zaten
+    /// alanların altında duruyor, tepede tekrar etmek gürültü olur.
+    var isFieldScoped: Bool {
+        guard case .problem(let problem) = self else { return false }
+        return problem.code == .validationFailed && problem.errors?.isEmpty == false
     }
 }

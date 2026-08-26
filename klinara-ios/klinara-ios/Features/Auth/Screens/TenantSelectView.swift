@@ -101,6 +101,6 @@ struct SelectionRow: View {
 }
 
 #Preview {
-    let model = AuthFlowModel(auth: MockAuthService(scenario: .multiTenant))
+    let model = AuthFlowModel(services: .mock(scenario: .multiTenant))
     return TenantSelectView(model: model)
 }

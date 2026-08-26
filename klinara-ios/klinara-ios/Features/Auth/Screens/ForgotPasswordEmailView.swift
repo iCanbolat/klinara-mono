@@ -60,5 +60,5 @@ struct ForgotPasswordEmailView: View {
 }
 
 #Preview {
-    ForgotPasswordEmailView(model: AuthFlowModel(auth: MockAuthService()))
+    ForgotPasswordEmailView(model: AuthFlowModel(services: .mock()))
 }

@@ -42,6 +42,7 @@ final class AuthFlowModel {
 
     // MARK: Bağımlılıklar
 
+    private let services: ServiceContainer
     private let auth: any AuthService
     private let passkeys: any PasskeyPerforming
     private let tokens: TokenStore
@@ -50,11 +51,12 @@ final class AuthFlowModel {
     /// ifadeleri nonisolated bağlamda değerlendirilir ve orada
     /// `TokenStore.shared`'a dokunmak Swift 6'da hatadır.
     init(
-        auth: any AuthService,
+        services: ServiceContainer,
         passkeys: (any PasskeyPerforming)? = nil,
         tokens: TokenStore? = nil
     ) {
-        self.auth = auth
+        self.services = services
+        self.auth = services.auth
         self.passkeys = passkeys ?? MockPasskeyService()
         self.tokens = tokens ?? .shared
     }
@@ -75,6 +77,13 @@ final class AuthFlowModel {
     var mfaCode = ""
     var backupCode = ""
     var smsCode = ""
+    /// Profilde kayıtlı numara yoksa kullanıcı burada girer.
+    ///
+    /// Bu alan olmadan akış ölü noktaya düşerdi: davet e-postasıyla açılan bir
+    /// hesapta telefon YOKTUR, mobil giriş ise doğrulanmış numara ister —
+    /// kullanıcı numarasını girecek bir yer bulamadan doğrulama ekranında
+    /// kilitli kalırdı.
+    var phoneToVerify = ""
     var forgotPasswordEmail = ""
     var totpSetupCode = ""
 
@@ -86,6 +95,11 @@ final class AuthFlowModel {
     private(set) var totpSetup: TotpSetup?
     private(set) var mfaChallenge: MfaChallenge?
     private(set) var phoneCodeExpiresAt: Date?
+
+    /// Oturum kabuğunun modeli. `.authenticated` adımına geçerken **bir kez**
+    /// kurulur; `RootView`'ın her çiziminde yeniden yaratılsaydı sekme seçimi
+    /// ve şube tercihi her yeniden çizimde sıfırlanırdı.
+    private(set) var session: AppSession?
 
     /// Ara token. `mfa` ve `tenant_select` adımlarında taşınır; hiçbir
     /// zaman kalıcı depoya yazılmaz — yarım oturumun sırrı diskte durmaz.
@@ -264,12 +278,33 @@ final class AuthFlowModel {
 
     // MARK: - Telefon doğrulama
 
+    /// Profilde numara yoksa ekran giriş alanı gösterir.
+    var needsPhoneEntry: Bool { profile?.user.phone == nil }
+
+    /// Doğrulanacak numara: profildeki varsa o, yoksa kullanıcının girdiği.
+    var verificationPhone: String? {
+        if let existing = profile?.user.phone, !existing.isEmpty { return existing }
+        return phoneToVerify.isEmpty ? nil : phoneToVerify
+    }
+
+    var canSubmitPhone: Bool { (verificationPhone?.count ?? 0) >= 12 }
+
     func sendPhoneCode() async {
-        guard let phone = profile?.user.phone else { return }
+        guard let phone = verificationPhone else { return }
         await perform {
             let started = try await self.auth.startPhoneVerification(phone: phone)
             self.phoneCodeExpiresAt = started.expiresAt
+            // Sunucu numarayı E.164'e normalize eder; ekranda gösterilen
+            // numaranın gönderilenle aynı olması için geri yazıyoruz.
+            self.phoneToVerify = started.phone
         }
+    }
+
+    /// Numarayı değiştirmek için doğrulama adımının başına dön.
+    func changePhoneNumber() {
+        error = nil
+        smsCode = ""
+        phoneCodeExpiresAt = nil
     }
 
     func submitPhoneCode() async {
@@ -299,14 +334,14 @@ final class AuthFlowModel {
             let registration = try await passkeys.register(options: options)
             try await auth.registerPasskey(registration, deviceLabel: DeviceLabel.current)
             PasskeyRegistry.hasEnrolledPasskey = true
-            step = .authenticated
+            finishAuthentication()
         } catch {
             capture(error)
         }
     }
 
     func skipPasskeyEnrollment() {
-        step = .authenticated
+        finishAuthentication()
     }
 
     // MARK: - Çıkış
@@ -316,6 +351,7 @@ final class AuthFlowModel {
         tokens.clear()
         resetInputs()
         profile = nil
+        session = nil
         step = .identifier
     }
 
@@ -325,6 +361,7 @@ final class AuthFlowModel {
         tokens.clear()
         resetInputs()
         profile = nil
+        session = nil
         error = nil
         phoneE164 = ""
         email = ""
@@ -432,7 +469,22 @@ final class AuthFlowModel {
         let eligible = didUsePasswordLogin
             && !PasskeyRegistry.hasEnrolledPasskey
             && profile?.user.hasPassword == true
-        step = eligible ? .passkeyEnrollOffer : .authenticated
+        if eligible {
+            step = .passkeyEnrollOffer
+        } else {
+            finishAuthentication()
+        }
+    }
+
+    /// Kabuğa geçiş. Oturum modeli burada, tek yerde kurulur.
+    private func finishAuthentication() {
+        guard let profile else {
+            // `/me` olmadan kabuğa geçilemez: izinler ve şubeler oradan gelir.
+            step = .identifier
+            return
+        }
+        session = AppSession(profile: profile, branches: branches, services: services)
+        step = .authenticated
     }
 
     // MARK: - Yardımcılar
@@ -456,6 +508,7 @@ final class AuthFlowModel {
         if authError.invalidatesSession {
             tokens.clear()
             resetInputs()
+            session = nil
             step = .identifier
         }
         error = authError
@@ -473,6 +526,7 @@ final class AuthFlowModel {
     private func resetInputs() {
         password = ""
         smsCode = ""
+        phoneToVerify = ""
         forgotPasswordEmail = ""
         tenants = []
         branches = []

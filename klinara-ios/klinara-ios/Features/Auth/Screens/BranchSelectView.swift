@@ -41,6 +41,6 @@ struct BranchSelectView: View {
 }
 
 #Preview {
-    let model = AuthFlowModel(auth: MockAuthService(scenario: .multiBranch))
+    let model = AuthFlowModel(services: .mock(scenario: .multiBranch))
     return BranchSelectView(model: model)
 }

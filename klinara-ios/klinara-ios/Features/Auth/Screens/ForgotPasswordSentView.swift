@@ -40,7 +40,7 @@ struct ForgotPasswordSentView: View {
 }
 
 #Preview {
-    let model = AuthFlowModel(auth: MockAuthService())
+    let model = AuthFlowModel(services: .mock())
     model.forgotPasswordEmail = "ayse.yilmaz@klinik.com"
     return ForgotPasswordSentView(model: model)
 }

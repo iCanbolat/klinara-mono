@@ -84,6 +84,6 @@ struct BackupCodesView: View {
 }
 
 #Preview {
-    let model = AuthFlowModel(auth: MockAuthService())
+    let model = AuthFlowModel(services: .mock())
     return BackupCodesView(model: model)
 }

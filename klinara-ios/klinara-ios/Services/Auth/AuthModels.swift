@@ -7,14 +7,14 @@ import Foundation
 // MARK: - Giriş yanıtı
 
 /// `LoginResponseDto.status` — giriş üç durumdan biriyle biter.
-enum LoginStatus: String, Decodable, Sendable {
+nonisolated enum LoginStatus: String, Decodable, Sendable {
     case authenticated
     case tenantSelectionRequired = "tenant_selection_required"
     case mfaRequired = "mfa_required"
 }
 
 /// `AuthTokensDto`. `refreshToken` opak bir değerdir; sunucuda yalnız sha256 özeti durur.
-struct AuthTokens: Decodable, Sendable, Equatable {
+nonisolated struct AuthTokens: Decodable, Sendable, Equatable {
     let accessToken: String
     let refreshToken: String
     let tokenType: String
@@ -23,7 +23,7 @@ struct AuthTokens: Decodable, Sendable, Equatable {
 }
 
 /// `TenantOptionDto` — kullanıcı birden çok klinikte üyeyse seçim listesi.
-struct TenantOption: Decodable, Sendable, Identifiable, Equatable {
+nonisolated struct TenantOption: Decodable, Sendable, Identifiable, Equatable {
     let id: String
     let slug: String
     let name: String
@@ -31,7 +31,7 @@ struct TenantOption: Decodable, Sendable, Identifiable, Equatable {
 }
 
 /// `MfaChallengeDto`.
-struct MfaChallenge: Decodable, Sendable, Equatable {
+nonisolated struct MfaChallenge: Decodable, Sendable, Equatable {
     /// Kullanıcı TOTP kurulumunu tamamlamış mı. `false` + `mfaRequired`
     /// kombinasyonu, kiracı politikasının 2FA'yı zorunlu kıldığı ama
     /// kullanıcının henüz kurmadığı anlamına gelir — kurulum ekranı gerekir.
@@ -42,12 +42,12 @@ struct MfaChallenge: Decodable, Sendable, Equatable {
     var allowsBackupCode: Bool { methods.contains("backup_code") }
 }
 
-struct SelectedTenant: Decodable, Sendable, Equatable {
+nonisolated struct SelectedTenant: Decodable, Sendable, Equatable {
     let id: String
 }
 
 /// `LoginResponseDto`. `tokens` **yalnız** `.authenticated` durumunda doludur.
-struct LoginResponse: Decodable, Sendable {
+nonisolated struct LoginResponse: Decodable, Sendable {
     let status: LoginStatus
     let tokens: AuthTokens?
     /// Ara token — kiracı seçimi ve 2FA adımlarında taşınır.
@@ -62,7 +62,7 @@ struct LoginResponse: Decodable, Sendable {
 /// `LoginResponse` ekranlarda doğrudan tüketilmez: opsiyonel `tokens` alanı,
 /// yarım kalmış bir oturumun yanlışlıkla tam yetkili sayılmasına açık kapı
 /// bırakır. Bu enum'da yarım oturumun token'ı **tip olarak yoktur**.
-enum LoginOutcome: Sendable {
+nonisolated enum LoginOutcome: Sendable {
     case success(AuthTokens)
     case needsTenantSelection(challengeToken: String, tenants: [TenantOption])
     case needsMfa(challengeToken: String, challenge: MfaChallenge)
@@ -95,7 +95,7 @@ extension LoginResponse {
 // MARK: - Kullanıcı
 
 /// `MembershipResponseDto`. `branchId` nil ise üyelik kiracı kapsamlıdır.
-struct MembershipSummary: Decodable, Sendable, Identifiable, Equatable {
+nonisolated struct MembershipSummary: Decodable, Sendable, Identifiable, Equatable {
     let id: String
     let branchId: String?
     let roleKey: String
@@ -103,7 +103,7 @@ struct MembershipSummary: Decodable, Sendable, Identifiable, Equatable {
 }
 
 /// `UserResponseDto`.
-struct UserProfile: Decodable, Sendable, Equatable {
+nonisolated struct UserProfile: Decodable, Sendable, Equatable {
     let id: String
     let email: String
     let fullName: String
@@ -121,7 +121,7 @@ struct UserProfile: Decodable, Sendable, Equatable {
 
 /// `MeResponseDto`. Dikkat: şube **adları** burada yoktur, yalnız kimlikleri —
 /// isimler için `GET /branches` gerekir.
-struct MeResponse: Decodable, Sendable {
+nonisolated struct MeResponse: Decodable, Sendable {
     let user: UserProfile
     let tenantId: String
     let roles: [String]
@@ -132,7 +132,7 @@ struct MeResponse: Decodable, Sendable {
 }
 
 /// `BranchResponseDto`.
-struct BranchSummary: Decodable, Sendable, Identifiable, Equatable {
+nonisolated struct BranchSummary: Decodable, Sendable, Identifiable, Equatable {
     let id: String
     let name: String
     let timezone: String
@@ -143,7 +143,7 @@ struct BranchSummary: Decodable, Sendable, Identifiable, Equatable {
 // MARK: - TOTP
 
 /// `TotpSetupResponseDto`.
-struct TotpSetup: Decodable, Sendable {
+nonisolated struct TotpSetup: Decodable, Sendable {
     let secret: String
     let otpauthUri: String
 }
@@ -151,7 +151,7 @@ struct TotpSetup: Decodable, Sendable {
 // MARK: - Telefon doğrulama
 
 /// `PhoneVerificationStartedDto`.
-struct PhoneVerificationStarted: Decodable, Sendable {
+nonisolated struct PhoneVerificationStarted: Decodable, Sendable {
     let phone: String
     /// Kodun son geçerlilik anı — geri sayım **bu değerden** sürülür,
     /// istemci tarafında ayrı bir 5 dakika sayacı tutulmaz.
@@ -160,7 +160,7 @@ struct PhoneVerificationStarted: Decodable, Sendable {
 }
 
 /// `PhoneVerifiedDto`.
-struct PhoneVerified: Decodable, Sendable {
+nonisolated struct PhoneVerified: Decodable, Sendable {
     let phone: String
     let verifiedAt: Date
 }
@@ -169,7 +169,7 @@ struct PhoneVerified: Decodable, Sendable {
 
 /// WebAuthn seçenekleri sunucudan ham JSON olarak gelir ve doğrudan
 /// `AuthenticationServices`'e aktarılır — istemci içeriğini yorumlamaz.
-struct PasskeyOptions: Sendable {
+nonisolated struct PasskeyOptions: Sendable {
     let challenge: Data
     let relyingPartyIdentifier: String
     /// Kayıt akışında dolu, doğrulama akışında nil.

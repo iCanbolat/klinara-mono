@@ -50,7 +50,11 @@ struct ErrorBanner: View {
         )
         .clipShape(.rect(cornerRadius: KlinaraMetrics.controlRadius))
         .transition(.opacity.combined(with: .move(edge: .top)))
-        .accessibilityElement(children: .combine)
+        // `.combine` DEĞİL: banner bir "Tekrar dene" düğmesi barındırabiliyor ve
+        // `.combine` alt ağacı tek bir öğeye indirgeyip düğmeye giden dokunuşları
+        // kesiyordu (aynı tuzak ``KlinaraToggleRow``'da da vardı).
+        // `.contain` gruplamayı korur, kontrolleri etkisiz bırakmaz.
+        .accessibilityElement(children: .contain)
     }
 }
 

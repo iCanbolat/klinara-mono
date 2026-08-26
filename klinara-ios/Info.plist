@@ -16,5 +16,24 @@
 	</array>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Kliniğinize parolanızı yazmadan, tek dokunuşla giriş yapmak için kullanılır.</string>
+
+	<!--
+	  API kökü. Şema düzenlemeden değiştirilebilsin diye burada durur:
+	  simülatör "localhost"a ulaşır, fiziksel cihaz Mac'in LAN adresine
+	  (örn. http://192.168.1.20:3000/api/v1) bakmalıdır.
+	-->
+	<key>KlinaraAPIBaseURL</key>
+	<string>http://localhost:3000/api/v1</string>
+
+	<!--
+	  ATS istisnası YALNIZ localhost için. Üretim kökü https'tir ve bu
+	  istisna onu etkilemez; genel `NSAllowsArbitraryLoads` bilinçli olarak
+	  kullanılmadı - tek bir yanlış yapılandırma tüm trafiği düz metne düşürürdü.
+	-->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 </dict>
 </plist>

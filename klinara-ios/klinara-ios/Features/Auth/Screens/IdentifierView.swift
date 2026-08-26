@@ -137,5 +137,5 @@ struct IdentifierView: View {
 }
 
 #Preview("Telefon") {
-    IdentifierView(model: AuthFlowModel(auth: MockAuthService()))
+    IdentifierView(model: AuthFlowModel(services: .mock()))
 }

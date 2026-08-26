@@ -39,6 +39,16 @@ struct PhoneVerificationView: View {
                     ErrorBanner(error: error)
                 }
 
+                if model.phoneCodeExpiresAt == nil, model.needsPhoneEntry {
+                    // Davetle açılan hesapta telefon yoktur; kullanıcı burada girer.
+                    PhoneNumberField(
+                        label: "Telefon numarası",
+                        e164: $model.phoneToVerify
+                    ) {
+                        send()
+                    }
+                }
+
                 if model.phoneCodeExpiresAt != nil {
                     OTPCodeField(
                         code: $model.smsCode,
@@ -52,7 +62,11 @@ struct PhoneVerificationView: View {
             }
         } actions: {
             if model.phoneCodeExpiresAt == nil {
-                KlinaraButton(title: "Kod gönder", isLoading: model.isBusy) {
+                KlinaraButton(
+                    title: "Kod gönder",
+                    isLoading: model.isBusy,
+                    isEnabled: model.canSubmitPhone
+                ) {
                     send()
                 }
             } else {
@@ -71,6 +85,13 @@ struct PhoneVerificationView: View {
                 ) {
                     send()
                 }
+
+                if model.needsPhoneEntry {
+                    KlinaraButton(title: "Numarayı değiştir", kind: .tertiary) {
+                        lastSentAt = nil
+                        model.changePhoneNumber()
+                    }
+                }
             }
         }
         .task {
@@ -84,10 +105,13 @@ struct PhoneVerificationView: View {
     }
 
     private var subtitle: String {
-        let phone = model.profile?.user.phone.map(PhoneNumberField.pretty) ?? ""
+        guard let phone = model.verificationPhone, !phone.isEmpty else {
+            return "Giriş yapabilmek için doğrulanmış bir numara gerekir. Numaranızı girin, 6 haneli bir kod gönderelim."
+        }
+        let pretty = PhoneNumberField.pretty(phone)
         return model.phoneCodeExpiresAt == nil
-            ? "\(phone) numarasına 6 haneli bir kod göndereceğiz."
-            : "\(phone) numarasına gönderilen kodu girin."
+            ? "\(pretty) numarasına 6 haneli bir kod göndereceğiz."
+            : "\(pretty) numarasına gönderilen kodu girin."
     }
 
     private var resendTitle: String {
@@ -129,5 +153,5 @@ struct PhoneVerificationView: View {
 }
 
 #Preview {
-    PhoneVerificationView(model: AuthFlowModel(auth: MockAuthService(scenario: .unverifiedPhone)))
+    PhoneVerificationView(model: AuthFlowModel(services: .mock(scenario: .unverifiedPhone)))
 }

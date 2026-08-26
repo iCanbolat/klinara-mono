@@ -51,5 +51,5 @@ struct TOTPView: View {
 }
 
 #Preview {
-    TOTPView(model: AuthFlowModel(auth: MockAuthService()))
+    TOTPView(model: AuthFlowModel(services: .mock()))
 }
