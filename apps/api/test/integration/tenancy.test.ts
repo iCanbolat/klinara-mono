@@ -1,14 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import request from 'supertest';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { sql } from 'drizzle-orm';
 import pg from 'pg';
 import { createTestApp } from '../helpers/app';
 import { startTestDatabase, type TestDatabase } from '../helpers/database';
+import { auth, bootstrapTenant, http, PLATFORM_TOKEN } from '../helpers/identity';
 import { DRIZZLE, PG_POOL, type Database } from '../../src/database/database.constants';
 import { withTenantTx } from '../../src/database/tenant-tx';
-
-const PLATFORM_TOKEN = 'platform-admin-test-tokeni-32-karakterden-uzun';
 
 interface TenantBody {
   id: string;
@@ -34,23 +32,11 @@ describe('kiracılık ve RLS', () => {
   let pool: pg.Pool;
   let db: Database;
 
-  const http = () => request(app.getHttpServer());
-
-  async function createTenant(slug: string, name: string) {
-    const res = await http()
-      .post('/api/v1/platform/tenants')
-      .set('authorization', `Bearer ${PLATFORM_TOKEN}`)
-      .send({ slug, name, branch: { slug: 'merkez', name: 'Merkez Şube' } });
-    expect(res.status, JSON.stringify(res.body)).toBe(201);
-    return res.body as { tenant: TenantBody; branch: BranchBody };
-  }
-
   beforeAll(async () => {
     database = await startTestDatabase();
     app = await createTestApp({
       env: {
         DATABASE_URL: database.appUrl,
-        AUTH_DEV_MODE: 'true',
         PLATFORM_ADMIN_TOKEN: PLATFORM_TOKEN,
       },
     });
@@ -69,15 +55,20 @@ describe('kiracılık ve RLS', () => {
 
   // -------------------------------------------------------------------------
   describe('platform yönetimi', () => {
-    it('kiracıyı ilk şubesi ve varsayılan ayarlarıyla birlikte oluşturur', async () => {
-      const { tenant, branch } = await createTenant('guzellik-merkezi', 'Güzellik Merkezi');
+    it('kiracıyı ilk şubesi, ayarları ve sahip davetiyle birlikte oluşturur', async () => {
+      const fixture = await bootstrapTenant(app, {
+        slug: 'guzellik-merkezi',
+        name: 'Güzellik Merkezi',
+      });
 
-      expect(tenant.slug).toBe('guzellik-merkezi');
-      expect(tenant.status).toBe('trial');
-      expect(tenant.timezone).toBe('Europe/Istanbul');
-      expect(branch.tenantId).toBe(tenant.id);
+      expect(fixture.tenant.slug).toBe('guzellik-merkezi');
+      expect(fixture.tenant.status).toBe('trial');
+      expect(fixture.tenant.timezone).toBe('Europe/Istanbul');
+      expect(fixture.branch.tenantId).toBe(fixture.tenant.id);
 
-      const settings = await http().get('/api/v1/tenant/settings').set('x-tenant-id', tenant.id);
+      const settings = await http(app)
+        .get('/api/v1/tenant/settings')
+        .set(auth(fixture.owner.tokens));
       expect(settings.status).toBe(200);
       expect((settings.body as { reminderHoursBefore: number[] }).reminderHoursBefore).toEqual([
         24, 2,
@@ -85,9 +76,14 @@ describe('kiracılık ve RLS', () => {
     });
 
     it('platform token olmadan kiracı oluşturulamaz', async () => {
-      const res = await http()
+      const res = await http(app)
         .post('/api/v1/platform/tenants')
-        .send({ slug: 'izinsiz', name: 'İzinsiz', branch: { slug: 'merkez', name: 'Merkez' } });
+        .send({
+          slug: 'izinsiz',
+          name: 'İzinsiz',
+          branch: { slug: 'merkez', name: 'Merkez' },
+          owner: { email: 'a@b.test' },
+        });
       expect(res.status).toBe(403);
       expect((res.body as Problem).code).toBe('FORBIDDEN');
     });
@@ -95,33 +91,43 @@ describe('kiracılık ve RLS', () => {
     it('yetki kontrolü GÖVDE DOĞRULAMASINDAN ÖNCE koşar (şema sızmaz)', async () => {
       // Gövde tamamen geçersiz; yine de 400 değil 403 dönmeli, aksi hâlde
       // yetkisiz çağıran alan adlarını hata mesajlarından öğrenirdi.
-      const res = await http().post('/api/v1/platform/tenants').send({ tamamen: 'gecersiz' });
+      const res = await http(app).post('/api/v1/platform/tenants').send({ tamamen: 'gecersiz' });
       expect(res.status).toBe(403);
       expect(res.text).not.toContain('slug');
     });
 
     it('aynı slug ikinci kez alınamaz', async () => {
-      await createTenant('ayni-slug', 'Birinci');
-      const res = await http()
+      await bootstrapTenant(app, { slug: 'ayni-slug', name: 'Birinci' });
+      const res = await http(app)
         .post('/api/v1/platform/tenants')
         .set('authorization', `Bearer ${PLATFORM_TOKEN}`)
-        .send({ slug: 'ayni-slug', name: 'İkinci', branch: { slug: 'merkez', name: 'Merkez' } });
+        .send({
+          slug: 'ayni-slug',
+          name: 'İkinci',
+          branch: { slug: 'merkez', name: 'Merkez' },
+          owner: { email: 'ikinci@klinik.test' },
+        });
       expect(res.status).toBe(409);
       expect((res.body as Problem).code).toBe('CONFLICT');
     });
 
     it('rezerve edilmiş slug reddedilir', async () => {
-      const res = await http()
+      const res = await http(app)
         .post('/api/v1/platform/tenants')
         .set('authorization', `Bearer ${PLATFORM_TOKEN}`)
-        .send({ slug: 'admin', name: 'Admin', branch: { slug: 'merkez', name: 'Merkez' } });
+        .send({
+          slug: 'admin',
+          name: 'Admin',
+          branch: { slug: 'merkez', name: 'Merkez' },
+          owner: { email: 'admin@klinik.test' },
+        });
       // DB check constraint'i ihlal edilir → 500 değil, anlamlı bir hata beklenir.
       expect(res.status).toBeGreaterThanOrEqual(400);
       expect(res.status).toBeLessThan(600);
     });
 
     it('geçersiz saat dilimi reddedilir', async () => {
-      const res = await http()
+      const res = await http(app)
         .post('/api/v1/platform/tenants')
         .set('authorization', `Bearer ${PLATFORM_TOKEN}`)
         .send({
@@ -129,6 +135,7 @@ describe('kiracılık ve RLS', () => {
           name: 'TZ',
           timezone: 'Mars/Olympus',
           branch: { slug: 'merkez', name: 'Merkez' },
+          owner: { email: 'tz@klinik.test' },
         });
       expect(res.status).toBe(400);
       expect((res.body as Problem).code).toBe('VALIDATION_FAILED');
@@ -138,16 +145,16 @@ describe('kiracılık ve RLS', () => {
   // -------------------------------------------------------------------------
   describe("kiracı izolasyonu (FAZ 0'IN EN ÖNEMLİ TESTİ)", () => {
     it('bir kiracı diğerinin şubelerini GÖREMEZ', async () => {
-      const a = await createTenant('klinik-a', 'Klinik A');
-      const b = await createTenant('klinik-b', 'Klinik B');
+      const a = await bootstrapTenant(app, { slug: 'klinik-a', name: 'Klinik A' });
+      const b = await bootstrapTenant(app, { slug: 'klinik-b', name: 'Klinik B' });
 
-      await http()
+      await http(app)
         .post('/api/v1/branches')
-        .set('x-tenant-id', a.tenant.id)
+        .set(auth(a.owner.tokens))
         .send({ slug: 'kadikoy', name: 'Kadıköy' });
 
-      const listA = await http().get('/api/v1/branches').set('x-tenant-id', a.tenant.id);
-      const listB = await http().get('/api/v1/branches').set('x-tenant-id', b.tenant.id);
+      const listA = await http(app).get('/api/v1/branches').set(auth(a.owner.tokens));
+      const listB = await http(app).get('/api/v1/branches').set(auth(b.owner.tokens));
 
       expect((listA.body as { data: BranchBody[] }).data).toHaveLength(2);
       expect((listB.body as { data: BranchBody[] }).data).toHaveLength(1);
@@ -157,36 +164,39 @@ describe('kiracılık ve RLS', () => {
     });
 
     it('bir kiracı diğerinin şubesini GÜNCELLEYEMEZ (varlığını bile sızdırmaz)', async () => {
-      const a = await createTenant('klinik-c', 'Klinik C');
-      const b = await createTenant('klinik-d', 'Klinik D');
+      const a = await bootstrapTenant(app, { slug: 'klinik-c', name: 'Klinik C' });
+      const b = await bootstrapTenant(app, { slug: 'klinik-d', name: 'Klinik D' });
 
-      const res = await http()
+      const res = await http(app)
         .patch(`/api/v1/branches/${a.branch.id}`)
-        .set('x-tenant-id', b.tenant.id)
+        .set(auth(b.owner.tokens))
         .send({ name: 'ELE GEÇİRİLDİ' });
       expect(res.status).toBe(404);
 
-      // A'nın şubesi değişmemiş olmalı.
-      const check = await http().get('/api/v1/branches').set('x-tenant-id', a.tenant.id);
+      const check = await http(app).get('/api/v1/branches').set(auth(a.owner.tokens));
       expect((check.body as { data: BranchBody[] }).data[0]?.name).toBe('Merkez Şube');
     });
 
     it('bir kiracı diğerinin kiracı kaydını okuyamaz', async () => {
-      const a = await createTenant('klinik-e', 'Klinik E');
-      await createTenant('klinik-f', 'Klinik F');
+      const a = await bootstrapTenant(app, { slug: 'klinik-e', name: 'Klinik E' });
+      await bootstrapTenant(app, { slug: 'klinik-f', name: 'Klinik F' });
 
-      const res = await http().get('/api/v1/tenant').set('x-tenant-id', a.tenant.id);
+      const res = await http(app).get('/api/v1/tenant').set(auth(a.owner.tokens));
       expect((res.body as TenantBody).slug).toBe('klinik-e');
     });
 
-    it("kiracı context'i olmadan kiracı kapsamlı uç 401 döner", async () => {
-      const res = await http().get('/api/v1/branches');
+    it('token olmadan kiracı kapsamlı uç 401 döner', async () => {
+      const res = await http(app).get('/api/v1/branches');
       expect(res.status).toBe(401);
-      expect((res.body as Problem).code).toBe('TENANT_CONTEXT_MISSING');
+      expect((res.body as Problem).code).toBe('UNAUTHENTICATED');
     });
 
-    it('geçersiz x-tenant-id başlığı 400 ile reddedilir', async () => {
-      const res = await http().get('/api/v1/branches').set('x-tenant-id', 'uuid-degil');
+    it('geçersiz x-branch-id başlığı 400 ile reddedilir', async () => {
+      const a = await bootstrapTenant(app, { slug: 'branch-hdr', name: 'Başlık' });
+      const res = await http(app)
+        .get('/api/v1/branches')
+        .set(auth(a.owner.tokens))
+        .set('x-branch-id', 'uuid-degil');
       expect(res.status).toBe(400);
       expect((res.body as Problem).code).toBe('VALIDATION_FAILED');
     });
@@ -199,10 +209,16 @@ describe('kiracılık ve RLS', () => {
       }>(`
         select relname, relrowsecurity, relforcerowsecurity
           from pg_class
-         where relname in ('tenants','branches','tenant_settings','audit_log')
+         where relname in (
+                 'tenants','branches','tenant_settings','audit_log',
+                 'users','memberships','sessions','refresh_tokens','login_attempts',
+                 'invitations','password_reset_tokens','user_totp_secrets',
+                 'user_backup_codes','phone_verification_codes','user_passkeys',
+                 'webauthn_challenges','roles','permissions','role_permissions'
+               )
            and relkind = 'r'
       `);
-      expect(rows).toHaveLength(4);
+      expect(rows).toHaveLength(19);
       for (const row of rows) {
         expect(row.relrowsecurity, `${row.relname} RLS kapalı`).toBe(true);
         expect(row.relforcerowsecurity, `${row.relname} FORCE kapalı`).toBe(true);
@@ -213,22 +229,22 @@ describe('kiracılık ve RLS', () => {
   // -------------------------------------------------------------------------
   describe('havuzlanmış bağlantıda context sızıntısı', () => {
     it('ardışık iki farklı kiracı isteği birbirine SIZMAZ', async () => {
-      const a = await createTenant('sizinti-a', 'Sızıntı A');
-      const b = await createTenant('sizinti-b', 'Sızıntı B');
+      const a = await bootstrapTenant(app, { slug: 'sizinti-a', name: 'Sızıntı A' });
+      const b = await bootstrapTenant(app, { slug: 'sizinti-b', name: 'Sızıntı B' });
 
       // Havuzda tek bağlantı kalacak şekilde çok sayıda ardışık istek: aynı
       // fiziksel bağlantı sürekli yeniden kullanılır. set_config transaction
       // kapsamlı olmasaydı buradaki sonuçlar birbirine karışırdı.
       for (let i = 0; i < 12; i += 1) {
         const target = i % 2 === 0 ? a : b;
-        const res = await http().get('/api/v1/tenant').set('x-tenant-id', target.tenant.id);
+        const res = await http(app).get('/api/v1/tenant').set(auth(target.owner.tokens));
         expect(res.status).toBe(200);
         expect((res.body as TenantBody).slug).toBe(target.tenant.slug);
       }
     });
 
     it('transaction bittikten sonra context TEMİZLENİR, sorgu 0 satır döner', async () => {
-      const a = await createTenant('temizlik-a', 'Temizlik A');
+      const a = await bootstrapTenant(app, { slug: 'temizlik-a', name: 'Temizlik A' });
 
       await withTenantTx(
         db,
@@ -236,6 +252,7 @@ describe('kiracılık ve RLS', () => {
           tenantId: a.tenant.id,
           userId: null,
           branchId: null,
+          sessionId: null,
           requestId: 'test',
           isPlatformAdmin: false,
         },
@@ -255,7 +272,7 @@ describe('kiracılık ve RLS', () => {
   // -------------------------------------------------------------------------
   describe('denetim kaydı (audit log)', () => {
     it("kiracı ve şube yazımları audit_log'a düşer", async () => {
-      const a = await createTenant('denetim-a', 'Denetim A');
+      const a = await bootstrapTenant(app, { slug: 'denetim-a', name: 'Denetim A' });
 
       const { rows } = await database.ownerPool.query<{
         table_name: string;
@@ -273,15 +290,11 @@ describe('kiracılık ve RLS', () => {
     });
 
     it("actor_user_id ve request_id context'ten doğru yazılır", async () => {
-      const a = await createTenant('denetim-b', 'Denetim B');
-      // Gerçek bir RFC 9562 v4 UUID. Not: '1111...-4444-...' gibi uydurma
-      // diziler doğrulamadan GEÇMEZ — variant biti geçersizdir.
-      const actorId = '3f2504e0-4f89-41d3-9a0c-0305e82c3301';
+      const a = await bootstrapTenant(app, { slug: 'denetim-b', name: 'Denetim B' });
 
-      const patch = await http()
+      const patch = await http(app)
         .patch('/api/v1/tenant')
-        .set('x-tenant-id', a.tenant.id)
-        .set('x-user-id', actorId)
+        .set(auth(a.owner.tokens))
         .set('x-request-id', 'denetim-istegi-999')
         .send({ name: 'Yeni Ad' });
       expect(patch.status).toBe(200);
@@ -293,13 +306,26 @@ describe('kiracılık ve RLS', () => {
       }>(`select actor_user_id, request_id, new_data from audit_log
            where table_name = 'tenants' and action = 'update' order by id desc limit 1`);
 
-      expect(rows[0]?.actor_user_id).toBe(actorId);
+      // Aktör artık başlıktan değil, access token'dan geliyor.
+      expect(rows[0]?.actor_user_id).toBe(a.owner.userId);
       expect(rows[0]?.request_id).toBe('denetim-istegi-999');
       expect(rows[0]?.new_data.name).toBe('Yeni Ad');
     });
 
+    it('parola hash’i denetim kaydına GİRMEZ', async () => {
+      await bootstrapTenant(app, { slug: 'denetim-hash', name: 'Hash' });
+
+      const { rows } = await database.ownerPool.query<{ new_data: Record<string, unknown> }>(
+        `select new_data from audit_log where table_name = 'users' order by id`,
+      );
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        expect(Object.keys(row.new_data ?? {})).not.toContain('password_hash');
+      }
+    });
+
     it('denetim kaydı DEĞİŞTİRİLEMEZ ve SİLİNEMEZ', async () => {
-      await createTenant('denetim-c', 'Denetim C');
+      await bootstrapTenant(app, { slug: 'denetim-c', name: 'Denetim C' });
 
       await expect(
         database.ownerPool.query(`update audit_log set action = 'insert' where id > 0`),
@@ -318,11 +344,7 @@ describe('kiracılık ve RLS', () => {
       // testlerde hiç fark edilmez. Üretimde sahip rol superuser olmadığında
       // ise `force row level security` denetim yazımını engeller ve AFTER
       // trigger olduğu için ASIL İŞ YAZIMI DA komple başarısız olur.
-      //
-      // Burada trigger fonksiyonunun sahibini geçici olarak superuser olmayan
-      // bir role çeviriyoruz; böylece SECURITY DEFINER o rolün haklarıyla
-      // koşar ve politika gerçekten sınanır.
-      const a = await createTenant('probe-tenant', 'Probe');
+      const a = await bootstrapTenant(app, { slug: 'probe-tenant', name: 'Probe' });
 
       await database.ownerPool.query(`
         do $$ begin
@@ -338,15 +360,18 @@ describe('kiracılık ve RLS', () => {
       await database.ownerPool.query(
         'alter function audit_row_change() owner to audit_probe_owner',
       );
+      await database.ownerPool.query(
+        'alter function audit_row_change_redacted() owner to audit_probe_owner',
+      );
 
       try {
         const before = await database.ownerPool.query<{ n: number }>(
           'select count(*)::int as n from audit_log',
         );
 
-        const res = await http()
+        const res = await http(app)
           .patch('/api/v1/tenant')
-          .set('x-tenant-id', a.tenant.id)
+          .set(auth(a.owner.tokens))
           .send({ name: 'Superuser Olmayan Sahip Testi' });
         expect(res.status, 'denetim yazımı işlemi bloke etmemeli').toBe(200);
 
@@ -356,12 +381,15 @@ describe('kiracılık ve RLS', () => {
         expect(after.rows[0]?.n).toBeGreaterThan(before.rows[0]?.n ?? 0);
       } finally {
         await database.ownerPool.query('alter function audit_row_change() owner to klinara_owner');
+        await database.ownerPool.query(
+          'alter function audit_row_change_redacted() owner to klinara_owner',
+        );
       }
     });
 
     it('bir kiracı diğerinin denetim kaydını okuyamaz', async () => {
-      const a = await createTenant('denetim-d', 'Denetim D');
-      const b = await createTenant('denetim-e', 'Denetim E');
+      const a = await bootstrapTenant(app, { slug: 'denetim-d', name: 'Denetim D' });
+      const b = await bootstrapTenant(app, { slug: 'denetim-e', name: 'Denetim E' });
 
       const readAs = async (tenantId: string) => {
         const client = await pool.connect();
@@ -383,11 +411,13 @@ describe('kiracılık ve RLS', () => {
 
       expect(countA).toBeGreaterThan(0);
       expect(countB).toBeGreaterThan(0);
-      // Her biri yalnızca KENDİ kayıtlarını görür; toplam ikisinin toplamına eşit.
+      // Kiracıya bağlanamayan kayıtlar (ör. kiracı-üstü kullanıcı satırları)
+      // hiçbir kiracının okumasına açık değildir; bu yüzden toplam >= ikisinin toplamı.
       const { rows } = await database.ownerPool.query<{ n: number }>(
         'select count(*)::int as n from audit_log',
       );
-      expect(countA + countB).toBe(rows[0]?.n);
+      expect(countA + countB).toBeLessThanOrEqual(rows[0]?.n ?? 0);
+      expect(countA + countB).toBeGreaterThan(0);
     });
   });
 });

@@ -6,6 +6,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
+import { Public } from '../../common/decorators/auth.decorators';
 import type { Response } from 'express';
 import pg from 'pg';
 import { PG_POOL } from '../../database/database.constants';
@@ -16,6 +17,10 @@ import { HealthResponseDto, ReadinessResponseDto } from './dto/health-response.d
 @Controller()
 // Sağlık uçları izleme sistemleri tarafından sık çağrılır; sınırlama dışı.
 @SkipThrottle()
+// Orkestratör (Kubernetes probe'u, load balancer) token taşıyamaz: bu uçlar
+// kimlik doğrulamasının DIŞINDA olmak zorundadır. Karşılığında hiçbir iş verisi
+// dönmezler — yalnız "ayakta mı" ve "trafik alabilir mi".
+@Public()
 export class HealthController {
   constructor(@Inject(PG_POOL) private readonly pool: pg.Pool) {}
 

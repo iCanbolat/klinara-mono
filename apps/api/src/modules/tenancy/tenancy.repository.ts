@@ -77,6 +77,29 @@ export async function getSettings(
   return row;
 }
 
+export async function updateSettings(
+  tx: Tx,
+  tenantId: string,
+  values: Updatable<
+    Pick<
+      TenantSettingsRow,
+      | 'slotGranularityMinutes'
+      | 'preventCustomerDoubleBooking'
+      | 'reminderHoursBefore'
+      | 'cancelWindowHours'
+      | 'requireMfaForAdmins'
+    >
+  >,
+): Promise<TenantSettingsRow | undefined> {
+  if (Object.keys(values).length === 0) return getSettings(tx, tenantId);
+  const [row] = await tx
+    .update(tenantSettings)
+    .set(values)
+    .where(eq(tenantSettings.tenantId, tenantId))
+    .returning();
+  return row;
+}
+
 export async function insertBranch(
   tx: Tx,
   values: {

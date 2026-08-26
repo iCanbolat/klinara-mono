@@ -1,10 +1,11 @@
 import { timingSafeEqual } from 'node:crypto';
 import { Injectable, type NestMiddleware } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { EnvironmentVariables } from '../../config/env.validation';
 import { isUUID } from 'class-validator';
 import type { NextFunction, Request, Response } from 'express';
 import { ERROR_CODES } from '@klinara/shared';
+import type { EnvironmentVariables } from '../../config/env.validation';
+import { TokenService } from '../../modules/identity/token.service';
 import { AppError } from '../errors/app-error';
 import { resolveRequestId, runWithRequestContext, type RequestContext } from '../request-context';
 
@@ -25,45 +26,67 @@ function uuidHeader(request: Request, name: string): string | null {
 }
 
 /**
- * İstek context'i: kiracı, kullanıcı, şube ve istek kimliği.
+ * İstek context'i: kiracı, kullanıcı, oturum, şube ve istek kimliği.
  *
- * ⚠️ GEÇİCİ KÖPRÜ — Faz 1'e kadar.
- * Gerçek kimlik doğrulaması Batch 1.2'de (JWT) gelecek. O zamana kadar:
- *   - `/platform/*` uçları PLATFORM_ADMIN_TOKEN bearer token'ı ile korunur.
- *   - Kiracı context'i yalnız AUTH_DEV_MODE açıkken başlıktan okunur; bu bayrak
- *     üretimde env doğrulaması tarafından REDDEDİLİR.
- * Batch 1.2 geldiğinde yalnızca `resolveContext` gövdesi JWT çözümlemesiyle
- * değişecek; `TenantTxService` sözleşmesi ve tüm çağıran kod aynı kalacak.
+ * Kimlik artık access JWT'sinden çözülür (Batch 1.2). Kiracı, token'ın
+ * içindedir — istemci başlıkla değiştiremez; `X-Tenant-Id` diye bir başlık
+ * ARTIK YOKTUR. Şube ise başlıkla gelir ama üyeliği `AuthGuard` doğrular.
+ *
+ * Token geçersizse istek burada DÜŞÜRÜLMEZ: hata isteğe iliştirilir ve
+ * `AuthGuard` fırlatır. Sebebi public uçlar — geçersiz bir Authorization
+ * başlığı, giriş ucunu kullanılamaz hâle getirmemeli.
+ *
+ * Platform yönetimi (`/platform/*`) ayrı kanaldadır: kiracı-üstü bir işlem
+ * olduğu için kiracı JWT'siyle ifade edilemez.
  */
 @Injectable()
 export class RequestContextMiddleware implements NestMiddleware {
-  constructor(private readonly config: ConfigService<EnvironmentVariables, true>) {}
+  constructor(
+    private readonly config: ConfigService<EnvironmentVariables, true>,
+    private readonly tokens: TokenService,
+  ) {}
 
-  private resolveContext(request: Request, requestId: string): RequestContext {
-    const authHeader = request.headers.authorization ?? '';
-    const bearer = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  private static bearerOf(request: Request): string {
+    const header = request.headers.authorization ?? '';
+    return header.startsWith('Bearer ') ? header.slice(7).trim() : '';
+  }
+
+  private isPlatformToken(bearer: string): boolean {
     const platformToken = this.config.get('PLATFORM_ADMIN_TOKEN', { infer: true });
+    return platformToken !== undefined && bearer.length > 0 && safeEqual(bearer, platformToken);
+  }
 
-    const isPlatformAdmin =
-      platformToken !== undefined && bearer.length > 0 && safeEqual(bearer, platformToken);
-
-    if (!this.config.get('AUTH_DEV_MODE', { infer: true })) {
-      return {
-        tenantId: null,
-        userId: null,
-        branchId: null,
-        requestId,
-        isPlatformAdmin,
-      };
-    }
-
-    return {
-      tenantId: uuidHeader(request, 'x-tenant-id'),
-      userId: uuidHeader(request, 'x-user-id'),
-      branchId: uuidHeader(request, 'x-branch-id'),
+  private async resolveContext(request: Request, requestId: string): Promise<RequestContext> {
+    const base: RequestContext = {
+      tenantId: null,
+      userId: null,
+      branchId: null,
+      sessionId: null,
       requestId,
-      isPlatformAdmin,
+      isPlatformAdmin: false,
     };
+
+    const bearer = RequestContextMiddleware.bearerOf(request);
+    if (bearer === '') return base;
+    if (this.isPlatformToken(bearer)) return { ...base, isPlatformAdmin: true };
+
+    try {
+      const claims = await this.tokens.verifyAccess(bearer);
+      request.tokenVersion = claims.tv;
+      return {
+        ...base,
+        tenantId: claims.tid,
+        userId: claims.sub,
+        sessionId: claims.sid,
+        branchId: uuidHeader(request, 'x-branch-id'),
+      };
+    } catch (error) {
+      if (error instanceof AppError) {
+        request.authError = error;
+        return base;
+      }
+      throw error;
+    }
   }
 
   use(request: Request, response: Response, next: NextFunction): void {
@@ -73,10 +96,15 @@ export class RequestContextMiddleware implements NestMiddleware {
     // ile log ve trace tek adımda bulunabilsin.
     response.setHeader('x-request-id', requestId);
 
-    const ctx = this.resolveContext(request, requestId);
-    request.ctx = ctx;
-    // `next()` ÇAĞRISI store'un İÇİNDE olmalı; zincirin geri kalanı ve tüm
-    // async devamları bağlamı buradan devralır.
-    runWithRequestContext(ctx, next);
+    void this.resolveContext(request, requestId)
+      .then((ctx) => {
+        request.ctx = ctx;
+        // `next()` ÇAĞRISI store'un İÇİNDE olmalı; zincirin geri kalanı ve tüm
+        // async devamları bağlamı buradan devralır.
+        runWithRequestContext(ctx, next);
+      })
+      .catch((error: unknown) => {
+        next(error);
+      });
   }
 }

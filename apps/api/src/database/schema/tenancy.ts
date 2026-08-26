@@ -9,32 +9,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { customType } from 'drizzle-orm/pg-core';
-
-/** `citext` — büyük/küçük harf duyarsız metin (slug, e-posta). */
-const citext = customType<{ data: string }>({
-  dataType: () => 'citext',
-});
-
-/**
- * `integer[]` — hatırlatma saatleri gibi küçük sayı listeleri.
- *
- * node-postgres `int4[]` sütunlarını ZATEN JS dizisine çevirir, dolayısıyla
- * `fromDriver` çoğu zaman bir dizi alır. Yine de ham `{24,2}` metni gelme
- * ihtimaline karşı iki biçimi de karşılıyoruz.
- */
-const integerArray = customType<{ data: number[]; driverData: string | number[] }>({
-  dataType: () => 'integer[]',
-  fromDriver: (value) => {
-    if (Array.isArray(value)) return value.map(Number);
-    return String(value)
-      .replace(/^\{|\}$/g, '')
-      .split(',')
-      .filter((part) => part.length > 0)
-      .map(Number);
-  },
-  toDriver: (value) => `{${value.join(',')}}`,
-});
+import { citext, integerArray } from './columns';
 
 export const tenantStatus = pgEnum('tenant_status', ['trial', 'active', 'suspended']);
 
@@ -78,6 +53,8 @@ export const tenantSettings = pgTable('tenant_settings', {
   preventCustomerDoubleBooking: boolean('prevent_customer_double_booking').notNull().default(true),
   reminderHoursBefore: integerArray('reminder_hours_before').notNull(),
   cancelWindowHours: integer('cancel_window_hours').notNull().default(24),
+  /** Yönetici rolleri (owner, manager, accountant) için 2FA zorunlu mu. */
+  requireMfaForAdmins: boolean('require_mfa_for_admins').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

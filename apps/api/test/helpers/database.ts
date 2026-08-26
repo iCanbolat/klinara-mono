@@ -55,9 +55,16 @@ export async function startTestDatabase(): Promise<TestDatabase> {
     ownerPool,
     appPool,
     truncateAll: async () => {
+      // Referans veri (roller, izinler) migration tarafından yazılır ve sistem
+      // sözleşmesinin parçasıdır — testler arasında SİLİNMEZ. Silinseydi her
+      // testin başında rol tablosu boş olur, üyelik ve davet yazımları
+      // anlamsız bir foreign key hatasıyla düşerdi.
       const { rows } = await ownerPool.query<{ tablename: string }>(
         `select tablename from pg_tables
-          where schemaname = 'public' and tablename <> '_klinara_migrations'`,
+          where schemaname = 'public'
+            and tablename not in (
+              '_klinara_migrations', 'roles', 'permissions', 'role_permissions'
+            )`,
       );
       if (rows.length === 0) return;
       const list = rows.map((r) => `public."${r.tablename}"`).join(', ');

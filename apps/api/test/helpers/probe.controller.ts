@@ -5,6 +5,7 @@ import { IsInt, IsString, Min, MinLength } from 'class-validator';
 import { PinoLogger } from 'nestjs-pino';
 import { ERROR_CODES } from '@klinara/shared';
 import { AppError } from '../../src/common/errors/app-error';
+import { Public } from '../../src/common/decorators/auth.decorators';
 
 export const LOG_MARKER = 'benzersiz-hata-izi-42';
 
@@ -25,6 +26,8 @@ class ProbeBodyDto {
  */
 @ApiExcludeController()
 @Controller()
+// Bu uçlar hata katmanını ölçer, kimlik katmanını değil.
+@Public()
 export class ProbeController {
   constructor(private readonly logger: PinoLogger) {}
 

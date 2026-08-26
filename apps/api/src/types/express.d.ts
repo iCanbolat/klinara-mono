@@ -1,4 +1,6 @@
 import type { RequestContext } from '../common/request-context';
+import type { Principal } from '../modules/identity/principal';
+import type { AppError } from '../common/errors/app-error';
 
 declare global {
   namespace Express {
@@ -10,6 +12,24 @@ declare global {
        * bildirmiyoruz, `requestIdOf()` ile string'e çeviriyoruz.
        */
       ctx?: RequestContext;
+
+      /**
+       * Çözümlenmiş yetkiler — `AuthGuard` yazar.
+       *
+       * İzinler token'da TAŞINMAZ: rol değişiminin anında etkili olması için
+       * her istekte üyelikten çözülür (kısa ömürlü cache ile).
+       */
+      principal?: Principal;
+
+      /** Access token'daki `tv` claim'i — yetki çözümlemesinde karşılaştırılır. */
+      tokenVersion?: number;
+
+      /**
+       * Token doğrulama hatası. Middleware token'ı çözemezse isteği hemen
+       * düşürmez — public uçlar geçersiz bir başlıktan etkilenmemeli. Hatayı
+       * `AuthGuard` fırlatır.
+       */
+      authError?: AppError;
     }
   }
 }

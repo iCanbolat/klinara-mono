@@ -4,6 +4,7 @@ import { AppError } from '../../common/errors/app-error';
 import { isPgError, PG_ERROR } from '../../common/errors/db-errors';
 import { setTenantContext } from '../../database/tenant-tx';
 import { TenantTxService } from '../../database/tenant-tx.service';
+import { InvitationsService } from '../identity/invitations.service';
 import * as repo from './tenancy.repository';
 import type {
   BranchResponseDto,
@@ -14,6 +15,7 @@ import type {
   TenantSettingsResponseDto,
   UpdateBranchDto,
   UpdateTenantDto,
+  UpdateTenantSettingsDto,
 } from './dto/tenant.dto';
 
 function toTenantResponse(row: repo.TenantRow): TenantResponseDto {
@@ -25,6 +27,16 @@ function toTenantResponse(row: repo.TenantRow): TenantResponseDto {
     timezone: row.timezone,
     currency: row.currency,
     createdAt: row.createdAt.toISOString(),
+  };
+}
+
+function toSettingsResponse(row: repo.TenantSettingsRow): TenantSettingsResponseDto {
+  return {
+    slotGranularityMinutes: row.slotGranularityMinutes,
+    preventCustomerDoubleBooking: row.preventCustomerDoubleBooking,
+    reminderHoursBefore: row.reminderHoursBefore,
+    cancelWindowHours: row.cancelWindowHours,
+    requireMfaForAdmins: row.requireMfaForAdmins,
   };
 }
 
@@ -44,14 +56,21 @@ function toBranchResponse(row: repo.BranchRow): BranchResponseDto {
 
 @Injectable()
 export class TenancyService {
-  constructor(private readonly tx: TenantTxService) {}
+  constructor(
+    private readonly tx: TenantTxService,
+    private readonly invitations: InvitationsService,
+  ) {}
 
   /**
-   * Yeni kiracı + ilk şube + varsayılan ayarlar.
+   * Yeni kiracı + ilk şube + varsayılan ayarlar + işletme sahibi daveti.
    *
    * Kiracı satırı yazıldıktan HEMEN SONRA context o kiracıya daraltılır;
    * devamındaki yazımlar platform istisnasıyla değil, NORMAL kiracı
    * politikasıyla geçer.
+   *
+   * Sahip daveti aynı transaction'da oluşur: kiracı açılır ama içine kimse
+   * giremezse iş görmez, ve platform yöneticisinin kiracı verisine erişimi
+   * yoktur (olmamalıdır da). Kullanıcı hesabı davet KABUL EDİLİNCE açılır.
    */
   async createTenant(input: CreateTenantDto): Promise<CreateTenantResponseDto> {
     const result = await this.tx
@@ -70,7 +89,12 @@ export class TenancyService {
           name: input.branch.name,
           timezone: input.branch.timezone ?? input.timezone,
         });
-        return { tenant, branch };
+        const invitation = await this.invitations.createOwnerInvitation(tx, {
+          tenantId: tenant.id,
+          email: input.owner.email,
+          fullName: input.owner.fullName,
+        });
+        return { tenant, branch, invitation };
       })
       .catch((error: unknown) => {
         if (isPgError(error, PG_ERROR.UNIQUE_VIOLATION)) {
@@ -81,9 +105,21 @@ export class TenancyService {
         throw error;
       });
 
+    const { invitation, token, link } = result.invitation;
+    await this.invitations.sendInvitationMail(
+      invitation.email,
+      link,
+      `${result.tenant.name} için Klinara hesabınız hazır`,
+    );
+
     return {
       tenant: toTenantResponse(result.tenant),
       branch: toBranchResponse(result.branch),
+      ownerInvitation: {
+        email: invitation.email,
+        expiresAt: invitation.expiresAt.toISOString(),
+        ...(this.invitations.tokenVisible ? { token, link } : {}),
+      },
     };
   }
 
@@ -105,12 +141,14 @@ export class TenancyService {
     const tenantId = this.tx.tenantId;
     const row = await this.tx.run((tx) => repo.getSettings(tx, tenantId));
     if (row === undefined) throw AppError.notFound('Kiracı ayarları bulunamadı');
-    return {
-      slotGranularityMinutes: row.slotGranularityMinutes,
-      preventCustomerDoubleBooking: row.preventCustomerDoubleBooking,
-      reminderHoursBefore: row.reminderHoursBefore,
-      cancelWindowHours: row.cancelWindowHours,
-    };
+    return toSettingsResponse(row);
+  }
+
+  async updateSettings(input: UpdateTenantSettingsDto): Promise<TenantSettingsResponseDto> {
+    const tenantId = this.tx.tenantId;
+    const row = await this.tx.run((tx) => repo.updateSettings(tx, tenantId, input));
+    if (row === undefined) throw AppError.notFound('Kiracı ayarları bulunamadı');
+    return toSettingsResponse(row);
   }
 
   async listBranches(): Promise<BranchResponseDto[]> {

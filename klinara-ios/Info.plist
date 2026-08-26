@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  GENERATE_INFOPLIST_FILE açık kalır; Xcode ürettiği anahtarları
+	  (scene manifest, launch screen, yönlendirme) bu dosyaya merge eder.
+	  Buraya yalnız üretilemeyen anahtarlar yazılır.
+	-->
+	<key>UIAppFonts</key>
+	<array>
+		<!-- Değişken font: Regular/Medium/SemiBold örneklerini tek dosyada taşır. -->
+		<string>Manrope-Variable.ttf</string>
+		<string>SourceSerif4-Regular.ttf</string>
+		<string>SourceSerif4-Semibold.ttf</string>
+	</array>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Kliniğinize parolanızı yazmadan, tek dokunuşla giriş yapmak için kullanılır.</string>
+</dict>
+</plist>

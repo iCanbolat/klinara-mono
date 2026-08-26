@@ -16,6 +16,8 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
+import { PERMISSIONS } from '@klinara/shared';
+import { RequirePermission } from '../../common/decorators/auth.decorators';
 import {
   BranchListResponseDto,
   BranchResponseDto,
@@ -24,6 +26,7 @@ import {
   TenantSettingsResponseDto,
   UpdateBranchDto,
   UpdateTenantDto,
+  UpdateTenantSettingsDto,
 } from './dto/tenant.dto';
 import { TenancyService } from './tenancy.service';
 
@@ -34,6 +37,7 @@ export class TenancyController {
   constructor(private readonly tenancy: TenancyService) {}
 
   @Get('tenant')
+  @RequirePermission(PERMISSIONS.TENANT_READ)
   @ApiOperation({ summary: 'Geçerli kiracının bilgileri' })
   @ApiOkResponse({ type: TenantResponseDto })
   getTenant(): Promise<TenantResponseDto> {
@@ -41,6 +45,7 @@ export class TenancyController {
   }
 
   @Patch('tenant')
+  @RequirePermission(PERMISSIONS.TENANT_WRITE)
   @ApiOperation({ summary: 'Kiracı bilgilerini güncelle' })
   @ApiOkResponse({ type: TenantResponseDto })
   updateTenant(@Body() body: UpdateTenantDto): Promise<TenantResponseDto> {
@@ -48,13 +53,23 @@ export class TenancyController {
   }
 
   @Get('tenant/settings')
+  @RequirePermission(PERMISSIONS.TENANT_READ)
   @ApiOperation({ summary: 'Kiracı ayarları' })
   @ApiOkResponse({ type: TenantSettingsResponseDto })
   getSettings(): Promise<TenantSettingsResponseDto> {
     return this.tenancy.getSettings();
   }
 
+  @Patch('tenant/settings')
+  @RequirePermission(PERMISSIONS.TENANT_WRITE)
+  @ApiOperation({ summary: 'Kiracı ayarlarını güncelle' })
+  @ApiOkResponse({ type: TenantSettingsResponseDto })
+  updateSettings(@Body() body: UpdateTenantSettingsDto): Promise<TenantSettingsResponseDto> {
+    return this.tenancy.updateSettings(body);
+  }
+
   @Get('branches')
+  @RequirePermission(PERMISSIONS.BRANCH_READ)
   @ApiOperation({ summary: 'Kiracının şubeleri' })
   @ApiOkResponse({ type: BranchListResponseDto })
   async listBranches(): Promise<BranchListResponseDto> {
@@ -62,6 +77,7 @@ export class TenancyController {
   }
 
   @Post('branches')
+  @RequirePermission(PERMISSIONS.BRANCH_WRITE)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Yeni şube aç' })
   @ApiCreatedResponse({ type: BranchResponseDto })
@@ -70,6 +86,7 @@ export class TenancyController {
   }
 
   @Patch('branches/:id')
+  @RequirePermission(PERMISSIONS.BRANCH_WRITE)
   @ApiOperation({ summary: 'Şube güncelle' })
   @ApiOkResponse({ type: BranchResponseDto })
   updateBranch(

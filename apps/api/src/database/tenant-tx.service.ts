@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { RequestContextService } from '../common/request-context';
+import { emptyContext, RequestContextService } from '../common/request-context';
 import { DRIZZLE, type Database } from './database.constants';
-import { withTenantTx, type Tx } from './tenant-tx';
+import { withAuthTx, withTenantTx, type Tx } from './tenant-tx';
 
 /**
  * Kiracı kapsamlı transaction'ların tek giriş noktası.
@@ -24,6 +24,31 @@ export class TenantTxService {
     const ctx = this.requestContext.get();
     if (ctx === undefined) throw new Error('İstek bağlamı bulunamadı');
     return withTenantTx(this.db, ctx, fn);
+  }
+
+  /**
+   * Kimlik akışı transaction'ı: kiracı seçilmeden önce koşan sorgular.
+   *
+   * YALNIZ kimlik modülünden çağrılır (giriş, davet, parola, passkey, telefon).
+   * `app.auth_flow` bayrağı kimlik tablolarını açar; iş verisi tablolarının
+   * politikalarında bu bayrak hiç geçmez.
+   */
+  async runAsAuth<T>(
+    fn: (tx: Tx) => Promise<T>,
+    options: { actorUserId?: string } = {},
+  ): Promise<T> {
+    const ctx = this.requestContext.get() ?? emptyContext();
+    // `actorUserId`: giriş akışında kullanıcı henüz istek bağlamında yoktur ama
+    // BİRİNCİ FAKTÖR DOĞRULANMIŞTIR. Aktörü açıkça vermek, kiracı listesi gibi
+    // sorguların politikada kullanıcıya daraltılabilmesini sağlar
+    // (bkz. `tenants_auth_flow_read`).
+    return withAuthTx(this.db, ctx, fn, options.actorUserId);
+  }
+
+  /** Kiracıyı açıkça vererek koşan kiracı kapsamlı transaction. */
+  async runForTenant<T>(tenantId: string, fn: (tx: Tx) => Promise<T>): Promise<T> {
+    const ctx = this.requestContext.get() ?? emptyContext();
+    return withTenantTx(this.db, { ...ctx, tenantId }, fn);
   }
 
   /** Platform yönetimi kapsamlı transaction (kiracı context'i olmadan). */

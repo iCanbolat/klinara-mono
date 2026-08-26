@@ -9,8 +9,22 @@ export interface RequestContext {
   tenantId: string | null;
   userId: string | null;
   branchId: string | null;
+  /** Access token'daki oturum kimliği; oturum listesi ve iptal için. */
+  sessionId: string | null;
   requestId: string;
   isPlatformAdmin: boolean;
+}
+
+/** İstek bağlamı olmayan akışlar (CLI, job) için boş bağlam. */
+export function emptyContext(requestId = randomUUID()): RequestContext {
+  return {
+    tenantId: null,
+    userId: null,
+    branchId: null,
+    sessionId: null,
+    requestId,
+    isPlatformAdmin: false,
+  };
 }
 
 /**
@@ -76,6 +90,15 @@ export class RequestContextService {
       );
     }
     return ctx.tenantId;
+  }
+
+  /** Kimliği doğrulanmış kullanıcının kimliği. */
+  requireUserId(): string {
+    const ctx = this.get();
+    if (ctx?.userId == null) {
+      throw AppError.unauthenticated();
+    }
+    return ctx.userId;
   }
 
   requirePlatformAdmin(): RequestContext {

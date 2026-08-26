@@ -46,7 +46,40 @@ export async function withTenantTx<T>(
         set_config('app.user_id',        ${ctx.userId ?? ''}, true),
         set_config('app.branch_id',      ${ctx.branchId ?? ''}, true),
         set_config('app.request_id',     ${ctx.requestId}, true),
-        set_config('app.platform_admin', ${ctx.isPlatformAdmin ? 'on' : 'off'}, true)
+        set_config('app.platform_admin', ${ctx.isPlatformAdmin ? 'on' : 'off'}, true),
+        set_config('app.auth_flow',      'off', true)
+    `);
+    return fn(tx);
+  });
+}
+
+/**
+ * Kimlik akışı transaction'ı — kiracı SEÇİLMEDEN önce koşan sorgular için.
+ *
+ * Giriş, parola sıfırlama, davet kabulü ve passkey doğrulaması "bu e-posta /
+ * bu credential kime ait?" sorusunu cevaplamak zorundadır; cevap kiracıdan
+ * bağımsızdır ve RLS bu soruya yardım edemez. `app.auth_flow` bayrağı bu
+ * istisnayı AÇIK, tek isimli ve denetlenebilir kılar.
+ *
+ * Bayrak yalnız kimlik tablolarının politikalarında geçer: bir kiracının
+ * randevusuna, müşterisine veya finansal kaydına ASLA erişim vermez. Alternatifi
+ * (uygulama rolüne BYPASSRLS vermek) izolasyonun tamamını çöpe atardı.
+ */
+export async function withAuthTx<T>(
+  db: Database,
+  ctx: RequestContext,
+  fn: (tx: Tx) => Promise<T>,
+  actorUserId?: string,
+): Promise<T> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`
+      select
+        set_config('app.auth_flow',      'on', true),
+        set_config('app.tenant_id',      ${ctx.tenantId ?? ''}, true),
+        set_config('app.user_id',        ${actorUserId ?? ctx.userId ?? ''}, true),
+        set_config('app.branch_id',      '', true),
+        set_config('app.request_id',     ${ctx.requestId}, true),
+        set_config('app.platform_admin', 'off', true)
     `);
     return fn(tx);
   });

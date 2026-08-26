@@ -18,6 +18,8 @@ export function setupSwagger(app: INestApplication, version: string): void {
     .addServer('/', 'Geçerli sunucu')
     .addTag('system', 'Sağlık, hazırlık ve metrikler')
     .addTag('tenancy', 'Kiracı ve şube yönetimi')
+    .addTag('auth', 'Giriş, oturum, 2FA, telefon doğrulama ve passkey')
+    .addTag('identity', 'Kullanıcılar, roller ve davetler')
     .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'bearerAuth')
     .build();
 

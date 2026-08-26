@@ -1,16 +1,21 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  IsArray,
   IsBoolean,
+  IsEmail,
   IsIn,
   IsNotEmpty,
   IsOptional,
   IsString,
+  IsInt,
   IsTimeZone,
   IsUUID,
   Length,
   Matches,
+  Max,
   MaxLength,
+  Min,
   ValidateNested,
 } from 'class-validator';
 
@@ -40,6 +45,18 @@ export class CreateTenantBranchDto {
   timezone?: string;
 }
 
+export class CreateTenantOwnerDto {
+  @ApiProperty({ example: 'sahip@klinik.com' })
+  @IsEmail({}, { message: 'Geçerli bir e-posta olmalı' })
+  email: string;
+
+  @ApiPropertyOptional({ example: 'Ayşe Yılmaz' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  fullName?: string;
+}
+
 export class CreateTenantDto {
   @ApiProperty({ example: 'guzellik-merkezi' })
   @IsString()
@@ -67,6 +84,17 @@ export class CreateTenantDto {
   @ValidateNested()
   @Type(() => CreateTenantBranchDto)
   branch: CreateTenantBranchDto;
+
+  /**
+   * İşletme sahibi daveti.
+   *
+   * Kiracı ile birlikte oluşturulur, çünkü sahipsiz bir kiracıya KİMSE giriş
+   * yapamaz — platform yöneticisinin kiracı verisine erişimi yoktur ve olmamalıdır.
+   */
+  @ApiProperty({ type: CreateTenantOwnerDto })
+  @ValidateNested()
+  @Type(() => CreateTenantOwnerDto)
+  owner: CreateTenantOwnerDto;
 }
 
 export class UpdateTenantDto {
@@ -112,6 +140,44 @@ export class TenantResponseDto {
   createdAt: string;
 }
 
+export class UpdateTenantSettingsDto {
+  @ApiPropertyOptional({ enum: [5, 10, 15, 20, 30, 60] })
+  @IsOptional()
+  @IsIn([5, 10, 15, 20, 30, 60])
+  slotGranularityMinutes?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  preventCustomerDoubleBooking?: boolean;
+
+  @ApiPropertyOptional({ type: [Number], example: [24, 2] })
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  @Max(720, { each: true })
+  reminderHoursBefore?: number[];
+
+  @ApiPropertyOptional({ example: 24 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(720)
+  cancelWindowHours?: number;
+
+  /**
+   * Yönetici rolleri (owner, manager, accountant) için 2FA zorunluluğu.
+   *
+   * Açıldığında, TOTP'si olmayan yöneticiler girişte kurulum akışına düşer;
+   * doğrulanmadan tam yetkili token ALMAZLAR.
+   */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  requireMfaForAdmins?: boolean;
+}
+
 export class TenantSettingsResponseDto {
   @ApiProperty({ example: 15 })
   slotGranularityMinutes: number;
@@ -124,6 +190,9 @@ export class TenantSettingsResponseDto {
 
   @ApiProperty({ example: 24 })
   cancelWindowHours: number;
+
+  @ApiProperty()
+  requireMfaForAdmins: boolean;
 }
 
 export class BranchResponseDto {
@@ -155,12 +224,35 @@ export class BranchResponseDto {
   createdAt: string;
 }
 
+export class TenantOwnerInvitationDto {
+  @ApiProperty()
+  email: string;
+
+  @ApiProperty({ format: 'date-time' })
+  expiresAt: string;
+
+  /**
+   * Davet token'ı — YALNIZ üretim dışında döner.
+   *
+   * E-posta gönderimi Batch 8.1'e kadar loga yazdığı için, geliştirme akışı
+   * tıkanmasın diye yanıtta da veriliyor.
+   */
+  @ApiPropertyOptional()
+  token?: string;
+
+  @ApiPropertyOptional()
+  link?: string;
+}
+
 export class CreateTenantResponseDto {
   @ApiProperty({ type: TenantResponseDto })
   tenant: TenantResponseDto;
 
   @ApiProperty({ type: BranchResponseDto })
   branch: BranchResponseDto;
+
+  @ApiProperty({ type: TenantOwnerInvitationDto })
+  ownerInvitation: TenantOwnerInvitationDto;
 }
 
 export class BranchListResponseDto {

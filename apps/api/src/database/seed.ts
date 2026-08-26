@@ -1,5 +1,13 @@
+import { createHash, randomBytes } from 'node:crypto';
+import { hash } from '@node-rs/argon2';
 import pg from 'pg';
 import { loadEnvOrExit } from '../config/load-env';
+
+/** `Algorithm.Argon2id`. Ambient const enum olduğu için değeri doğrudan yazıyoruz. */
+const ARGON2_ID = 2;
+
+const DEMO_OWNER_EMAIL = 'sahip@demo-klinik.test';
+const DEMO_PASSWORD = 'demo-parola-12345';
 
 /**
  * Geliştirme ortamı hazırlığı.
@@ -58,7 +66,52 @@ async function seed(): Promise<void> {
       [tenantId],
     );
 
-    process.stdout.write(`[seed] Demo kiracı hazır: ${tenantId} (slug: demo-klinik)\n`);
+    // İşletme sahibi: Faz 1'den sonra giriş yapılabilir bir hesap olmadan API
+    // kullanılamaz (kiracı context'i JWT'den gelir, başlıktan değil).
+    const passwordHash = await hash(DEMO_PASSWORD, {
+      algorithm: ARGON2_ID,
+      memoryCost: env.ARGON2_MEMORY_COST,
+      timeCost: env.ARGON2_TIME_COST,
+      parallelism: env.ARGON2_PARALLELISM,
+    });
+
+    const owner = await client.query<{ id: string }>(
+      `insert into users (email, full_name, password_hash)
+       values ($1, 'Demo Klinik Sahibi', $2)
+       on conflict (email) where deleted_at is null
+       do update set password_hash = excluded.password_hash
+       returning id`,
+      [DEMO_OWNER_EMAIL, passwordHash],
+    );
+    const ownerId = owner.rows[0]?.id;
+    if (ownerId === undefined) throw new Error('Demo kullanıcı oluşturulamadı');
+
+    await client.query(
+      `insert into memberships (tenant_id, user_id, role_key)
+       values ($1, $2, 'owner')
+       on conflict do nothing`,
+      [tenantId, ownerId],
+    );
+
+    // Resepsiyon için bekleyen bir davet: davet akışı yerelde tek komutla denenebilsin.
+    const invitationToken = randomBytes(32).toString('base64url');
+    const branch = await client.query<{ id: string }>(
+      `select id from branches where tenant_id = $1 and slug = 'merkez'`,
+      [tenantId],
+    );
+    await client.query(
+      `insert into invitations (tenant_id, branch_id, role_key, email, full_name, token_hash, expires_at)
+       values ($1, $2, 'receptionist', 'resepsiyon@demo-klinik.test', 'Demo Resepsiyon', $3, now() + interval '7 days')
+       on conflict (tenant_id, email) where accepted_at is null and revoked_at is null
+       do nothing`,
+      [tenantId, branch.rows[0]?.id, createHash('sha256').update(invitationToken).digest('hex')],
+    );
+
+    process.stdout.write(
+      `[seed] Demo kiracı hazır: ${tenantId} (slug: demo-klinik)\n` +
+        `[seed] Giriş: ${DEMO_OWNER_EMAIL} / ${DEMO_PASSWORD}\n` +
+        `[seed] Bekleyen davet token'ı: ${invitationToken}\n`,
+    );
   } finally {
     await client.end();
   }

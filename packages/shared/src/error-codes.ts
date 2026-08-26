@@ -16,8 +16,32 @@ export const ERROR_CODES = {
   // --- Kimlik & yetki ---
   UNAUTHENTICATED: 'UNAUTHENTICATED',
   TOKEN_EXPIRED: 'TOKEN_EXPIRED',
+  TOKEN_INVALID: 'TOKEN_INVALID',
   FORBIDDEN: 'FORBIDDEN',
   BRANCH_FORBIDDEN: 'BRANCH_FORBIDDEN',
+
+  // --- Giriş akışı ---
+  /** Kullanıcı adı VEYA parola hatalı. İkisi bilerek ayrıştırılmaz. */
+  INVALID_CREDENTIALS: 'INVALID_CREDENTIALS',
+  /** Ardışık hatalı denemeler sonrası geçici kilit. */
+  ACCOUNT_LOCKED: 'ACCOUNT_LOCKED',
+  ACCOUNT_DISABLED: 'ACCOUNT_DISABLED',
+  /** Kullanıcı birden çok kiracıda; `POST /auth/tenant` ile seçim gerekir. */
+  TENANT_SELECTION_REQUIRED: 'TENANT_SELECTION_REQUIRED',
+  /** İkinci faktör bekleniyor; ara `mfa` token'ı ile doğrulanmalı. */
+  MFA_REQUIRED: 'MFA_REQUIRED',
+  MFA_INVALID: 'MFA_INVALID',
+  /** Doğrulanmamış telefon giriş tanımlayıcısı olarak kullanılamaz. */
+  PHONE_NOT_VERIFIED: 'PHONE_NOT_VERIFIED',
+  PHONE_IN_USE: 'PHONE_IN_USE',
+  /** SMS / e-posta doğrulama kodu hatalı, süresi dolmuş veya yanmış. */
+  VERIFICATION_FAILED: 'VERIFICATION_FAILED',
+  PASSKEY_INVALID: 'PASSKEY_INVALID',
+  /** Son giriş yöntemi kaldırılamaz — kullanıcı hesabından kilitlenirdi. */
+  CREDENTIAL_REQUIRED: 'CREDENTIAL_REQUIRED',
+  INVITATION_INVALID: 'INVITATION_INVALID',
+  /** Kendinden geniş yetkili bir rolü atama denemesi. */
+  ROLE_ESCALATION: 'ROLE_ESCALATION',
 
   // --- Takvim ---
   SLOT_CONFLICT: 'SLOT_CONFLICT',

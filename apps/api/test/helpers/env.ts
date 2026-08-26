@@ -5,6 +5,18 @@ const BASE: Record<string, string> = {
   NODE_ENV: 'test',
   LOG_LEVEL: 'silent',
   DATABASE_URL: 'postgres://klinara_app:pw@127.0.0.1:5433/klinara_test',
+  JWT_SECRET: 'test-ortami-icin-jwt-anahtari-32-karakterden-uzun',
+  FIELD_ENCRYPTION_KEY: 'dGVzdC1hbGFuLXNpZnJlbGVtZS1hbmFodGFyaS0zMmI=',
+  // argon2 varsayılanı testlerde her giriş için ~50 ms harcar; testler
+  // ONLARCA giriş yapıyor. Parametreler burada bilerek düşürülür — üretim
+  // değerleri `.env.example` ve `env.validation.ts` içindedir.
+  ARGON2_MEMORY_COST: '8192',
+  ARGON2_TIME_COST: '2',
+  // Uç bazlı hız sınırları (giriş: dakikada 10) testleri birbirine bağlar;
+  // sayaç kapalı koşar. Hız sınırının KENDİSİ ayrı bir dosyada, açıkken sınanır.
+  RATE_LIMIT_ENABLED: 'false',
+  WEBAUTHN_RP_ID: 'localhost',
+  WEBAUTHN_ORIGINS: 'http://localhost:5173',
 };
 
 /**
