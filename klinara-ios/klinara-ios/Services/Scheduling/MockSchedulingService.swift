@@ -41,6 +41,23 @@ final class MockSchedulingService: SchedulingService, @unchecked Sendable {
         try? await Task.sleep(for: .seconds(seconds))
     }
 
+    // MARK: - Diğer mock'lar için eşzamanlı görüntü
+
+    /// ``MockBookingService`` uygunluğu bu üç görüntüden hesaplar. Ayrı bir
+    /// kopya tutmak yerine buradan okumasının sebebi: uygulamada çalışma
+    /// saatlerini değiştiren kullanıcı, bunun uygunluğa yansımasını görmeli.
+    func snapshotHours(branchId: String) -> [BranchHour] {
+        withLock { hours[branchId] ?? [] }
+    }
+
+    func snapshotSchedule(staffProfileId: String, branchId: String) -> [StaffScheduleEntry] {
+        withLock { schedules[Self.key(staffProfileId, branchId)] ?? [] }
+    }
+
+    func snapshotExceptions() -> [ScheduleException] {
+        withLock { exceptions.filter(\.isActive) }
+    }
+
     // MARK: - Şube saatleri
 
     func branchHours(branchId: String) async throws -> BranchHours {

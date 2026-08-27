@@ -27,6 +27,10 @@ final class AppSession {
     /// tutarsızlık üretirdi.
     let catalogStore: CatalogStore
     let staffStore: StaffStore
+    /// Takvim ve müşteriler de oturum ömürlü: randevu oluşturma sayfası,
+    /// randevu detayı ve müşteri kartı **aynı** listeyi güncelliyor.
+    let calendarStore: CalendarStore
+    let customerStore: CustomerStore
 
     private let tokens: TokenStore
 
@@ -39,8 +43,11 @@ final class AppSession {
         self.profile = profile
         self.branches = branches
         self.services = services
-        self.catalogStore = CatalogStore(service: services.catalog)
+        let catalogStore = CatalogStore(service: services.catalog)
+        self.catalogStore = catalogStore
         self.staffStore = StaffStore(service: services.staff)
+        self.calendarStore = CalendarStore(service: services.booking, catalog: catalogStore)
+        self.customerStore = CustomerStore(service: services.customers)
         let store = tokens ?? .shared
         self.tokens = store
         self.selectedBranchId = store.branchId ?? branches.first?.id

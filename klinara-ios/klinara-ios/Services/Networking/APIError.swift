@@ -40,12 +40,13 @@ nonisolated enum APIErrorCode: String, Decodable, Sendable {
     case roleEscalation = "ROLE_ESCALATION"
     case tenantContextMissing = "TENANT_CONTEXT_MISSING"
 
-    // Takvim (Faz 3'te kullanılacak; kod sözleşmesi şimdiden burada)
+    // Takvim
     case slotConflict = "SLOT_CONFLICT"
     case resourceUnavailable = "RESOURCE_UNAVAILABLE"
     case outsideWorkingHours = "OUTSIDE_WORKING_HOURS"
     case invalidStatusTransition = "INVALID_STATUS_TRANSITION"
     case versionConflict = "VERSION_CONFLICT"
+    case idempotencyConflict = "IDEMPOTENCY_CONFLICT"
 
     case unknown = "UNKNOWN"
 
@@ -75,13 +76,25 @@ nonisolated struct ProblemDetails: Decodable, Sendable {
     /// Yalnız doğrulama hatalarında dolu.
     let errors: [FieldError]?
 
+    /// `409 SLOT_CONFLICT`'te hangi kaynağın hangi aralıkta dolu olduğu.
+    ///
+    /// RFC 9457 uzantı alanları **belgenin kökünde** durur ve gövde taşıma
+    /// katmanında bir kez çözülür; uca özgü olmalarına rağmen burada olmalarının
+    /// sebebi bu. `nil` ile `[]` aynı anlama gelir — sunucu üretemediğinde
+    /// sessizce boş dizi döndürüyor.
+    let conflicts: [SlotConflict]?
+    /// Aynı hatada sunulan en fazla üç alternatif slot.
+    let suggestions: [SlotSuggestion]?
+
     init(
         code: APIErrorCode,
         title: String,
         detail: String? = nil,
         status: Int,
         requestId: String? = nil,
-        errors: [FieldError]? = nil
+        errors: [FieldError]? = nil,
+        conflicts: [SlotConflict]? = nil,
+        suggestions: [SlotSuggestion]? = nil
     ) {
         self.code = code
         self.title = title
@@ -89,6 +102,8 @@ nonisolated struct ProblemDetails: Decodable, Sendable {
         self.status = status
         self.requestId = requestId
         self.errors = errors
+        self.conflicts = conflicts
+        self.suggestions = suggestions
     }
 }
 
@@ -181,6 +196,16 @@ extension APIError {
                 return "Seçilen saat dolu. Başka bir saat seçin."
             case .outsideWorkingHours:
                 return "Seçilen saat çalışma saatleri dışında."
+            case .resourceUnavailable:
+                // Sunucu bu kodu üç ayrı sebeple döndürüyor (yetkinsiz personel,
+                // pasif hizmet/personel, personelin izinli olması) ve hangisi
+                // olduğunu yalnız `detail` söylüyor. Genel bir cümle burada
+                // kullanıcıyı yanlış yöne gönderirdi.
+                return problem.detail ?? problem.title
+            case .invalidStatusTransition:
+                return problem.detail ?? problem.title
+            case .idempotencyConflict:
+                return "Aynı istek hâlâ işleniyor. Birkaç saniye sonra tekrar deneyin."
             case .versionConflict:
                 return "Bu kayıt siz düzenlerken başkası tarafından değiştirildi. Yenileyip tekrar deneyin."
             default:
@@ -228,6 +253,27 @@ extension APIError {
 // MARK: - Form yardımcıları
 
 extension APIError {
+
+    /// Çakışma ayrıntıları — yalnız `SLOT_CONFLICT` hatasında anlamlı.
+    var slotConflicts: [SlotConflict] {
+        guard case .problem(let problem) = self, problem.code == .slotConflict else { return [] }
+        return problem.conflicts ?? []
+    }
+
+    /// Sunucunun önerdiği alternatif slotlar — yalnız `SLOT_CONFLICT`'te dolu.
+    var slotSuggestions: [SlotSuggestion] {
+        guard case .problem(let problem) = self, problem.code == .slotConflict else { return [] }
+        return problem.suggestions ?? []
+    }
+
+    /// `PATCH`/`reschedule` başlığı eksik gönderilmiş — istemci hatası.
+    ///
+    /// Sunucu bunu `412` değil **`428`** ile ve `VERSION_CONFLICT` koduyla
+    /// bildiriyor; koda bakıp "başkası değiştirdi" demek yanlış olurdu.
+    var isPreconditionRequired: Bool {
+        guard case .problem(let problem) = self else { return false }
+        return problem.status == 428
+    }
 
     /// Alan bazlı doğrulama hataları — form alanlarının altına yerleştirilir.
     var fieldErrors: [String: String] {

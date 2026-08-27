@@ -19,6 +19,11 @@ final class MockStaffService: StaffService, @unchecked Sendable {
         return try body()
     }
 
+    /// ``MockBookingService`` yetkinlik ve personel adlarını buradan okur —
+    /// randevunun personelinin gerçekten o hizmeti yapabildiğini mock da
+    /// doğrulasın diye. ``MockCatalogService/snapshotServices`` ile aynı amaç.
+    var snapshotProfiles: [StaffProfile] { withLock { _profiles } }
+
     private func latency(_ seconds: Double = 0.4) async {
         try? await Task.sleep(for: .seconds(seconds))
     }

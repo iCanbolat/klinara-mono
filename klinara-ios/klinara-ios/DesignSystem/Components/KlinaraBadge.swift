@@ -3,7 +3,10 @@ import SwiftUI
 /// Küçük durum rozeti — aktif/pasif, online, şubeye özel.
 struct KlinaraBadge: View {
 
-    enum Tone {
+    /// Değer tipi; oyuncu izolasyonu gerektirmez. `nonisolated` işareti,
+    /// wire modellerinin (`AppointmentStatus.badgeTone`) tonu doğrudan
+    /// söyleyebilmesi için — varsayılan `MainActor` izolasyonu onu kapatırdı.
+    nonisolated enum Tone: Sendable {
         case neutral, positive, warning, muted
     }
 

@@ -10,13 +10,26 @@ struct DeveloperScenarioList: View {
 
     let mock: MockAuthService
     var onSelect: (MockScenario) -> Void
+    /// Oturum açıldıktan sonraki mock veriyi seçer. Giriş ekranından
+    /// açıldığında verilmez — orada bakılacak bir takvim henüz yok.
+    var data: MockDataScenario?
+    var onSelectData: ((MockDataScenario) -> Void)?
 
     @State private var selection: MockScenario
+    @State private var dataSelection: MockDataScenario?
 
-    init(mock: MockAuthService, onSelect: @escaping (MockScenario) -> Void) {
+    init(
+        mock: MockAuthService,
+        data: MockDataScenario? = nil,
+        onSelectData: ((MockDataScenario) -> Void)? = nil,
+        onSelect: @escaping (MockScenario) -> Void
+    ) {
         self.mock = mock
+        self.data = data
+        self.onSelectData = onSelectData
         self.onSelect = onSelect
         _selection = State(initialValue: mock.scenario)
+        _dataSelection = State(initialValue: data)
     }
 
     var body: some View {
@@ -43,6 +56,41 @@ struct DeveloperScenarioList: View {
                     .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
+            }
+
+            if let onSelectData {
+                Rectangle()
+                    .fill(KlinaraColor.border)
+                    .frame(height: 1)
+
+                Text("Veri")
+                    .klinaraText(.label)
+                    .foregroundStyle(KlinaraColor.charcoalMuted)
+
+                ForEach(MockDataScenario.allCases) { scenario in
+                    Button {
+                        dataSelection = scenario
+                        onSelectData(scenario)
+                    } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(scenario.turkishName)
+                                    .klinaraText(.bodyM)
+                                    .foregroundStyle(KlinaraColor.charcoal)
+                                Text(scenario.detail)
+                                    .font(.footnote)
+                                    .foregroundStyle(KlinaraColor.charcoalMuted)
+                            }
+                            Spacer()
+                            if dataSelection == scenario {
+                                Image(systemName: "checkmark")
+                                    .foregroundStyle(KlinaraColor.sage)
+                            }
+                        }
+                        .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
 
             Rectangle()

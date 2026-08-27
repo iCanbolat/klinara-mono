@@ -25,23 +25,36 @@ struct AppShellView: View {
         session.canAny(Permissions.serviceRead, Permissions.staffRead, Permissions.scheduleRead)
     }
 
+    /// `accountant` rolünde hiç randevu izni yok. Sekme yine de duruyor —
+    /// varsayılan seçili sekmenin bazı rollerde kaybolması bilgi mimarisini
+    /// role göre değiştirmek olurdu — ama içerik "erişimin yok" der.
+    private var canSeeCalendar: Bool {
+        session.canAny(Permissions.appointmentReadAll, Permissions.appointmentReadOwn)
+    }
+
     var body: some View {
         TabView(selection: $selection) {
             Tab("Bugün", systemImage: "calendar", value: Tabs.today) {
-                ComingSoonView(
-                    title: "Bugün",
-                    icon: "calendar",
-                    message: "Randevu takvimi Faz 3 ile geliyor."
-                )
+                if canSeeCalendar {
+                    CalendarHomeView(session: session)
+                } else {
+                    NavigationStack {
+                        EmptyStateView(
+                            icon: "calendar",
+                            title: "Takvim erişiminiz yok",
+                            message: "Rolünüz randevuları görüntülemeyi kapsamıyor."
+                        )
+                        .background(KlinaraColor.surface)
+                        .navigationTitle("Bugün")
+                        .navigationBarTitleDisplayMode(.inline)
+                    }
+                    .tint(KlinaraColor.sage)
+                }
             }
 
             if session.can(Permissions.customerRead) {
                 Tab("Müşteriler", systemImage: "person.2", value: Tabs.customers) {
-                    ComingSoonView(
-                        title: "Müşteriler",
-                        icon: "person.2",
-                        message: "Müşteri kartı, notlar ve tıbbi profil Faz 4 ile geliyor."
-                    )
+                    CustomerListView(session: session)
                 }
             }
 
@@ -73,6 +86,12 @@ enum Permissions {
     static let scheduleRead = "schedule:read"
     static let scheduleWrite = "schedule:write"
     static let customerRead = "customer:read"
+    static let customerWrite = "customer:write"
+    static let appointmentReadAll = "appointment:read.all"
+    static let appointmentReadOwn = "appointment:read.own"
+    static let appointmentWrite = "appointment:write"
+    /// `completed`tan çıkış izni. `owner` ve `manager`da var, `receptionist`te yok.
+    static let appointmentReopen = "appointment:reopen"
     static let branchRead = "branch:read"
     static let userRead = "user:read"
 }

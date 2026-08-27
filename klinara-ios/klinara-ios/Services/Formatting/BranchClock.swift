@@ -149,4 +149,67 @@ struct BranchClock: Sendable {
     func adding(days: Int, to date: Date) -> Date {
         calendar.date(byAdding: .day, value: days, to: date) ?? date
     }
+
+    // MARK: Takvim aritmetiği
+
+    /// `GET /calendar/day?date=` ve `?weekStart=` parametrelerinin biçimi.
+    ///
+    /// Sunucu burada bir **an** değil, şubenin yerel takvim gününü bekliyor.
+    /// Cihaz saatiyle üretmek gece yarısına yakın saatlerde bir gün öteye
+    /// kayardı — kullanıcı bugünü açar, dün gelirdi.
+    func localDateString(_ date: Date) -> String {
+        let parts = calendar.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
+    }
+
+    /// `"2026-09-07"` → şube saatinde o günün başlangıcı.
+    /// `density[].localDay` ve `birthDate` gibi çıplak tarihleri yorumlar.
+    func date(fromLocalDateString raw: String) -> Date? {
+        let parts = raw.split(separator: "-")
+        guard parts.count == 3,
+              let year = Int(parts[0]), let month = Int(parts[1]), let day = Int(parts[2])
+        else { return nil }
+        var components = DateComponents()
+        components.year = year
+        components.month = month
+        components.day = day
+        return calendar.date(from: components)
+    }
+
+    /// Haftanın başlangıcı — `firstWeekday = 2` olduğu için daima **pazartesi**.
+    func startOfWeek(_ date: Date) -> Date {
+        let interval = calendar.dateInterval(of: .weekOfYear, for: date)
+        return interval?.start ?? startOfDay(date)
+    }
+
+    /// Verilen tarihin haftasındaki yedi gün, pazartesiden pazara.
+    func weekDays(of date: Date) -> [Date] {
+        let start = startOfWeek(date)
+        return (0..<7).map { adding(days: $0, to: start) }
+    }
+
+    func adding(minutes: Int, to date: Date) -> Date {
+        calendar.date(byAdding: .minute, value: minutes, to: date) ?? date
+    }
+
+    /// İki an arasındaki dakika farkı. Izgarada blok yüksekliği bundan çıkar.
+    func minutes(from start: Date, to end: Date) -> Int {
+        calendar.dateComponents([.minute], from: start, to: end).minute ?? 0
+    }
+
+    /// Şube saatinde gece yarısından itibaren geçen dakika — ızgarada y ofseti.
+    ///
+    /// `startOfDay`'e göre ölçülür, saat bileşenine göre değil: yaz saati
+    /// geçişinde gün 23 ya da 25 saat sürer ve blokların kayması gerekir.
+    func minutesFromMidnight(_ date: Date) -> Int {
+        minutes(from: startOfDay(date), to: date)
+    }
+
+    func isSameDay(_ lhs: Date, _ rhs: Date) -> Bool {
+        calendar.isDate(lhs, inSameDayAs: rhs)
+    }
+
+    func isToday(_ date: Date, now: Date = Date()) -> Bool {
+        isSameDay(date, now)
+    }
 }

@@ -459,7 +459,18 @@ final class AuthFlowModel {
         if visible.count > 1, tokens.branchId == nil {
             step = .branchSelect
         } else {
-            tokens.setBranch(visible.first?.id)
+            // Bu yol oturum GERİ YÜKLENİRKEN de geçiliyor. Koşulsuz
+            // `setBranch(visible.first)` yazmak, kullanıcının seçtiği şubeyi
+            // her açılışta listenin ilkiyle eziyordu — çok şubeli bir klinik
+            // uygulamayı her açtığında yanlış şubenin takvimine bakıyordu.
+            //
+            // Kayıtlı şube artık **erişilebilir değilse** yine de düzeltilir:
+            // üyeliği alınmış bir şube kimliğiyle atılan her istek
+            // `403 BRANCH_FORBIDDEN` alırdı.
+            let saved = tokens.branchId
+            if saved == nil || !visible.contains(where: { $0.id == saved }) {
+                tokens.setBranch(visible.first?.id)
+            }
             await offerPasskeyOrFinish()
         }
     }

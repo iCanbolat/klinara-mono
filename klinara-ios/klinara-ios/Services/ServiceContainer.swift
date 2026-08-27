@@ -12,9 +12,13 @@ final class ServiceContainer {
     let staff: any StaffService
     let scheduling: any SchedulingService
     let users: any UsersService
+    let booking: any BookingService
+    let customers: any CustomerService
 
     /// Mock kullanılıyorsa geliştirici senaryo menüsü açılır.
     let mockAuth: MockAuthService?
+    /// Mock veride hangi senaryonun yüklü olduğu — menüde seçili satır için.
+    private(set) var mockDataScenario: MockDataScenario?
 
     private init(
         auth: any AuthService,
@@ -22,14 +26,20 @@ final class ServiceContainer {
         staff: any StaffService,
         scheduling: any SchedulingService,
         users: any UsersService,
-        mockAuth: MockAuthService?
+        booking: any BookingService,
+        customers: any CustomerService,
+        mockAuth: MockAuthService?,
+        mockDataScenario: MockDataScenario? = nil
     ) {
         self.auth = auth
         self.catalog = catalog
         self.staff = staff
         self.scheduling = scheduling
         self.users = users
+        self.booking = booking
+        self.customers = customers
         self.mockAuth = mockAuth
+        self.mockDataScenario = mockDataScenario
     }
 
     /// Gerçek sunucuya bağlanan kurulum.
@@ -41,22 +51,61 @@ final class ServiceContainer {
             staff: LiveStaffService(client: client),
             scheduling: LiveSchedulingService(client: client),
             users: LiveUsersService(client: client),
+            booking: LiveBookingService(client: client),
+            customers: LiveCustomerService(client: client),
             mockAuth: nil
         )
     }
 
     /// Sunucu olmadan arayüzü sürmek için — Preview'lar ve senaryo menüsü.
-    static func mock(scenario: MockScenario = .passwordThenTotp) -> ServiceContainer {
+    ///
+    /// İki senaryo bağımsızdır: `scenario` girişin hangi yoldan gideceğini,
+    /// `data` oturum açıldıktan sonra görülecek takvimi seçer.
+    ///
+    /// Mock'lar birbirine **kurucu üzerinden** bağlanır (personel katalogdan,
+    /// randevu üçünden birden okur); ayrı ayrı tohumlanmış kopyalar birbirini
+    /// tanımayan kimliklerle çalışırdı.
+    static func mock(
+        scenario: MockScenario = .passwordThenTotp,
+        data: MockDataScenario = .busyDay
+    ) -> ServiceContainer {
         let mockAuth = MockAuthService(scenario: scenario)
         let catalog = MockCatalogService()
+        let staff = MockStaffService(catalog: catalog)
+        let scheduling = MockSchedulingService()
+        let customers = MockCustomerService(scenario: data)
         return ServiceContainer(
             auth: mockAuth,
             catalog: catalog,
-            staff: MockStaffService(catalog: catalog),
-            scheduling: MockSchedulingService(),
+            staff: staff,
+            scheduling: scheduling,
             users: MockUsersService(),
-            mockAuth: mockAuth
+            booking: MockBookingService(
+                catalog: catalog,
+                staff: staff,
+                scheduling: scheduling,
+                customers: customers,
+                scenario: data
+            ),
+            customers: customers,
+            mockAuth: mockAuth,
+            mockDataScenario: data
         )
+    }
+
+    /// Mock veri senaryosunu değiştirir. Canlı kurulumda hiçbir şey yapmaz.
+    ///
+    /// Konteyneri yeniden kurmak yerine servisleri yeniden tohumluyoruz:
+    /// çalışan ``AppSession`` eski servis örneklerini tutuyor ve yeni bir
+    /// konteyner ona hiç ulaşmazdı. Çağıran yine de oturumu düşürmeli —
+    /// store'lar yüklenmiş veriyi önbelleğinde tutuyor.
+    func applyMockData(_ scenario: MockDataScenario) {
+        guard let customers = customers as? MockCustomerService,
+              let booking = booking as? MockBookingService
+        else { return }
+        customers.reseed(scenario)
+        booking.reseed(scenario)
+        mockDataScenario = scenario
     }
 
     /// Oturum düştüğünde kabuğun haberdar olması için `APIClient`'a bağlanır.

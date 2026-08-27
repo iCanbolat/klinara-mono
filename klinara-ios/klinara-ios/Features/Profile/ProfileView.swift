@@ -116,7 +116,16 @@ struct ProfileView: View {
         if let mock = session.services.mockAuth {
             KlinaraCard {
                 DisclosureGroup(isExpanded: $showsDeveloperMenu) {
-                    DeveloperScenarioList(mock: mock) { scenario in
+                    DeveloperScenarioList(
+                        mock: mock,
+                        data: session.services.mockDataScenario,
+                        onSelectData: { scenario in
+                            session.services.applyMockData(scenario)
+                            // Store'lar veriyi önbellekte tutuyor; oturumu
+                            // düşürmeden yeni tohum ekrana yansımazdı.
+                            Task { await authFlow.logout() }
+                        }
+                    ) { scenario in
                         mock.scenario = scenario
                         PasskeyRegistry.hasEnrolledPasskey = (scenario == .happyPasskey)
                         Task { await authFlow.logout() }

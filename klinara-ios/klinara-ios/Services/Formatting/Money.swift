@@ -37,14 +37,13 @@ enum Money {
     /// Ayrıştırılamayan girdi `nil` döner — sessizce 0 kabul etmek, kullanıcının
     /// yazdığından farklı bir fiyat kaydetmenin en kestirme yoludur.
     static func parse(_ text: String) -> Int? {
-        let cleaned = text
+        let stripped = text
             .replacingOccurrences(of: "₺", with: "")
             .replacingOccurrences(of: " ", with: "")
             .replacingOccurrences(of: "\u{00A0}", with: "")
-            .replacingOccurrences(of: ".", with: "")
-            .replacingOccurrences(of: ",", with: ".")
             .trimmingCharacters(in: .whitespaces)
 
+        let cleaned = normalizeSeparators(stripped)
         guard !cleaned.isEmpty else { return nil }
         let decimal = NSDecimalNumber(string: cleaned, locale: Locale(identifier: "en_US_POSIX"))
         guard decimal != .notANumber else { return nil }
@@ -52,6 +51,27 @@ enum Money {
         let minor = decimal.multiplying(by: 100, withBehavior: roundingBehavior)
         guard minor.compare(NSDecimalNumber.zero) != .orderedAscending else { return nil }
         return minor.intValue
+    }
+
+    /// Nokta ve virgülün hangisinin ondalık olduğunu ayırır.
+    ///
+    /// Virgül varsa Türkçe yazım kesindir: noktalar binlik ayırıcıdır. Virgül
+    /// yoksa tek bir noktanın ardından **bir ya da iki** basamak geliyorsa bu
+    /// ondalıktır (`1500.50`), üç basamak geliyorsa binlik ayırıcıdır (`1.500`).
+    ///
+    /// Bu ayrım olmadan `"1500.50"` girişi noktası silinip `150050` oluyor ve
+    /// 1.500,50 ₺ yerine **150.050,00 ₺** kaydediliyordu — yüz katlık bir hata.
+    private static func normalizeSeparators(_ raw: String) -> String {
+        if raw.contains(",") {
+            return raw
+                .replacingOccurrences(of: ".", with: "")
+                .replacingOccurrences(of: ",", with: ".")
+        }
+        let parts = raw.components(separatedBy: ".")
+        if parts.count == 2, (1...2).contains(parts[1].count) {
+            return raw
+        }
+        return raw.replacingOccurrences(of: ".", with: "")
     }
 
     private static let roundingBehavior = NSDecimalNumberHandler(

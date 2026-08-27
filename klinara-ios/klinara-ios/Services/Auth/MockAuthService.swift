@@ -16,8 +16,19 @@ enum MockScenario: String, CaseIterable, Identifiable, Sendable {
     case accountLocked = "Hesap kilitli"
     case rateLimited = "Hız sınırı"
     case networkError = "Bağlantı hatası"
+    case practitionerScope = "Uygulayıcı yetkisi"
 
     var id: String { rawValue }
+
+    /// Oturumun taşıdığı rol.
+    ///
+    /// Faz 2'ye kadar mock **daima** `practitioner` döndürüyordu; o rolde
+    /// Yönetim sekmesi hiç görünmez ve randevu yazılamaz, yani mock modda
+    /// uygulamanın yarısı erişilemez kalıyordu. Varsayılan artık `manager`;
+    /// dar yetkiyi denemek isteyen ``practitionerScope`` senaryosunu seçer.
+    var roleKey: String {
+        self == .practitionerScope ? "practitioner" : "manager"
+    }
 }
 
 /// Sahte kimlik servisi.
@@ -191,8 +202,12 @@ final class MockAuthService: AuthService, @unchecked Sendable {
 
     func me() async throws -> MeResponse {
         await simulateLatency(0.3)
-        let (verified, multipleBranches) = withLock { (_phoneVerified, _scenario == .multiBranch) }
-        return try decode(Fixtures.me(phoneVerified: verified, multipleBranches: multipleBranches))
+        let (verified, current) = withLock { (_phoneVerified, _scenario) }
+        return try decode(Fixtures.me(
+            phoneVerified: verified,
+            multipleBranches: current == .multiBranch,
+            roleKey: current.roleKey
+        ))
     }
 
     func branches() async throws -> [BranchSummary] {
@@ -310,20 +325,43 @@ private enum Fixtures {
         "9a4c-7b2f", "5f8e-4c3d", "3b7d-8e1a", "6c2f-5a9b", "0e1d-3c7f",
     ]
 
-    static func me(phoneVerified: Bool, multipleBranches: Bool) -> String {
+    /// `packages/shared/src/permissions.ts` içindeki rol tanımlarının aynısı.
+    /// Elle kısaltılmış bir liste, ekranların gerçekte olmayan bir yetki
+    /// bileşimiyle test edilmesi demek olurdu.
+    private static func permissions(for roleKey: String) -> String {
+        switch roleKey {
+        case "practitioner":
+            return """
+            ["appointment:read.own", "appointment:write", "customer:read", "customer:write",
+             "customer.medical:read", "customer.medical:write", "service:read", "staff:read",
+             "schedule:read", "package:read", "consent:read"]
+            """
+        default:  // manager
+            return """
+            ["appointment:read.all", "appointment:write", "appointment:reopen",
+             "customer:read", "customer:write", "customer.medical:read",
+             "service:read", "service:write", "staff:read", "staff:write",
+             "schedule:read", "schedule:write", "branch:read", "user:read", "user:invite",
+             "package:read", "package:write", "consent:read", "notification:send"]
+            """
+        }
+    }
+
+    static func me(phoneVerified: Bool, multipleBranches: Bool, roleKey: String) -> String {
+        let roleName = roleKey == "practitioner" ? "Uygulayıcı" : "Yönetici"
         let memberships = multipleBranches
             ? """
               [
                 { "id": "m1", "branchId": "b1000000-0000-4000-8000-000000000001",
-                  "roleKey": "practitioner", "roleName": "Uygulayıcı" },
+                  "roleKey": "\(roleKey)", "roleName": "\(roleName)" },
                 { "id": "m2", "branchId": "b1000000-0000-4000-8000-000000000002",
-                  "roleKey": "practitioner", "roleName": "Uygulayıcı" }
+                  "roleKey": "\(roleKey)", "roleName": "\(roleName)" }
               ]
               """
             : """
               [
                 { "id": "m1", "branchId": "b1000000-0000-4000-8000-000000000001",
-                  "roleKey": "practitioner", "roleName": "Uygulayıcı" }
+                  "roleKey": "\(roleKey)", "roleName": "\(roleName)" }
               ]
               """
         let branchIds = multipleBranches
@@ -346,8 +384,8 @@ private enum Fixtures {
             "memberships": \(memberships)
           },
           "tenantId": "7f3d1a20-0000-4000-8000-000000000001",
-          "roles": ["practitioner"],
-          "permissions": ["appointment:read.own", "customer:read"],
+          "roles": ["\(roleKey)"],
+          "permissions": \(permissions(for: roleKey)),
           "branchIds": \(branchIds),
           "tenantWide": false
         }

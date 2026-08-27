@@ -140,6 +140,10 @@ actor APIClient {
             urlRequest.setValue(key, forHTTPHeaderField: "Idempotency-Key")
         }
 
+        if let ifMatch = request.ifMatch {
+            urlRequest.setValue(ifMatch, forHTTPHeaderField: "If-Match")
+        }
+
         if let body = request.body {
             urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
             do {
