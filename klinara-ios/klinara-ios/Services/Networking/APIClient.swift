@@ -69,6 +69,43 @@ actor APIClient {
         _ = try await perform(request)
     }
 
+    // MARK: - İmzalı yükleme
+
+    /// İmzalı adrese doğrudan PUT — dosya içeriği API sürecinden GEÇMEZ.
+    ///
+    /// Bu istek uygulamanın kendi sunucusuna değil, **nesne depolamasına**
+    /// (S3/MinIO ya da yerel geliştirme kapısı) gidiyor. Bu yüzden:
+    /// - `Authorization` ve `X-Branch-Id` **gönderilmez**. Oturum token'ını
+    ///   üçüncü bir tarafa sızdırmak kabul edilemez; imza zaten yetkidir.
+    /// - 401'de token yenileme denenmez — imzanın süresi dolduysa yeni bir
+    ///   `presign` gerekir, yeni bir access token değil.
+    /// - Yanıt `problem+json` değildir; hata ``APIError/uploadFailed(status:)``
+    ///   olarak taşınır.
+    ///
+    /// `Content-Type` `presign` yanıtındaki değerle **birebir aynı** olmalı:
+    /// imza onu kapsıyor, farklı bir değer imzayı geçersiz kılar.
+    func uploadToSignedURL(_ url: URL, data: Data, contentType: String) async throws {
+        var request = URLRequest(url: url)
+        request.httpMethod = HTTPMethod.put.rawValue
+        request.setValue(contentType, forHTTPHeaderField: "Content-Type")
+
+        let response: URLResponse
+        do {
+            (_, response) = try await session.upload(for: request, from: data)
+        } catch let error as URLError {
+            throw error.code == .cancelled ? APIError.cancelled : APIError.network
+        } catch {
+            throw APIError.network
+        }
+
+        guard let http = response as? HTTPURLResponse else {
+            throw APIError.malformedResponse("HTTP olmayan yanıt")
+        }
+        guard (200..<300).contains(http.statusCode) else {
+            throw APIError.uploadFailed(status: http.statusCode)
+        }
+    }
+
     // MARK: - Çekirdek
 
     private func perform(_ request: APIRequest, isRetry: Bool = false) async throws -> Data {

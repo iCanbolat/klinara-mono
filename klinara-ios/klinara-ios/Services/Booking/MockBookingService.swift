@@ -24,6 +24,15 @@ final class MockBookingService: BookingService, @unchecked Sendable {
     /// `Idempotency-Key` → (gövde imzası, üretilen randevu kimliği).
     private var idempotency: [String: (signature: String, appointmentId: String)] = [:]
 
+    /// Bir müşterinin randevuları — ``MockNotesService`` zaman çizelgesini
+    /// buradan kuruyor. İki mock ayrı ayrı tohumlansaydı aynı müşterinin
+    /// randevusu kartta hiç görünmezdi.
+    func appointmentSnapshot(customerId: String) -> [Appointment] {
+        lock.lock()
+        defer { lock.unlock() }
+        return appointments.filter { $0.customerId == customerId }
+    }
+
     /// Kullanıcının `appointment:reopen` izni. Mock'ta kimlik bilgisi yok;
     /// senaryo menüsünden gelen oturum bunu belirlemiyor, bu yüzden açık
     /// bırakılıyor ve kısıt yalnız ekranda (izin kontrolüyle) uygulanıyor.

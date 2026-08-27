@@ -1,9 +1,10 @@
 import Foundation
 
-/// Müşteri çekirdeği — `apps/api/src/modules/crm/dto/customer.dto.ts`.
+/// Müşteri kartı — `apps/api/src/modules/crm/dto/customer.dto.ts`.
 ///
-/// Batch 3.0'ın dar kapsamı: ad, telefon, e-posta, doğum tarihi, cinsiyet, not.
-/// Etiketler, mükerrer kayıt birleştirme ve sunucu tarafı arama Batch 4.1'e ait.
+/// Batch 3.0 çekirdeği (ad, telefon, e-posta, doğum tarihi, cinsiyet, not)
+/// Batch 4.1 ile genişledi: adres, geliş kaynağı, etiketler, sunucu tarafı
+/// arama ve mükerrer kayıt birleştirme.
 
 // MARK: - Alan temizleme
 
@@ -33,6 +34,46 @@ extension Nullable where Value == String {
         else { return .clear }
         return .set(trimmed)
     }
+}
+
+/// Müşterinin kliniğe nereden geldiği. Sunucudaki `CUSTOMER_SOURCES` ile
+/// birebir; sıra da aynı tutuluyor ki seçicideki düzen sunucu belgesine baksın.
+nonisolated enum CustomerSource: String, Codable, Sendable, CaseIterable, Identifiable {
+    case walkIn = "walk_in"
+    case referral
+    case instagram
+    case google
+    case website
+    case whatsapp
+    case other
+
+    var id: String { rawValue }
+
+    var turkishName: String {
+        switch self {
+        case .walkIn: return "Kapıdan"
+        case .referral: return "Tavsiye"
+        case .instagram: return "Instagram"
+        case .google: return "Google"
+        case .website: return "Web sitesi"
+        case .whatsapp: return "WhatsApp"
+        case .other: return "Diğer"
+        }
+    }
+}
+
+/// Kiracı kapsamlı etiket. Tekillik sunucuda **katlanmış ada** göre:
+/// "VIP", "Vip" ve "vıp" aynı etikettir (Ek G).
+nonisolated struct CustomerTag: Codable, Sendable, Identifiable, Equatable, Hashable {
+    let id: String
+    let name: String
+    /// `#RRGGBB` ya da `nil`.
+    let color: String?
+}
+
+nonisolated struct CustomerTagInput: Encodable, Sendable, Equatable {
+    var name: String
+    var color: String?
 }
 
 nonisolated enum CustomerGender: String, Codable, Sendable, CaseIterable, Identifiable {
@@ -66,13 +107,56 @@ nonisolated struct Customer: Codable, Sendable, Identifiable, Equatable {
     let birthDate: String?
     let gender: CustomerGender?
     let notes: String?
+    let addressLine: String?
+    let district: String?
+    let city: String?
+    let postalCode: String?
+    let source: CustomerSource?
+    /// Bu kayıt birleştirildiyse hayatta kalan kaydın kimliği. Elinde eski
+    /// kimliğe link olan bir istemci nereye gideceğini buradan görüyor.
+    let mergedIntoCustomerId: String?
+    let tags: [CustomerTag]
     let createdAt: Date
 
-    /// Listede aranırken bakılan alanlar. Sunucuda arama ucu Batch 4.1'de
-    /// gelecek; o güne kadar filtreleme istemcide.
+    /// Adres alanlarının okunur birleşimi — hepsi boşsa `nil`.
+    var addressSummary: String? {
+        let parts = [addressLine, [district, city].compactMap { $0 }.joined(separator: " / ")]
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
+        return parts.isEmpty ? nil : parts.joined(separator: "\n")
+    }
+
+    /// Etiket kümesi değişmiş bir kopya. Etiket adı ya da rengi düzenlendiğinde
+    /// karttaki rozetin de değişmesi gerekiyor; tüm listeyi yeniden çekmek
+    /// bir ad düzeltmesi için orantısızdı.
+    func replacingTags(_ tags: [CustomerTag]) -> Customer {
+        Customer(
+            id: id,
+            tenantId: tenantId,
+            fullName: fullName,
+            phone: phone,
+            email: email,
+            birthDate: birthDate,
+            gender: gender,
+            notes: notes,
+            addressLine: addressLine,
+            district: district,
+            city: city,
+            postalCode: postalCode,
+            source: source,
+            mergedIntoCustomerId: mergedIntoCustomerId,
+            tags: tags,
+            createdAt: createdAt
+        )
+    }
+
+    /// YEREL eşleşme — yüklü bir listeyi anlık filtrelemek için.
     ///
-    /// Karşılaştırma ``SearchText`` üzerinden: Türkçe'de `lowercased()` ile
-    /// `contains` birleşimi `"YILMAZ"` ile `"Yılmaz"`ı eşleştiremiyor.
+    /// Liste ekranı artık `GET /customers/search`e gidiyor; bu yol randevu
+    /// akışındaki müşteri seçici gibi zaten elde olan kaydı süzen yerlerde
+    /// kalıyor. Katlama ``SearchText`` üzerinden ve sunucudaki
+    /// `klinara_fold_tr()` ile **aynı haritayı** taşıyor: ikisi aynı sorguya
+    /// aynı cevabı veriyor.
     func matches(_ term: String) -> Bool {
         guard !term.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return true }
         if SearchText.matchesDigits(phone, term: term) { return true }
@@ -92,6 +176,11 @@ nonisolated struct CreateCustomerInput: Encodable, Sendable, Equatable {
     var birthDate: String?
     var gender: CustomerGender?
     var notes: String?
+    var addressLine: String?
+    var district: String?
+    var city: String?
+    var postalCode: String?
+    var source: CustomerSource?
 }
 
 /// Her alan üç durumlu: gönderilmedi / değer / `null`.
@@ -103,9 +192,15 @@ nonisolated struct UpdateCustomerInput: Encodable, Sendable, Equatable {
     var birthDate: Nullable<String> = .unchanged
     var gender: CustomerGender?
     var notes: Nullable<String> = .unchanged
+    var addressLine: Nullable<String> = .unchanged
+    var district: Nullable<String> = .unchanged
+    var city: Nullable<String> = .unchanged
+    var postalCode: Nullable<String> = .unchanged
+    var source: Nullable<CustomerSource> = .unchanged
 
     private enum CodingKeys: String, CodingKey {
         case fullName, phone, email, birthDate, gender, notes
+        case addressLine, district, city, postalCode, source
     }
 
     func encode(to encoder: any Encoder) throws {
@@ -116,6 +211,11 @@ nonisolated struct UpdateCustomerInput: Encodable, Sendable, Equatable {
         try container.encode(email, forKey: .email)
         try container.encode(birthDate, forKey: .birthDate)
         try container.encode(notes, forKey: .notes)
+        try container.encode(addressLine, forKey: .addressLine)
+        try container.encode(district, forKey: .district)
+        try container.encode(city, forKey: .city)
+        try container.encode(postalCode, forKey: .postalCode)
+        try container.encode(source, forKey: .source)
     }
 
     /// Gönderilecek bir şey var mı — boş gövde sunucuda no-op ama gereksiz bir
@@ -124,6 +224,48 @@ nonisolated struct UpdateCustomerInput: Encodable, Sendable, Equatable {
         fullName == nil && gender == nil
             && phone.isUnchanged && email.isUnchanged
             && birthDate.isUnchanged && notes.isUnchanged
+            && addressLine.isUnchanged && district.isUnchanged
+            && city.isUnchanged && postalCode.isUnchanged && source.isUnchanged
+    }
+}
+
+// MARK: - Etiket ataması
+
+/// `PUT /customers/:id/tags` — etiket kümesini TOPLUCA ayarlar.
+/// Ekleme/çıkarma ucu yok: gönderilen liste yeni kümedir.
+nonisolated struct PutCustomerTagsInput: Encodable, Sendable, Equatable {
+    let tagIds: [String]
+}
+
+// MARK: - Birleştirme
+
+nonisolated struct MergeCustomerInput: Encodable, Sendable, Equatable {
+    /// Arşivlenecek MÜKERRER kayıt. Yoldaki kimlik hayatta kalır.
+    let sourceCustomerId: String
+}
+
+nonisolated struct CustomerMergeResult: Decodable, Sendable, Equatable {
+    let id: String
+    let sourceCustomerId: String
+    let targetCustomerId: String
+    /// Tablo adı → taşınan satır sayısı. Ekranda "12 randevu taşındı" demek için.
+    let moved: [String: Int]
+    let customer: Customer
+
+    /// Kullanıcıya gösterilecek özet: sıfır satır taşınan tablolar atlanır.
+    var movedSummary: [(label: String, count: Int)] {
+        let labels = [
+            "appointments": "Randevu",
+            "customer_bookings": "Randevu kaydı",
+            "customer_notes": "Not",
+            "customer_files": "Dosya",
+            "customer_file_groups": "Fotoğraf grubu",
+            "customer_tag_assignments": "Etiket",
+        ]
+        return moved
+            .filter { $0.value > 0 }
+            .map { (labels[$0.key] ?? $0.key, $0.value) }
+            .sorted { $0.1 > $1.1 }
     }
 }
 

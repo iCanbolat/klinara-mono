@@ -8,6 +8,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   Req,
 } from '@nestjs/common';
 import {
@@ -29,6 +30,7 @@ import {
   CreateFileGroupDto,
   CustomerFileListResponseDto,
   CustomerFileResponseDto,
+  DownloadUrlQueryDto,
   DownloadUrlResponseDto,
   FileGroupListResponseDto,
   FileGroupResponseDto,
@@ -120,15 +122,17 @@ export class FilesController {
   @RequirePermission(PERMISSIONS.CUSTOMER_READ)
   @ApiOperation({
     summary: 'Süreli indirme adresi',
-    description: 'HER çağrı `customer_record_access_log`a düşer (KVKK m.6).',
+    description:
+      'HER çağrı `customer_record_access_log`a düşer (KVKK m.6): tam boyut `download`, küçük görsel `view` olarak. `variant=thumb` küçük görsel hazır değilse 409 döner — sessizce tam boyuta DÜŞMEZ.',
   })
   @ApiOkResponse({ type: DownloadUrlResponseDto })
   downloadUrl(
     @CurrentUser() principal: Principal,
     @Param('id', new ParseUUIDPipe()) id: string,
+    @Query() query: DownloadUrlQueryDto,
     @Req() request: Request,
   ): Promise<DownloadUrlResponseDto> {
-    return this.files.downloadUrl(principal, id, accessMeta(request));
+    return this.files.downloadUrl(principal, id, query.variant ?? 'original', accessMeta(request));
   }
 
   @Delete('files/:id')

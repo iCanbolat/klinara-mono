@@ -318,4 +318,88 @@ describe('müşteri dosyaları (Batch 4.3)', () => {
       ).resolves.toBeUndefined();
     });
   });
+
+  // -------------------------------------------------------------------------
+  describe('indirme adresi varyantı', () => {
+    it('küçük görsel HAZIR DEĞİLKEN thumb isteği 409 — tam boyuta düşmez', async () => {
+      const created = await upload();
+      const id = (created.body as FileBody).id;
+
+      const res = await http(app)
+        .get(`/api/v1/files/${id}/download-url`)
+        .query({ variant: 'thumb' })
+        .set(ownerAuth());
+
+      expect(res.status).toBe(409);
+      expect((res.body as Problem).code).toBe('CONFLICT');
+    });
+
+    it('worker koştuktan sonra thumb adresi KÜÇÜK görseli verir', async () => {
+      const created = await upload();
+      const id = (created.body as FileBody).id;
+
+      const worker = app.get(ThumbnailWorker);
+      await worker.handle({ fileId: id, tenantId: clinic.tenant.id });
+
+      const res = await http(app)
+        .get(`/api/v1/files/${id}/download-url`)
+        .query({ variant: 'thumb' })
+        .set(ownerAuth())
+        .expect(200);
+
+      const url = (res.body as { url: string }).url;
+      expect(url).toContain('-thumb.webp');
+
+      // İnen nesne TAM BOYUT değil: aynı adresten gelen gövde orijinalle
+      // birebir aynı olsaydı varyant hiçbir şey kazandırmıyor demekti.
+      const downloaded = await http(app).get(url).expect(200);
+      expect(Buffer.from(downloaded.body as Buffer).equals(PNG_1x1)).toBe(false);
+    });
+
+    it('erişim kaydı iki fiili AYIRIR: thumb view, tam boyut download', async () => {
+      const created = await upload();
+      const id = (created.body as FileBody).id;
+
+      const worker = app.get(ThumbnailWorker);
+      await worker.handle({ fileId: id, tenantId: clinic.tenant.id });
+
+      await http(app)
+        .get(`/api/v1/files/${id}/download-url`)
+        .query({ variant: 'thumb' })
+        .set(ownerAuth())
+        .expect(200);
+      await http(app).get(`/api/v1/files/${id}/download-url`).set(ownerAuth()).expect(200);
+
+      const rows = await database.ownerPool.query<{ action: string }>(
+        'select action from customer_record_access_log order by created_at',
+      );
+      // İstek sırası: önce ızgara (thumb), sonra tam boyut.
+      expect(rows.rows.map((r) => r.action)).toEqual(['view', 'download']);
+    });
+
+    it('409 olan thumb isteği erişim kaydı BIRAKMAZ', async () => {
+      const created = await upload();
+      const id = (created.body as FileBody).id;
+
+      await http(app)
+        .get(`/api/v1/files/${id}/download-url`)
+        .query({ variant: 'thumb' })
+        .set(ownerAuth())
+        .expect(409);
+
+      const rows = await database.ownerPool.query('select 1 from customer_record_access_log');
+      expect(rows.rowCount).toBe(0);
+    });
+
+    it('bilinmeyen varyant reddedilir', async () => {
+      const created = await upload();
+      const id = (created.body as FileBody).id;
+
+      const res = await http(app)
+        .get(`/api/v1/files/${id}/download-url`)
+        .query({ variant: 'huge' })
+        .set(ownerAuth());
+      expect(res.status).toBe(400);
+    });
+  });
 });

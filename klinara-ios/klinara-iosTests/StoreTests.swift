@@ -285,16 +285,20 @@ struct CustomerStoreTests {
         }
     }
 
-    @Test("Arama istemcide çalışır")
-    func searchesLocally() async {
+    /// Liste ekranı artık `GET /customers/search`e gidiyor (bkz.
+    /// `CustomerSearchAndTagTests`); YEREL eşleşme randevu akışındaki müşteri
+    /// seçici gibi zaten elde olan kaydı süzen yerlerde kalıyor.
+    @Test("Yerel eşleşme Türkçe katlamayla çalışır")
+    func matchesLocally() async {
         let graph = MockGraph(scenario: .busyDay)
         let store = CustomerStore(service: graph.customers)
         await store.load()
 
-        #expect(store.search("").count == store.customers.count)
-        #expect(store.search("zeynep").count == 1)
-        #expect(store.search("KAYA").count == 1)      // Türkçe katlama
-        #expect(store.search("0532 777").count == 1)  // biçimli telefon
-        #expect(store.search("bulunamaz").isEmpty)
+        let zeynep = store.customers.first { $0.id == MockCustomerSeed.zeynep }
+        #expect(zeynep?.matches("") == true)
+        #expect(zeynep?.matches("zeynep") == true)
+        #expect(zeynep?.matches("KAYA") == true)      // Türkçe katlama
+        #expect(zeynep?.matches("0532 777") == true)  // biçimli telefon
+        #expect(zeynep?.matches("bulunamaz") == false)
     }
 }

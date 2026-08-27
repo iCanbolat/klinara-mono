@@ -121,6 +121,9 @@ nonisolated enum APIError: Error, Sendable {
     case malformedResponse(String)
     /// Kullanıcı sistem sheet'ini kapattı — hata gösterilmez.
     case cancelled
+    /// İmzalı adrese yükleme başarısız. Nesne depolaması `problem+json`
+    /// konuşmuyor; elimizde yalnız HTTP durumu var.
+    case uploadFailed(status: Int)
 }
 
 /// Giriş akışı kodunun eski adı. Yeni kodda `APIError` kullanılır.
@@ -147,6 +150,13 @@ extension APIError {
 
         case .malformedResponse:
             return "Beklenmeyen bir yanıt alındı. Lütfen tekrar deneyin."
+
+        case .uploadFailed(let status):
+            // 403 neredeyse her zaman süresi dolmuş imza demek: kullanıcıya
+            // "yetkiniz yok" demek yanlış yönlendirme olurdu.
+            return status == 403
+                ? "Yükleme adresinin süresi doldu. Lütfen tekrar deneyin."
+                : "Dosya yüklenemedi. Bağlantınızı kontrol edip tekrar deneyin."
 
         case .problem(let problem):
             switch problem.code {
@@ -232,6 +242,10 @@ extension APIError {
             return true
         case .problem(let problem):
             return problem.code == .internalError || problem.code == .serviceUnavailable
+        // Yükleme hatası neredeyse her zaman geçici: süresi dolmuş imza ya da
+        // kopan bağlantı. Tekrar denemek yeni bir `presign` üretecek.
+        case .uploadFailed:
+            return true
         case .cancelled, .malformedResponse:
             return false
         }

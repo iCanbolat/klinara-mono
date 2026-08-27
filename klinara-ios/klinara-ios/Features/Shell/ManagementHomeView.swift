@@ -24,6 +24,9 @@ struct ManagementHomeView: View {
                     if session.can(Permissions.scheduleRead) {
                         scheduleCard
                     }
+                    if session.can(Permissions.customerRead) {
+                        customerCard
+                    }
                 }
                 .padding(.horizontal, KlinaraMetrics.screenInset)
                 .padding(.vertical, KlinaraMetrics.lg)
@@ -85,6 +88,20 @@ struct ManagementHomeView: View {
                 icon: "person.text.rectangle"
             ) {
                 StaffListView(session: session)
+            }
+        }
+    }
+
+    /// Etiketler kiracı kapsamlı ve müşteri kartından değil buradan yönetilir:
+    /// bir kartın içinde etiket **seçilir**, tanımlanmaz.
+    private var customerCard: some View {
+        KlinaraCard(title: "Müşteri") {
+            KlinaraNavigationRow(
+                label: "Müşteri etiketleri",
+                detail: "VIP, hassas cilt, kampanya…",
+                icon: "tag"
+            ) {
+                CustomerTagListView(session: session)
             }
         }
     }

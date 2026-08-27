@@ -387,6 +387,7 @@ extension APIError: @retroactive Identifiable {
         case .network: return "network"
         case .cancelled: return "cancelled"
         case .malformedResponse(let detail): return "malformed#\(detail)"
+        case .uploadFailed(let status): return "upload#\(status)"
         }
     }
 }

@@ -87,6 +87,12 @@ enum Permissions {
     static let scheduleWrite = "schedule:write"
     static let customerRead = "customer:read"
     static let customerWrite = "customer:write"
+    /// Birleştirme FK taşıyan ve geri alınması pahalı bir işlem; `owner` ve
+    /// `manager`da var, resepsiyonda yok.
+    static let customerMerge = "customer:merge"
+    /// Klinik notu ve fotoğraf sağlık verisidir (KVKK m.6): ayrı izin.
+    static let customerMedicalRead = "customer.medical:read"
+    static let customerMedicalWrite = "customer.medical:write"
     static let appointmentReadAll = "appointment:read.all"
     static let appointmentReadOwn = "appointment:read.own"
     static let appointmentWrite = "appointment:write"

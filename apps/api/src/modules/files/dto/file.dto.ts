@@ -20,6 +20,16 @@ export const FILE_KINDS = ['photo', 'document'] as const;
 export const FILE_POSITIONS = ['before', 'after', 'other'] as const;
 
 /**
+ * İndirme adresinin hangi nesneyi işaret ettiği.
+ *
+ * `thumb` yalnız fotoğraflarda ve küçük görsel üretildikten SONRA anlamlı;
+ * hazır değilken sessizce tam boyuta düşmek 25 MB'lık bir nesneyi ızgaraya
+ * indirmek olurdu.
+ */
+export const FILE_VARIANTS = ['original', 'thumb'] as const;
+export type FileVariant = (typeof FILE_VARIANTS)[number];
+
+/**
  * İzin verilen içerik tipleri.
  *
  * Beyaz liste, kara liste değil: yarın eklenecek bir tipin sessizce geçmesi
@@ -142,6 +152,13 @@ export class CustomerFileResponseDto {
 export class CustomerFileListResponseDto {
   @ApiProperty({ type: [CustomerFileResponseDto] })
   data: CustomerFileResponseDto[];
+}
+
+export class DownloadUrlQueryDto {
+  @ApiPropertyOptional({ enum: FILE_VARIANTS, default: 'original' })
+  @IsOptional()
+  @IsIn(FILE_VARIANTS)
+  variant?: FileVariant;
 }
 
 export class DownloadUrlResponseDto {

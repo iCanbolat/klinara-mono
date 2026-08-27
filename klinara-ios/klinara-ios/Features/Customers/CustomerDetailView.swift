@@ -1,22 +1,30 @@
 import SwiftUI
 
-/// Müşteri kartının Faz 3 hâli: kimlik bilgileri ve randevu geçmişi.
+/// Müşteri kartı — Faz 4 hâli.
 ///
-/// Notlar zaman çizelgesi, fotoğraflar ve tıbbi profil Faz 4'e ait; bu ekran
-/// onlara yer açacak biçimde bölümlenmiş durumda.
+/// Üç bölüm: **Bilgiler** (kimlik, iletişim, adres, etiketler), **zaman
+/// çizelgesi** (randevu + not, tek akış) ve **fotoğraflar ve belgeler**.
+///
+/// Faz 3'te ayrı bir randevu isteği vardı; zaman çizelgesi randevuları zaten
+/// getirdiği için kaldırıldı — ikisi birden aynı veriyi iki kez çekerdi.
 struct CustomerDetailView: View {
 
     let session: AppSession
     let customerId: String
 
-    @State private var appointments: LoadState<[CalendarEntry]> = .loading
+    @State private var record: CustomerRecordStore?
+    @State private var thumbnails: ThumbnailCache?
     @State private var isEditing = false
     @State private var isArchiving = false
+    @State private var isMerging = false
+    @State private var composingNote = false
+    @State private var editingNoteId: NoteReference?
     @State private var error: APIError?
 
     private var store: CustomerStore { session.customerStore }
     private var clock: BranchClock { session.clock }
     private var canWrite: Bool { session.can(Permissions.customerWrite) }
+    private var canMerge: Bool { session.can(Permissions.customerMerge) }
     private var customer: Customer? { store.customer(id: customerId) }
 
     var body: some View {
@@ -31,12 +39,12 @@ struct CustomerDetailView: View {
                         }
                         detailsCard(customer)
                         if let notes = customer.notes {
-                            KlinaraCard(title: "Not") {
+                            KlinaraCard(title: "Kart notu") {
                                 KlinaraRow(label: notes)
                             }
                         }
-                        appointmentsCard
-                        if canWrite { archiveButton }
+                        recordSections
+                        actionButtons
                     }
                     .padding(.horizontal, KlinaraMetrics.screenInset)
                     .padding(.vertical, KlinaraMetrics.lg)
@@ -45,25 +53,32 @@ struct CustomerDetailView: View {
                 EmptyStateView(
                     icon: "person.crop.circle.badge.questionmark",
                     title: "Müşteri bulunamadı",
-                    message: "Kayıt arşivlenmiş olabilir."
+                    message: "Kayıt arşivlenmiş ya da başka bir karta birleştirilmiş olabilir."
                 )
             }
         }
         .navigationTitle(customer?.fullName ?? "Müşteri")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            if canWrite, customer != nil {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Düzenle") { isEditing = true }
-                        .klinaraText(.bodyEmphasis)
-                        .foregroundStyle(KlinaraColor.sageDeep)
-                }
-            }
-        }
-        .task { await loadAppointments() }
+        .toolbar { toolbarContent }
+        .task(id: customerId) { await setUpRecord() }
         .sheet(isPresented: $isEditing) {
             if let customer {
                 CustomerEditorView(session: session, target: .edit(customer))
+            }
+        }
+        .sheet(isPresented: $isMerging) {
+            if let customer {
+                CustomerMergeView(session: session, target: customer)
+            }
+        }
+        .sheet(isPresented: $composingNote) {
+            if let record {
+                NoteEditorView(session: session, record: record, existing: nil)
+            }
+        }
+        .sheet(item: $editingNoteId) { noteId in
+            if let record, let note = record.note(id: noteId.value) {
+                NoteEditorView(session: session, record: record, existing: note)
             }
         }
         .confirmationDialog(
@@ -80,6 +95,19 @@ struct CustomerDetailView: View {
             )
         }
     }
+
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        if canWrite, customer != nil {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Düzenle") { isEditing = true }
+                    .klinaraText(.bodyEmphasis)
+                    .foregroundStyle(KlinaraColor.sageDeep)
+            }
+        }
+    }
+
+    // MARK: Bilgiler
 
     private func detailsCard(_ customer: Customer) -> some View {
         KlinaraCard(title: "Bilgiler") {
@@ -99,72 +127,98 @@ struct CustomerDetailView: View {
                 label: "Cinsiyet",
                 value: customer.gender?.turkishName ?? CustomerGender.undisclosed.turkishName
             )
+            if let address = customer.addressSummary {
+                KlinaraDivider()
+                KlinaraRow(label: "Adres", detail: address)
+            }
+            if let source = customer.source {
+                KlinaraDivider()
+                KlinaraRow(label: "Geliş kaynağı", value: source.turkishName)
+            }
             KlinaraDivider()
             KlinaraRow(label: "Kayıt", value: clock.formatDate(customer.createdAt))
+
+            if !customer.tags.isEmpty {
+                KlinaraDivider()
+                CustomerTagRow(tags: customer.tags)
+            }
         }
     }
 
+    // MARK: Kart verisi
+
     @ViewBuilder
-    private var appointmentsCard: some View {
-        switch appointments {
-        case .loading:
-            KlinaraCard(title: "Randevular") {
-                ProgressView()
-                    .tint(KlinaraColor.sage)
-                    .frame(maxWidth: .infinity)
-                    .padding(KlinaraMetrics.lg)
+    private var recordSections: some View {
+        if let record, let thumbnails {
+            CustomerTimelineView(
+                session: session,
+                record: record,
+                onEditNote: { editingNoteId = NoteReference(value: $0) }
+            )
+
+            if canWrite {
+                KlinaraButton(title: "Not ekle", kind: .secondary, icon: "square.and.pencil") {
+                    composingNote = true
+                }
             }
 
-        case .failed(let failure):
-            ErrorBanner(error: failure, onRetry: { Task { await loadAppointments() } })
+            CustomerFilesSection(session: session, record: record, thumbnails: thumbnails)
 
-        case .loaded(let entries):
-            KlinaraCard(
-                title: "Randevular",
-                footnote: entries.isEmpty ? nil : "Son bir yıl."
-            ) {
-                if entries.isEmpty {
-                    KlinaraRow(label: "Randevu kaydı yok")
-                } else {
-                    ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
-                        if index > 0 { KlinaraDivider() }
-                        KlinaraRow(
-                            label: entry.serviceSummary,
-                            detail: clock.formatDateTime(entry.startsAt)
-                        ) {
-                            KlinaraBadge(
-                                text: entry.status.turkishName,
-                                tone: entry.status.badgeTone
-                            )
-                        }
+            if record.canReadMedical {
+                KlinaraCard {
+                    KlinaraNavigationRow(
+                        label: "Öncesi / sonrası",
+                        detail: "Karşılaştırma grupları",
+                        icon: "rectangle.on.rectangle"
+                    ) {
+                        PhotoGroupsView(
+                            session: session,
+                            record: record,
+                            thumbnails: thumbnails
+                        )
                     }
                 }
             }
         }
     }
 
-    private var archiveButton: some View {
-        KlinaraButton(
-            title: "Müşteriyi arşivle",
-            kind: .tertiary,
-            icon: "archivebox"
-        ) { isArchiving = true }
+    @ViewBuilder
+    private var actionButtons: some View {
+        if canMerge, customer != nil {
+            KlinaraButton(
+                title: "Mükerrer kaydı birleştir",
+                kind: .tertiary,
+                icon: "arrow.triangle.merge"
+            ) { isMerging = true }
+        }
+        if canWrite {
+            KlinaraButton(title: "Müşteriyi arşivle", kind: .tertiary, icon: "archivebox") {
+                isArchiving = true
+            }
+        }
     }
 
-    private func loadAppointments() async {
-        appointments = .loading
-        let now = Date()
-        do {
-            let page = try await session.services.booking.appointments(AppointmentListQuery(
-                branchId: session.selectedBranchId,
-                from: clock.adding(days: -365, to: now),
-                to: clock.adding(days: 365, to: now),
-                customerId: customerId
-            ))
-            appointments = .loaded(page.data.sorted { $0.startsAt > $1.startsAt })
-        } catch {
-            appointments = .failed(error as? APIError ?? .network)
-        }
+    // MARK: Eylemler
+
+    /// Kart verisi kartla birlikte doğar. Store'u `.task(id:)` içinde kurmak,
+    /// başka bir müşteriye geçildiğinde eski notların ekranda kalmamasını
+    /// garanti ediyor.
+    private func setUpRecord() async {
+        let store = CustomerRecordStore(
+            customerId: customerId,
+            notes: session.services.notes,
+            files: session.services.files,
+            canReadMedical: session.can(Permissions.customerMedicalRead),
+            canWriteMedical: session.can(Permissions.customerMedicalWrite)
+        )
+        record = store
+        thumbnails = ThumbnailCache(service: session.services.files)
+
+        // Üçü paralel: kart açılışı üç isteğin toplamı kadar beklemesin.
+        async let timeline: Void = store.loadTimeline()
+        async let notes: Void = store.loadNotes()
+        async let files: Void = store.loadFiles()
+        _ = await (timeline, notes, files)
     }
 
     private func archive() async {
@@ -179,4 +233,10 @@ struct CustomerDetailView: View {
     private func formatted(_ localDate: String) -> String {
         clock.date(fromLocalDateString: localDate).map(clock.formatDate) ?? localDate
     }
+}
+
+/// `sheet(item:)` bir `Identifiable` istiyor; çıplak `String?` yetmiyor.
+private struct NoteReference: Identifiable {
+    let value: String
+    var id: String { value }
 }

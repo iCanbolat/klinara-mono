@@ -20,6 +20,7 @@ import {
   type CreateFileGroupDto,
   type CustomerFileResponseDto,
   type DownloadUrlResponseDto,
+  type FileVariant,
   type FileGroupResponseDto,
   type PresignUploadDto,
   type PresignUploadResponseDto,
@@ -213,6 +214,7 @@ export class FilesService {
   async downloadUrl(
     principal: Principal,
     id: string,
+    variant: FileVariant,
     meta: AccessMeta,
   ): Promise<DownloadUrlResponseDto> {
     const canSeePhotos = FilesService.canReadMedical(principal);
@@ -224,13 +226,22 @@ export class FilesService {
       // Göremeyeceği dosya 404 döner, 403 değil.
       if (file.kind === 'photo' && !canSeePhotos) return undefined;
 
+      // Küçük görsel HENÜZ hazır değilse tam boyuta düşmüyoruz: ızgara
+      // farkında olmadan 25 MB'lık nesneler indirirdi. İstemci yer tutucu
+      // gösterip birazdan tekrar sorsun.
+      if (variant === 'thumb' && file.thumbnailKey === null) {
+        throw AppError.conflict(ERROR_CODES.CONFLICT, 'Küçük görsel henüz hazır değil');
+      }
+
       await repo.insertAccessLog(tx, {
         tenantId: this.tx.tenantId,
         customerId: file.customerId,
         actorUserId: principal.userId,
         resourceType: 'file',
         resourceId: file.id,
-        action: 'download',
+        // Küçük görsel önizlemedir, dosyanın kendisini vermez: erişim kaydı
+        // ikisini AYIRIYOR. Enum'da her iki fiil de zaten var.
+        action: variant === 'thumb' ? 'view' : 'download',
         ip: meta.ip ?? null,
         userAgent: meta.userAgent ?? null,
         requestId: this.requestContext.get()?.requestId ?? null,
@@ -240,8 +251,10 @@ export class FilesService {
 
     if (row === undefined) throw AppError.notFound('Dosya bulunamadı');
 
+    const key = variant === 'thumb' && row.thumbnailKey !== null ? row.thumbnailKey : row.storageKey;
+
     return {
-      url: await this.storage.presignGet(row.storageKey, ttl),
+      url: await this.storage.presignGet(key, ttl),
       expiresAt: new Date(Date.now() + ttl * 1000).toISOString(),
     };
   }

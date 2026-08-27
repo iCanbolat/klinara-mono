@@ -15,6 +15,14 @@ struct CustomerForm: Equatable {
     var birthDate: Date
     var gender: CustomerGender?
     var notes: String
+    var addressLine: String
+    var district: String
+    var city: String
+    var postalCode: String
+    var source: CustomerSource?
+    /// Seçili etiket kimlikleri. Etiketler ayrı bir uca (`PUT .../tags`)
+    /// yazılıyor; form onları taşır ama gövdesine koymaz.
+    var tagIds: Set<String>
 
     private let original: Snapshot
 
@@ -25,6 +33,12 @@ struct CustomerForm: Equatable {
         var birthDate: String?
         var gender: CustomerGender?
         var notes: String
+        var addressLine: String
+        var district: String
+        var city: String
+        var postalCode: String
+        var source: CustomerSource?
+        var tagIds: Set<String>
     }
 
     private var current: Snapshot {
@@ -34,7 +48,13 @@ struct CustomerForm: Equatable {
             email: trimmed(email),
             birthDate: birthDateString,
             gender: gender,
-            notes: trimmed(notes)
+            notes: trimmed(notes),
+            addressLine: trimmed(addressLine),
+            district: trimmed(district),
+            city: trimmed(city),
+            postalCode: trimmed(postalCode),
+            source: source,
+            tagIds: tagIds
         )
     }
 
@@ -49,6 +69,12 @@ struct CustomerForm: Equatable {
         birthDate = parsed ?? clock.adding(days: -365 * 30, to: clock.startOfDay(Date()))
         gender = existing?.gender
         notes = existing?.notes ?? ""
+        addressLine = existing?.addressLine ?? ""
+        district = existing?.district ?? ""
+        city = existing?.city ?? ""
+        postalCode = existing?.postalCode ?? ""
+        source = existing?.source
+        tagIds = Set(existing?.tags.map(\.id) ?? [])
 
         original = Snapshot(
             fullName: existing?.fullName ?? "",
@@ -56,7 +82,13 @@ struct CustomerForm: Equatable {
             email: existing?.email ?? "",
             birthDate: existing?.birthDate,
             gender: existing?.gender,
-            notes: existing?.notes ?? ""
+            notes: existing?.notes ?? "",
+            addressLine: existing?.addressLine ?? "",
+            district: existing?.district ?? "",
+            city: existing?.city ?? "",
+            postalCode: existing?.postalCode ?? "",
+            source: existing?.source,
+            tagIds: Set(existing?.tags.map(\.id) ?? [])
         )
     }
 
@@ -96,9 +128,19 @@ struct CustomerForm: Equatable {
             email: nilIfEmpty(email),
             birthDate: birthDateString,
             gender: gender,
-            notes: nilIfEmpty(notes)
+            notes: nilIfEmpty(notes),
+            addressLine: nilIfEmpty(addressLine),
+            district: nilIfEmpty(district),
+            city: nilIfEmpty(city),
+            postalCode: nilIfEmpty(postalCode),
+            source: source
         )
     }
+
+    /// Etiket kümesi değişti mi — değişmediyse `PUT .../tags` isteği hiç
+    /// atılmaz. Kaydet düğmesi iki uca birden yazıyor; ikincisi gereksizse
+    /// atlanmalı.
+    var tagsChanged: Bool { tagIds != original.tagIds }
 
     /// Boşaltılan alanlar `null` gider — sunucu bunu "temizle" olarak okur.
     func updateInput() -> UpdateCustomerInput {
@@ -108,7 +150,12 @@ struct CustomerForm: Equatable {
             email: Nullable.text(email),
             birthDate: birthDateString.map { Nullable.set($0) } ?? .clear,
             gender: gender,
-            notes: Nullable.text(notes)
+            notes: Nullable.text(notes),
+            addressLine: Nullable.text(addressLine),
+            district: Nullable.text(district),
+            city: Nullable.text(city),
+            postalCode: Nullable.text(postalCode),
+            source: source.map { Nullable.set($0) } ?? .clear
         )
     }
 }

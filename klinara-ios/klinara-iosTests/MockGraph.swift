@@ -13,13 +13,19 @@ struct MockGraph {
     let scheduling: MockSchedulingService
     let customers: MockCustomerService
     let booking: MockBookingService
+    let notes: MockNotesService
+    let files: MockFilesService
     let clock: BranchClock
 
     /// Nişantaşı şubesi: mock çalışma saatlerinin ve personel şablonunun
     /// kurulu olduğu tek şube.
     static let branchId = MockIDs.branchNisantasi
 
-    init(scenario: MockDataScenario = .emptyDay, canReopen: Bool = true) {
+    init(
+        scenario: MockDataScenario = .emptyDay,
+        canReopen: Bool = true,
+        canReadMedical: Bool = true
+    ) {
         catalog = MockCatalogService()
         staff = MockStaffService(catalog: catalog)
         scheduling = MockSchedulingService()
@@ -32,6 +38,8 @@ struct MockGraph {
             scenario: scenario,
             canReopen: canReopen
         )
+        notes = MockNotesService(booking: booking, canReadMedical: canReadMedical)
+        files = MockFilesService(canReadMedical: canReadMedical)
         clock = BranchClock(timeZoneIdentifier: MockBookingSeed.timezone)
     }
 

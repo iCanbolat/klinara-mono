@@ -14,6 +14,8 @@ final class ServiceContainer {
     let users: any UsersService
     let booking: any BookingService
     let customers: any CustomerService
+    let notes: any NotesService
+    let files: any FilesService
 
     /// Mock kullanılıyorsa geliştirici senaryo menüsü açılır.
     let mockAuth: MockAuthService?
@@ -28,6 +30,8 @@ final class ServiceContainer {
         users: any UsersService,
         booking: any BookingService,
         customers: any CustomerService,
+        notes: any NotesService,
+        files: any FilesService,
         mockAuth: MockAuthService?,
         mockDataScenario: MockDataScenario? = nil
     ) {
@@ -38,6 +42,8 @@ final class ServiceContainer {
         self.users = users
         self.booking = booking
         self.customers = customers
+        self.notes = notes
+        self.files = files
         self.mockAuth = mockAuth
         self.mockDataScenario = mockDataScenario
     }
@@ -53,6 +59,8 @@ final class ServiceContainer {
             users: LiveUsersService(client: client),
             booking: LiveBookingService(client: client),
             customers: LiveCustomerService(client: client),
+            notes: LiveNotesService(client: client),
+            files: LiveFilesService(client: client),
             mockAuth: nil
         )
     }
@@ -74,20 +82,23 @@ final class ServiceContainer {
         let staff = MockStaffService(catalog: catalog)
         let scheduling = MockSchedulingService()
         let customers = MockCustomerService(scenario: data)
+        let booking = MockBookingService(
+            catalog: catalog,
+            staff: staff,
+            scheduling: scheduling,
+            customers: customers,
+            scenario: data
+        )
         return ServiceContainer(
             auth: mockAuth,
             catalog: catalog,
             staff: staff,
             scheduling: scheduling,
             users: MockUsersService(),
-            booking: MockBookingService(
-                catalog: catalog,
-                staff: staff,
-                scheduling: scheduling,
-                customers: customers,
-                scenario: data
-            ),
+            booking: booking,
             customers: customers,
+            notes: MockNotesService(booking: booking),
+            files: MockFilesService(),
             mockAuth: mockAuth,
             mockDataScenario: data
         )
@@ -105,6 +116,8 @@ final class ServiceContainer {
         else { return }
         customers.reseed(scenario)
         booking.reseed(scenario)
+        (notes as? MockNotesService)?.reseed(canReadMedical: true)
+        (files as? MockFilesService)?.reseed(canReadMedical: true)
         mockDataScenario = scenario
     }
 

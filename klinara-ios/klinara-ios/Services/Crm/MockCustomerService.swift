@@ -4,15 +4,22 @@ import Foundation
 ///
 /// Sunucunun **davranışını** taklit eder, sadece veri döndürmez: telefon E.164'e
 /// normalize edilir, kiracı içinde tekildir, arşivleme numarayı serbest
-/// bırakır ve `PATCH`'te `null` ile "alan gönderilmedi" ayrımı korunur. Mock'ta
-/// geçen bir akışın canlıda patlaması, mock'un hiç olmamasından kötüdür.
+/// bırakır, `PATCH`'te `null` ile "alan gönderilmedi" ayrımı korunur, arama
+/// sunucudaki katlamayla aynı cevabı verir ve birleştirme veri kazandırır.
+/// Mock'ta geçen bir akışın canlıda patlaması, mock'un hiç olmamasından kötüdür.
 final class MockCustomerService: CustomerService, @unchecked Sendable {
 
     private let lock = NSLock()
     private var records: [Customer]
+    private var tagRecords: [CustomerTag]
+    /// `customerId → tagId` — sunucudaki `customer_tag_assignments`.
+    private var assignments: [String: Set<String>]
 
     init(scenario: MockDataScenario = .busyDay) {
         records = MockCustomerSeed.customers(at: Date(), scenario: scenario)
+        tagRecords = MockCustomerSeed.tags
+        assignments = MockCustomerSeed.assignments(scenario: scenario)
+        records = Self.applyTags(to: records, tags: tagRecords, assignments: assignments)
     }
 
     private func withLock<T>(_ body: () throws -> T) rethrows -> T {
@@ -32,14 +39,65 @@ final class MockCustomerService: CustomerService, @unchecked Sendable {
     /// Konteyner yeniden kurulmuyor; kurulsaydı çalışan tüm store'lar eski
     /// servis örneklerine bağlı kalırdı.
     func reseed(_ scenario: MockDataScenario) {
-        withLock { records = MockCustomerSeed.customers(at: Date(), scenario: scenario) }
+        withLock {
+            records = MockCustomerSeed.customers(at: Date(), scenario: scenario)
+            tagRecords = MockCustomerSeed.tags
+            assignments = MockCustomerSeed.assignments(scenario: scenario)
+            records = Self.applyTags(to: records, tags: tagRecords, assignments: assignments)
+        }
     }
 
     // MARK: Okuma
 
-    func customers() async throws -> [Customer] {
+    /// Sunucudaki `(created_at, id)` cursor'unun aynısı: sıralama anahtarı
+    /// gövdede taşınıyor, ofset sayılmıyor. Araya yeni kayıt girdiğinde
+    /// ofsetle sayfalamak bir kaydı iki kez göstermek olurdu.
+    func customers(
+        cursor: String?,
+        limit: Int?,
+        tagId: String?,
+        source: CustomerSource?
+    ) async throws -> Page<Customer> {
         await latency(0.3)
-        return withLock { records.sorted { $0.createdAt > $1.createdAt } }
+        let size = min(limit ?? 50, 200)
+
+        return try withLock {
+            var visible = records.sorted {
+                ($0.createdAt, $0.id) > ($1.createdAt, $1.id)
+            }
+            if let tagId { visible = visible.filter { $0.tags.contains { $0.id == tagId } } }
+            if let source { visible = visible.filter { $0.source == source } }
+
+            if let cursor {
+                guard let key = MockCursor.decode(cursor) else {
+                    throw MockErrors.validation("Geçersiz cursor", path: "cursor")
+                }
+                visible = visible.filter { ($0.createdAt, $0.id) < (key.createdAt, key.id) }
+            }
+
+            let page = Array(visible.prefix(size))
+            let hasMore = visible.count > size
+            let next = hasMore ? page.last.map { MockCursor.encode($0) } : nil
+            return Page(data: page, pageInfo: PageInfo(nextCursor: next, hasMore: hasMore))
+        }
+    }
+
+    /// Sunucudaki `search_text` (ad + telefon, tek indeks) davranışı:
+    /// ad katlanmış karşılaştırılır, telefon rakama indirgenir.
+    func search(_ term: String, limit: Int?) async throws -> [Customer] {
+        await latency(0.2)
+        let trimmed = term.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 2 else {
+            throw MockErrors.validation("Arama terimi en az 2 karakter olmalı", path: "q")
+        }
+        let size = min(limit ?? 20, 50)
+        return withLock {
+            records
+                .filter { $0.matches(trimmed) }
+                .sorted { ($0.createdAt, $0.id) > ($1.createdAt, $1.id) }
+                .prefix(size)
+                .map { $0 }
+        }
     }
 
     func customer(id: String) async throws -> Customer {
@@ -66,6 +124,13 @@ final class MockCustomerService: CustomerService, @unchecked Sendable {
                 birthDate: input.birthDate,
                 gender: input.gender,
                 notes: input.notes,
+                addressLine: input.addressLine,
+                district: input.district,
+                city: input.city,
+                postalCode: input.postalCode,
+                source: input.source,
+                mergedIntoCustomerId: nil,
+                tags: [],
                 createdAt: Date()
             )
             records.append(record)
@@ -99,6 +164,13 @@ final class MockCustomerService: CustomerService, @unchecked Sendable {
                 birthDate: resolve(input.birthDate, current: old.birthDate),
                 gender: input.gender ?? old.gender,
                 notes: resolve(input.notes, current: old.notes),
+                addressLine: resolve(input.addressLine, current: old.addressLine),
+                district: resolve(input.district, current: old.district),
+                city: resolve(input.city, current: old.city),
+                postalCode: resolve(input.postalCode, current: old.postalCode),
+                source: resolve(input.source, current: old.source),
+                mergedIntoCustomerId: old.mergedIntoCustomerId,
+                tags: old.tags,
                 createdAt: old.createdAt
             )
             records[index] = updated
@@ -114,7 +186,120 @@ final class MockCustomerService: CustomerService, @unchecked Sendable {
                 throw MockErrors.notFound
             }
             // Arşivlenen kayıt listeden düşer ve numarası serbest kalır.
+            assignments[id] = nil
             return records.remove(at: index)
+        }
+    }
+
+    func replaceTags(customerId: String, tagIds: [String]) async throws -> Customer {
+        await latency(0.3)
+        return try withLock {
+            guard records.contains(where: { $0.id == customerId }) else { throw MockErrors.notFound }
+            let known = Set(tagRecords.map(\.id))
+            guard Set(tagIds).isSubset(of: known) else { throw MockErrors.notFound }
+            assignments[customerId] = Set(tagIds)
+            records = Self.applyTags(to: records, tags: tagRecords, assignments: assignments)
+            return records.first { $0.id == customerId }!
+        }
+    }
+
+    /// Birleştirme veri **kazanmaktır** (Ek G): hedefin dolu alanı ezilmez,
+    /// boş alanı kaynaktan dolar, notlar birleşir, etiketler toplanır, kaynak
+    /// arşivlenip hayatta kalana işaret eder.
+    func merge(into targetId: String, sourceId: String) async throws -> CustomerMergeResult {
+        await latency(0.6)
+        return try withLock {
+            guard sourceId != targetId else {
+                throw MockErrors.validation("Bir kayıt kendisiyle birleştirilemez")
+            }
+            guard let targetIndex = records.firstIndex(where: { $0.id == targetId }),
+                  let sourceIndex = records.firstIndex(where: { $0.id == sourceId })
+            else { throw MockErrors.notFound }
+
+            let target = records[targetIndex]
+            let source = records[sourceIndex]
+
+            let mergedTags = Set(target.tags.map(\.id)).union(source.tags.map(\.id))
+            assignments[targetId] = mergedTags
+            assignments[sourceId] = nil
+
+            let merged = Customer(
+                id: target.id,
+                tenantId: target.tenantId,
+                fullName: target.fullName,
+                phone: target.phone ?? source.phone,
+                email: target.email ?? source.email,
+                birthDate: target.birthDate ?? source.birthDate,
+                gender: target.gender ?? source.gender,
+                notes: Self.mergeNotes(target.notes, source.notes),
+                addressLine: target.addressLine ?? source.addressLine,
+                district: target.district ?? source.district,
+                city: target.city ?? source.city,
+                postalCode: target.postalCode ?? source.postalCode,
+                source: target.source ?? source.source,
+                mergedIntoCustomerId: nil,
+                tags: target.tags,
+                createdAt: target.createdAt
+            )
+            records[targetIndex] = merged
+            records.remove(at: sourceIndex)
+            records = Self.applyTags(to: records, tags: tagRecords, assignments: assignments)
+
+            return CustomerMergeResult(
+                id: MockIDs.uuid(),
+                sourceCustomerId: sourceId,
+                targetCustomerId: targetId,
+                moved: [
+                    "appointments": 0,
+                    "customer_tag_assignments": mergedTags.subtracting(target.tags.map(\.id)).count,
+                ],
+                customer: records.first { $0.id == targetId }!
+            )
+        }
+    }
+
+    // MARK: Etiketler
+
+    func tags() async throws -> [CustomerTag] {
+        await latency(0.2)
+        return withLock { tagRecords.sorted { SearchText.fold($0.name) < SearchText.fold($1.name) } }
+    }
+
+    func createTag(_ input: CustomerTagInput) async throws -> CustomerTag {
+        await latency(0.3)
+        return try withLock {
+            let name = input.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            try assertTagNameFree(name, excluding: nil)
+            let tag = CustomerTag(id: MockIDs.uuid(), name: name, color: input.color)
+            tagRecords.append(tag)
+            return tag
+        }
+    }
+
+    func updateTag(id: String, _ input: CustomerTagInput) async throws -> CustomerTag {
+        await latency(0.3)
+        return try withLock {
+            guard let index = tagRecords.firstIndex(where: { $0.id == id }) else {
+                throw MockErrors.notFound
+            }
+            let name = input.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            try assertTagNameFree(name, excluding: id)
+            let tag = CustomerTag(id: id, name: name, color: input.color)
+            tagRecords[index] = tag
+            records = Self.applyTags(to: records, tags: tagRecords, assignments: assignments)
+            return tag
+        }
+    }
+
+    func deleteTag(id: String) async throws {
+        await latency(0.3)
+        try withLock {
+            guard let index = tagRecords.firstIndex(where: { $0.id == id }) else {
+                throw MockErrors.notFound
+            }
+            tagRecords.remove(at: index)
+            for key in assignments.keys { assignments[key]?.remove(id) }
+            records = Self.applyTags(to: records, tags: tagRecords, assignments: assignments)
         }
     }
 
@@ -144,6 +329,77 @@ final class MockCustomerService: CustomerService, @unchecked Sendable {
         let taken = records.contains { $0.phone == phone && $0.id != id }
         if taken { throw MockErrors.duplicatePhone }
     }
+
+    /// Tekillik KATLANMIŞ ada göre: "VIP", "Vip" ve "vıp" aynı etiket (Ek G).
+    private func assertTagNameFree(_ name: String, excluding id: String?) throws {
+        let folded = SearchText.fold(name)
+        let taken = tagRecords.contains { SearchText.fold($0.name) == folded && $0.id != id }
+        if taken { throw MockErrors.duplicateTag }
+    }
+
+    private static func mergeNotes(_ target: String?, _ source: String?) -> String? {
+        switch (target, source) {
+        case (let t?, let s?) where t != s: return "\(t)\n\n\(s)"
+        case (let t?, _): return t
+        case (nil, let s?): return s
+        default: return nil
+        }
+    }
+
+    /// Etiket atamalarını kayıtlara yansıtır — sunucu `tags` alanını yanıt
+    /// kurarken dolduruyor, burada da aynı an.
+    private static func applyTags(
+        to records: [Customer],
+        tags: [CustomerTag],
+        assignments: [String: Set<String>]
+    ) -> [Customer] {
+        let byId = Dictionary(uniqueKeysWithValues: tags.map { ($0.id, $0) })
+        return records.map { record in
+            let assigned = (assignments[record.id] ?? [])
+                .compactMap { byId[$0] }
+                .sorted { SearchText.fold($0.name) < SearchText.fold($1.name) }
+            return Customer(
+                id: record.id,
+                tenantId: record.tenantId,
+                fullName: record.fullName,
+                phone: record.phone,
+                email: record.email,
+                birthDate: record.birthDate,
+                gender: record.gender,
+                notes: record.notes,
+                addressLine: record.addressLine,
+                district: record.district,
+                city: record.city,
+                postalCode: record.postalCode,
+                source: record.source,
+                mergedIntoCustomerId: record.mergedIntoCustomerId,
+                tags: assigned,
+                createdAt: record.createdAt
+            )
+        }
+    }
+}
+
+// MARK: - Cursor
+
+/// Mock'un opak cursor'u. Sunucu base64'lü bir JSON taşıyor; biçim istemciyi
+/// ilgilendirmiyor, **çözülebilir olmaması** ilgilendiriyor — bu yüzden burada
+/// da opak bir metin üretiliyor, ham tarih değil.
+enum MockCursor {
+
+    static func encode(_ customer: Customer) -> String {
+        let raw = "\(customer.createdAt.timeIntervalSince1970)|\(customer.id)"
+        return Data(raw.utf8).base64EncodedString()
+    }
+
+    static func decode(_ cursor: String) -> (createdAt: Date, id: String)? {
+        guard let data = Data(base64Encoded: cursor),
+              let raw = String(data: data, encoding: .utf8)
+        else { return nil }
+        let parts = raw.split(separator: "|", maxSplits: 1)
+        guard parts.count == 2, let seconds = TimeInterval(parts[0]) else { return nil }
+        return (Date(timeIntervalSince1970: seconds), String(parts[1]))
+    }
 }
 
 // MARK: - Hatalar
@@ -160,6 +416,15 @@ enum MockErrors {
         .problem(ProblemDetails(
             code: .conflict,
             title: "Bu telefon numarası başka bir müşteri kartında kayıtlı",
+            status: 409
+        ))
+    }
+
+    static var duplicateTag: APIError {
+        .problem(ProblemDetails(
+            code: .conflict,
+            title: "Bu adda bir etiket zaten var",
+            detail: "Etiket adları büyük/küçük harf ve Türkçe karakter farkı gözetmeden tekildir.",
             status: 409
         ))
     }
@@ -264,6 +529,24 @@ enum MockCustomerSeed {
     static let zeynep = "c1000000-0000-4000-8000-000000000003"
     static let burak = "c1000000-0000-4000-8000-000000000004"
 
+    static let tagVip = "c2000000-0000-4000-8000-000000000001"
+    static let tagSensitive = "c2000000-0000-4000-8000-000000000002"
+    static let tagCampaign = "c2000000-0000-4000-8000-000000000003"
+
+    static let tags = [
+        CustomerTag(id: tagVip, name: "VIP", color: "#c0392b"),
+        CustomerTag(id: tagSensitive, name: "Hassas cilt", color: "#8e7cc3"),
+        CustomerTag(id: tagCampaign, name: "Kampanya", color: "#2e8b57"),
+    ]
+
+    static func assignments(scenario: MockDataScenario) -> [String: Set<String>] {
+        guard scenario != .emptyDay else { return [ayse: [tagVip]] }
+        return [
+            ayse: [tagVip, tagCampaign],
+            zeynep: [tagSensitive],
+        ]
+    }
+
     static func customers(at now: Date, scenario: MockDataScenario) -> [Customer] {
         var records = [
             customer(
@@ -273,6 +556,11 @@ enum MockCustomerSeed {
                 email: "ayse@ornek.test",
                 birthDate: "1990-05-12",
                 gender: .female,
+                addressLine: "Bağdat Cad. No: 120 D: 5",
+                district: "Kadıköy",
+                city: "İstanbul",
+                postalCode: "34710",
+                source: .instagram,
                 createdAt: now.addingTimeInterval(-86_400 * 40)
             ),
             customer(
@@ -280,6 +568,7 @@ enum MockCustomerSeed {
                 name: "Mehmet Demir",
                 phone: "+905324445566",
                 email: nil,
+                source: .walkIn,
                 createdAt: now.addingTimeInterval(-86_400 * 25)
             ),
         ]
@@ -295,6 +584,9 @@ enum MockCustomerSeed {
                 birthDate: "1985-11-03",
                 gender: .female,
                 notes: "Cilt hassasiyeti var, düşük enerji tercih ediyor.",
+                district: "Beşiktaş",
+                city: "İstanbul",
+                source: .referral,
                 createdAt: now.addingTimeInterval(-86_400 * 10)
             ),
             customer(
@@ -303,6 +595,7 @@ enum MockCustomerSeed {
                 phone: nil,
                 email: "burak@ornek.test",
                 gender: .male,
+                source: .google,
                 createdAt: now.addingTimeInterval(-86_400 * 2)
             ),
         ])
@@ -317,6 +610,11 @@ enum MockCustomerSeed {
         birthDate: String? = nil,
         gender: CustomerGender? = nil,
         notes: String? = nil,
+        addressLine: String? = nil,
+        district: String? = nil,
+        city: String? = nil,
+        postalCode: String? = nil,
+        source: CustomerSource? = nil,
         createdAt: Date
     ) -> Customer {
         Customer(
@@ -328,6 +626,13 @@ enum MockCustomerSeed {
             birthDate: birthDate,
             gender: gender,
             notes: notes,
+            addressLine: addressLine,
+            district: district,
+            city: city,
+            postalCode: postalCode,
+            source: source,
+            mergedIntoCustomerId: nil,
+            tags: [],
             createdAt: createdAt
         )
     }

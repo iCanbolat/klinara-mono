@@ -52,8 +52,11 @@ struct CustomerEditorView: View {
         ) {
             identitySection
             contactSection
+            addressSection
+            tagSection
             notesSection
         }
+        .task { await store.loadTags() }
     }
 
     private var identitySection: some View {
@@ -137,6 +140,105 @@ struct CustomerEditorView: View {
         }
     }
 
+    private var addressSection: some View {
+        KlinaraFormSection(
+            title: "Adres ve geliş kaynağı",
+            footnote: "Geliş kaynağı hangi kanalın müşteri getirdiğini gösterir."
+        ) {
+            KlinaraTextField(
+                label: "Adres",
+                text: $form.addressLine,
+                placeholder: "Bağdat Cad. No: 120 D: 5",
+                error: fieldErrors["addressLine"],
+                autocapitalization: .words
+            )
+            .padding(KlinaraMetrics.md)
+            .disabled(isReadOnly)
+
+            KlinaraDivider()
+
+            KlinaraTextField(
+                label: "İlçe",
+                text: $form.district,
+                placeholder: "Kadıköy",
+                error: fieldErrors["district"],
+                autocapitalization: .words
+            )
+            .padding(KlinaraMetrics.md)
+            .disabled(isReadOnly)
+
+            KlinaraDivider()
+
+            KlinaraTextField(
+                label: "İl",
+                text: $form.city,
+                placeholder: "İstanbul",
+                error: fieldErrors["city"],
+                autocapitalization: .words
+            )
+            .padding(KlinaraMetrics.md)
+            .disabled(isReadOnly)
+
+            KlinaraDivider()
+
+            KlinaraTextField(
+                label: "Posta kodu",
+                text: $form.postalCode,
+                placeholder: "34710",
+                error: fieldErrors["postalCode"],
+                keyboardType: .numberPad
+            )
+            .padding(KlinaraMetrics.md)
+            .disabled(isReadOnly)
+
+            KlinaraDivider()
+
+            Picker("Geliş kaynağı", selection: $form.source) {
+                Text("Belirtilmedi").tag(CustomerSource?.none)
+                ForEach(CustomerSource.allCases) { value in
+                    Text(value.turkishName).tag(CustomerSource?.some(value))
+                }
+            }
+            .pickerStyle(.menu)
+            .tint(KlinaraColor.sageDeep)
+            .klinaraText(.bodyM)
+            .padding(KlinaraMetrics.md)
+            .disabled(isReadOnly)
+        }
+    }
+
+    /// Etiketler ayrı bir uca yazılıyor (`PUT /customers/:id/tags`) ve bu uç
+    /// **var olan** bir kart istiyor. Yeni kayıtta bu yüzden önce kart açılıyor,
+    /// etiketler ikinci istekle bağlanıyor.
+    @ViewBuilder
+    private var tagSection: some View {
+        KlinaraFormSection(
+            title: "Etiketler",
+            footnote: store.tags.isEmpty
+                ? "Henüz etiket tanımlanmamış. Yönetim → Müşteri etiketleri."
+                : nil
+        ) {
+            if store.tags.isEmpty {
+                KlinaraRow(label: "Etiket yok")
+            } else {
+                KlinaraChipGrid(
+                    options: store.tags,
+                    title: { $0.name },
+                    isSelected: { form.tagIds.contains($0.id) },
+                    isEnabled: { _ in !isReadOnly },
+                    onTap: { tag in
+                        if form.tagIds.contains(tag.id) {
+                            form.tagIds.remove(tag.id)
+                        } else {
+                            form.tagIds.insert(tag.id)
+                        }
+                    }
+                )
+                .padding(KlinaraMetrics.md)
+            }
+        }
+    }
+
     private var notesSection: some View {
         KlinaraFormSection(title: "Not") {
             KlinaraTextField(
@@ -154,12 +256,23 @@ struct CustomerEditorView: View {
     private func save() async {
         error = nil
         do {
-            let saved: Customer
+            var saved: Customer
+            let isNew = target.existing == nil
             if let existing = target.existing {
                 saved = try await store.update(id: existing.id, form.updateInput())
             } else {
                 saved = try await store.create(form.createInput())
             }
+
+            // Etiketler ayrı uçta. Kart AÇILDIKTAN sonra yazılıyor: yeni kayıtta
+            // henüz kimlik yoktu. Değişmediyse istek hiç atılmaz.
+            if form.tagsChanged || (isNew && !form.tagIds.isEmpty) {
+                saved = try await store.replaceTags(
+                    customerId: saved.id,
+                    tagIds: Array(form.tagIds)
+                )
+            }
+
             onSaved?(saved)
             dismiss()
         } catch {

@@ -18,6 +18,15 @@
 	<string>Kliniğinize parolanızı yazmadan, tek dokunuşla giriş yapmak için kullanılır.</string>
 
 	<!--
+	  Kamera YALNIZ müşteri kartına klinik fotoğrafı eklemek için kullanılır.
+	  Öncesi/sonrası fotoğrafı çoğunlukla o anda çekiliyor ve galeriye
+	  kaydedilmeden doğrudan karta giriyor; bu yüzden PhotosPicker tek başına
+	  yetmiyor.
+	-->
+	<key>NSCameraUsageDescription</key>
+	<string>Müşteri kartına öncesi/sonrası fotoğrafı eklemek için kamera kullanılır. Fotoğraflar yalnız kliniğinizin kaydına gider.</string>
+
+	<!--
 	  API kökü. Şema düzenlemeden değiştirilebilsin diye burada durur:
 	  simülatör "localhost"a ulaşır, fiziksel cihaz Mac'in LAN adresine
 	  (örn. http://192.168.1.20:3000/api/v1) bakmalıdır.
