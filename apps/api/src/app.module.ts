@@ -12,15 +12,19 @@ import { validateEnv, type EnvironmentVariables } from './config/env.validation'
 import { DatabaseModule } from './database/database.module';
 import { IdempotencyModule } from './common/idempotency/idempotency.module';
 import { MailModule } from './lib/mail/mail.module';
+import { QueueModule } from './lib/queue/queue.module';
 import { SmsModule } from './lib/sms/sms.module';
+import { StorageModule } from './lib/storage/storage.module';
 import { HealthModule } from './modules/health/health.module';
 import { IdentityModule } from './modules/identity/identity.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { AvailabilityCacheModule } from './modules/booking/availability-cache.module';
 import { BookingModule } from './modules/booking/booking.module';
 import { CrmModule } from './modules/crm/crm.module';
+import { FilesModule } from './modules/files/files.module';
 import { SchedulingModule } from './modules/scheduling/scheduling.module';
 import { StaffModule } from './modules/staff/staff.module';
+import { BranchAccessModule } from './modules/tenancy/branch-access.module';
 import { TenancyModule } from './modules/tenancy/tenancy.module';
 import { LoggingModule } from './observability/logging.module';
 import { MetricsModule } from './observability/metrics.module';
@@ -56,13 +60,17 @@ import { MetricsModule } from './observability/metrics.module';
     MetricsModule,
     DatabaseModule,
     AvailabilityCacheModule,
+    BranchAccessModule,
     IdempotencyModule,
     SmsModule,
+    StorageModule,
+    QueueModule,
     MailModule,
     HealthModule,
     IdentityModule,
     CatalogModule,
     CrmModule,
+    FilesModule,
     BookingModule,
     StaffModule,
     SchedulingModule,

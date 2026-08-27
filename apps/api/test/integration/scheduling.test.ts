@@ -308,44 +308,68 @@ describe('çalışma saatleri ve istisnalar', () => {
       expect((res.body as Problem).code).toBe('CONFLICT');
     });
 
-    it('BAŞKA kiracının şubesi istendiğinde hiçbir veri sızmaz', async () => {
-      // `canAccessBranch`, kiracı geneli rolleri (owner/accountant) tüm
-      // şubelere açar ve şubenin gerçekten bu kiracıya ait olduğunu SORMAZ —
-      // yani yabancı bir şube kimliği uygulama katmanından geçer. Sızıntıyı
-      // engelleyen RLS'tir: sorgu boş küme döner, yazım ise kapsam
-      // trigger'ında durur. Bu testin ölçtüğü garanti budur.
-      // TODO(Faz 3.4): şube kimliği kiracıya ait mi kontrolü tek bir ortak
-      // yardımcıya taşınıp tüm şube kapsamlı uçlarda uygulanmalı.
+    it('BAŞKA kiracının şube kimliği 403 BRANCH_FORBIDDEN alır', async () => {
+      // Faz 3'te bu kontrol yoktu: `canAccessBranch` kiracı geneli rolleri
+      // (owner/accountant) tüm şubelere açıyor ve şubenin gerçekten bu
+      // kiracıya ait olduğunu sormuyordu. Yabancı kimlik uygulama katmanından
+      // geçiyor, sızıntıyı yalnız RLS ve kapsam trigger'ı engelliyordu — yani
+      // çağıran ilgisiz bir hata alıyordu. Artık `BranchAccessService` aidiyeti
+      // de doğruluyor ve kapı ilk adımda kapanıyor.
       const clinic = await setupClinic(app, { slug: 'klinik-a' });
       const other = await bootstrapTenant(app, { slug: 'klinik-b' });
       const clinicAuth = auth(clinic.owner.tokens);
 
-      await http(app)
-        .post('/api/v1/schedule-exceptions')
-        .set(auth(other.owner.tokens))
-        .set(branchHeader(other.branch.id))
-        .send({
-          staffProfileId: clinic.practitioner.staffProfileId,
-          branchId: other.branch.id,
-          startsAt: '2026-09-01T10:00:00+03:00',
-          endsAt: '2026-09-01T12:00:00+03:00',
-        });
+      // Başlık yolu: guard'da durur.
+      const header = await http(app)
+        .get('/api/v1/schedule-exceptions')
+        .query({ branchId: clinic.branch.id })
+        .set(clinicAuth)
+        .set(branchHeader(other.branch.id));
+      expect(header.status).toBe(403);
+      expect((header.body as Problem).code).toBe('BRANCH_FORBIDDEN');
 
+      // Sorgu parametresi yolu: servis katmanında durur.
       const read = await http(app)
         .get('/api/v1/schedule-exceptions')
         .query({ branchId: other.branch.id })
         .set(clinicAuth)
-        .set(branchHeader(other.branch.id));
-      expect(read.status).toBe(200);
-      expect((read.body as { data: ExceptionBody[] }).data).toHaveLength(0);
+        .set(branchHeader(clinic.branch.id));
+      expect(read.status).toBe(403);
+      expect((read.body as Problem).code).toBe('BRANCH_FORBIDDEN');
 
+      // Yazım yolu: artık kapsam trigger'ının 409'una hiç ulaşmıyor.
       const write = await http(app)
         .put(`/api/v1/branches/${other.branch.id}/hours`)
         .set(clinicAuth)
-        .set(branchHeader(other.branch.id))
+        .set(branchHeader(clinic.branch.id))
         .send({ entries: weeklyBranchHours() });
-      expect(write.status).toBe(409);
-      expect((write.body as Problem).code).toBe('CONFLICT');
+      expect(write.status).toBe(403);
+      expect((write.body as Problem).code).toBe('BRANCH_FORBIDDEN');
+    });
+
+    it('yeni açılan şube ERİŞİM CACHE\'i yüzünden 403 almaz', async () => {
+      // Şube kimlikleri süreç-içi cache'te duruyor; yazımda invalide
+      // edilmeseydi yeni şube TTL boyunca "bu kiracıya ait değil" görünür,
+      // yani açıldığı dakika kullanılamazdı.
+      const clinic = await setupClinic(app, { slug: 'klinik-a' });
+      const clinicAuth = auth(clinic.owner.tokens);
+
+      // Cache'i doldur.
+      await http(app).get('/api/v1/branches').set(clinicAuth).set(branchHeader(clinic.branch.id));
+
+      const created = await http(app)
+        .post('/api/v1/branches')
+        .set(clinicAuth)
+        .send({ slug: 'ikinci-sube', name: 'İkinci Şube' });
+      expect(created.status).toBe(201);
+      const branchId = (created.body as { id: string }).id;
+
+      const res = await http(app)
+        .get('/api/v1/schedule-exceptions')
+        .query({ branchId })
+        .set(clinicAuth)
+        .set(branchHeader(branchId));
+      expect(res.status).toBe(200);
     });
   });
 });

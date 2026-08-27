@@ -273,6 +273,62 @@ export class EnvironmentVariables {
   @IsNotEmpty()
   FIELD_ENCRYPTION_KEY_ID: string = 'v1';
 
+  // --- Depolama (S3 / MinIO) — Batch 4.3 ---
+  /**
+   * Kimlik bilgileri EKSİKSE gerçek S3 istemcisi hiç kurulmaz; yerel bir
+   * bellek-içi depolama devreye girer (SMS adapter'ıyla aynı gerekçe).
+   */
+  @Expose()
+  @IsOptional()
+  @IsString()
+  S3_ENDPOINT?: string;
+
+  @Expose()
+  @IsString()
+  S3_REGION: string = 'auto';
+
+  @Expose()
+  @IsString()
+  S3_BUCKET: string = 'klinara';
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  S3_ACCESS_KEY_ID?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  S3_SECRET_ACCESS_KEY?: string;
+
+  /** İmzalı URL ömrü. Kısa olması şart: bağlantı paylaşılabilir bir sırdır. */
+  @Expose()
+  @Type(() => Number)
+  @IsInt()
+  @Min(60)
+  @Max(3600)
+  S3_PRESIGN_TTL_SECONDS: number = 300;
+
+  /** Tek dosya üst sınırı (bayt). */
+  @Expose()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1024)
+  UPLOAD_MAX_BYTES: number = 25 * 1024 * 1024;
+
+  // --- Kuyruk (pg-boss) — Batch 4.3 ---
+  /** Testlerde kapatılır: kuyruk kendi şemasını kurar ve arka planda çalışır. */
+  @Expose()
+  @Transform(({ value }: { value: unknown }) =>
+    value === undefined ? undefined : value === 'true' || value === true,
+  )
+  @IsBoolean()
+  QUEUE_ENABLED: boolean = true;
+
+  @Expose()
+  @IsString()
+  QUEUE_SCHEMA: string = 'pgboss';
+
   // --- Passkey (WebAuthn) ---
   /**
    * `rpId` uygulamanın kayıtlı olduğu ETKİN ALAN ADIDIR ve sonradan

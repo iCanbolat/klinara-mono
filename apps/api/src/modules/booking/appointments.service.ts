@@ -7,7 +7,8 @@ import { TenantTxService } from '../../database/tenant-tx.service';
 import type { Tx } from '../../database/tenant-tx';
 import type { AppointmentStatus } from '../../database/schema/appointments';
 import type { Principal } from '../identity/principal';
-import { canAccessBranch, hasPermission } from '../identity/principal';
+import { hasPermission } from '../identity/principal';
+import { BranchAccessService } from '../tenancy/branch-access.service';
 import { AvailabilityCacheService } from './availability-cache.service';
 import { AvailabilityService } from './availability.service';
 import * as repo from './appointments.repository';
@@ -56,6 +57,7 @@ export class AppointmentsService {
     private readonly tx: TenantTxService,
     private readonly availability: AvailabilityService,
     private readonly cache: AvailabilityCacheService,
+    private readonly branchAccess: BranchAccessService,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -65,7 +67,7 @@ export class AppointmentsService {
     principal: Principal,
     input: CreateAppointmentDto,
   ): Promise<AppointmentResponseDto> {
-    AppointmentsService.assertBranch(principal, input.branchId);
+    await this.branchAccess.assertInput(principal, input.branchId);
     const startsAt = AppointmentsService.parseInstant(input.startsAt);
 
     const created = await this.tx
@@ -115,7 +117,7 @@ export class AppointmentsService {
     });
 
     if (payload === undefined) throw AppError.notFound('Randevu bulunamadı');
-    AppointmentsService.assertBranch(principal, payload.appointment.branchId);
+    BranchAccessService.assertMembership(principal, payload.appointment.branchId);
     await this.assertVisible(principal, payload.services);
     return this.present(payload.appointment, payload.services);
   }
@@ -130,7 +132,7 @@ export class AppointmentsService {
     });
 
     if (payload === undefined) throw AppError.notFound('Randevu bulunamadı');
-    AppointmentsService.assertBranch(principal, payload.appointment.branchId);
+    BranchAccessService.assertMembership(principal, payload.appointment.branchId);
     await this.assertVisible(principal, payload.services);
 
     return payload.rows.map((row) => ({
@@ -158,7 +160,7 @@ export class AppointmentsService {
     const payload = await this.tx.run(async (tx) => {
       const current = await repo.findAppointmentById(tx, id);
       if (current === undefined) return undefined;
-      AppointmentsService.assertBranch(principal, current.branchId);
+      BranchAccessService.assertMembership(principal, current.branchId);
 
       const updated = await repo.updateWithVersion(tx, id, expectedVersion, {
         notes: input.notes ?? null,
@@ -198,7 +200,7 @@ export class AppointmentsService {
       .run(async (tx) => {
         const current = await repo.findAppointmentById(tx, id);
         if (current === undefined) return undefined;
-        AppointmentsService.assertBranch(principal, current.branchId);
+        BranchAccessService.assertMembership(principal, current.branchId);
         AppointmentsService.assertMutable(current.status);
 
         branchId = current.branchId;
@@ -281,7 +283,7 @@ export class AppointmentsService {
       .run(async (tx) => {
         const current = await repo.findAppointmentById(tx, id);
         if (current === undefined) return undefined;
-        AppointmentsService.assertBranch(principal, current.branchId);
+        BranchAccessService.assertMembership(principal, current.branchId);
 
         if (current.status === status) {
           const services = await repo.listAppointmentServices(tx, id);
@@ -642,12 +644,6 @@ export class AppointmentsService {
   // ---------------------------------------------------------------------------
   // Yardımcılar
   // ---------------------------------------------------------------------------
-  private static assertBranch(principal: Principal, branchId: string): void {
-    if (!canAccessBranch(principal, branchId)) {
-      throw new AppError(403, ERROR_CODES.BRANCH_FORBIDDEN, 'Bu şubede yetkiniz yok');
-    }
-  }
-
   /**
    * `practitioner` varsayılan olarak yalnız KENDİ randevularını görür.
    *

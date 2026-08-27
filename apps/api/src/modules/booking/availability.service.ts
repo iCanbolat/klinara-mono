@@ -4,7 +4,7 @@ import { AppError } from '../../common/errors/app-error';
 import { toZonedIso } from '../../common/time';
 import { TenantTxService } from '../../database/tenant-tx.service';
 import type { Principal } from '../identity/principal';
-import { canAccessBranch } from '../identity/principal';
+import { BranchAccessService } from '../tenancy/branch-access.service';
 import { AvailabilityCacheService } from './availability-cache.service';
 import * as repo from './availability.repository';
 import * as settingsRepo from './booking-settings.repository';
@@ -18,6 +18,7 @@ export class AvailabilityService {
   constructor(
     private readonly tx: TenantTxService,
     private readonly cache: AvailabilityCacheService,
+    private readonly branchAccess: BranchAccessService,
   ) {}
 
   async findSlots(
@@ -25,9 +26,7 @@ export class AvailabilityService {
     query: AvailabilityQueryDto,
     now: Date = new Date(),
   ): Promise<AvailabilityResponseDto> {
-    if (!canAccessBranch(principal, query.branchId)) {
-      throw new AppError(403, ERROR_CODES.BRANCH_FORBIDDEN, 'Bu şubede yetkiniz yok');
-    }
+    await this.branchAccess.assertInput(principal, query.branchId);
     return this.computeSlots(query, now);
   }
 

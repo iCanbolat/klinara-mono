@@ -11,7 +11,8 @@ import {
 import { toZonedIso, zonedDayRange } from '../../common/time';
 import { TenantTxService } from '../../database/tenant-tx.service';
 import type { Principal } from '../identity/principal';
-import { canAccessBranch, hasPermission } from '../identity/principal';
+import { hasPermission } from '../identity/principal';
+import { BranchAccessService } from '../tenancy/branch-access.service';
 import * as appointmentsRepo from './appointments.repository';
 import * as repo from './calendar.repository';
 import * as settingsRepo from './booking-settings.repository';
@@ -29,7 +30,10 @@ const MAX_RANGE_DAYS = 92;
 
 @Injectable()
 export class CalendarService {
-  constructor(private readonly tx: TenantTxService) {}
+  constructor(
+    private readonly tx: TenantTxService,
+    private readonly branchAccess: BranchAccessService,
+  ) {}
 
   async day(principal: Principal, query: CalendarDayQueryDto): Promise<CalendarResponseDto> {
     return this.rangeView(principal, query.branchId, query.date, 1, query.staffProfileId);
@@ -40,7 +44,7 @@ export class CalendarService {
   }
 
   async staff(principal: Principal, query: CalendarStaffQueryDto): Promise<CalendarResponseDto> {
-    CalendarService.assertBranch(principal, query.branchId);
+    await this.branchAccess.assertInput(principal, query.branchId);
     const from = new Date(query.from);
     const to = new Date(query.to);
     CalendarService.assertRange(from, to);
@@ -60,7 +64,7 @@ export class CalendarService {
     query: ListAppointmentsQueryDto,
   ): Promise<Page<CalendarEntryDto>> {
     if (query.branchId !== undefined) {
-      CalendarService.assertBranch(principal, query.branchId);
+      await this.branchAccess.assertInput(principal, query.branchId);
     }
 
     const from = new Date(query.from);
@@ -106,7 +110,7 @@ export class CalendarService {
     dayCount: number,
     staffProfileId: string | undefined,
   ): Promise<CalendarResponseDto> {
-    CalendarService.assertBranch(principal, branchId);
+    await this.branchAccess.assertInput(principal, branchId);
 
     const timezone = await this.timezoneOf(branchId);
     // Gün sınırı ŞUBE saat diliminde belirlenir; UTC gününe göre kesmek
@@ -182,12 +186,6 @@ export class CalendarService {
     const branch = await this.tx.run((tx) => settingsRepo.findBranchForBooking(tx, branchId));
     if (branch === undefined) throw AppError.notFound('Şube bulunamadı');
     return branch.timezone;
-  }
-
-  private static assertBranch(principal: Principal, branchId: string): void {
-    if (!canAccessBranch(principal, branchId)) {
-      throw new AppError(403, ERROR_CODES.BRANCH_FORBIDDEN, 'Bu şubede yetkiniz yok');
-    }
   }
 
   private static assertRange(from: Date, to: Date): void {

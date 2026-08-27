@@ -17,6 +17,11 @@ const BASE: Record<string, string> = {
   RATE_LIMIT_ENABLED: 'false',
   WEBAUTHN_RP_ID: 'localhost',
   WEBAUTHN_ORIGINS: 'http://localhost:5173',
+  // pg-boss kendi şemasını kurar ve arka planda bakım koşturur; testler
+  // Testcontainers'ta her dosyada yeni bir veritabanı açıyor. Kuyruk kapalı
+  // koşuyor; `QueueService.send` sessizce atlanıyor ve worker'lar doğrudan
+  // çağrılarak sınanıyor (bkz. customer-files.test.ts).
+  QUEUE_ENABLED: 'false',
 };
 
 /**

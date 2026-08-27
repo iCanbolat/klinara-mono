@@ -4,6 +4,7 @@ import { AppError } from '../../common/errors/app-error';
 import { isPgError, PG_ERROR } from '../../common/errors/db-errors';
 import { setTenantContext } from '../../database/tenant-tx';
 import { TenantTxService } from '../../database/tenant-tx.service';
+import { BranchAccessService } from './branch-access.service';
 import { InvitationsService } from '../identity/invitations.service';
 import * as repo from './tenancy.repository';
 import type {
@@ -61,6 +62,7 @@ export class TenancyService {
   constructor(
     private readonly tx: TenantTxService,
     private readonly invitations: InvitationsService,
+    private readonly branchAccess: BranchAccessService,
   ) {}
 
   /**
@@ -182,6 +184,9 @@ export class TenancyService {
         throw error;
       });
 
+    // Yeni şube, erişim cache'i TTL'i dolana kadar "bu kiracıya ait değil"
+    // görünürdü — yani açılan şube bir dakika boyunca 403 verirdi.
+    this.branchAccess.invalidateTenant(tenantId);
     return toBranchResponse(row);
   }
 
@@ -190,6 +195,8 @@ export class TenancyService {
     // RLS sayesinde başka kiracının şubesi de burada "bulunamadı" olur —
     // varlığını bile sızdırmaz.
     if (row === undefined) throw AppError.notFound('Şube bulunamadı');
+    // Şube pasifleştirilmiş veya silinmiş olabilir.
+    this.branchAccess.invalidateTenant(this.tx.tenantId);
     return toBranchResponse(row);
   }
 }

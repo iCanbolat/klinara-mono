@@ -1,11 +1,10 @@
 import { Injectable, type CanActivate, type ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { ERROR_CODES } from '@klinara/shared';
 import type { Request } from 'express';
 import { AppError } from '../errors/app-error';
 import { contextOf } from '../request-context';
 import { PrincipalService } from '../../modules/identity/principal.service';
-import { canAccessBranch } from '../../modules/identity/principal';
+import { BranchAccessService } from '../../modules/tenancy/branch-access.service';
 import { PLATFORM_ADMIN_KEY, PUBLIC_KEY } from '../decorators/auth.decorators';
 
 /**
@@ -23,6 +22,7 @@ export class AuthGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly principals: PrincipalService,
+    private readonly branchAccess: BranchAccessService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -55,11 +55,12 @@ export class AuthGuard implements CanActivate {
     });
     request.principal = principal;
 
-    // `X-Branch-Id` gönderildiyse üyelik ARANIR — ucun şube kapsamı isteyip
-    // istemediğinden bağımsız olarak. Aksi hâlde başlık, RLS'e yazılan bir
-    // şube context'ini keyfî olarak belirleyebilirdi.
-    if (ctx.branchId !== null && !canAccessBranch(principal, ctx.branchId)) {
-      throw new AppError(403, ERROR_CODES.BRANCH_FORBIDDEN, 'Bu şubede yetkiniz yok');
+    // `X-Branch-Id` gönderildiyse üyelik VE şubenin bu kiracıya ait olduğu
+    // aranır — ucun şube kapsamı isteyip istemediğinden bağımsız olarak. Aksi
+    // hâlde başlık, RLS'e yazılan bir şube context'ini keyfî olarak
+    // belirleyebilirdi.
+    if (ctx.branchId !== null) {
+      await this.branchAccess.assertInput(principal, ctx.branchId);
     }
 
     return true;

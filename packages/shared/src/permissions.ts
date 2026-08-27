@@ -42,6 +42,9 @@ export const PERMISSIONS = {
   // --- Müşteri ---
   CUSTOMER_READ: 'customer:read',
   CUSTOMER_WRITE: 'customer:write',
+  // Birleştirme FK taşıyan ve geri alınması pahalı bir işlemdir; yazma izniyle
+  // birlikte resepsiyona açmak orantısız olurdu.
+  CUSTOMER_MERGE: 'customer:merge',
   CUSTOMER_MEDICAL_READ: 'customer.medical:read',
   CUSTOMER_MEDICAL_WRITE: 'customer.medical:write',
 
@@ -143,6 +146,7 @@ export const ROLE_DEFINITIONS: RoleDefinition[] = [
       P.STAFF_WRITE,
       P.SCHEDULE_WRITE,
       P.CUSTOMER_MEDICAL_READ,
+      P.CUSTOMER_MERGE,
       P.PACKAGE_WRITE,
       P.FINANCE_PAYMENT_READ,
       P.FINANCE_PAYMENT_WRITE,

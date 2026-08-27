@@ -5,7 +5,7 @@ import { isPgError, PG_ERROR } from '../../common/errors/db-errors';
 import { TenantTxService } from '../../database/tenant-tx.service';
 import { AvailabilityCacheService } from '../booking/availability-cache.service';
 import type { Principal } from '../identity/principal';
-import { canAccessBranch } from '../identity/principal';
+import { BranchAccessService } from '../tenancy/branch-access.service';
 import * as repo from './scheduling.repository';
 import type {
   BranchHourInputDto,
@@ -26,6 +26,7 @@ export class SchedulingService {
   constructor(
     private readonly tx: TenantTxService,
     private readonly availabilityCache: AvailabilityCacheService,
+    private readonly branchAccess: BranchAccessService,
   ) {}
 
   /**
@@ -37,7 +38,7 @@ export class SchedulingService {
   }
 
   async getBranchHours(principal: Principal, branchId: string): Promise<BranchHoursResponseDto> {
-    SchedulingService.assertBranchAccess(principal, branchId);
+    await this.branchAccess.assertInput(principal, branchId);
 
     const rows = await this.tx.run((tx) => repo.listBranchHours(tx, branchId));
     return {
@@ -51,7 +52,7 @@ export class SchedulingService {
     branchId: string,
     input: PutBranchHoursDto,
   ): Promise<BranchHoursResponseDto> {
-    SchedulingService.assertBranchAccess(principal, branchId);
+    await this.branchAccess.assertInput(principal, branchId);
     SchedulingService.assertBranchHourEntries(input.entries);
 
     const rows = await this.tx
@@ -82,7 +83,7 @@ export class SchedulingService {
     staffProfileId: string,
     branchId: string,
   ): Promise<StaffScheduleByBranchResponseDto> {
-    SchedulingService.assertBranchAccess(principal, branchId);
+    await this.branchAccess.assertInput(principal, branchId);
 
     const rows = await this.tx.run((tx) => repo.listStaffSchedule(tx, staffProfileId, branchId));
     return {
@@ -97,7 +98,7 @@ export class SchedulingService {
     staffProfileId: string,
     input: PutStaffScheduleDto,
   ): Promise<StaffScheduleByBranchResponseDto> {
-    SchedulingService.assertBranchAccess(principal, input.branchId);
+    await this.branchAccess.assertInput(principal, input.branchId);
     SchedulingService.assertStaffScheduleEntries(input.entries);
 
     const rows = await this.tx
@@ -139,7 +140,7 @@ export class SchedulingService {
     principal: Principal,
     query: ListScheduleExceptionsQueryDto,
   ): Promise<ScheduleExceptionResponseDto[]> {
-    SchedulingService.assertBranchAccess(principal, query.branchId);
+    await this.branchAccess.assertInput(principal, query.branchId);
 
     const filters: {
       branchId: string;
@@ -161,7 +162,7 @@ export class SchedulingService {
     principal: Principal,
     input: ScheduleExceptionInputDto,
   ): Promise<ScheduleExceptionResponseDto> {
-    SchedulingService.assertBranchAccess(principal, input.branchId);
+    await this.branchAccess.assertInput(principal, input.branchId);
     SchedulingService.assertExceptionInput(input);
 
     const row = await this.tx
@@ -189,19 +190,13 @@ export class SchedulingService {
     await this.tx.run(async (tx) => {
       const current = await repo.findScheduleExceptionById(tx, id);
       if (current === undefined) throw AppError.notFound('İstisna kaydı bulunamadı');
-      SchedulingService.assertBranchAccess(principal, current.branchId);
+      BranchAccessService.assertMembership(principal, current.branchId);
 
       const updated = await repo.deactivateScheduleException(tx, id);
       if (updated === undefined) throw AppError.notFound('İstisna kaydı bulunamadı');
     });
 
     this.invalidateAvailability();
-  }
-
-  private static assertBranchAccess(principal: Principal, branchId: string): void {
-    if (!canAccessBranch(principal, branchId)) {
-      throw new AppError(403, ERROR_CODES.BRANCH_FORBIDDEN, 'Bu şubede yetkiniz yok');
-    }
   }
 
   private static assertBranchHourEntries(entries: BranchHourInputDto[]): void {
