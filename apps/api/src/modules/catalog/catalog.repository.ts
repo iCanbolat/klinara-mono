@@ -1,9 +1,9 @@
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { branchServiceOverrides, serviceCategories, services } from '../../database/schema';
 import type { Tx } from '../../database/tenant-tx';
+import { definedValues, hasUpdates, type Updatable } from '../../database/updates';
 import type { BranchServiceOverrideInputDto } from './dto/catalog.dto';
 
-type Updatable<T> = { [K in keyof T]?: T[K] | undefined };
 
 export type ServiceCategoryRow = typeof serviceCategories.$inferSelect;
 export type ServiceRow = typeof services.$inferSelect;
@@ -49,10 +49,11 @@ export async function updateServiceCategory(
   id: string,
   values: Updatable<Pick<ServiceCategoryRow, 'slug' | 'name' | 'sortOrder' | 'isActive'>>,
 ): Promise<ServiceCategoryRow | undefined> {
-  if (Object.keys(values).length === 0) return findServiceCategoryById(tx, id);
+  const patch = definedValues(values);
+  if (!hasUpdates(patch)) return findServiceCategoryById(tx, id);
   const [row] = await tx
     .update(serviceCategories)
-    .set(values)
+    .set(patch)
     .where(eq(serviceCategories.id, id))
     .returning();
   return row;
@@ -133,8 +134,9 @@ export async function updateService(
     >
   >,
 ): Promise<ServiceRow | undefined> {
-  if (Object.keys(values).length === 0) return findServiceById(tx, id);
-  const [row] = await tx.update(services).set(values).where(eq(services.id, id)).returning();
+  const patch = definedValues(values);
+  if (!hasUpdates(patch)) return findServiceById(tx, id);
+  const [row] = await tx.update(services).set(patch).where(eq(services.id, id)).returning();
   return row;
 }
 

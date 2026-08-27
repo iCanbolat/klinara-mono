@@ -53,6 +53,10 @@ export const tenantSettings = pgTable('tenant_settings', {
   preventCustomerDoubleBooking: boolean('prevent_customer_double_booking').notNull().default(true),
   reminderHoursBefore: integerArray('reminder_hours_before').notNull(),
   cancelWindowHours: integer('cancel_window_hours').notNull().default(24),
+  /** Randevu için minimum önden süre (uygunluk motoru penceresi — Batch 3.2). */
+  minLeadMinutes: integer('min_lead_minutes').notNull().default(0),
+  /** Kaç gün ileriye randevu alınabilir. */
+  maxAdvanceDays: integer('max_advance_days').notNull().default(180),
   /** Yönetici rolleri (owner, manager, accountant) için 2FA zorunlu mu. */
   requireMfaForAdmins: boolean('require_mfa_for_admins').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

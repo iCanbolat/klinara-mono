@@ -36,6 +36,8 @@ function toSettingsResponse(row: repo.TenantSettingsRow): TenantSettingsResponse
     preventCustomerDoubleBooking: row.preventCustomerDoubleBooking,
     reminderHoursBefore: row.reminderHoursBefore,
     cancelWindowHours: row.cancelWindowHours,
+    minLeadMinutes: row.minLeadMinutes,
+    maxAdvanceDays: row.maxAdvanceDays,
     requireMfaForAdmins: row.requireMfaForAdmins,
   };
 }

@@ -5,3 +5,5 @@ export * from './credentials';
 export * from './catalog';
 export * from './staff';
 export * from './scheduling';
+export * from './crm';
+export * from './appointments';

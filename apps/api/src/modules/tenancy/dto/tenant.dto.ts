@@ -166,6 +166,20 @@ export class UpdateTenantSettingsDto {
   @Max(720)
   cancelWindowHours?: number;
 
+  @ApiPropertyOptional({ example: 60, description: 'Randevu için minimum önden süre (dk)' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(43200)
+  minLeadMinutes?: number;
+
+  @ApiPropertyOptional({ example: 180, description: 'Kaç gün ileriye randevu alınabilir' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(730)
+  maxAdvanceDays?: number;
+
   /**
    * Yönetici rolleri (owner, manager, accountant) için 2FA zorunluluğu.
    *
@@ -190,6 +204,12 @@ export class TenantSettingsResponseDto {
 
   @ApiProperty({ example: 24 })
   cancelWindowHours: number;
+
+  @ApiProperty({ example: 60 })
+  minLeadMinutes: number;
+
+  @ApiProperty({ example: 180 })
+  maxAdvanceDays: number;
 
   @ApiProperty()
   requireMfaForAdmins: boolean;

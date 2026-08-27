@@ -5,6 +5,7 @@ import { PlatformAdminGuard } from '../guards/platform-admin.guard';
 export const PUBLIC_KEY = 'klinara:public';
 export const SELF_SERVICE_KEY = 'klinara:selfService';
 export const PERMISSIONS_KEY = 'klinara:permissions';
+export const ANY_PERMISSIONS_KEY = 'klinara:anyPermissions';
 export const BRANCH_SCOPE_KEY = 'klinara:branchScope';
 export const PLATFORM_ADMIN_KEY = 'klinara:platformAdmin';
 
@@ -34,6 +35,18 @@ export const SelfService = () => SetMetadata(SELF_SERVICE_KEY, true);
  */
 export const RequirePermission = (...permissions: Permission[]) =>
   SetMetadata(PERMISSIONS_KEY, permissions);
+
+/**
+ * İzinlerden HERHANGİ BİRİ yeterlidir.
+ *
+ * Takvim uçları bunsuz çalışamaz: `owner` rolünde `appointment:read.own`
+ * bilerek YOKTUR (tüm takvimi görür), `practitioner` rolünde ise
+ * `appointment:read.all` yoktur. "Hepsi aranır" semantiğiyle aynı uç
+ * rollerden biri için mutlaka 403 verirdi. Görünürlüğün DARALTILMASI ayrı bir
+ * iştir ve servis katmanında yapılır — guard yalnız kapıyı açar.
+ */
+export const RequireAnyPermission = (...permissions: Permission[]) =>
+  SetMetadata(ANY_PERMISSIONS_KEY, permissions);
 
 /**
  * `X-Branch-Id` başlığını ZORUNLU kılar ve kullanıcının o şubede üyeliğini arar.

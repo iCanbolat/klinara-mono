@@ -6,6 +6,7 @@ import { AppError } from '../errors/app-error';
 import { contextOf } from '../request-context';
 import { hasPermission } from '../../modules/identity/principal';
 import {
+  ANY_PERMISSIONS_KEY,
   BRANCH_SCOPE_KEY,
   PERMISSIONS_KEY,
   PLATFORM_ADMIN_KEY,
@@ -45,6 +46,14 @@ export class PermissionsGuard implements CanActivate {
           detail: 'Bu uç şube kapsamında çalışır.',
         });
       }
+    }
+
+    const anyOf = this.reflector.getAllAndOverride<Permission[]>(ANY_PERMISSIONS_KEY, targets);
+    if (anyOf !== undefined && anyOf.length > 0) {
+      if (anyOf.some((permission) => hasPermission(principal, permission))) return true;
+      throw AppError.forbidden('Bu işlem için yetkiniz yok', {
+        detail: `Gereken izinlerden biri: ${anyOf.join(', ')}`,
+      });
     }
 
     const required = this.reflector.getAllAndOverride<Permission[]>(PERMISSIONS_KEY, targets);

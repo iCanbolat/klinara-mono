@@ -3,6 +3,7 @@ import { ERROR_CODES } from '@klinara/shared';
 import { AppError } from '../../common/errors/app-error';
 import { isPgError, PG_ERROR } from '../../common/errors/db-errors';
 import { TenantTxService } from '../../database/tenant-tx.service';
+import { AvailabilityCacheService } from '../booking/availability-cache.service';
 import * as repo from './catalog.repository';
 import type {
   BranchServiceOverrideInputDto,
@@ -17,7 +18,18 @@ import type {
 
 @Injectable()
 export class CatalogService {
-  constructor(private readonly tx: TenantTxService) {}
+  constructor(
+    private readonly tx: TenantTxService,
+    private readonly availabilityCache: AvailabilityCacheService,
+  ) {}
+
+  /**
+   * Katalog değişimi uygunluğu bayatlatır: süre ve buffer slot bloğunu
+   * belirler, aktiflik ise hizmetin randevuya açık olup olmadığını.
+   */
+  private invalidateAvailability(): void {
+    this.availabilityCache.invalidateTenant(this.tx.tenantId);
+  }
 
   async listServiceCategories(): Promise<ServiceCategoryResponseDto[]> {
     const rows = await this.tx.run((tx) => repo.listServiceCategories(tx));
@@ -42,6 +54,7 @@ export class CatalogService {
         throw error;
       });
 
+    this.invalidateAvailability();
     return CatalogService.toCategoryResponse(row);
   }
 
@@ -66,6 +79,7 @@ export class CatalogService {
       });
 
     if (row === undefined) throw AppError.notFound('Hizmet kategorisi bulunamadı');
+    this.invalidateAvailability();
     return CatalogService.toCategoryResponse(row);
   }
 
@@ -85,6 +99,7 @@ export class CatalogService {
     });
 
     if (updated === undefined) throw AppError.notFound('Hizmet kategorisi bulunamadı');
+    this.invalidateAvailability();
     return CatalogService.toCategoryResponse(updated);
   }
 
@@ -155,9 +170,16 @@ export class CatalogService {
         if (isPgError(error, PG_ERROR.FOREIGN_KEY_VIOLATION)) {
           throw AppError.notFound('Hizmet kategorisi veya şube bulunamadı');
         }
+        if (isPgError(error, PG_ERROR.CHECK_VIOLATION)) {
+          throw AppError.conflict(
+            ERROR_CODES.CONFLICT,
+            'Kategori ve şube bu kiracıya ait olmalı',
+          );
+        }
         throw error;
       });
 
+    this.invalidateAvailability();
     return CatalogService.toServiceResponse(payload.service, payload.overrides);
   }
 
@@ -196,10 +218,17 @@ export class CatalogService {
         if (isPgError(error, PG_ERROR.FOREIGN_KEY_VIOLATION)) {
           throw AppError.notFound('Hizmet kategorisi veya şube bulunamadı');
         }
+        if (isPgError(error, PG_ERROR.CHECK_VIOLATION)) {
+          throw AppError.conflict(
+            ERROR_CODES.CONFLICT,
+            'Kategori ve şube bu kiracıya ait olmalı',
+          );
+        }
         throw error;
       });
 
     if (payload === undefined) throw AppError.notFound('Hizmet bulunamadı');
+    this.invalidateAvailability();
     return CatalogService.toServiceResponse(payload.service, payload.overrides);
   }
 
@@ -212,6 +241,7 @@ export class CatalogService {
     });
 
     if (payload === undefined) throw AppError.notFound('Hizmet bulunamadı');
+    this.invalidateAvailability();
     return CatalogService.toServiceResponse(payload.service, payload.overrides);
   }
 

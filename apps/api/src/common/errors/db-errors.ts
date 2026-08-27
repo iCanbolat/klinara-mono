@@ -23,6 +23,19 @@ export const PG_ERROR = {
   INSUFFICIENT_PRIVILEGE: '42501',
   /** restrict_violation — append-only tabloya UPDATE/DELETE denemesi */
   RESTRICT_VIOLATION: '2F004',
+
+  // --- Klinara'ya özel SQLSTATE'ler ---
+  //
+  // 'K' sınıfını PostgreSQL kullanmaz, bu yüzden kendi iş kurallarımıza
+  // ayırdık. Genel `check_violation`dan ayrı tutulmaları kasıtlı: aynı
+  // trigger içinde hem kiracı kapsamı hem iş kuralı ihlali doğrulanıyor ve
+  // ikisi istemciye TAMAMEN farklı mesajlarla dönmeli.
+  /** Geçersiz randevu durum geçişi (Faz 3.1) */
+  INVALID_STATUS_TRANSITION: 'K0001',
+  /** Pasif hizmet/personel ile kayıt oluşturma denemesi */
+  INACTIVE_SERVICE: 'K0002',
+  /** Personel bu hizmette yetkin değil (Faz 3.1) */
+  STAFF_NOT_COMPETENT: 'K0003',
 } as const;
 
 const PG_CODE_PATTERN = /^[0-9A-Z]{5}$/;

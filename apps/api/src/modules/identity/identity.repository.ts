@@ -8,6 +8,7 @@ import {
   users,
 } from '../../database/schema';
 import type { Tx } from '../../database/tenant-tx';
+import { definedValues, hasUpdates, type Updatable } from '../../database/updates';
 
 /**
  * Kimlik repository'si.
@@ -18,7 +19,6 @@ import type { Tx } from '../../database/tenant-tx';
  * kimlik tablolarının politikalarını açar.
  */
 
-type Updatable<T> = { [K in keyof T]?: T[K] | undefined };
 
 export type UserRow = typeof users.$inferSelect;
 export type MembershipRow = typeof memberships.$inferSelect;
@@ -118,8 +118,9 @@ export async function updateUser(
     >
   >,
 ): Promise<UserRow | undefined> {
-  if (Object.keys(values).length === 0) return findUserById(tx, id);
-  const [row] = await tx.update(users).set(values).where(eq(users.id, id)).returning();
+  const patch = definedValues(values);
+  if (!hasUpdates(patch)) return findUserById(tx, id);
+  const [row] = await tx.update(users).set(patch).where(eq(users.id, id)).returning();
   return row;
 }
 

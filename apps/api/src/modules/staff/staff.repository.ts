@@ -1,9 +1,9 @@
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { staffProfiles, staffServices, users } from '../../database/schema';
 import type { Tx } from '../../database/tenant-tx';
+import { definedValues, hasUpdates, type Updatable } from '../../database/updates';
 import type { StaffServiceInputDto } from './dto/staff.dto';
 
-type Updatable<T> = { [K in keyof T]?: T[K] | undefined };
 
 export type StaffProfileRow = typeof staffProfiles.$inferSelect;
 export type StaffServiceRow = typeof staffServices.$inferSelect;
@@ -103,7 +103,8 @@ export async function updateStaffProfile(
     >
   >,
 ): Promise<StaffProfileRow | undefined> {
-  if (Object.keys(values).length === 0) {
+  const patch = definedValues(values);
+  if (!hasUpdates(patch)) {
     const [row] = await tx
       .select()
       .from(staffProfiles)
@@ -112,7 +113,7 @@ export async function updateStaffProfile(
     return row;
   }
 
-  const [row] = await tx.update(staffProfiles).set(values).where(eq(staffProfiles.id, id)).returning();
+  const [row] = await tx.update(staffProfiles).set(patch).where(eq(staffProfiles.id, id)).returning();
   return row;
 }
 

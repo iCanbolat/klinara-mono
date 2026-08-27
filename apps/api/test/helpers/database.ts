@@ -63,7 +63,8 @@ export async function startTestDatabase(): Promise<TestDatabase> {
         `select tablename from pg_tables
           where schemaname = 'public'
             and tablename not in (
-              '_klinara_migrations', 'roles', 'permissions', 'role_permissions'
+              '_klinara_migrations', 'roles', 'permissions', 'role_permissions',
+              'appointment_status_transitions'
             )`,
       );
       if (rows.length === 0) return;

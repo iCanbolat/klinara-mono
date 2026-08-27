@@ -10,11 +10,15 @@ import { RequestContextMiddleware } from './common/middleware/request-context.mi
 import { validationExceptionFactory } from './common/pipes/validation-exception.factory';
 import { validateEnv, type EnvironmentVariables } from './config/env.validation';
 import { DatabaseModule } from './database/database.module';
+import { IdempotencyModule } from './common/idempotency/idempotency.module';
 import { MailModule } from './lib/mail/mail.module';
 import { SmsModule } from './lib/sms/sms.module';
 import { HealthModule } from './modules/health/health.module';
 import { IdentityModule } from './modules/identity/identity.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
+import { AvailabilityCacheModule } from './modules/booking/availability-cache.module';
+import { BookingModule } from './modules/booking/booking.module';
+import { CrmModule } from './modules/crm/crm.module';
 import { SchedulingModule } from './modules/scheduling/scheduling.module';
 import { StaffModule } from './modules/staff/staff.module';
 import { TenancyModule } from './modules/tenancy/tenancy.module';
@@ -51,11 +55,15 @@ import { MetricsModule } from './observability/metrics.module';
     }),
     MetricsModule,
     DatabaseModule,
+    AvailabilityCacheModule,
+    IdempotencyModule,
     SmsModule,
     MailModule,
     HealthModule,
     IdentityModule,
     CatalogModule,
+    CrmModule,
+    BookingModule,
     StaffModule,
     SchedulingModule,
     TenancyModule,

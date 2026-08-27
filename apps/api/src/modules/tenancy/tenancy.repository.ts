@@ -1,6 +1,7 @@
 import { and, eq, isNull } from 'drizzle-orm';
 import { branches, tenants, tenantSettings } from '../../database/schema';
 import type { Tx } from '../../database/tenant-tx';
+import { definedValues, hasUpdates, type Updatable } from '../../database/updates';
 
 /**
  * Kiracılık repository'si.
@@ -16,7 +17,6 @@ import type { Tx } from '../../database/tenant-tx';
  * alanları reddeder. Kısmi güncellemelerde (PATCH) gövdeden gelen alanlar tam
  * olarak böyle geldiği için, `undefined`a izin veren kendi tipimizi kullanıyoruz.
  */
-type Updatable<T> = { [K in keyof T]?: T[K] | undefined };
 
 export type TenantRow = typeof tenants.$inferSelect;
 export type BranchRow = typeof branches.$inferSelect;
@@ -60,8 +60,9 @@ export async function updateTenant(
 ): Promise<TenantRow | undefined> {
   // Boş PATCH gövdesi geçerli bir istektir; `set({})` ise SQL kurucusunu
   // patlatır. Değişecek alan yoksa mevcut satırı döndürmek yeterli.
-  if (Object.keys(values).length === 0) return findTenantById(tx, id);
-  const [row] = await tx.update(tenants).set(values).where(eq(tenants.id, id)).returning();
+  const patch = definedValues(values);
+  if (!hasUpdates(patch)) return findTenantById(tx, id);
+  const [row] = await tx.update(tenants).set(patch).where(eq(tenants.id, id)).returning();
   return row;
 }
 
@@ -87,14 +88,17 @@ export async function updateSettings(
       | 'preventCustomerDoubleBooking'
       | 'reminderHoursBefore'
       | 'cancelWindowHours'
+      | 'minLeadMinutes'
+      | 'maxAdvanceDays'
       | 'requireMfaForAdmins'
     >
   >,
 ): Promise<TenantSettingsRow | undefined> {
-  if (Object.keys(values).length === 0) return getSettings(tx, tenantId);
+  const patch = definedValues(values);
+  if (!hasUpdates(patch)) return getSettings(tx, tenantId);
   const [row] = await tx
     .update(tenantSettings)
-    .set(values)
+    .set(patch)
     .where(eq(tenantSettings.tenantId, tenantId))
     .returning();
   return row;
@@ -136,7 +140,8 @@ export async function updateBranch(
   id: string,
   values: Updatable<Pick<BranchRow, 'name' | 'timezone' | 'phone' | 'address' | 'isActive'>>,
 ): Promise<BranchRow | undefined> {
-  if (Object.keys(values).length === 0) return findBranchById(tx, id);
-  const [row] = await tx.update(branches).set(values).where(eq(branches.id, id)).returning();
+  const patch = definedValues(values);
+  if (!hasUpdates(patch)) return findBranchById(tx, id);
+  const [row] = await tx.update(branches).set(patch).where(eq(branches.id, id)).returning();
   return row;
 }

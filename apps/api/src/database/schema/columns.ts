@@ -42,3 +42,16 @@ export const textArray = customType<{ data: string[]; driverData: string | strin
 export const inet = customType<{ data: string }>({
   dataType: () => 'inet',
 });
+
+/**
+ * `tstzrange` — zaman aralığı; takvim çekirdeğinin `EXCLUDE` constraint'i
+ * bu tip üzerinde çalışır.
+ *
+ * Sürücü aralığı `["2026-09-01 11:00:00+00","2026-09-01 12:15:00+00")` metni
+ * olarak taşır. Uygulama tarafında aralık DEĞERİ elle kurulmaz: yazarken
+ * daima `sql\`tstzrange(${from}, ${to}, '[)')\`` kullanılır, böylece sınır
+ * kuralı (`[)` — başlangıç dahil, bitiş hariç) tek bir yerde kalır.
+ */
+export const tstzrange = customType<{ data: string }>({
+  dataType: () => 'tstzrange',
+});

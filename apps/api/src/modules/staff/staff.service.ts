@@ -3,6 +3,7 @@ import { ERROR_CODES } from '@klinara/shared';
 import { AppError } from '../../common/errors/app-error';
 import { isPgError, PG_ERROR } from '../../common/errors/db-errors';
 import { TenantTxService } from '../../database/tenant-tx.service';
+import { AvailabilityCacheService } from '../booking/availability-cache.service';
 import * as repo from './staff.repository';
 import type {
   CreateStaffProfileDto,
@@ -15,7 +16,15 @@ import type {
 
 @Injectable()
 export class StaffService {
-  constructor(private readonly tx: TenantTxService) {}
+  constructor(
+    private readonly tx: TenantTxService,
+    private readonly availabilityCache: AvailabilityCacheService,
+  ) {}
+
+  /** Uygunluğu etkileyen her yazımdan sonra kiracının cache'i düşürülür. */
+  private invalidateAvailability(): void {
+    this.availabilityCache.invalidateTenant(this.tx.tenantId);
+  }
 
   async listStaffProfiles(): Promise<StaffProfileResponseDto[]> {
     const payload = await this.tx.run(async (tx) => {
@@ -83,9 +92,25 @@ export class StaffService {
         if (isPgError(error, PG_ERROR.FOREIGN_KEY_VIOLATION)) {
           throw AppError.notFound('Kullanıcı, şube veya hizmet bulunamadı');
         }
+        if (isPgError(error, PG_ERROR.INACTIVE_SERVICE)) {
+          throw AppError.conflict(
+            ERROR_CODES.CONFLICT,
+            'Pasif bir hizmete yetkinlik atanamaz; önce hizmeti tekrar aktif edin',
+          );
+        }
+        // Kapsam trigger'ı: kullanıcı bu kiracının üyesi değil ya da şube
+        // başka kiracıya ait. FK kontrolleri RLS'i BYPASS ettiği için bu
+        // durumlar veritabanına kadar gelir ve burada 4xx'e çevrilmelidir.
+        if (isPgError(error, PG_ERROR.CHECK_VIOLATION)) {
+          throw AppError.conflict(
+            ERROR_CODES.CONFLICT,
+            'Personel profili açılamadı: kullanıcı bu kiracının aktif üyesi olmalı ve seçilen şube bu kiracıya ait olmalı',
+          );
+        }
         throw error;
       });
 
+    this.invalidateAvailability();
     return StaffService.toProfileResponse(payload.profile, payload.services);
   }
 
@@ -113,10 +138,14 @@ export class StaffService {
         if (isPgError(error, PG_ERROR.FOREIGN_KEY_VIOLATION)) {
           throw AppError.notFound('Şube bulunamadı');
         }
+        if (isPgError(error, PG_ERROR.CHECK_VIOLATION)) {
+          throw AppError.conflict(ERROR_CODES.CONFLICT, 'Seçilen şube bu kiracıya ait değil');
+        }
         throw error;
       });
 
     if (payload === undefined) throw AppError.notFound('Personel profili bulunamadı');
+    this.invalidateAvailability();
     return StaffService.toProfileResponse(payload.profile, payload.services);
   }
 
@@ -139,10 +168,23 @@ export class StaffService {
         if (isPgError(error, PG_ERROR.FOREIGN_KEY_VIOLATION)) {
           throw AppError.notFound('Hizmet veya şube bulunamadı');
         }
+        if (isPgError(error, PG_ERROR.INACTIVE_SERVICE)) {
+          throw AppError.conflict(
+            ERROR_CODES.CONFLICT,
+            'Pasif bir hizmete yetkinlik atanamaz; listeden çıkarın veya hizmeti aktif edin',
+          );
+        }
+        if (isPgError(error, PG_ERROR.CHECK_VIOLATION)) {
+          throw AppError.conflict(
+            ERROR_CODES.CONFLICT,
+            'Yetkinlik kaydedilemedi: hizmet ve şube bu kiracıya ait olmalı',
+          );
+        }
         throw error;
       });
 
     if (payload === undefined) throw AppError.notFound('Personel profili bulunamadı');
+    this.invalidateAvailability();
     return StaffService.toProfileResponse(payload.profile, payload.services);
   }
 

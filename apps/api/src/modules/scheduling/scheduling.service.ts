@@ -3,6 +3,7 @@ import { ERROR_CODES } from '@klinara/shared';
 import { AppError } from '../../common/errors/app-error';
 import { isPgError, PG_ERROR } from '../../common/errors/db-errors';
 import { TenantTxService } from '../../database/tenant-tx.service';
+import { AvailabilityCacheService } from '../booking/availability-cache.service';
 import type { Principal } from '../identity/principal';
 import { canAccessBranch } from '../identity/principal';
 import * as repo from './scheduling.repository';
@@ -22,7 +23,18 @@ import type {
 
 @Injectable()
 export class SchedulingService {
-  constructor(private readonly tx: TenantTxService) {}
+  constructor(
+    private readonly tx: TenantTxService,
+    private readonly availabilityCache: AvailabilityCacheService,
+  ) {}
+
+  /**
+   * Çalışma saati, şablon ve istisna değişimleri uygunluğun TANIMINI
+   * değiştirir; cache onsuz eski takvimi göstermeye devam ederdi.
+   */
+  private invalidateAvailability(): void {
+    this.availabilityCache.invalidateTenant(this.tx.tenantId);
+  }
 
   async getBranchHours(principal: Principal, branchId: string): Promise<BranchHoursResponseDto> {
     SchedulingService.assertBranchAccess(principal, branchId);
@@ -51,8 +63,13 @@ export class SchedulingService {
         if (isPgError(error, PG_ERROR.FOREIGN_KEY_VIOLATION)) {
           throw AppError.notFound('Şube bulunamadı');
         }
+        if (isPgError(error, PG_ERROR.CHECK_VIOLATION)) {
+          throw AppError.conflict(ERROR_CODES.CONFLICT, 'Şube bu kiracıya ait değil');
+        }
         throw error;
       });
+
+    this.invalidateAvailability();
 
     return {
       branchId,
@@ -98,8 +115,18 @@ export class SchedulingService {
         if (isPgError(error, PG_ERROR.FOREIGN_KEY_VIOLATION)) {
           throw AppError.notFound('Personel profili veya şube bulunamadı');
         }
+        // Kapsam trigger'ı: FK doğrulaması RLS'i bypass ettiği için BAŞKA bir
+        // kiracının profil/şube kimliği FK'dan geçer, kurala trigger'da takılır.
+        if (isPgError(error, PG_ERROR.CHECK_VIOLATION)) {
+          throw AppError.conflict(
+            ERROR_CODES.CONFLICT,
+            'Personel profili ve şube bu kiracıya ait olmalı',
+          );
+        }
         throw error;
       });
+
+    this.invalidateAvailability();
 
     return {
       staffProfileId,
@@ -143,9 +170,18 @@ export class SchedulingService {
         if (isPgError(error, PG_ERROR.FOREIGN_KEY_VIOLATION)) {
           throw AppError.notFound('Personel profili veya şube bulunamadı');
         }
+        // Kapsam trigger'ı: FK doğrulaması RLS'i bypass ettiği için BAŞKA bir
+        // kiracının profil/şube kimliği FK'dan geçer, kurala trigger'da takılır.
+        if (isPgError(error, PG_ERROR.CHECK_VIOLATION)) {
+          throw AppError.conflict(
+            ERROR_CODES.CONFLICT,
+            'Personel profili ve şube bu kiracıya ait olmalı',
+          );
+        }
         throw error;
       });
 
+    this.invalidateAvailability();
     return SchedulingService.toScheduleExceptionResponse(row);
   }
 
@@ -158,6 +194,8 @@ export class SchedulingService {
       const updated = await repo.deactivateScheduleException(tx, id);
       if (updated === undefined) throw AppError.notFound('İstisna kaydı bulunamadı');
     });
+
+    this.invalidateAvailability();
   }
 
   private static assertBranchAccess(principal: Principal, branchId: string): void {
