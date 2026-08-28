@@ -53,7 +53,7 @@ enum MockBookingSeed {
         else { return [] }
 
         let clock = BranchClock(timeZoneIdentifier: timezone)
-        let today = clock.startOfDay(Date())
+        let today = clock.startOfDay(MockNow.reference)
         let branchId = MockIDs.branchNisantasi
         let bolgesel = services.first { $0.id == MockCatalogSeed.serviceLazerBolgesel } ?? lazer
 

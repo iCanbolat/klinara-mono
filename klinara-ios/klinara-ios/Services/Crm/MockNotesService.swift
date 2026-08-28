@@ -23,13 +23,13 @@ final class MockNotesService: NotesService, @unchecked Sendable {
     init(booking: MockBookingService, canReadMedical: Bool = true) {
         self.booking = booking
         self.canReadMedical = canReadMedical
-        records = MockNoteSeed.notes(at: Date())
+        records = MockNoteSeed.notes(at: MockNow.reference)
     }
 
     func reseed(canReadMedical: Bool) {
         withLock {
             self.canReadMedical = canReadMedical
-            records = MockNoteSeed.notes(at: Date())
+            records = MockNoteSeed.notes(at: MockNow.reference)
             revisionRecords = [:]
         }
     }
@@ -72,6 +72,7 @@ final class MockNotesService: NotesService, @unchecked Sendable {
         await latency(0.4)
         return try withLock {
             try assertCanWrite(input.kind)
+            let now = MockNow.next()
             let note = CustomerNote(
                 id: MockIDs.uuid(),
                 customerId: customerId,
@@ -81,8 +82,8 @@ final class MockNotesService: NotesService, @unchecked Sendable {
                 customerVisible: input.customerVisible ?? false,
                 authorUserId: MockIDs.userOwner,
                 version: 1,
-                createdAt: Date(),
-                updatedAt: Date()
+                createdAt: now,
+                updatedAt: now
             )
             records.append(note)
             return note
@@ -111,7 +112,7 @@ final class MockNotesService: NotesService, @unchecked Sendable {
                     body: old.body,
                     version: old.version,
                     editedBy: MockIDs.userOwner,
-                    editedAt: Date()
+                    editedAt: MockNow.next()
                 ))
             }
 
@@ -125,7 +126,7 @@ final class MockNotesService: NotesService, @unchecked Sendable {
                 authorUserId: old.authorUserId,
                 version: textChanged ? old.version + 1 : old.version,
                 createdAt: old.createdAt,
-                updatedAt: Date()
+                updatedAt: MockNow.next()
             )
             records[index] = updated
             return updated

@@ -16,7 +16,7 @@ final class MockCustomerService: CustomerService, @unchecked Sendable {
     private var assignments: [String: Set<String>]
 
     init(scenario: MockDataScenario = .busyDay) {
-        records = MockCustomerSeed.customers(at: Date(), scenario: scenario)
+        records = MockCustomerSeed.customers(at: MockNow.reference, scenario: scenario)
         tagRecords = MockCustomerSeed.tags
         assignments = MockCustomerSeed.assignments(scenario: scenario)
         records = Self.applyTags(to: records, tags: tagRecords, assignments: assignments)
@@ -40,7 +40,7 @@ final class MockCustomerService: CustomerService, @unchecked Sendable {
     /// servis örneklerine bağlı kalırdı.
     func reseed(_ scenario: MockDataScenario) {
         withLock {
-            records = MockCustomerSeed.customers(at: Date(), scenario: scenario)
+            records = MockCustomerSeed.customers(at: MockNow.reference, scenario: scenario)
             tagRecords = MockCustomerSeed.tags
             assignments = MockCustomerSeed.assignments(scenario: scenario)
             records = Self.applyTags(to: records, tags: tagRecords, assignments: assignments)
@@ -131,7 +131,7 @@ final class MockCustomerService: CustomerService, @unchecked Sendable {
                 source: input.source,
                 mergedIntoCustomerId: nil,
                 tags: [],
-                createdAt: Date()
+                createdAt: MockNow.next()
             )
             records.append(record)
             return record
