@@ -18,6 +18,9 @@ struct MockGraph {
     let packages: MockPackagesService
     let finance: MockFinanceService
     let commissions: MockCommissionsService
+    let notifications: MockNotificationsService
+    let messages: MockMessagesService
+    let whatsapp: MockWhatsAppService
     let clock: BranchClock
 
     /// Nişantaşı şubesi: mock çalışma saatlerinin ve personel şablonunun
@@ -47,6 +50,13 @@ struct MockGraph {
         // Tahsilat prim tahakkuku doğursun diye iki mock bağlanıyor —
         // ``ServiceContainer/mock(scenario:data:)`` ile birebir aynı bağ.
         finance.commissions = commissions
+        // ``ServiceContainer/mock(scenario:data:)`` ile birebir aynı bağ:
+        // bildirim mock'u randevu mock'undan okuyor (çizelge randevunun kendi
+        // saatinden türetiliyor) ve WhatsApp test gönderimi mesaj günlüğüne
+        // yazıyor.
+        notifications = MockNotificationsService(booking: booking)
+        messages = MockMessagesService()
+        whatsapp = MockWhatsAppService(messages: messages)
         notes = MockNotesService(booking: booking, canReadMedical: canReadMedical)
         files = MockFilesService(canReadMedical: canReadMedical)
         clock = BranchClock(timeZoneIdentifier: MockBookingSeed.timezone)

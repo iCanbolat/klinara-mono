@@ -328,21 +328,33 @@ private enum Fixtures {
     /// `packages/shared/src/permissions.ts` içindeki rol tanımlarının aynısı.
     /// Elle kısaltılmış bir liste, ekranların gerçekte olmayan bir yetki
     /// bileşimiyle test edilmesi demek olurdu.
+    ///
+    /// Faz 8'de bu liste sunucudan **geride kalmış** halde bulundu: Faz 6'nın
+    /// finans izinleri hiç eklenmemişti ve mock modda kasa, prim ve cari hesap
+    /// ekranlarına ulaşılamıyordu. Bir izni eklemeyi unutmak, ekranı sessizce
+    /// erişilemez kılıyor — testin yakalayamadığı, yalnız elle gezerken
+    /// görülen bir kayıp. Yeni bir izin `permissions.ts`e girdiğinde buraya da
+    /// girmeli.
     private static func permissions(for roleKey: String) -> String {
         switch roleKey {
         case "practitioner":
             return """
-            ["appointment:read.own", "appointment:write", "customer:read", "customer:write",
+            ["branch:read", "appointment:read.own", "appointment:write", "customer:read",
              "customer.medical:read", "customer.medical:write", "service:read", "staff:read",
-             "schedule:read", "package:read", "consent:read"]
+             "schedule:read", "package:read", "consent:read", "notification:read"]
             """
         default:  // manager
             return """
-            ["appointment:read.all", "appointment:write", "appointment:reopen",
-             "customer:read", "customer:write", "customer.medical:read",
-             "service:read", "service:write", "staff:read", "staff:write",
-             "schedule:read", "schedule:write", "branch:read", "user:read", "user:invite",
-             "package:read", "package:write", "consent:read", "notification:send"]
+            ["tenant:read", "branch:read", "user:read", "user:invite",
+             "appointment:read.all", "appointment:write", "customer:read", "customer:write",
+             "service:read", "staff:read", "schedule:read", "package:read", "consent:read",
+             "notification:read",
+             "appointment:reopen", "service:write", "staff:write", "schedule:write",
+             "customer.medical:read", "customer:merge",
+             "package:write", "package:refund", "package:transfer",
+             "finance.payment:read", "finance.payment:write", "finance.price:override",
+             "finance.commission:read", "finance.commission:write", "report.revenue:read",
+             "consent:manage", "notification:send", "notification:manage", "audit:read"]
             """
         }
     }

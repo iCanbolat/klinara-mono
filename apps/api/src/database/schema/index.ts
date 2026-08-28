@@ -10,3 +10,7 @@ export * from './files';
 export * from './appointments';
 export * from './packages';
 export * from './finance';
+export * from './notifications';
+export * from './whatsapp';
+export * from './webhooks';
+export * from './reminders';

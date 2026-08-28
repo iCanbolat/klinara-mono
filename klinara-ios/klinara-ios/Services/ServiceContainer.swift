@@ -19,6 +19,9 @@ final class ServiceContainer {
     let packages: any PackagesService
     let finance: any FinanceService
     let commissions: any CommissionsService
+    let notifications: any NotificationsService
+    let messages: any MessagesService
+    let whatsapp: any WhatsAppService
 
     /// Mock kullanılıyorsa geliştirici senaryo menüsü açılır.
     let mockAuth: MockAuthService?
@@ -38,6 +41,9 @@ final class ServiceContainer {
         packages: any PackagesService,
         finance: any FinanceService,
         commissions: any CommissionsService,
+        notifications: any NotificationsService,
+        messages: any MessagesService,
+        whatsapp: any WhatsAppService,
         mockAuth: MockAuthService?,
         mockDataScenario: MockDataScenario? = nil
     ) {
@@ -53,6 +59,9 @@ final class ServiceContainer {
         self.packages = packages
         self.finance = finance
         self.commissions = commissions
+        self.notifications = notifications
+        self.messages = messages
+        self.whatsapp = whatsapp
         self.mockAuth = mockAuth
         self.mockDataScenario = mockDataScenario
     }
@@ -73,6 +82,9 @@ final class ServiceContainer {
             packages: LivePackagesService(client: client),
             finance: LiveFinanceService(client: client),
             commissions: LiveCommissionsService(client: client),
+            notifications: LiveNotificationsService(client: client),
+            messages: LiveMessagesService(client: client),
+            whatsapp: LiveWhatsAppService(client: client),
             mockAuth: nil
         )
     }
@@ -108,6 +120,14 @@ final class ServiceContainer {
         // bağlanıyor. Gerçek sunucuda ikisi aynı transaction'da; burada zayıf
         // bir referans, çünkü prim mock'u da finans kayıtlarını okuyor.
         finance.commissions = commissions
+        // Bildirim mock'u randevu mock'undan okuyor: bir randevunun hatırlatma
+        // çizelgesi onun kendi saatinden türetiliyor. Ayrı tohumlanmış bir
+        // kopya, ertelenen randevuda çizelgeyi yalan söyletirdi.
+        let notifications = MockNotificationsService(booking: booking)
+        let messages = MockMessagesService()
+        // Test gönderimi mesaj günlüğünde iz bıraksın diye; sunucuda ikisi de
+        // aynı `message_log` tablosuna yazıyor.
+        let whatsapp = MockWhatsAppService(messages: messages)
         return ServiceContainer(
             auth: mockAuth,
             catalog: catalog,
@@ -121,6 +141,9 @@ final class ServiceContainer {
             packages: packages,
             finance: finance,
             commissions: commissions,
+            notifications: notifications,
+            messages: messages,
+            whatsapp: whatsapp,
             mockAuth: mockAuth,
             mockDataScenario: data
         )
@@ -143,6 +166,9 @@ final class ServiceContainer {
         (packages as? MockPackagesService)?.reseed()
         (finance as? MockFinanceService)?.reseed()
         (commissions as? MockCommissionsService)?.reseed()
+        (notifications as? MockNotificationsService)?.reseed()
+        (messages as? MockMessagesService)?.reseed()
+        (whatsapp as? MockWhatsAppService)?.reseed()
         mockDataScenario = scenario
     }
 

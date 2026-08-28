@@ -28,6 +28,13 @@ const SENSITIVE_KEYS = [
   'phone',
   'phoneNumber',
   'customerPhone',
+  // Bildirim çekirdeği (8.1): gönderim worker'ı ham adresi bellekte tutar ve
+  // bir hata nesnesiyle birlikte loga düşmesi işten değildir. `to` bu yüzden
+  // tamamen gizlenir — yerel SMS göndericisi zaten maskeli yazıyordu, buradaki
+  // kural onun unutulduğu yolları da kapatıyor.
+  'to',
+  'renderedBody',
+  'variables',
 ] as const;
 
 /**
@@ -54,6 +61,16 @@ export function maskPhone(value: string): string {
   const prefix = value.startsWith('+') ? value.slice(0, 3) : value.slice(0, 2);
   const suffix = value.slice(-2);
   return `${prefix}${'*'.repeat(Math.max(value.length - prefix.length - 2, 3))}${suffix}`;
+}
+
+/** `ayse@klinik.com` → `a***e@klinik.com` */
+export function maskEmail(value: string): string {
+  const at = value.indexOf('@');
+  if (at <= 0) return '***';
+  const local = value.slice(0, at);
+  const domain = value.slice(at);
+  if (local.length <= 2) return `${local[0] ?? '*'}***${domain}`;
+  return `${local[0] ?? ''}***${local[local.length - 1] ?? ''}${domain}`;
 }
 
 const PHONE_LIKE = /phone/i;

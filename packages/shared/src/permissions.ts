@@ -76,6 +76,16 @@ export const PERMISSIONS = {
 
   // --- İletişim ve denetim ---
   NOTIFICATION_SEND: 'notification:send',
+  /** Mesaj kaydı ve gelen kutusu okuma. */
+  NOTIFICATION_READ: 'notification:read',
+  /**
+   * Şablon, tercih ve WhatsApp entegrasyonu yönetimi.
+   *
+   * `notification:send` üzerine BİNMEZ: resepsiyon tek tek mesaj gönderebilir
+   * ama kiracının TÜM müşterilerine giden şablonu değiştiremez. Bir şablon
+   * hatası binlerce yanlış mesaj demektir, tek bir yanlış mesaj değil.
+   */
+  NOTIFICATION_MANAGE: 'notification:manage',
   AUDIT_READ: 'audit:read',
 } as const;
 
@@ -122,6 +132,7 @@ const OPERATIONS: Permission[] = [
   P.SCHEDULE_READ,
   P.PACKAGE_READ,
   P.CONSENT_READ,
+  P.NOTIFICATION_READ,
 ];
 
 export const ROLE_DEFINITIONS: RoleDefinition[] = [
@@ -170,6 +181,7 @@ export const ROLE_DEFINITIONS: RoleDefinition[] = [
       P.REPORT_REVENUE_READ,
       P.CONSENT_MANAGE,
       P.NOTIFICATION_SEND,
+      P.NOTIFICATION_MANAGE,
       P.AUDIT_READ,
     ],
   },
@@ -227,6 +239,7 @@ export const ROLE_DEFINITIONS: RoleDefinition[] = [
       P.SCHEDULE_READ,
       P.PACKAGE_READ,
       P.CONSENT_READ,
+      P.NOTIFICATION_READ,
     ],
   },
 ];

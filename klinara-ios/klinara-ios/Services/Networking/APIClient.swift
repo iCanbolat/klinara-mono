@@ -69,6 +69,26 @@ actor APIClient {
         _ = try await perform(request)
     }
 
+    /// **Boş gövdeli `200`**i `nil`e çeviren çağrılar.
+    ///
+    /// `GET /integrations/whatsapp` hesap kurulmamışken `200` ile BOŞ bir gövde
+    /// döndürüyor (denetleyici `null` döndürüyor, Nest onu hiç yazmıyor).
+    /// ``send(_:)`` bunu `malformedResponse` sayardı ve ekran, kullanıcının
+    /// henüz yapmadığı bir kurulumu bozulmuş gibi gösterirdi. Ayrı bir
+    /// aşırı yükleme, "boş yanıt beklenen bir sonuçtur" kararını çağrı
+    /// yerinde görünür kılıyor.
+    func sendOptional<Response: Decodable & Sendable>(
+        _ request: APIRequest
+    ) async throws -> Response? {
+        let data = try await perform(request)
+        guard !data.isEmpty else { return nil }
+        do {
+            return try Self.decoder.decode(Response.self, from: data)
+        } catch {
+            throw APIError.malformedResponse(String(describing: error))
+        }
+    }
+
     // MARK: - İmzalı yükleme
 
     /// İmzalı adrese doğrudan PUT — dosya içeriği API sürecinden GEÇMEZ.

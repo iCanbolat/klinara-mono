@@ -69,6 +69,27 @@ nonisolated enum APIErrorCode: String, Decodable, Sendable {
     /// Kapatılmış prim dönemi değiştirilemez; düzeltme cari döneme düşer.
     case periodClosed = "PERIOD_CLOSED"
 
+    // Bildirim ve WhatsApp (Faz 8)
+    /// Müşteri ticari ileti almayı kapatmış. Yalnız **pazarlama** mesajlarını
+    /// engeller; randevu hatırlatması işlemseldir ve etkilenmez.
+    case optOut = "OPT_OUT"
+    /// Şablon metninde o olayda tanımlı olmayan bir `{{değişken}}` var.
+    case templateInvalid = "TEMPLATE_INVALID"
+    /// Olay için seçilen kanalın sağlayıcısı bu kiracıda kurulu değil.
+    case channelNotConfigured = "CHANNEL_NOT_CONFIGURED"
+    /// WABA kimlik bilgileri hiç girilmemiş.
+    case whatsappNotConfigured = "WHATSAPP_NOT_CONFIGURED"
+    /// Template Meta'da onaylı değil — kalıcı hata, yeniden denenmez.
+    case whatsappTemplateNotApproved = "WHATSAPP_TEMPLATE_NOT_APPROVED"
+    /// Numara WhatsApp'ta geçerli değil — kalıcı hata.
+    case whatsappInvalidRecipient = "WHATSAPP_INVALID_RECIPIENT"
+    /// 24 saatlik müşteri hizmetleri penceresi kapalı; yalnız onaylı template
+    /// gönderilebilir. Ek M: pencereyi Meta'ya sormuyoruz, kendimiz izliyoruz.
+    case whatsappWindowClosed = "WHATSAPP_WINDOW_CLOSED"
+    /// Sağlayıcı kotası doldu — **geçici**; sunucu 503 döndürüyor ve worker
+    /// yeniden deniyor.
+    case whatsappRateLimited = "WHATSAPP_RATE_LIMITED"
+
     case unknown = "UNKNOWN"
 
     init(from decoder: any Decoder) throws {
@@ -257,6 +278,24 @@ extension APIError {
                 return "Bu şubede zaten açık bir kasa var. Önce mevcut kasayı kapatın."
             case .periodClosed:
                 return "Bu prim dönemi kapatılmış ve değiştirilemez. Düzeltmeler cari döneme düşer."
+            case .optOut:
+                return "Müşteri ticari ileti almayı kapatmış. Randevu hatırlatmaları bundan etkilenmez."
+            case .templateInvalid:
+                // `detail` izinli değişkenleri sayıyor; genel bir cümle
+                // kullanıcıya hangi adı yazacağını söylemezdi.
+                return problem.detail ?? "Şablonda tanımlı olmayan bir değişken var."
+            case .channelNotConfigured:
+                return "Bu kanal henüz kurulmadı. Entegrasyon ayarlarından yapılandırın."
+            case .whatsappNotConfigured:
+                return "WhatsApp entegrasyonu kurulmamış. Yönetim → İletişim → WhatsApp entegrasyonu'ndan kimlik bilgilerini girin."
+            case .whatsappTemplateNotApproved:
+                return "Bu şablon Meta'da onaylı değil. Onay sürecini Meta Business Manager'dan takip edin."
+            case .whatsappInvalidRecipient:
+                return "Numara WhatsApp'ta geçerli değil. Ülke kodunu ve numarayı kontrol edin."
+            case .whatsappWindowClosed:
+                return "Müşteriyle 24 saatlik yanıt penceresi kapandı. Yalnız onaylı bir şablon gönderilebilir."
+            case .whatsappRateLimited:
+                return "WhatsApp gönderim kotası doldu. Bir süre sonra tekrar deneyin."
             default:
                 return "Bir sorun oluştu. Lütfen tekrar deneyin."
             }
@@ -280,7 +319,12 @@ extension APIError {
         case .network:
             return true
         case .problem(let problem):
-            return problem.code == .internalError || problem.code == .serviceUnavailable
+            // `whatsappRateLimited` sunucuda 503 ile geliyor ve worker zaten
+            // yeniden deniyor; kullanıcıya da tekrar deneme hakkı verilmeli.
+            // Diğer WhatsApp kodları KALICI — tekrar denemek aynı sonucu verir.
+            return problem.code == .internalError
+                || problem.code == .serviceUnavailable
+                || problem.code == .whatsappRateLimited
         // Yükleme hatası neredeyse her zaman geçici: süresi dolmuş imza ya da
         // kopan bağlantı. Tekrar denemek yeni bir `presign` üretecek.
         case .uploadFailed:

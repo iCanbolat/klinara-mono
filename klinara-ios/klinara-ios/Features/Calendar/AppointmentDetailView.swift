@@ -44,6 +44,13 @@ struct AppointmentDetailView: View {
                     actionsCard(appointment)
                 }
 
+                // Bildirim çizelgesi: uç `appointment:read.*` ile korunuyor,
+                // yani bu ekranı açabilen herkes görebilir — ayrı bir kapı yok.
+                AppointmentNotificationsSection(
+                    session: session,
+                    appointmentId: appointment.id
+                )
+
                 KlinaraCard {
                     KlinaraNavigationRow(
                         label: "Geçmiş",

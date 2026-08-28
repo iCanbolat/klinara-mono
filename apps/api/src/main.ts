@@ -46,7 +46,10 @@ async function bootstrap(): Promise<void> {
 
   const app = await NestFactory.create<import('@nestjs/platform-express').NestExpressApplication>(
     AppModule,
-    { bufferLogs: true },
+    // `rawBody`: WhatsApp webhook imzası (8.3) gövdenin HAM baytları üzerinden
+    // doğrulanır. Parse edilip yeniden serialize edilmiş gövde başka bir imza
+    // üretir ve doğrulama sessizce başarısız olur.
+    { bufferLogs: true, rawBody: true },
   );
 
   configureApp(app);

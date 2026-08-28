@@ -15,6 +15,7 @@ import { MailModule } from './lib/mail/mail.module';
 import { QueueModule } from './lib/queue/queue.module';
 import { SmsModule } from './lib/sms/sms.module';
 import { StorageModule } from './lib/storage/storage.module';
+import { WhatsAppModule } from './lib/whatsapp/whatsapp.module';
 import { HealthModule } from './modules/health/health.module';
 import { IdentityModule } from './modules/identity/identity.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
@@ -24,6 +25,8 @@ import { BookingModule } from './modules/booking/booking.module';
 import { CrmModule } from './modules/crm/crm.module';
 import { FinanceModule } from './modules/finance/finance.module';
 import { FilesModule } from './modules/files/files.module';
+import { IntegrationsModule } from './modules/integrations/integrations.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import { SchedulingModule } from './modules/scheduling/scheduling.module';
 import { StaffModule } from './modules/staff/staff.module';
 import { BranchAccessModule } from './modules/tenancy/branch-access.module';
@@ -68,6 +71,7 @@ import { MetricsModule } from './observability/metrics.module';
     StorageModule,
     QueueModule,
     MailModule,
+    WhatsAppModule,
     HealthModule,
     IdentityModule,
     CatalogModule,
@@ -76,6 +80,8 @@ import { MetricsModule } from './observability/metrics.module';
     FinanceModule,
     BookingModule,
     PackagesModule,
+    IntegrationsModule,
+    NotificationsModule,
     StaffModule,
     SchedulingModule,
     TenancyModule,

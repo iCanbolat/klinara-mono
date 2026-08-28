@@ -27,7 +27,8 @@ import {
  * değil, açılışta fark edilir.
  */
 
-const POSTGRES_URL = /^postgres(ql)?:\/\//;
+const POSTGRES_URL = /^postgres(ql)?:\/\//
+const CLOCK_TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 /** `15m`, `30d`, `900s` — jose'un kabul ettiği süre biçimi. */
 const DURATION =
   /^\d+\s?(s|m|h|d|w|y|sec|secs|second|seconds|min|mins|minute|minutes|hour|hours|day|days|week|weeks|year|years)$/;
@@ -406,6 +407,105 @@ export class EnvironmentVariables {
   @IsString()
   @IsNotEmpty()
   APP_BASE_URL: string = 'http://localhost:5173';
+
+  // --- E-posta gönderimi (SMTP) — Batch 8.1 ---
+  /**
+   * Tanımsızsa e-posta GÖNDERİLMEZ; içerik yalnız loga yazılır.
+   *
+   * Netgsm'deki mantığın aynısı: yanlış yapılandırılmış bir ortamda sessizce
+   * gerçek gönderim denemektense loga yazan gönderici güvenli varsayılandır.
+   */
+  @Expose()
+  @IsOptional()
+  @IsString()
+  SMTP_HOST?: string;
+
+  @Expose()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(65535)
+  SMTP_PORT: number = 1025;
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  SMTP_USER?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  SMTP_PASSWORD?: string;
+
+  /** TLS'i baştan kur (465). 587'de STARTTLS kullanılır, bu değer `false` kalır. */
+  @Expose()
+  @Transform(({ value }: { value: unknown }) =>
+    value === undefined ? undefined : value === 'true' || value === true,
+  )
+  @IsBoolean()
+  SMTP_SECURE: boolean = false;
+
+  @Expose()
+  @IsString()
+  @IsNotEmpty()
+  MAIL_FROM: string = 'Klinara <bildirim@klinara.local>';
+
+  // --- Bildirim çekirdeği — Batch 8.1 ---
+  /**
+   * Kiracı/şube tercihi yoksa geçerli olan sessiz saat penceresi (şube saati).
+   * Gece yarısını aşan pencere geçerlidir: 22:00–09:00.
+   */
+  @Expose()
+  @Matches(CLOCK_TIME, { message: "'HH:MM' biçiminde olmalı" })
+  NOTIFICATION_QUIET_HOURS_START: string = '21:00';
+
+  @Expose()
+  @Matches(CLOCK_TIME, { message: "'HH:MM' biçiminde olmalı" })
+  NOTIFICATION_QUIET_HOURS_END: string = '09:00';
+
+  // --- WhatsApp Cloud API — Batch 8.2 ---
+  /**
+   * Kiracı kimlik bilgileri env'de DEĞİL, veritabanında şifreli durur.
+   * Buradakiler platform seviyesidir.
+   *
+   * `WHATSAPP_API_BASE_URL` testlerde yerel mock sunucuya çevrilir; gerçek
+   * Graph API'ye test sırasında çağrı yapılmaz.
+   */
+  @Expose()
+  @IsString()
+  @IsNotEmpty()
+  WHATSAPP_API_BASE_URL: string = 'https://graph.facebook.com';
+
+  @Expose()
+  @Matches(/^v\d+\.\d+$/, { message: "'v21.0' biçiminde olmalı" })
+  WHATSAPP_API_VERSION: string = 'v21.0';
+
+  @Expose()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1000)
+  @Max(60000)
+  WHATSAPP_TIMEOUT_MS: number = 10_000;
+
+  /**
+   * Meta webhook'u kaydederken bir kez sorulan `hub.verify_token` (8.3).
+   *
+   * Tanımsızsa doğrulama ucu HİÇBİR isteği kabul etmez — boş bir sırla
+   * eşleşen bir istek, webhook'u kayıt ettirmek isteyen herkese kapıyı açardı.
+   */
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @MinLength(16)
+  WHATSAPP_WEBHOOK_VERIFY_TOKEN?: string;
+
+  /** Onayla/İptal buton token'ının ömrü. Randevudan uzun yaşamasının anlamı yok. */
+  @Expose()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(720)
+  MESSAGE_ACTION_TTL_HOURS: number = 48;
 }
 
 export class EnvValidationError extends Error {

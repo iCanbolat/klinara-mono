@@ -32,7 +32,9 @@ struct AppShellView: View {
             Permissions.staffRead,
             Permissions.scheduleRead,
             Permissions.financePaymentRead,
-            Permissions.financeCommissionRead
+            Permissions.financeCommissionRead,
+            Permissions.notificationRead,
+            Permissions.notificationManage
         )
     }
 
@@ -135,4 +137,14 @@ enum Permissions {
     static let financeCommissionRead = "finance.commission:read"
     /// Prim kuralı yazma ve dönem kapatma. `owner` + `manager`.
     static let financeCommissionWrite = "finance.commission:write"
+    /// Mesaj günlüğü, gelen kutusu, şablon ve hatırlatma ayarlarının okunması (Faz 8).
+    static let notificationRead = "notification:read"
+    /// Tek tek mesaj gönderme ve gelen mesajı işlendi işaretleme. `manage`
+    /// üzerine **binmez**: resepsiyon test mesajı atabilir ama kiracının
+    /// şablonunu değiştiremez. Sunucudaki ayrımın aynısı.
+    static let notificationSend = "notification:send"
+    /// Şablon, bildirim tercihi, hatırlatma ayarı ve WhatsApp kimlik bilgileri.
+    /// `send`i **kapsamaz**: şablonu yöneten bir muhasebeci mesaj göndermek
+    /// zorunda değil.
+    static let notificationManage = "notification:manage"
 }

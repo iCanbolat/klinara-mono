@@ -16,6 +16,7 @@ struct CustomerDetailView: View {
     @State private var packages: CustomerPackagesStore?
     @State private var account: CustomerAccountStore?
     @State private var thumbnails: ThumbnailCache?
+    @State private var optOuts: CustomerOptOutStore?
     @State private var isEditing = false
     @State private var isArchiving = false
     @State private var isMerging = false
@@ -177,6 +178,14 @@ struct CustomerDetailView: View {
                 CustomerAccountSection(session: session, store: account)
             }
 
+            // İletişim izni cari hesabın ALTINDA ve dosyaların ÜSTÜNDE: para
+            // sorusundan sonra gelen ama klinik veriden önce sorulan bir soru.
+            // Ayrı bir izin istiyor (`notification:read`) — müşteri okuma
+            // modeli bu bilgiyi taşımıyor.
+            if let optOuts {
+                CustomerOptOutSection(session: session, store: optOuts)
+            }
+
             CustomerFilesSection(session: session, record: record, thumbnails: thumbnails)
 
             if record.canReadMedical {
@@ -242,6 +251,18 @@ struct CustomerDetailView: View {
             ? CustomerAccountStore(customerId: customerId, service: session.services.finance)
             : nil
         account = accountStore
+
+        // Aynı gerekçe: iletişim izni ayrı bir uçta ve ayrı bir izinde
+        // (`notification:read`). İzinsiz kullanıcıya boş bir kart göstermek
+        // "bu müşterinin izin kaydı yok" demek olurdu; oysa bilmiyoruz.
+        // Yüklemeyi bölümün kendi `.task`ı yapıyor — kart açılışını iki
+        // istek daha beklemesin.
+        optOuts = session.can(Permissions.notificationRead)
+            ? CustomerOptOutStore(
+                service: session.services.notifications,
+                customerId: customerId
+            )
+            : nil
 
         // Hepsi paralel: kart açılışı isteklerin toplamı kadar beklemesin.
         async let timeline: Void = store.loadTimeline()

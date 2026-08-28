@@ -39,7 +39,12 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<NestE
     controllers: options.controllers ?? [],
   }).compile();
 
-  const app = moduleRef.createNestApplication<NestExpressApplication>({ bufferLogs: true });
+  // `rawBody` üretimdeki `main.ts` ile AYNI şekilde açılır: kapalı kalsaydı
+  // webhook imza testi yeşil görünürken üretimde imza doğrulanamazdı.
+  const app = moduleRef.createNestApplication<NestExpressApplication>({
+    bufferLogs: true,
+    rawBody: true,
+  });
   configureApp(app);
   await app.init();
   return app;

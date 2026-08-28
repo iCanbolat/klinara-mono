@@ -34,6 +34,12 @@ struct ManagementHomeView: View {
                         cashCard
                     }
                     if session.canAny(
+                        Permissions.notificationRead,
+                        Permissions.notificationManage
+                    ) {
+                        communicationCard
+                    }
+                    if session.canAny(
                         Permissions.packageRead,
                         Permissions.reportRevenueRead,
                         Permissions.financeCommissionRead
@@ -161,6 +167,73 @@ struct ManagementHomeView: View {
                 icon: "shippingbox"
             ) {
                 PackageDefinitionListView(session: session)
+            }
+        }
+    }
+
+    /// İletişim ayrı bir kart, kasa gibi: gelen kutusu günlük bir resepsiyon
+    /// işi ama sekme kümesi Faz 3'te donduruldu ve bilgi mimarisini her fazda
+    /// yeniden kurmak kullanıcının kas hafızasını sıfırlamak demek.
+    ///
+    /// Dipnot Ek M'in en çok yanlış anlaşılan kararını görünür kılıyor:
+    /// işlemsel/pazarlama ayrımı olayın tanımında, kiracı ayarında değil.
+    private var communicationCard: some View {
+        KlinaraCard(
+            title: "İletişim",
+            footnote: "Randevu hatırlatması ticari ileti değildir; iletişim izni iptali yalnız pazarlama mesajlarını durdurur."
+        ) {
+            if session.can(Permissions.notificationRead) {
+                KlinaraNavigationRow(
+                    label: "Gelen kutusu",
+                    detail: "Müşterilerin WhatsApp'tan yazdığı mesajlar",
+                    icon: "tray.and.arrow.down"
+                ) {
+                    InboxView(session: session)
+                }
+                KlinaraDivider()
+                KlinaraNavigationRow(
+                    label: "Mesaj günlüğü",
+                    detail: "Gönderilen, ulaşan ve gönderilmeyen mesajlar",
+                    icon: "bubble.left.and.text.bubble.right"
+                ) {
+                    MessageLogView(session: session)
+                }
+                KlinaraDivider()
+                KlinaraNavigationRow(
+                    label: "Hatırlatma ayarları",
+                    detail: "Randevudan kaç saat önce, gelmedi takibi",
+                    icon: "bell.badge"
+                ) {
+                    ReminderSettingsView(session: session)
+                }
+                KlinaraDivider()
+                KlinaraNavigationRow(
+                    label: "Bildirim şablonları",
+                    detail: "Olay ve kanal başına mesaj metni",
+                    icon: "text.quote"
+                ) {
+                    NotificationTemplateListView(session: session)
+                }
+                KlinaraDivider()
+                KlinaraNavigationRow(
+                    label: "Bildirim tercihleri",
+                    detail: "Kanal önceliği ve sessiz saatler",
+                    icon: "slider.horizontal.3"
+                ) {
+                    NotificationPreferenceListView(session: session)
+                }
+            }
+            if session.can(Permissions.notificationManage) {
+                if session.can(Permissions.notificationRead) {
+                    KlinaraDivider()
+                }
+                KlinaraNavigationRow(
+                    label: "WhatsApp entegrasyonu",
+                    detail: "WABA kimlik bilgileri, şablonlar ve test gönderimi",
+                    icon: "link"
+                ) {
+                    WhatsAppSettingsView(session: session)
+                }
             }
         }
     }

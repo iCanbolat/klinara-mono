@@ -13,6 +13,13 @@ export const QUEUES = {
   // demekti.
   PACKAGE_EXPIRE_SWEEP: 'package.expire.sweep',
   PACKAGE_EXPIRE_TENANT: 'package.expire.tenant',
+  // Bildirim gönderimi. İş yalnız `message_log` satırının kimliğini taşır;
+  // içerik (alıcı, metin) HER ZAMAN işin kendi transaction'ında, RLS altında
+  // okunur — kuyruk tablosu kişisel veri taşımaz.
+  NOTIFICATION_SEND: 'notification.send',
+  // Hatırlatma. İş randevuyla AYNI transaction'da yazılır (8.4): randevu
+  // rollback olursa hatırlatma da olmaz.
+  REMINDER_SEND: 'reminder.send',
 } as const;
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES];

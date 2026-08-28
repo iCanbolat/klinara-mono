@@ -7,10 +7,9 @@ export interface MailMessage {
 /**
  * E-posta gönderim arayüzü.
  *
- * Faz 1'de yalnız loga yazan uygulaması vardır: davet ve parola sıfırlama
- * bağlantıları geliştirme ortamında logdan okunur. Gerçek SMTP/sağlayıcı
- * uygulaması Batch 8.1'de (bildirim çekirdeği) gelecek — arayüz o gün
- * değişmeyecek şekilde şimdiden buradadır.
+ * İki uygulaması var ve seçim `SMTP_HOST`a bakar (bkz. `mail.module.ts`):
+ * yapılandırılmışsa `SmtpMailSender`, değilse içeriği loga yazan gönderici.
+ * Çağıran hangisinin koştuğunu bilmez.
  */
 export interface MailSender {
   send(message: MailMessage): Promise<void>;

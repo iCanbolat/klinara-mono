@@ -75,6 +75,24 @@ export const ERROR_CODES = {
 
   // --- İletişim ---
   OPT_OUT: 'OPT_OUT',
+  /** Şablonda tanımsız değişken ya da beyaz listede olmayan yer tutucu. */
+  TEMPLATE_INVALID: 'TEMPLATE_INVALID',
+  /** Kanal bu kiracı için yapılandırılmamış (WhatsApp hesabı, SMTP vb.). */
+  CHANNEL_NOT_CONFIGURED: 'CHANNEL_NOT_CONFIGURED',
+
+  // --- WhatsApp (Batch 8.2) ---
+  // Ayrımlar KALICI/GEÇİCİ hata sınıflamasını taşır: kalıcı olanlar yeniden
+  // denenmez, geçici olan (`WHATSAPP_RATE_LIMITED`) denenir.
+  /** Kiracının WhatsApp hesabı yok ya da token geçersiz. */
+  WHATSAPP_NOT_CONFIGURED: 'WHATSAPP_NOT_CONFIGURED',
+  /** Template Meta'da onaylı değil, yok ya da parametre sayısı tutmuyor. */
+  WHATSAPP_TEMPLATE_NOT_APPROVED: 'WHATSAPP_TEMPLATE_NOT_APPROVED',
+  /** Numara WhatsApp kullanıcısı değil ya da mesaj teslim edilemiyor. */
+  WHATSAPP_INVALID_RECIPIENT: 'WHATSAPP_INVALID_RECIPIENT',
+  /** 24 saatlik müşteri hizmetleri penceresi kapalı — yalnız template gider. */
+  WHATSAPP_WINDOW_CLOSED: 'WHATSAPP_WINDOW_CLOSED',
+  /** Sağlayıcı kotası aşıldı; GEÇİCİ, yeniden denenir. */
+  WHATSAPP_RATE_LIMITED: 'WHATSAPP_RATE_LIMITED',
 
   // --- Kiracılık ---
   TENANT_CONTEXT_MISSING: 'TENANT_CONTEXT_MISSING',

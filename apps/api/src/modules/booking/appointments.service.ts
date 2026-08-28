@@ -17,6 +17,7 @@ import { hasPermission } from '../identity/principal';
 import { BranchAccessService } from '../tenancy/branch-access.service';
 import { AvailabilityCacheService } from './availability-cache.service';
 import { AvailabilityService } from './availability.service';
+import { ReminderSchedulerService } from '../notifications/reminder-scheduler.service';
 import * as repo from './appointments.repository';
 import * as settingsRepo from './booking-settings.repository';
 import type {
@@ -68,6 +69,7 @@ export class AppointmentsService {
     private readonly consumption: PackageConsumptionService,
     private readonly chargeGeneration: ChargeGenerationService,
     private readonly commissions: CommissionAccrualService,
+    private readonly reminders: ReminderSchedulerService,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -104,6 +106,17 @@ export class AppointmentsService {
           action: 'created',
           toStatus: appointment.status,
           newStartsAt: appointment.startsAt,
+        });
+
+        // Hatırlatma AYNI transaction'da planlanır (8.4): randevu rollback
+        // olursa hatırlatma satırı da pg-boss işi de yazılmaz. Outbox'a bu
+        // yüzden gerek yok (mimari karar 4.6).
+        await this.reminders.scheduleForAppointment(tx, {
+          tenantId: this.tx.tenantId,
+          appointmentId: appointment.id,
+          branchId: input.branchId,
+          startsAt: appointment.startsAt,
+          status: appointment.status,
         });
 
         const services = await repo.listAppointmentServices(tx, appointment.id);
@@ -248,6 +261,15 @@ export class AppointmentsService {
           reason: input.reason ?? null,
         });
 
+        // Eski plan `superseded`, yeni saate göre yeniden planlanır.
+        await this.reminders.reschedule(tx, {
+          tenantId: this.tx.tenantId,
+          appointmentId: id,
+          branchId: current.branchId,
+          startsAt: updated.startsAt,
+          status: updated.status,
+        });
+
         const services = await repo.listAppointmentServices(tx, id);
         return { appointment: updated, services };
       })
@@ -341,6 +363,21 @@ export class AppointmentsService {
           toStatus: status,
           reason: reason ?? null,
         });
+
+        // Randevu artık hatırlatma hak etmiyorsa bekleyen planlar kapanır.
+        // Kuyruktaki iş İPTAL EDİLMEZ; zamanı gelince koşar, satırı `pending`
+        // bulamaz ve sessizce çıkar (bkz. ReminderWorker).
+        if (status !== 'scheduled' && status !== 'confirmed') {
+          await this.reminders.cancelForAppointment(tx, id);
+        }
+        if (status === 'no_show') {
+          await this.reminders.scheduleNoShowFollowup(tx, {
+            tenantId: this.tx.tenantId,
+            appointmentId: id,
+            branchId: current.branchId,
+            startsAt: current.startsAt,
+          });
+        }
 
         // Paket tüketimi AYNI transaction'da. Atomiklik ayrı bir mekanizma
         // değil, burada olmalarının doğal sonucu: hak yetersizse ya da paket
