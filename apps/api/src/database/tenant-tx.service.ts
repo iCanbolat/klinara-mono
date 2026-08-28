@@ -57,6 +57,20 @@ export class TenantTxService {
     return withTenantTx(this.db, ctx, fn);
   }
 
+  /**
+   * Bakım transaction'ı — YALNIZ kuyruk worker'larından, YALNIZ kiracı
+   * LİSTESİNİ okumak için.
+   *
+   * Worker'ın istek bağlamı yoktur, dolayısıyla `runAsPlatform` (bağlam ister)
+   * kullanılamaz. `app.platform_admin='on'` bayrağı yalnız `tenants`
+   * politikasında geçer (0005); iş verisi tablolarının politikalarında hiç
+   * geçmez. Asıl iş bu yüzden DAİMA `runForTenant` altında koşar — burada
+   * yalnız "hangi kiracılar var?" sorusu cevaplanır.
+   */
+  async runAsSystem<T>(fn: (tx: Tx) => Promise<T>): Promise<T> {
+    return withTenantTx(this.db, { ...emptyContext(), isPlatformAdmin: true }, fn);
+  }
+
   /** Geçerli isteğin kiracı kimliği. */
   get tenantId(): string {
     return this.requestContext.requireTenantId();

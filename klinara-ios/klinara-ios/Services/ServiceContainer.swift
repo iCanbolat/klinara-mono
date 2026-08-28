@@ -16,6 +16,7 @@ final class ServiceContainer {
     let customers: any CustomerService
     let notes: any NotesService
     let files: any FilesService
+    let packages: any PackagesService
 
     /// Mock kullanılıyorsa geliştirici senaryo menüsü açılır.
     let mockAuth: MockAuthService?
@@ -32,6 +33,7 @@ final class ServiceContainer {
         customers: any CustomerService,
         notes: any NotesService,
         files: any FilesService,
+        packages: any PackagesService,
         mockAuth: MockAuthService?,
         mockDataScenario: MockDataScenario? = nil
     ) {
@@ -44,6 +46,7 @@ final class ServiceContainer {
         self.customers = customers
         self.notes = notes
         self.files = files
+        self.packages = packages
         self.mockAuth = mockAuth
         self.mockDataScenario = mockDataScenario
     }
@@ -61,6 +64,7 @@ final class ServiceContainer {
             customers: LiveCustomerService(client: client),
             notes: LiveNotesService(client: client),
             files: LiveFilesService(client: client),
+            packages: LivePackagesService(client: client),
             mockAuth: nil
         )
     }
@@ -89,6 +93,7 @@ final class ServiceContainer {
             customers: customers,
             scenario: data
         )
+        let packages = MockPackagesService(catalog: catalog, customers: customers, booking: booking)
         return ServiceContainer(
             auth: mockAuth,
             catalog: catalog,
@@ -99,6 +104,7 @@ final class ServiceContainer {
             customers: customers,
             notes: MockNotesService(booking: booking),
             files: MockFilesService(),
+            packages: packages,
             mockAuth: mockAuth,
             mockDataScenario: data
         )
@@ -118,6 +124,7 @@ final class ServiceContainer {
         booking.reseed(scenario)
         (notes as? MockNotesService)?.reseed(canReadMedical: true)
         (files as? MockFilesService)?.reseed(canReadMedical: true)
+        (packages as? MockPackagesService)?.reseed()
         mockDataScenario = scenario
     }
 

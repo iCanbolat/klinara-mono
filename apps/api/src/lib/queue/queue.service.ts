@@ -10,7 +10,7 @@ import { PgBoss, fromDrizzle } from 'pg-boss';
 import { Client } from 'pg';
 import type { EnvironmentVariables } from '../../config/env.validation';
 import type { Tx } from '../../database/tenant-tx';
-import { ALL_QUEUES, type QueueName } from './queue.constants';
+import { ALL_QUEUES, SCHEDULES, type QueueName } from './queue.constants';
 
 type Handler = (jobs: { data: unknown }[]) => Promise<void>;
 
@@ -66,6 +66,8 @@ export class QueueService implements OnApplicationBootstrap, OnApplicationShutdo
     // yazıyor, kuyruğun kendi havuzundan değil — atomikliğin bedeli bu.
     await QueueService.grantAppRole(connectionString, schema, appUrl);
 
+    await QueueService.applySchedules(boss);
+
     for (const [queue, handler] of this.handlers) {
       await boss.work(queue, handler);
     }
@@ -91,6 +93,26 @@ export class QueueService implements OnApplicationBootstrap, OnApplicationShutdo
   async send(tx: Tx, queue: QueueName, data: object, options: object = {}): Promise<void> {
     if (!this.started || this.boss === undefined) return;
     await this.boss.send(queue, data, { ...options, db: fromDrizzle(tx, sql) });
+  }
+
+  /**
+   * Zamanlamaları kurar ve YETİM olanları temizler.
+   *
+   * Temizlik şart: pg-boss zamanlamayı kendi şemasında tutuyor, yani bir
+   * kuyruğun adı değiştiğinde eski zamanlama orada kalır ve artık var olmayan
+   * bir kuyruğa iş yazmayı denemeye devam eder.
+   */
+  private static async applySchedules(boss: PgBoss): Promise<void> {
+    for (const schedule of SCHEDULES) {
+      await boss.schedule(schedule.queue, schedule.cron, {}, { tz: schedule.timezone });
+    }
+
+    const existing = await boss.getSchedules();
+    for (const row of existing) {
+      if (!SCHEDULES.some((schedule) => schedule.queue === row.name)) {
+        await boss.unschedule(row.name);
+      }
+    }
   }
 
   private static async grantAppRole(

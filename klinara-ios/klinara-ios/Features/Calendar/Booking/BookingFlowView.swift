@@ -27,6 +27,9 @@ struct BookingFlowView: View {
     @State private var error: APIError?
     @State private var conflict: APIError?
     @State private var isCreatingCustomer = false
+    /// Seçili müşterinin kullanılabilir paket hakları. Store'lanmıyor: sorgu
+    /// bu sayfaya özgü, kısa ömürlü ve müşteri değişince baştan çekiliyor.
+    @State private var entitlements: [PackageEntitlement] = []
 
     private var store: CalendarStore { session.calendarStore }
     private var clock: BranchClock { session.clock }
@@ -72,6 +75,7 @@ struct BookingFlowView: View {
             } else {
                 customerSection
                 servicesSection
+                packageSection
                 if draft.canQueryAvailability {
                     staffSection
                     slotSection
@@ -82,9 +86,10 @@ struct BookingFlowView: View {
         }
         .task { await session.customerStore.load() }
         .task(id: availabilityKey) { await loadSlots() }
+        .task(id: draft.customerId) { await loadEntitlements() }
         .sheet(isPresented: $isCreatingCustomer) {
             CustomerEditorView(session: session, target: .create) { created in
-                draft.customerId = created.id
+                draft.select(customerId: created.id)
             }
         }
         .sheet(item: $conflict) { problem in
@@ -117,7 +122,7 @@ struct BookingFlowView: View {
                 label: \.fullName,
                 detail: { $0.phone.map(PhoneNumberField.pretty) },
                 isSelected: { $0.id == draft.customerId },
-                onSelect: { draft.customerId = $0.id },
+                onSelect: { draft.select(customerId: $0.id) },
                 searchPrompt: "Müşteri ara",
                 emptyMessage: "Eşleşen müşteri yok.",
                 createLabel: session.can(Permissions.customerWrite) ? "Yeni müşteri ekle" : nil,
@@ -168,6 +173,49 @@ struct BookingFlowView: View {
                 .disabled(!draft.canEditLineup)
             }
         }
+    }
+
+    /// Paket hakkı seçimi.
+    ///
+    /// Yalnız **seçili hizmetlerin** hakları gösterilir: müşterinin başka
+    /// hizmetlerdeki paketleri bu randevuyla ilgisiz ve listeyi gürültüye
+    /// çevirirdi. Seans randevu `completed` olduğunda düşer, şimdi değil.
+    @ViewBuilder
+    private var packageSection: some View {
+        let relevant = entitlements.filter { draft.serviceIds.contains($0.serviceId) }
+        if !relevant.isEmpty {
+            KlinaraFormSection(
+                title: "Paketten düş",
+                footnote: "Seans, randevu TAMAMLANDIĞINDA düşer. Hak yetersizse randevu tamamlanamaz."
+            ) {
+                ForEach(Array(relevant.enumerated()), id: \.element.id) { index, item in
+                    if index > 0 { KlinaraDivider() }
+                    Button {
+                        draft.selectPackageItem(item.customerPackageItemId, for: item.serviceId)
+                    } label: {
+                        KlinaraRow(
+                            label: item.serviceName,
+                            detail: entitlementDetail(item)
+                        ) {
+                            if draft.packageItemIds[item.serviceId] == item.customerPackageItemId {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(KlinaraColor.sageDeep)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private func entitlementDetail(_ item: PackageEntitlement) -> String {
+        var parts = [item.packageName, "\(item.remainingSessions) seans kaldı"]
+        if let expiresAt = item.expiresAt {
+            parts.append("\(clock.formatDate(expiresAt))'de doluyor")
+        }
+        return parts.joined(separator: " · ")
     }
 
     @ViewBuilder
@@ -372,6 +420,20 @@ struct BookingFlowView: View {
                 self.error = failure
             }
         }
+    }
+
+    /// Paket izni yoksa hiç sorulmuyor: `403` alıp sessizce boş liste
+    /// göstermek, hakkı olmayan bir müşteri izlenimi verirdi.
+    private func loadEntitlements() async {
+        guard session.can(Permissions.packageRead), let customerId = draft.customerId else {
+            entitlements = []
+            return
+        }
+        entitlements = (try? await session.services.packages.entitlements(
+            customerId: customerId,
+            serviceId: nil,
+            branchId: draft.branchId.isEmpty ? nil : draft.branchId
+        )) ?? []
     }
 
     private func staffName(_ id: String) -> String {

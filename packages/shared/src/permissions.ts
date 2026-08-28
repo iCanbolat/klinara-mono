@@ -51,6 +51,11 @@ export const PERMISSIONS = {
   // --- Paket ---
   PACKAGE_READ: 'package:read',
   PACKAGE_WRITE: 'package:write',
+  // İade ve devir `package:write` üzerine BİNMEZ. Gerekçe `customer:merge`
+  // ile aynı: geri alınması pahalı, paraya dokunan işlemlerin resepsiyonun
+  // günlük yazma iznine binmesi yetkisiz iade demektir.
+  PACKAGE_REFUND: 'package:refund',
+  PACKAGE_TRANSFER: 'package:transfer',
 
   // --- Finans ---
   FINANCE_PAYMENT_READ: 'finance.payment:read',
@@ -148,6 +153,8 @@ export const ROLE_DEFINITIONS: RoleDefinition[] = [
       P.CUSTOMER_MEDICAL_READ,
       P.CUSTOMER_MERGE,
       P.PACKAGE_WRITE,
+      P.PACKAGE_REFUND,
+      P.PACKAGE_TRANSFER,
       P.FINANCE_PAYMENT_READ,
       P.FINANCE_PAYMENT_WRITE,
       P.FINANCE_COMMISSION_READ,
@@ -169,6 +176,7 @@ export const ROLE_DEFINITIONS: RoleDefinition[] = [
       P.BRANCH_READ,
       P.CUSTOMER_READ,
       P.PACKAGE_READ,
+      P.PACKAGE_REFUND,
       P.FINANCE_PAYMENT_READ,
       P.FINANCE_PAYMENT_WRITE,
       P.FINANCE_COMMISSION_READ,

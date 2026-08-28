@@ -19,6 +19,7 @@ import { HealthModule } from './modules/health/health.module';
 import { IdentityModule } from './modules/identity/identity.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { AvailabilityCacheModule } from './modules/booking/availability-cache.module';
+import { PackagesModule } from './modules/packages/packages.module';
 import { BookingModule } from './modules/booking/booking.module';
 import { CrmModule } from './modules/crm/crm.module';
 import { FilesModule } from './modules/files/files.module';
@@ -72,6 +73,7 @@ import { MetricsModule } from './observability/metrics.module';
     CrmModule,
     FilesModule,
     BookingModule,
+    PackagesModule,
     StaffModule,
     SchedulingModule,
     TenancyModule,

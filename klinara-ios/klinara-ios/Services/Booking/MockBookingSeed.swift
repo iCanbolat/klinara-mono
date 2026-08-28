@@ -90,7 +90,8 @@ enum MockBookingSeed {
                 bufferBeforeMinutes: effective.bufferBeforeMinutes,
                 bufferAfterMinutes: effective.bufferAfterMinutes,
                 priceMinor: effective.priceMinor,
-                vatRateBasisPoints: effective.vatRateBasisPoints
+                vatRateBasisPoints: effective.vatRateBasisPoints,
+                customerPackageItemId: nil
             )
             return Appointment(
                 id: MockIDs.uuid(),

@@ -15,6 +15,7 @@ struct MockGraph {
     let booking: MockBookingService
     let notes: MockNotesService
     let files: MockFilesService
+    let packages: MockPackagesService
     let clock: BranchClock
 
     /// Nişantaşı şubesi: mock çalışma saatlerinin ve personel şablonunun
@@ -38,6 +39,7 @@ struct MockGraph {
             scenario: scenario,
             canReopen: canReopen
         )
+        packages = MockPackagesService(catalog: catalog, customers: customers, booking: booking)
         notes = MockNotesService(booking: booking, canReadMedical: canReadMedical)
         files = MockFilesService(canReadMedical: canReadMedical)
         clock = BranchClock(timeZoneIdentifier: MockBookingSeed.timezone)

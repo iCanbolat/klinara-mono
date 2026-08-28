@@ -20,11 +20,14 @@ struct AppointmentDetailView: View {
     @State private var cancelReason = ""
     @State private var isRescheduling = false
     @State private var isEditingNotes = false
+    /// Paket bağlama sayfası — bir hizmet kalemi için açılır.
+    @State private var bindingLine: AppointmentServiceLine?
 
     private var store: CalendarStore { session.calendarStore }
     private var clock: BranchClock { session.clock }
     private var canWrite: Bool { session.can(Permissions.appointmentWrite) }
     private var canReopen: Bool { session.can(Permissions.appointmentReopen) }
+    private var canBindPackage: Bool { session.can(Permissions.packageWrite) }
 
     var body: some View {
         NavigationStack {
@@ -61,6 +64,18 @@ struct AppointmentDetailView: View {
                 }
             }
             .task { await load() }
+            .sheet(item: $bindingLine) { line in
+                if let appointment = state.value {
+                    BindPackageSheet(
+                        session: session,
+                        appointment: appointment,
+                        line: line,
+                        // Bağlama sonrası kaydı yeniden çekiyoruz: yanıt
+                        // yalnız sayaç döndürüyor, randevunun kendisini değil.
+                        onBound: { Task { await load() } }
+                    )
+                }
+            }
             .overlay {
                 if store.isSaving { AuthLoadingOverlay(message: "Kaydediliyor…") }
             }
@@ -142,15 +157,42 @@ struct AppointmentDetailView: View {
             let ordered = appointment.services.sorted { $0.sortOrder < $1.sortOrder }
             ForEach(Array(ordered.enumerated()), id: \.element.id) { index, line in
                 if index > 0 { KlinaraDivider() }
-                KlinaraRow(
-                    label: serviceName(line.serviceId),
-                    value: Money.format(minor: line.priceMinor),
-                    detail: "\(staffName(line.staffProfileId)) · "
-                        + "\(clock.formatTime(line.startsAt))–\(clock.formatTime(line.endsAt)) · "
-                        + DurationFormat.format(minutes: line.durationMinutes)
-                ) {
-                    ColorDot(hex: session.staffStore.profile(id: line.staffProfileId)?.calendarColor)
+                serviceRow(line, in: appointment)
+            }
+        }
+    }
+
+    private func serviceRow(_ line: AppointmentServiceLine, in appointment: Appointment) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            KlinaraRow(
+                label: serviceName(line.serviceId),
+                value: Money.format(minor: line.priceMinor),
+                detail: "\(staffName(line.staffProfileId)) · "
+                    + "\(clock.formatTime(line.startsAt))–\(clock.formatTime(line.endsAt)) · "
+                    + DurationFormat.format(minutes: line.durationMinutes)
+            ) {
+                ColorDot(hex: session.staffStore.profile(id: line.staffProfileId)?.calendarColor)
+            }
+
+            // Bağlı paket rozeti ve bağlama düğmesi: "bu hizmet paketten mi
+            // düşecek?" sorusunun cevabı randevu detayında görünmezse
+            // kullanıcı tamamlamaya basana kadar öğrenemez.
+            if line.customerPackageItemId != nil {
+                KlinaraBadge(text: "Paketten düşecek", tone: .positive, icon: "shippingbox")
+                    .padding(.horizontal, KlinaraMetrics.md)
+                    .padding(.bottom, KlinaraMetrics.sm)
+            } else if canBindPackage, !appointment.status.isTerminal {
+                Button {
+                    bindingLine = line
+                } label: {
+                    Label("Pakete bağla", systemImage: "shippingbox")
+                        .klinaraText(.bodyM)
+                        .font(.footnote)
+                        .foregroundStyle(KlinaraColor.sageDeep)
                 }
+                .buttonStyle(.plain)
+                .padding(.horizontal, KlinaraMetrics.md)
+                .padding(.bottom, KlinaraMetrics.sm)
             }
         }
     }

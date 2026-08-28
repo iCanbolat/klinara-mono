@@ -75,8 +75,10 @@ nonisolated struct APIRequest: Sendable {
         APIRequest(method: .put, path: path, body: body)
     }
 
-    static func delete(_ path: String) -> APIRequest {
-        APIRequest(method: .delete, path: path)
+    /// `ifMatch`: `DELETE /package-definitions/:id` gibi iyimser kilit isteyen
+    /// uçlar için — silme de bayat bir sürüm üzerinde yapılabilir.
+    static func delete(_ path: String, ifMatch: String? = nil) -> APIRequest {
+        APIRequest(method: .delete, path: path, ifMatch: ifMatch)
     }
 }
 

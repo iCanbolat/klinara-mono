@@ -31,6 +31,9 @@ final class AppSession {
     /// randevu detayı ve müşteri kartı **aynı** listeyi güncelliyor.
     let calendarStore: CalendarStore
     let customerStore: CustomerStore
+    /// Paket tanımları da oturum ömürlü: yönetimdeki tanım ekranı ile müşteri
+    /// kartındaki satış sayfası **aynı** listeye bakıyor.
+    let packageDefinitionStore: PackageDefinitionStore
 
     private let tokens: TokenStore
 
@@ -48,6 +51,7 @@ final class AppSession {
         self.staffStore = StaffStore(service: services.staff)
         self.calendarStore = CalendarStore(service: services.booking, catalog: catalogStore)
         self.customerStore = CustomerStore(service: services.customers)
+        self.packageDefinitionStore = PackageDefinitionStore(service: services.packages)
         let store = tokens ?? .shared
         self.tokens = store
         self.selectedBranchId = store.branchId ?? branches.first?.id

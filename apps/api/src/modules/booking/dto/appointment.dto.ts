@@ -31,6 +31,15 @@ export class AppointmentServiceInputDto {
   @ApiProperty({ format: 'uuid', description: 'Bu hizmeti uygulayacak personel' })
   @IsUUID()
   staffProfileId: string;
+
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description:
+      'Bu hizmet bir paketten düşülecekse müşterinin paket kalemi. Randevu `completed` olduğunda AYNI transactionda bir seans düşer.',
+  })
+  @IsOptional()
+  @IsUUID()
+  customerPackageItemId?: string;
 }
 
 export class CreateAppointmentDto {
@@ -149,6 +158,15 @@ export class AppointmentServiceResponseDto {
 
   @ApiProperty({ example: 2000 })
   vatRateBasisPoints: number;
+
+  @ApiProperty({
+    format: 'uuid',
+    nullable: true,
+    type: String,
+    description:
+      'Bu kalem bir paketten düşülüyorsa müşterinin paket kalemi. İstemci bunu okuyamazsa "bağlı mı" sorusunu cevaplayamaz.',
+  })
+  customerPackageItemId: string | null;
 }
 
 export class AppointmentResponseDto {

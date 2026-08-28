@@ -190,6 +190,67 @@ struct BookingDraftTests {
         #expect(input.services?.count == appointment.services.count)
     }
 
+    @Test("Seçili paket kalemi gövdeye yazılır")
+    func carriesPackageBinding() throws {
+        var draft = BookingDraft(branchId: MockIDs.branchNisantasi)
+        draft.select(customerId: MockCustomerSeed.ayse)
+        draft.toggle(serviceId: MockCatalogSeed.serviceLazerBolgesel)
+        draft.toggle(serviceId: MockCatalogSeed.serviceHydrafacial)
+        draft.select(slot: slot(at: 11))
+        draft.selectPackageItem(
+            MockPackagesSeed.soldAyseItemLazer,
+            for: MockCatalogSeed.serviceLazerBolgesel
+        )
+
+        let input = try #require(draft.createInput(clock: clock))
+        let lazer = input.services.first { $0.serviceId == MockCatalogSeed.serviceLazerBolgesel }
+        let bakim = input.services.first { $0.serviceId == MockCatalogSeed.serviceHydrafacial }
+        #expect(lazer?.customerPackageItemId == MockPackagesSeed.soldAyseItemLazer)
+        // Seçilmeyen hizmet paketsiz gider; `nil` "paketten düşme" demek.
+        #expect(bakim?.customerPackageItemId == nil)
+
+        // Aynı kaleme ikinci dokunuş seçimi kaldırır.
+        draft.selectPackageItem(
+            MockPackagesSeed.soldAyseItemLazer,
+            for: MockCatalogSeed.serviceLazerBolgesel
+        )
+        #expect(try #require(draft.createInput(clock: clock))
+            .services.allSatisfy { $0.customerPackageItemId == nil })
+    }
+
+    @Test("Müşteri değişince paket seçimi düşer")
+    func packageBindingResetsWithCustomer() throws {
+        var draft = BookingDraft(branchId: MockIDs.branchNisantasi)
+        draft.select(customerId: MockCustomerSeed.ayse)
+        draft.toggle(serviceId: MockCatalogSeed.serviceLazerBolgesel)
+        draft.select(slot: slot(at: 11))
+        draft.selectPackageItem(
+            MockPackagesSeed.soldAyseItemLazer,
+            for: MockCatalogSeed.serviceLazerBolgesel
+        )
+
+        // Haklar müşteriye özeldir: taşınan bir seçim BAŞKASININ paketinden
+        // seans düşürürdü.
+        draft.select(customerId: MockCustomerSeed.mehmet)
+
+        #expect(draft.packageItemIds.isEmpty)
+        #expect(try #require(draft.createInput(clock: clock))
+            .services.allSatisfy { $0.customerPackageItemId == nil })
+    }
+
+    @Test("Hizmet çıkarılınca paket bağı da düşer")
+    func packageBindingDropsWithService() {
+        var draft = BookingDraft(branchId: MockIDs.branchNisantasi)
+        draft.toggle(serviceId: MockCatalogSeed.serviceLazerBolgesel)
+        draft.selectPackageItem(
+            MockPackagesSeed.soldAyseItemLazer,
+            for: MockCatalogSeed.serviceLazerBolgesel
+        )
+        draft.toggle(serviceId: MockCatalogSeed.serviceLazerBolgesel)
+
+        #expect(draft.packageItemIds.isEmpty)
+    }
+
     @Test("Erteleme modunda hizmet seçimi değiştirilemez")
     func rescheduleKeepsLineupLocked() throws {
         let appointment = try Fixtures.decode(Appointment.self, from: Fixtures.appointment)

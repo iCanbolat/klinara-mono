@@ -100,4 +100,14 @@ enum Permissions {
     static let appointmentReopen = "appointment:reopen"
     static let branchRead = "branch:read"
     static let userRead = "user:read"
+    static let packageRead = "package:read"
+    static let packageWrite = "package:write"
+    /// İade ve devir `package:write` üzerine **binmez**. Gerekçe `customer:merge`
+    /// ile aynı: geri alınması pahalı, paraya dokunan işlemlerin resepsiyonun
+    /// günlük yazma iznine binmesi yetkisiz iade demektir.
+    static let packageRefund = "package:refund"
+    static let packageTransfer = "package:transfer"
+    /// Parasal rapor izni. Yükümlülük raporu ve süre dolumu listesindeki tutar
+    /// alanları buna bakar — izin yoksa sunucu tutarı `null` döner.
+    static let reportRevenueRead = "report.revenue:read"
 }

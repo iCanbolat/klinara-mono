@@ -150,6 +150,9 @@ nonisolated struct AppointmentServiceLine: Codable, Sendable, Identifiable, Equa
     let bufferAfterMinutes: Int
     let priceMinor: Int
     let vatRateBasisPoints: Int
+    /// Bu kalem bir paketten düşülecekse müşterinin paket kalemi (Faz 5).
+    /// Randevu `completed` olduğunda **aynı transaction'da** bir seans düşer.
+    let customerPackageItemId: String?
 
     /// Takvimde işgal edilen süre. `startsAt`/`endsAt` **görünen** aralıktır;
     /// buffer'lar müşteriye gösterilen saati kirletmesin diye ayrı duruyor.
@@ -290,6 +293,9 @@ nonisolated struct SlotSuggestion: Decodable, Sendable, Equatable, Identifiable 
 nonisolated struct AppointmentServiceInput: Encodable, Sendable, Equatable {
     let serviceId: String
     let staffProfileId: String
+    /// Doluysa hizmet bu paket kaleminden düşer. Randevu oluştururken
+    /// verilebilir; sonradan bağlamak için `POST /appointments/:id/consume-package`.
+    var customerPackageItemId: String?
 }
 
 nonisolated struct CreateAppointmentInput: Encodable, Sendable, Equatable {

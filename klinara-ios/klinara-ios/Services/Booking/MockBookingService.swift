@@ -33,6 +33,42 @@ final class MockBookingService: BookingService, @unchecked Sendable {
         return appointments.filter { $0.customerId == customerId }
     }
 
+    /// Randevu kalemini bir paket kalemine bağlar ve randevunun o anki
+    /// durumunu döndürür. ``MockPackagesService`` seansı yalnız randevu
+    /// `completed` ise düşüyor — sunucudaki kural bu ve iki mock'un ayrışması
+    /// arayüzü canlıda yanıltırdı.
+    @discardableResult
+    func bindPackageItem(
+        appointmentId: String,
+        appointmentServiceId: String,
+        customerPackageItemId: String
+    ) -> AppointmentStatus? {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let index = appointments.firstIndex(where: { $0.id == appointmentId })
+        else { return nil }
+        let appointment = appointments[index]
+        let services = appointment.services.map { line in
+            guard line.id == appointmentServiceId else { return line }
+            return AppointmentServiceLine(
+                id: line.id,
+                serviceId: line.serviceId,
+                staffProfileId: line.staffProfileId,
+                sortOrder: line.sortOrder,
+                startsAt: line.startsAt,
+                endsAt: line.endsAt,
+                durationMinutes: line.durationMinutes,
+                bufferBeforeMinutes: line.bufferBeforeMinutes,
+                bufferAfterMinutes: line.bufferAfterMinutes,
+                priceMinor: line.priceMinor,
+                vatRateBasisPoints: line.vatRateBasisPoints,
+                customerPackageItemId: customerPackageItemId
+            )
+        }
+        appointments[index] = appointment.with(services: services)
+        return appointment.status
+    }
+
     /// Kullanıcının `appointment:reopen` izni. Mock'ta kimlik bilgisi yok;
     /// senaryo menüsünden gelen oturum bunu belirlemiyor, bu yüzden açık
     /// bırakılıyor ve kısıt yalnız ekranda (izin kontrolüyle) uygulanıyor.
@@ -337,7 +373,13 @@ final class MockBookingService: BookingService, @unchecked Sendable {
         // Hizmet dizilimi verilmezse mevcut olan korunur — sunucudaki kural.
         let lineup = input.services ?? old.services
             .sorted { $0.sortOrder < $1.sortOrder }
-            .map { AppointmentServiceInput(serviceId: $0.serviceId, staffProfileId: $0.staffProfileId) }
+            .map {
+                AppointmentServiceInput(
+                    serviceId: $0.serviceId,
+                    staffProfileId: $0.staffProfileId,
+                    customerPackageItemId: $0.customerPackageItemId
+                )
+            }
         let plan = try buildPlan(
             startsAt: startsAt,
             branchId: old.branchId,
@@ -459,7 +501,8 @@ final class MockBookingService: BookingService, @unchecked Sendable {
                 bufferBeforeMinutes: effective.bufferBeforeMinutes,
                 bufferAfterMinutes: effective.bufferAfterMinutes,
                 priceMinor: effective.priceMinor,
-                vatRateBasisPoints: effective.vatRateBasisPoints
+                vatRateBasisPoints: effective.vatRateBasisPoints,
+                customerPackageItemId: input.customerPackageItemId
             ))
             occupied.append((
                 profile.id,

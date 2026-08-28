@@ -41,7 +41,8 @@ enum Fixtures {
           "bufferBeforeMinutes": 5,
           "bufferAfterMinutes": 10,
           "priceMinor": 150000,
-          "vatRateBasisPoints": 2000
+          "vatRateBasisPoints": 2000,
+          "customerPackageItemId": null
         }
       ]
     }
@@ -238,12 +239,16 @@ enum Fixtures {
     """
 
     /// Sunucuya sonradan eklenecek bir kod istemciyi kırmamalı.
+    ///
+    /// Örnek kod Faz 7'den (onam) seçildi: Faz 5 gelince buradaki
+    /// `PACKAGE_EXHAUSTED` artık **bilinen** bir kod oldu ve test kendi
+    /// varsayımını sınamaya başlamıştı.
     static let unknownCode = """
     {
-      "type": "https://errors.klinara.app/package-exhausted",
-      "title": "Paket hakkı bitti",
+      "type": "https://errors.klinara.app/consent-required",
+      "title": "Onam alınmamış",
       "status": 409,
-      "code": "PACKAGE_EXHAUSTED",
+      "code": "CONSENT_REQUIRED",
       "instance": "/api/v1/appointments",
       "requestId": "9d1f0f4e-0000-4000-8000-000000000004"
     }

@@ -6,6 +6,8 @@ import { toZonedIso } from '../../common/time';
 import { TenantTxService } from '../../database/tenant-tx.service';
 import type { Tx } from '../../database/tenant-tx';
 import type { AppointmentStatus } from '../../database/schema/appointments';
+import { CustomerPackagesService } from '../packages/customer-packages.service';
+import { PackageConsumptionService } from '../packages/package-consumption.service';
 import type { Principal } from '../identity/principal';
 import { hasPermission } from '../identity/principal';
 import { BranchAccessService } from '../tenancy/branch-access.service';
@@ -41,6 +43,7 @@ interface PlannedService {
   bufferAfterMinutes: number;
   priceMinor: number;
   vatRateBasisPoints: number;
+  customerPackageItemId: string | null;
 }
 
 interface Plan {
@@ -58,6 +61,7 @@ export class AppointmentsService {
     private readonly availability: AvailabilityService,
     private readonly cache: AvailabilityCacheService,
     private readonly branchAccess: BranchAccessService,
+    private readonly consumption: PackageConsumptionService,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -332,10 +336,31 @@ export class AppointmentsService {
           reason: reason ?? null,
         });
 
+        // Paket tüketimi AYNI transaction'da. Atomiklik ayrı bir mekanizma
+        // değil, burada olmalarının doğal sonucu: hak yetersizse ya da paket
+        // süresi dolmuşsa trigger hata fırlatır, transaction düşer ve randevu
+        // tamamlanmaz (5.3 kabul kriteri).
+        if (status === 'completed') {
+          await this.consumption.consumeForAppointment(tx, {
+            tenantId: this.tx.tenantId,
+            appointmentId: id,
+            actorUserId: principal.userId,
+          });
+        } else if (current.status === 'completed') {
+          await this.consumption.reverseForAppointment(tx, {
+            tenantId: this.tx.tenantId,
+            appointmentId: id,
+            actorUserId: principal.userId,
+            reason,
+          });
+        }
+
         const services = await repo.listAppointmentServices(tx, id);
         return { appointment: updated, services };
       })
       .catch((error: unknown) => {
+        const translated = CustomerPackagesService.translate(error);
+        if (translated !== error) throw translated;
         if (isPgError(error, PG_ERROR.INVALID_STATUS_TRANSITION)) {
           throw new AppError(
             409,
@@ -412,6 +437,7 @@ export class AppointmentsService {
         bufferAfterMinutes: bufferAfter,
         priceMinor: Number(definition.price_minor),
         vatRateBasisPoints: definition.vat_rate_basis_points,
+        customerPackageItemId: entry.customerPackageItemId ?? null,
       });
 
       cursor = visibleEnd;
@@ -470,6 +496,7 @@ export class AppointmentsService {
         bufferAfterMinutes: service.bufferAfterMinutes,
         priceMinor: service.priceMinor,
         vatRateBasisPoints: service.vatRateBasisPoints,
+        customerPackageItemId: service.customerPackageItemId,
       })),
     );
 
@@ -550,6 +577,11 @@ export class AppointmentsService {
     startsAt: Date,
     entries: AppointmentServiceInputDto[],
   ): Promise<never> {
+    // Paket bağlama ve defter hataları TEK yerde çevriliyor; randevu tarafının
+    // aynı eşlemeyi ikinci kez yazması, ikisinin bir gün ayrışması demekti.
+    const packageError = CustomerPackagesService.translate(error);
+    if (packageError !== error) throw packageError;
+
     if (isPgError(error, PG_ERROR.EXCLUSION_VIOLATION)) {
       throw await this.slotConflict(branchId, startsAt, entries);
     }
@@ -737,6 +769,7 @@ export class AppointmentsService {
       bufferAfterMinutes: row.bufferAfterMinutes,
       priceMinor: Number(row.priceMinor),
       vatRateBasisPoints: row.vatRateBasisPoints,
+      customerPackageItemId: row.customerPackageItemId,
     };
   }
 }

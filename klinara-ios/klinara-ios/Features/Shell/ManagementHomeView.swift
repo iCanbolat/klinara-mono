@@ -27,6 +27,12 @@ struct ManagementHomeView: View {
                     if session.can(Permissions.customerRead) {
                         customerCard
                     }
+                    if session.can(Permissions.packageRead) {
+                        packageCard
+                    }
+                    if session.canAny(Permissions.packageRead, Permissions.reportRevenueRead) {
+                        reportsCard
+                    }
                 }
                 .padding(.horizontal, KlinaraMetrics.screenInset)
                 .padding(.vertical, KlinaraMetrics.lg)
@@ -102,6 +108,35 @@ struct ManagementHomeView: View {
                 icon: "tag"
             ) {
                 CustomerTagListView(session: session)
+            }
+        }
+    }
+
+    /// Paketler kataloğun altında değil ayrı bir kartta: bir paket hizmet
+    /// değil, hizmet **hakkı** satar ve muhasebesi kataloğunkinden farklı.
+    private var packageCard: some View {
+        KlinaraCard(
+            title: "Paketler",
+            footnote: "Tanım değişikliği satılmış paketleri etkilemez; satış anındaki snapshot geçerlidir."
+        ) {
+            KlinaraNavigationRow(
+                label: "Paket tanımları",
+                detail: "Kalemler, fiyat, geçerlilik ve devir kuralı",
+                icon: "shippingbox"
+            ) {
+                PackageDefinitionListView(session: session)
+            }
+        }
+    }
+
+    private var reportsCard: some View {
+        KlinaraCard(title: "Raporlar") {
+            KlinaraNavigationRow(
+                label: "Paket raporları",
+                detail: "Taşınan yükümlülük, süre dolumu ve dönem kullanımı",
+                icon: "chart.bar.doc.horizontal"
+            ) {
+                PackageReportsHomeView(session: session)
             }
         }
     }

@@ -21,6 +21,10 @@ struct BookingDraft: Equatable {
     var slot: AvailabilitySlot?
     var notes = ""
     var reason = ""
+    /// `serviceId` → `customerPackageItemId`. Bir hizmet en fazla bir paket
+    /// kaleminden düşer; sözlük olması "hangi hizmet hangi paketten" sorusunu
+    /// tek yerde cevaplıyor.
+    var packageItemIds: [String: String] = [:]
 
     private let original: Snapshot
 
@@ -30,6 +34,7 @@ struct BookingDraft: Equatable {
         var staffProfileId: String?
         var slotStart: Date?
         var notes: String
+        var packageItemIds: [String: String]
     }
 
     private var current: Snapshot {
@@ -38,7 +43,8 @@ struct BookingDraft: Equatable {
             serviceIds: serviceIds,
             staffProfileId: staffProfileId,
             slotStart: slot?.startsAt,
-            notes: notes
+            notes: notes,
+            packageItemIds: packageItemIds
         )
     }
 
@@ -51,13 +57,21 @@ struct BookingDraft: Equatable {
             serviceIds = ordered.map(\.serviceId)
             staffProfileId = ordered.first?.staffProfileId
             notes = rescheduling.notes ?? ""
+            // Erteleme mevcut paket bağlarını KORUR: gövdeye yazılmazsa
+            // erteleme sessizce paketi çözer ve seans hiç düşmez.
+            for line in ordered {
+                if let itemId = line.customerPackageItemId {
+                    packageItemIds[line.serviceId] = itemId
+                }
+            }
         }
         original = Snapshot(
             customerId: customerId,
             serviceIds: serviceIds,
             staffProfileId: staffProfileId,
             slotStart: nil,
-            notes: notes
+            notes: notes,
+            packageItemIds: packageItemIds
         )
     }
 
@@ -80,12 +94,27 @@ struct BookingDraft: Equatable {
     mutating func toggle(serviceId: String) {
         if let index = serviceIds.firstIndex(of: serviceId) {
             serviceIds.remove(at: index)
+            // Hizmet çıkarıldıysa paket bağı da düşer; yoksa gövdeye artık
+            // seçili olmayan bir hizmetin kalemi giderdi.
+            packageItemIds[serviceId] = nil
         } else {
             serviceIds.append(serviceId)
         }
         // Hizmet kümesi değişince slot süresi de değişir; eski seçim artık
         // geçerli olmayabilir, sessizce taşımaktansa sıfırlamak doğru.
         slot = nil
+    }
+
+    /// Paket hakkı seçimi. Aynı kaleme ikinci kez dokunmak seçimi kaldırır.
+    mutating func selectPackageItem(_ itemId: String?, for serviceId: String) {
+        packageItemIds[serviceId] = packageItemIds[serviceId] == itemId ? nil : itemId
+    }
+
+    /// Müşteri değişince paket seçimleri **düşer**: haklar müşteriye özeldir
+    /// ve devredilen bir seçim başkasının paketinden seans düşürürdü.
+    mutating func select(customerId id: String?) {
+        customerId = id
+        packageItemIds = [:]
     }
 
     mutating func select(staffProfileId id: String?) {
@@ -111,7 +140,11 @@ struct BookingDraft: Equatable {
             customerId: customerId,
             startsAt: clock.wireValue(slot.startsAt),
             services: serviceIds.map {
-                AppointmentServiceInput(serviceId: $0, staffProfileId: staffProfileId)
+                AppointmentServiceInput(
+                    serviceId: $0,
+                    staffProfileId: staffProfileId,
+                    customerPackageItemId: packageItemIds[$0]
+                )
             },
             notes: trimmed.isEmpty ? nil : trimmed
         )
@@ -123,7 +156,11 @@ struct BookingDraft: Equatable {
         return RescheduleAppointmentInput(
             startsAt: clock.wireValue(slot.startsAt),
             services: serviceIds.map {
-                AppointmentServiceInput(serviceId: $0, staffProfileId: staffProfileId)
+                AppointmentServiceInput(
+                    serviceId: $0,
+                    staffProfileId: staffProfileId,
+                    customerPackageItemId: packageItemIds[$0]
+                )
             },
             reason: trimmed.isEmpty ? nil : trimmed
         )

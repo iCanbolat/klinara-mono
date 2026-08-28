@@ -8,3 +8,4 @@ export * from './scheduling';
 export * from './crm';
 export * from './files';
 export * from './appointments';
+export * from './packages';

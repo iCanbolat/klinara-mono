@@ -177,6 +177,17 @@ struct BranchClock: Sendable {
     }
 
     /// Haftanın başlangıcı — `firstWeekday = 2` olduğu için daima **pazartesi**.
+    /// Ayın ilk günü, şube saatinde. Rapor aralıkları **yarı açıktır**
+    /// (`[from, to)`) ve ay sınırını cihaz takviminde hesaplamak, seyahat eden
+    /// bir yöneticiye komşu ayın raporunu gösterirdi.
+    func startOfMonth(_ date: Date) -> Date {
+        calendar.date(from: calendar.dateComponents([.year, .month], from: date)) ?? date
+    }
+
+    func adding(months: Int, to date: Date) -> Date {
+        calendar.date(byAdding: .month, value: months, to: date) ?? date
+    }
+
     func startOfWeek(_ date: Date) -> Date {
         let interval = calendar.dateInterval(of: .weekOfYear, for: date)
         return interval?.start ?? startOfDay(date)

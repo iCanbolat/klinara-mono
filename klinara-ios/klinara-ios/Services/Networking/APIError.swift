@@ -48,6 +48,13 @@ nonisolated enum APIErrorCode: String, Decodable, Sendable {
     case versionConflict = "VERSION_CONFLICT"
     case idempotencyConflict = "IDEMPOTENCY_CONFLICT"
 
+    // Paket (Faz 5)
+    /// Kalan hak yetersiz. Randevu tamamlanırken de gelebilir — o zaman
+    /// randevu da tamamlanmamıştır, ikisi aynı transaction'da yaşar.
+    case packageExhausted = "PACKAGE_EXHAUSTED"
+    /// Paket süresi dolmuş ya da aktif değil; tüketim yazılamaz.
+    case packageExpired = "PACKAGE_EXPIRED"
+
     case unknown = "UNKNOWN"
 
     init(from decoder: any Decoder) throws {
@@ -218,6 +225,12 @@ extension APIError {
                 return "Aynı istek hâlâ işleniyor. Birkaç saniye sonra tekrar deneyin."
             case .versionConflict:
                 return "Bu kayıt siz düzenlerken başkası tarafından değiştirildi. Yenileyip tekrar deneyin."
+            case .packageExhausted:
+                // Randevu tamamlanırken gelirse randevu da tamamlanmadı: cümle
+                // bunu söylemezse kullanıcı seansın düştüğünü sanır.
+                return "Paket hakkı yetersiz. İşlem tamamlanmadı; kalan hakkı kontrol edin."
+            case .packageExpired:
+                return "Paket kullanılabilir durumda değil. Süresi dolmuş ya da kapatılmış olabilir."
             default:
                 return "Bir sorun oluştu. Lütfen tekrar deneyin."
             }

@@ -22,7 +22,7 @@ export type CustomerMergeRow = typeof customerMerges.$inferSelect;
  * `customer_tag_assignments` burada YOK: composite PK'sı yüzünden çakışma
  * ihtimali var, ayrıca ele alınıyor.
  */
-const CUSTOMER_OWNED_TABLES = ['appointments', 'customer_bookings'] as const;
+const CUSTOMER_OWNED_TABLES = ['appointments', 'customer_bookings', 'customer_packages'] as const;
 
 interface ListFilters {
   limit: number;

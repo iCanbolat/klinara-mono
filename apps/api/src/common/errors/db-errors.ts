@@ -36,6 +36,18 @@ export const PG_ERROR = {
   INACTIVE_SERVICE: 'K0002',
   /** Personel bu hizmette yetkin değil (Faz 3.1) */
   STAFF_NOT_COMPETENT: 'K0003',
+  /** Paket hakkı yetersiz (Faz 5.2) — apply_package_ledger_entry() */
+  PACKAGE_EXHAUSTED: 'K0004',
+  /** Paket süresi dolmuş ya da aktif değil; tüketim yazılamaz (Faz 5.3) */
+  PACKAGE_NOT_CONSUMABLE: 'K0005',
+  /** Devredilemez paketin devri denendi (Faz 5.3) */
+  PACKAGE_NOT_TRANSFERABLE: 'K0006',
+  /** Satılmış paket tanımı silinemez (Faz 5.1) */
+  PACKAGE_DEFINITION_IN_USE: 'K0007',
+  /** Kalem tahsisi paket toplamıyla uyuşmuyor (Faz 5.2, iç tutarlılık) */
+  PACKAGE_ALLOCATION_MISMATCH: 'K0008',
+  /** Randevu kalemi yanlış pakete/hizmete/müşteriye bağlanmaya çalışıldı (5.3) */
+  PACKAGE_BINDING_INVALID: 'K0009',
 } as const;
 
 const PG_CODE_PATTERN = /^[0-9A-Z]{5}$/;

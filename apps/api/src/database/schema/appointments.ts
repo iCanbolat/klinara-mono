@@ -87,6 +87,9 @@ export const appointmentServices = pgTable(
     bufferAfterMinutes: integer('buffer_after_minutes').notNull().default(0),
     priceMinor: bigint('price_minor', { mode: 'number' }).notNull(),
     vatRateBasisPoints: integer('vat_rate_basis_points').notNull().default(2000),
+    // Faz 5.3 — bu kalem bir paketten mi düşülüyor ve düşüldü mü.
+    customerPackageItemId: uuid('customer_package_item_id'),
+    packageConsumedEntryId: uuid('package_consumed_entry_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
