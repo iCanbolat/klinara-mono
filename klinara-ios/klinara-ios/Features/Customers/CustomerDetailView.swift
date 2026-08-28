@@ -14,6 +14,7 @@ struct CustomerDetailView: View {
 
     @State private var record: CustomerRecordStore?
     @State private var packages: CustomerPackagesStore?
+    @State private var account: CustomerAccountStore?
     @State private var thumbnails: ThumbnailCache?
     @State private var isEditing = false
     @State private var isArchiving = false
@@ -169,6 +170,13 @@ struct CustomerDetailView: View {
                 CustomerPackagesSection(session: session, store: packages)
             }
 
+            // Cari hesap paketlerin ALTINDA: "kaç seansı kaldı" sorusu
+            // kasada "ne kadar ödeyecek" sorusundan önce geliyor ve paket
+            // hakkı olan müşterinin borcu çoğu zaman sıfır.
+            if let account {
+                CustomerAccountSection(session: session, store: account)
+            }
+
             CustomerFilesSection(session: session, record: record, thumbnails: thumbnails)
 
             if record.canReadMedical {
@@ -228,12 +236,20 @@ struct CustomerDetailView: View {
             : nil
         packages = packageStore
 
+        // Aynı gerekçe: `finance.payment:read` yoksa cari hesap store'u hiç
+        // kurulmaz ve bölüm çizilmez.
+        let accountStore = session.can(Permissions.financePaymentRead)
+            ? CustomerAccountStore(customerId: customerId, service: session.services.finance)
+            : nil
+        account = accountStore
+
         // Hepsi paralel: kart açılışı isteklerin toplamı kadar beklemesin.
         async let timeline: Void = store.loadTimeline()
         async let notes: Void = store.loadNotes()
         async let files: Void = store.loadFiles()
         async let packageList: Void = packageStore?.load() ?? ()
-        _ = await (timeline, notes, files, packageList)
+        async let accountLoad: Void = accountStore?.load() ?? ()
+        _ = await (timeline, notes, files, packageList, accountLoad)
     }
 
     private func archive() async {

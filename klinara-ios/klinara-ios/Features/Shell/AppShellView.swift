@@ -19,10 +19,21 @@ struct AppShellView: View {
         case today, customers, management, profile
     }
 
-    /// Yönetim sekmesi Faz 2'nin tamamını barındırır; üç izinden herhangi biri
+    /// Yönetim sekmesi Faz 2'nin tamamını barındırır; izinlerden herhangi biri
     /// yeter (yalnız çalışma saatlerini düzenleyen bir yönetici de girebilmeli).
+    ///
+    /// Faz 6 ile finans izinleri de sayılıyor ve bu bir düzeltme:
+    /// `accountant` rolünde `service:read`, `staff:read`, `schedule:read`
+    /// **yok**. Eski koşulla muhasebe sekmeyi hiç göremez, dolayısıyla kendisi
+    /// için yazılmış Kasa ve Prim ekranlarına da hiç ulaşamazdı.
     private var showsManagement: Bool {
-        session.canAny(Permissions.serviceRead, Permissions.staffRead, Permissions.scheduleRead)
+        session.canAny(
+            Permissions.serviceRead,
+            Permissions.staffRead,
+            Permissions.scheduleRead,
+            Permissions.financePaymentRead,
+            Permissions.financeCommissionRead
+        )
     }
 
     /// `accountant` rolünde hiç randevu izni yok. Sekme yine de duruyor —
@@ -110,4 +121,18 @@ enum Permissions {
     /// Parasal rapor izni. Yükümlülük raporu ve süre dolumu listesindeki tutar
     /// alanları buna bakar — izin yoksa sunucu tutarı `null` döner.
     static let reportRevenueRead = "report.revenue:read"
+    /// Borç kalemi, tahsilat ve kasa görüntüleme (Faz 6). Cari hesap bölümü ve
+    /// kasa ekranları buna bakar.
+    static let financePaymentRead = "finance.payment:read"
+    /// Kalem açma, tahsilat alma, kasa açma/kapatma ve iade.
+    static let financePaymentWrite = "finance.payment:write"
+    /// Katalog fiyatının dışına çıkma. `finance.payment:write` üzerine **binmez**:
+    /// gerekçe `package:refund` ile aynı — resepsiyonun günlük tahsilat izni
+    /// yetkisiz indirim anlamına gelemez.
+    static let financePriceOverride = "finance.price:override"
+    /// Prim kuralı, tahakkuk, dönem ve raporun görüntülenmesi. Muhasebe primi
+    /// **görür** ama kuralını değiştiremez; yazma ayrı izinde.
+    static let financeCommissionRead = "finance.commission:read"
+    /// Prim kuralı yazma ve dönem kapatma. `owner` + `manager`.
+    static let financeCommissionWrite = "finance.commission:write"
 }

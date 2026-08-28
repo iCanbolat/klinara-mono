@@ -5,11 +5,13 @@ import { AvailabilityController } from './availability.controller';
 import { AvailabilityService } from './availability.service';
 import { CalendarController } from './calendar.controller';
 import { CalendarService } from './calendar.service';
+import { FinanceModule } from '../finance/finance.module';
 import { PackagesModule } from '../packages/packages.module';
 
 @Module({
-  // Randevu tamamlaması paket hakkını AYNI transaction'da düşer (5.3).
-  imports: [PackagesModule],
+  // Randevu tamamlaması paket hakkını AYNI transaction'da düşer (5.3) ve
+  // paketten karşılanmayan hizmetlerin borcunu aynı transaction'da doğurur (6.1).
+  imports: [PackagesModule, FinanceModule],
   // Sıra ÖNEMLİ: `GET /appointments` (liste) CalendarController'da,
   // `GET /appointments/:id` AppointmentsController'da. Liste ucu önce
   // kaydedilmezse ":id" onu da yakalar ve liste isteği "appointments" adlı bir

@@ -6,6 +6,10 @@ import { toZonedIso } from '../../common/time';
 import { TenantTxService } from '../../database/tenant-tx.service';
 import type { Tx } from '../../database/tenant-tx';
 import type { AppointmentStatus } from '../../database/schema/appointments';
+import { ChargeGenerationService } from '../finance/charge-generation.service';
+import { CommissionAccrualService } from '../finance/commission-accrual.service';
+import { ChargesService } from '../finance/charges.service';
+import { CommissionsService } from '../finance/commissions.service';
 import { CustomerPackagesService } from '../packages/customer-packages.service';
 import { PackageConsumptionService } from '../packages/package-consumption.service';
 import type { Principal } from '../identity/principal';
@@ -62,6 +66,8 @@ export class AppointmentsService {
     private readonly cache: AvailabilityCacheService,
     private readonly branchAccess: BranchAccessService,
     private readonly consumption: PackageConsumptionService,
+    private readonly chargeGeneration: ChargeGenerationService,
+    private readonly commissions: CommissionAccrualService,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -346,9 +352,37 @@ export class AppointmentsService {
             appointmentId: id,
             actorUserId: principal.userId,
           });
+          // Borç da AYNI transaction'da doğar (6.1). Paketten karşılanan
+          // kalemler atlanır: o borç paket satıldığında zaten doğdu.
+          await this.chargeGeneration.generateForAppointment(tx, {
+            tenantId: this.tx.tenantId,
+            appointmentId: id,
+            actorUserId: principal.userId,
+          });
+          // Prim de aynı transaction'da tahakkuk eder (6.4). Kural yoksa
+          // sessizce hiçbir şey yazılmaz.
+          await this.commissions.accrueForAppointment(tx, {
+            tenantId: this.tx.tenantId,
+            appointmentId: id,
+            actorUserId: principal.userId,
+          });
         } else if (current.status === 'completed') {
           await this.consumption.reverseForAppointment(tx, {
             tenantId: this.tx.tenantId,
+            appointmentId: id,
+            actorUserId: principal.userId,
+            reason,
+          });
+          // Sıra ÖNEMLİ: prim ters kaydı, ücret kalemleri `void` edilmeden
+          // ÖNCE yazılır — ters kayıt hangi kalemlerin primlendiğini o
+          // kalemler üzerinden bulur.
+          await this.commissions.reverse(tx, {
+            tenantId: this.tx.tenantId,
+            actorUserId: principal.userId,
+            reason: reason ?? 'Randevu tamamlaması geri alındı',
+            chargeIds: await this.chargeGeneration.openChargeIdsForAppointment(tx, id),
+          });
+          await this.chargeGeneration.voidForAppointment(tx, {
             appointmentId: id,
             actorUserId: principal.userId,
             reason,
@@ -361,6 +395,10 @@ export class AppointmentsService {
       .catch((error: unknown) => {
         const translated = CustomerPackagesService.translate(error);
         if (translated !== error) throw translated;
+        const financeTranslated = ChargesService.translate(error);
+        if (financeTranslated !== error) throw financeTranslated;
+        const commissionTranslated = CommissionsService.translate(error);
+        if (commissionTranslated !== error) throw commissionTranslated;
         if (isPgError(error, PG_ERROR.INVALID_STATUS_TRANSITION)) {
           throw new AppError(
             409,

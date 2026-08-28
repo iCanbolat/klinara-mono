@@ -34,6 +34,13 @@ final class AppSession {
     /// Paket tanımları da oturum ömürlü: yönetimdeki tanım ekranı ile müşteri
     /// kartındaki satış sayfası **aynı** listeye bakıyor.
     let packageDefinitionStore: PackageDefinitionStore
+    /// Kasa da oturum ömürlü: nakit tahsilat sheet'i "açık kasa hangisi?"
+    /// sorusunu soruyor ve kasa ekranı aynı listeye bakıyor. İki ayrı örnek,
+    /// tahsilat ekranının kasa ekranından farklı bir açık kasa görmesi demekti.
+    let cashSessionStore: CashSessionStore
+    /// İndirim tanımları — yönetim ekranı ile kalem açma seçicisi aynı listeye
+    /// baksın diye (``packageDefinitionStore`` ile aynı gerekçe).
+    let discountStore: DiscountStore
 
     private let tokens: TokenStore
 
@@ -52,6 +59,8 @@ final class AppSession {
         self.calendarStore = CalendarStore(service: services.booking, catalog: catalogStore)
         self.customerStore = CustomerStore(service: services.customers)
         self.packageDefinitionStore = PackageDefinitionStore(service: services.packages)
+        self.cashSessionStore = CashSessionStore(service: services.finance)
+        self.discountStore = DiscountStore(service: services.finance)
         let store = tokens ?? .shared
         self.tokens = store
         self.selectedBranchId = store.branchId ?? branches.first?.id

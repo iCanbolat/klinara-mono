@@ -22,6 +22,7 @@ import { AvailabilityCacheModule } from './modules/booking/availability-cache.mo
 import { PackagesModule } from './modules/packages/packages.module';
 import { BookingModule } from './modules/booking/booking.module';
 import { CrmModule } from './modules/crm/crm.module';
+import { FinanceModule } from './modules/finance/finance.module';
 import { FilesModule } from './modules/files/files.module';
 import { SchedulingModule } from './modules/scheduling/scheduling.module';
 import { StaffModule } from './modules/staff/staff.module';
@@ -72,6 +73,7 @@ import { MetricsModule } from './observability/metrics.module';
     CatalogModule,
     CrmModule,
     FilesModule,
+    FinanceModule,
     BookingModule,
     PackagesModule,
     StaffModule,

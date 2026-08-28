@@ -48,6 +48,20 @@ export const PG_ERROR = {
   PACKAGE_ALLOCATION_MISMATCH: 'K0008',
   /** Randevu kalemi yanlış pakete/hizmete/müşteriye bağlanmaya çalışıldı (5.3) */
   PACKAGE_BINDING_INVALID: 'K0009',
+  /** İptal edilmiş (`void`) bir ücret kalemine işlem yapılmaya çalışıldı (6.1) */
+  CHARGE_NOT_OPEN: 'K0010',
+  /** İndirim pasif, süresi dolmuş ya da kullanım hakkı tükenmiş (6.1) */
+  DISCOUNT_INVALID: 'K0011',
+  /** Tahsis toplamı tahsilatın kendisini aşıyor (6.2, deferred kontrol) */
+  PAYMENT_OVER_ALLOCATED: 'K0012',
+  /** Bir kaleme tahsis edilen toplam, kalemin tutarını aşıyor (6.2) */
+  PAYMENT_EXCEEDS_CHARGE: 'K0013',
+  /** Nakit hareket için açık bir kasa oturumu gerekiyor (6.3) */
+  CASH_SESSION_REQUIRED: 'K0014',
+  /** Kapanmış kasa oturumuna hareket yazılamaz (6.3) */
+  CASH_SESSION_CLOSED: 'K0015',
+  /** Kapatılmış prim dönemine tahakkuk yazılamaz (6.4) */
+  COMMISSION_PERIOD_CLOSED: 'K0016',
 } as const;
 
 const PG_CODE_PATTERN = /^[0-9A-Z]{5}$/;

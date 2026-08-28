@@ -70,3 +70,87 @@ export function remainingValueMinor(
   if (quantityTotal <= 0 || remainingSessions <= 0) return 0;
   return Math.floor((itemTotalMinor * remainingSessions * 2 + quantityTotal) / (quantityTotal * 2));
 }
+
+/**
+ * Yarıyı çifte yuvarlayan tamsayı bölme (bankers rounding) — doküman 4.4'ün
+ * "yuvarlama sadece tek bir yerde yapılır" kuralının o tek yeri.
+ *
+ * `Math.round` YETMEZ: her yarım değeri yukarı çeker ve yüzlerce kalem
+ * üzerinde sistematik bir sapma biriktirir. Yarıyı çifte çekmek sapmayı
+ * uzun vadede sıfıra yaklaştırır — KDV ve prim hesabında aranan davranış budur.
+ *
+ * Float yok: bölme, taban ve kalan üzerinden tamsayı olarak yapılır.
+ */
+export function roundHalfEven(numerator: number, denominator: number): number {
+  if (!Number.isInteger(numerator) || !Number.isInteger(denominator)) {
+    throw new TypeError('roundHalfEven: pay ve payda tamsayı olmalı.');
+  }
+  if (denominator === 0) {
+    throw new RangeError('roundHalfEven: payda sıfır olamaz.');
+  }
+
+  // Paydayı pozitife normalize et; `Math.floor` negatif payda ile ters çalışır.
+  const sign = denominator < 0 ? -1 : 1;
+  const n = numerator * sign;
+  const d = denominator * sign;
+
+  const quotient = Math.floor(n / d);
+  const remainder = n - quotient * d; // 0 <= remainder < d
+  const twice = remainder * 2;
+
+  if (twice > d) return quotient + 1;
+  if (twice < d) return quotient;
+  // Tam yarım: çift olana çek. (JS'te negatif `%` negatif döner; `!== 0`
+  // kontrolü tek sayıyı her iki işarette de doğru yakalar.)
+  return quotient % 2 === 0 ? quotient : quotient + 1;
+}
+
+export interface VatSplit {
+  netMinor: number;
+  vatMinor: number;
+}
+
+/**
+ * KDV DAHİL bir tutarı net + KDV olarak ayırır.
+ *
+ * Ürünün fiyat sözleşmesi brüttür: katalogdaki `price_minor` müşteriye söylenen
+ * tutardır ("lazer 1.500 TL"), üzerine KDV eklenmez. KDV o tutarın İÇİNDEN
+ * çıkarılır; bu yüzden payda `10000 + rate`, `10000` değil.
+ *
+ * `netMinor + vatMinor = totalMinor` her zaman sağlanır — net, KDV'nin
+ * çıkarılmasıyla bulunur, ayrıca yuvarlanmaz. İki tarafı da yuvarlamak
+ * toplamın brütten sapması demekti.
+ */
+export function splitVatInclusive(totalMinor: number, rateBasisPoints: number): VatSplit {
+  if (!Number.isInteger(totalMinor)) {
+    throw new TypeError('splitVatInclusive: tutar tamsayı (minor unit) olmalı.');
+  }
+  if (!Number.isInteger(rateBasisPoints) || rateBasisPoints < 0) {
+    throw new RangeError('splitVatInclusive: KDV oranı negatif olmayan tamsayı olmalı.');
+  }
+
+  const vatMinor = roundHalfEven(totalMinor * rateBasisPoints, 10000 + rateBasisPoints);
+  return { netMinor: totalMinor - vatMinor, vatMinor };
+}
+
+export type DiscountKind = 'percent' | 'amount';
+
+/**
+ * İndirim tutarını hesaplar — TABANI AŞAMAZ.
+ *
+ * `percent` için `value` baz puandır (1500 = %15), `amount` için doğrudan
+ * minor unit. Sonuç `[0, baseMinor]` aralığına kırpılır: kabul kriteri
+ * "indirim sonrası tutar negatife düşemez" diyor ve bunu çağıranın
+ * hatırlamasına bırakmak, bir gün hatırlamaması demekti.
+ */
+export function applyDiscount(baseMinor: number, kind: DiscountKind, value: number): number {
+  if (!Number.isInteger(baseMinor) || baseMinor < 0) {
+    throw new RangeError('applyDiscount: taban negatif olmayan tamsayı olmalı.');
+  }
+  if (!Number.isInteger(value) || value < 0) {
+    throw new RangeError('applyDiscount: indirim değeri negatif olmayan tamsayı olmalı.');
+  }
+
+  const raw = kind === 'percent' ? roundHalfEven(baseMinor * value, 10000) : value;
+  return Math.min(raw, baseMinor);
+}

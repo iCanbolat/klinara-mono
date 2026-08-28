@@ -30,7 +30,14 @@ struct ManagementHomeView: View {
                     if session.can(Permissions.packageRead) {
                         packageCard
                     }
-                    if session.canAny(Permissions.packageRead, Permissions.reportRevenueRead) {
+                    if session.can(Permissions.financePaymentRead) {
+                        cashCard
+                    }
+                    if session.canAny(
+                        Permissions.packageRead,
+                        Permissions.reportRevenueRead,
+                        Permissions.financeCommissionRead
+                    ) {
                         reportsCard
                     }
                 }
@@ -79,6 +86,35 @@ struct ManagementHomeView: View {
                 icon: "folder"
             ) {
                 ServiceCategoryListView(session: session)
+            }
+            KlinaraDivider()
+            // İndirim finans kartında değil katalogda: sunucu onu
+            // `service:write` ile koruyor ve bir kampanya, günlük tahsilat
+            // işlemi değil bir fiyat kararı.
+            KlinaraNavigationRow(
+                label: "İndirimler",
+                detail: "Kampanya kodu, yüzde/tutar ve geçerlilik",
+                icon: "percent"
+            ) {
+                DiscountListView(session: session)
+            }
+        }
+    }
+
+    /// Kasa günlük bir resepsiyon işi ama yeni bir sekme açmıyoruz: sekme
+    /// kümesi Faz 3'te donduruldu ve bilgi mimarisini her fazda yeniden kurmak
+    /// kullanıcının kas hafızasını sıfırlamak demek.
+    private var cashCard: some View {
+        KlinaraCard(
+            title: "Kasa",
+            footnote: "Nakit tahsilat ve iade, açık bir kasa oturumuna bağlanmadan kaydedilemez."
+        ) {
+            KlinaraNavigationRow(
+                label: "Kasa oturumları",
+                detail: "Açılış, kapanış, sayım farkı ve hareket dökümü",
+                icon: "tray.full"
+            ) {
+                CashSessionListView(session: session)
             }
         }
     }
@@ -131,12 +167,26 @@ struct ManagementHomeView: View {
 
     private var reportsCard: some View {
         KlinaraCard(title: "Raporlar") {
-            KlinaraNavigationRow(
-                label: "Paket raporları",
-                detail: "Taşınan yükümlülük, süre dolumu ve dönem kullanımı",
-                icon: "chart.bar.doc.horizontal"
-            ) {
-                PackageReportsHomeView(session: session)
+            if session.canAny(Permissions.packageRead, Permissions.reportRevenueRead) {
+                KlinaraNavigationRow(
+                    label: "Paket raporları",
+                    detail: "Taşınan yükümlülük, süre dolumu ve dönem kullanımı",
+                    icon: "chart.bar.doc.horizontal"
+                ) {
+                    PackageReportsHomeView(session: session)
+                }
+            }
+            if session.can(Permissions.financeCommissionRead) {
+                if session.canAny(Permissions.packageRead, Permissions.reportRevenueRead) {
+                    KlinaraDivider()
+                }
+                KlinaraNavigationRow(
+                    label: "Prim",
+                    detail: "Personel primi, tahakkuklar, dönemler ve kurallar",
+                    icon: "person.badge.plus"
+                ) {
+                    CommissionHomeView(session: session)
+                }
             }
         }
     }

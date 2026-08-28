@@ -12,6 +12,7 @@ import {
 } from '../../common/pagination';
 import { TenantTxService } from '../../database/tenant-tx.service';
 import type { Tx } from '../../database/tenant-tx';
+import { ChargeGenerationService } from '../finance/charge-generation.service';
 import { BranchAccessService } from '../tenancy/branch-access.service';
 import type { Principal } from '../identity/principal';
 import * as definitionsRepo from './package-definitions.repository';
@@ -29,6 +30,7 @@ export class CustomerPackagesService {
   constructor(
     private readonly tx: TenantTxService,
     private readonly branchAccess: BranchAccessService,
+    private readonly chargeGeneration: ChargeGenerationService,
   ) {}
 
   /**
@@ -127,6 +129,14 @@ export class CustomerPackagesService {
             actorUserId: principal.userId,
           });
         }
+
+        // Borç AYNI transaction'da doğar (6.1): kalem başına bir ücret satırı,
+        // tutarı `item_total_minor`dan — yani kampanyalı satış fiyatından.
+        await this.chargeGeneration.generateForPackageSale(tx, {
+          tenantId: this.tx.tenantId,
+          customerPackageId: pkg.id,
+          actorUserId: principal.userId,
+        });
 
         const loaded = await this.load(tx, pkg.id);
         if (loaded === undefined) throw new Error('Paket yazıldıktan sonra okunamadı');

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { FinanceModule } from '../finance/finance.module';
 import { CustomerPackagesController } from './customer-packages.controller';
 import { CustomerPackagesService } from './customer-packages.service';
 import { PackageDefinitionsController } from './package-definitions.controller';
@@ -15,6 +16,8 @@ import { PackageReportsService } from './package-reports.service';
  * controller'da; ayırmak iki dosyada aynı servisi enjekte etmek olurdu.
  */
 @Module({
+  // Paket satışı ve iadesi borcu AYNI transaction'da doğurur (6.1).
+  imports: [FinanceModule],
   controllers: [
     PackageDefinitionsController,
     CustomerPackagesController,

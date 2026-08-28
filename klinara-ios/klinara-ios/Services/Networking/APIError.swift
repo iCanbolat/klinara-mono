@@ -55,6 +55,20 @@ nonisolated enum APIErrorCode: String, Decodable, Sendable {
     /// Paket süresi dolmuş ya da aktif değil; tüketim yazılamaz.
     case packageExpired = "PACKAGE_EXPIRED"
 
+    // Finans (Faz 6)
+    /// Tahsis edilen tutar kalemin bakiyesini ya da tahsilatın kendisini aşıyor.
+    /// Sunucu bunu iki ayrı deferred trigger'dan üretiyor (`K0012`, `K0013`);
+    /// istemci için ikisi de aynı düzeltmeyi ister: tutarı küçült.
+    case paymentExceedsBalance = "PAYMENT_EXCEEDS_BALANCE"
+    /// İndirim süresi dolmuş, pasif ya da kullanım hakkı tükenmiş.
+    case discountInvalid = "DISCOUNT_INVALID"
+    /// Nakit tahsilat ya da iade için açık bir kasa oturumu gerekir.
+    case cashSessionRequired = "CASH_SESSION_REQUIRED"
+    /// Şube başına yalnız bir açık kasa oturumu olabilir.
+    case cashSessionAlreadyOpen = "CASH_SESSION_ALREADY_OPEN"
+    /// Kapatılmış prim dönemi değiştirilemez; düzeltme cari döneme düşer.
+    case periodClosed = "PERIOD_CLOSED"
+
     case unknown = "UNKNOWN"
 
     init(from decoder: any Decoder) throws {
@@ -231,6 +245,18 @@ extension APIError {
                 return "Paket hakkı yetersiz. İşlem tamamlanmadı; kalan hakkı kontrol edin."
             case .packageExpired:
                 return "Paket kullanılabilir durumda değil. Süresi dolmuş ya da kapatılmış olabilir."
+            case .paymentExceedsBalance:
+                return "Tahsis edilen tutar kalemin bakiyesini aşıyor. Dağıtımı kontrol edin."
+            case .discountInvalid:
+                return "İndirim geçerli değil. Süresi dolmuş, pasife alınmış ya da kullanım hakkı tükenmiş olabilir."
+            case .cashSessionRequired:
+                // Nakit işlem kasaya bağlanmadan yazılamaz; kullanıcıya ne
+                // yapması gerektiğini söylemek "işlem başarısız"tan yararlı.
+                return "Nakit işlem için açık bir kasa oturumu gerekir. Önce kasayı açın."
+            case .cashSessionAlreadyOpen:
+                return "Bu şubede zaten açık bir kasa var. Önce mevcut kasayı kapatın."
+            case .periodClosed:
+                return "Bu prim dönemi kapatılmış ve değiştirilemez. Düzeltmeler cari döneme düşer."
             default:
                 return "Bir sorun oluştu. Lütfen tekrar deneyin."
             }

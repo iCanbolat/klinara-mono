@@ -16,6 +16,8 @@ struct MockGraph {
     let notes: MockNotesService
     let files: MockFilesService
     let packages: MockPackagesService
+    let finance: MockFinanceService
+    let commissions: MockCommissionsService
     let clock: BranchClock
 
     /// Nişantaşı şubesi: mock çalışma saatlerinin ve personel şablonunun
@@ -40,6 +42,11 @@ struct MockGraph {
             canReopen: canReopen
         )
         packages = MockPackagesService(catalog: catalog, customers: customers, booking: booking)
+        finance = MockFinanceService(customers: customers)
+        commissions = MockCommissionsService()
+        // Tahsilat prim tahakkuku doğursun diye iki mock bağlanıyor —
+        // ``ServiceContainer/mock(scenario:data:)`` ile birebir aynı bağ.
+        finance.commissions = commissions
         notes = MockNotesService(booking: booking, canReadMedical: canReadMedical)
         files = MockFilesService(canReadMedical: canReadMedical)
         clock = BranchClock(timeZoneIdentifier: MockBookingSeed.timezone)

@@ -6,6 +6,7 @@ import { remainingValueMinor } from '../../common/money';
 import { versionConflict } from '../../common/http/etag';
 import { TenantTxService } from '../../database/tenant-tx.service';
 import type { Tx } from '../../database/tenant-tx';
+import { ChargeGenerationService } from '../finance/charge-generation.service';
 import type { Principal } from '../identity/principal';
 import { CustomerPackagesService } from './customer-packages.service';
 import { PackageConsumptionService } from './package-consumption.service';
@@ -29,6 +30,7 @@ export class PackageOperationsService {
     private readonly tx: TenantTxService,
     private readonly packages: CustomerPackagesService,
     private readonly consumption: PackageConsumptionService,
+    private readonly chargeGeneration: ChargeGenerationService,
   ) {}
 
   /** Randevu ekranının paket seçimi: kullanılabilir kalemler. */
@@ -149,8 +151,10 @@ export class PackageOperationsService {
    * (`finance.price:override`) Faz 6.1'de geliyor, şimdi o kapıyı açmak
    * yetkisiz indirim demek olurdu.
    *
-   * Kasa hareketi YOK. `refund_settlement_status = 'pending'` bir borcun
-   * doğduğunu söyler; Batch 6.2 bunu okuyup negatif charge üretecek.
+   * NEGATİF ücret kalemi burada doğar (6.1) ama KASA HAREKETİ YOK:
+   * `refund_settlement_status = 'pending'` "klinik bu parayı borçlandı, henüz
+   * ödemedi" demektir. Paranın fiilen çıkması ve durumun `settled`'a dönmesi
+   * Batch 6.3'ün (kasa/iade) işidir.
    */
   async refund(
     principal: Principal,
@@ -162,6 +166,9 @@ export class PackageOperationsService {
     let refundAmountMinor = 0;
 
     await this.write(id, expectedVersion, async (tx, pkg) => {
+      // Kalem başına iade tutarları; negatif ücret kalemleri bunlardan doğar.
+      const refundLines: { customerPackageItemId: string; amountMinor: number }[] = [];
+
       const items = await PackageOperationsService.itemsById(tx, id);
       const requested =
         input.items ??
@@ -197,12 +204,22 @@ export class PackageOperationsService {
         });
 
         refundedSessions += entry.sessions;
-        refundAmountMinor += remainingValueMinor(
+        const lineMinor = remainingValueMinor(
           item.itemTotalMinor,
           item.quantityTotal,
           entry.sessions,
         );
+        refundAmountMinor += lineMinor;
+        refundLines.push({ customerPackageItemId: item.id, amountMinor: lineMinor });
       }
+
+      await this.chargeGeneration.generateForPackageRefund(tx, {
+        tenantId: this.tx.tenantId,
+        customerPackageId: id,
+        actorUserId: principal.userId,
+        lines: refundLines,
+        reason: input.reason,
+      });
 
       const remainingAfter = pkg.remainingSessions - refundedSessions;
       return {

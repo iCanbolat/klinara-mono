@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { allocateMinor, remainingValueMinor } from '../../src/common/money';
+import {
+  allocateMinor,
+  applyDiscount,
+  remainingValueMinor,
+  roundHalfEven,
+  splitVatInclusive,
+} from '../../src/common/money';
 
 describe('allocateMinor', () => {
   it('kuruş kaybetmez — toplam DAİMA korunur', () => {
@@ -58,5 +64,76 @@ describe('remainingValueMinor', () => {
 
   it('sıfır paydada patlamaz', () => {
     expect(remainingValueMinor(1000, 0, 5)).toBe(0);
+  });
+});
+
+describe('roundHalfEven', () => {
+  it('yarımı ÇİFTE çeker — sistematik sapma birikmez', () => {
+    expect(roundHalfEven(5, 2)).toBe(2); // 2,5 → 2
+    expect(roundHalfEven(7, 2)).toBe(4); // 3,5 → 4
+    expect(roundHalfEven(9, 2)).toBe(4); // 4,5 → 4
+    expect(roundHalfEven(11, 2)).toBe(6); // 5,5 → 6
+  });
+
+  it('yarım olmayanları normal yuvarlar', () => {
+    expect(roundHalfEven(4, 3)).toBe(1); // 1,33
+    expect(roundHalfEven(5, 3)).toBe(2); // 1,66
+  });
+
+  it('negatif değerlerde de yarımı çifte çeker', () => {
+    expect(roundHalfEven(-5, 2)).toBe(-2); // -2,5 → -2
+    expect(roundHalfEven(-7, 2)).toBe(-4); // -3,5 → -4
+  });
+
+  it('negatif payda ve sıfır payda', () => {
+    expect(roundHalfEven(5, -2)).toBe(-2);
+    expect(() => roundHalfEven(1, 0)).toThrow(RangeError);
+    expect(() => roundHalfEven(1.5, 2)).toThrow(TypeError);
+  });
+});
+
+describe('splitVatInclusive', () => {
+  it('KDV brütün İÇİNDEN çıkar; net + KDV daima brüte eşittir', () => {
+    // 120,00 TL brüt, %20 → 100,00 net + 20,00 KDV.
+    expect(splitVatInclusive(12_000, 2000)).toEqual({ netMinor: 10_000, vatMinor: 2_000 });
+  });
+
+  it('kuruş kaybı yok — rastgele tutar/oran kombinasyonlarında toplam korunur', () => {
+    for (const total of [1, 7, 99, 12_345, 999_999, 1_000_000]) {
+      for (const rate of [0, 100, 800, 1000, 1800, 2000]) {
+        const { netMinor, vatMinor } = splitVatInclusive(total, rate);
+        expect(netMinor + vatMinor).toBe(total);
+      }
+    }
+  });
+
+  it('negatif tutarda (iade) da toplamı korur', () => {
+    const { netMinor, vatMinor } = splitVatInclusive(-12_000, 2000);
+    expect(netMinor + vatMinor).toBe(-12_000);
+    expect(vatMinor).toBe(-2_000);
+  });
+
+  it('sıfır oranda KDV üretmez', () => {
+    expect(splitVatInclusive(50_000, 0)).toEqual({ netMinor: 50_000, vatMinor: 0 });
+  });
+});
+
+describe('applyDiscount', () => {
+  it('yüzde indirimini baz puandan hesaplar', () => {
+    expect(applyDiscount(100_000, 'percent', 1500)).toBe(15_000);
+    expect(applyDiscount(100_000, 'percent', 10_000)).toBe(100_000);
+  });
+
+  it('tutar indirimini olduğu gibi uygular', () => {
+    expect(applyDiscount(100_000, 'amount', 25_000)).toBe(25_000);
+  });
+
+  it('TABANI AŞAMAZ — indirim sonrası tutar negatife düşemez', () => {
+    expect(applyDiscount(10_000, 'amount', 500_000)).toBe(10_000);
+  });
+
+  it('negatif değerleri reddeder', () => {
+    expect(() => applyDiscount(-1, 'amount', 1)).toThrow(RangeError);
+    expect(() => applyDiscount(1, 'amount', -1)).toThrow(RangeError);
   });
 });

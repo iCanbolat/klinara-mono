@@ -58,7 +58,16 @@ export const ERROR_CODES = {
   CONSENT_REQUIRED: 'CONSENT_REQUIRED',
 
   // --- Finans ---
+  /** Tahsis edilen tutar kalemin bakiyesini ya da tahsilatın kendisini aşıyor. */
   PAYMENT_EXCEEDS_BALANCE: 'PAYMENT_EXCEEDS_BALANCE',
+  /** İndirim süresi dolmuş, pasif ya da kullanım hakkı tükenmiş. */
+  DISCOUNT_INVALID: 'DISCOUNT_INVALID',
+  /** Nakit tahsilat/iade için açık bir kasa oturumu gerekir. */
+  CASH_SESSION_REQUIRED: 'CASH_SESSION_REQUIRED',
+  /** Şubede zaten açık bir kasa oturumu var. */
+  CASH_SESSION_ALREADY_OPEN: 'CASH_SESSION_ALREADY_OPEN',
+  /** Kapatılmış prim dönemi değiştirilemez. */
+  PERIOD_CLOSED: 'PERIOD_CLOSED',
 
   // --- Eş zamanlılık ---
   IDEMPOTENCY_CONFLICT: 'IDEMPOTENCY_CONFLICT',
