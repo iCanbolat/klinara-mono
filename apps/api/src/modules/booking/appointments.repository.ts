@@ -253,6 +253,12 @@ export async function insertAppointment(
     endsAt: Date;
     notes?: string | undefined;
     createdBy: string | null;
+    /**
+     * Randevunun kaynağı. Enum 0018'den beri var ama `'online'` Faz 9'a kadar
+     * hiç yazılmamıştı: raporlarda "online randevu oranı" sorusunun cevabı
+     * burada doğuyor.
+     */
+    origin?: 'internal' | 'online';
   },
 ): Promise<AppointmentRow> {
   const [row] = await tx.insert(appointments).values(values).returning();
@@ -278,6 +284,10 @@ export async function deleteAppointmentServices(tx: Tx, appointmentId: string): 
  * `[)` sınırı ve buffer'ın dahil edilmesi TEK yerde, burada kurulur: sınır
  * kuralının iki farklı yerde ayrı ayrı yazılması, birinin bir gün diğerinden
  * ayrılması demektir.
+ *
+ * Tutma (`source_type='hold'`) için kardeş fonksiyon `insertHoldBooking`;
+ * ikisi de AYNI `resource_bookings_no_overlap` EXCLUDE constraint'ine yazar,
+ * çakışma garantisi bu yüzden ortak.
  */
 export async function insertResourceBooking(
   tx: Tx,
@@ -442,4 +452,43 @@ export async function listHistory(
     .from(appointmentHistory)
     .where(eq(appointmentHistory.appointmentId, appointmentId))
     .orderBy(desc(appointmentHistory.createdAt));
+}
+
+/**
+ * Slot tutmayı kaynak işgali olarak yazar (Batch 9.4).
+ *
+ * `insertResourceBooking` ile aynı tabloya, aynı `[)` sınırıyla ve aynı
+ * EXCLUDE constraint'ine yazıyor — tutmanın randevuyla aynı garantiyi alması
+ * bunun doğal sonucu. Ayrı bir "tutma çakışması" kontrolü YOK; uygulama
+ * seviyesinde bir kilit, iki eş zamanlı isteğin ikisini de geçirebilecek bir
+ * kilit olurdu.
+ */
+export async function insertHoldBooking(
+  tx: Tx,
+  values: {
+    tenantId: string;
+    branchId: string;
+    staffProfileId: string;
+    holdId: string;
+    from: Date;
+    to: Date;
+  },
+): Promise<void> {
+  await tx.execute(sql`
+    insert into resource_bookings (
+      tenant_id, branch_id, resource_type, resource_id, source_type, hold_id, time_range
+    ) values (
+      ${values.tenantId}, ${values.branchId}, 'staff', ${values.staffProfileId},
+      'hold', ${values.holdId},
+      tstzrange(${values.from.toISOString()}::timestamptz, ${values.to.toISOString()}::timestamptz, '[)')
+    )
+  `);
+}
+
+/** Tutmanın işgalini serbest bırakır. Satır SİLİNMEZ, `active=false` olur. */
+export async function deactivateHoldBooking(tx: Tx, holdId: string): Promise<void> {
+  await tx.execute(sql`
+    update resource_bookings set active = false, updated_at = now()
+     where hold_id = ${holdId} and active
+  `);
 }

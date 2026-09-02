@@ -13,6 +13,13 @@ export interface RequestContext {
   sessionId: string | null;
   requestId: string;
   isPlatformAdmin: boolean;
+  /**
+   * İstek online randevu sayfasından mı geliyor.
+   *
+   * Log redaction ve metrik etiketi için: public trafiğin hacmi ve hata
+   * profili iç panelinkinden bağımsız izlenmeli.
+   */
+  isPublicBooking: boolean;
 }
 
 /** İstek bağlamı olmayan akışlar (CLI, job) için boş bağlam. */
@@ -24,6 +31,7 @@ export function emptyContext(requestId = randomUUID()): RequestContext {
     sessionId: null,
     requestId,
     isPlatformAdmin: false,
+    isPublicBooking: false,
   };
 }
 
@@ -99,6 +107,31 @@ export class RequestContextService {
       throw AppError.unauthenticated();
     }
     return ctx.userId;
+  }
+
+  /**
+   * Public randevu isteğinde kiracıyı bağlama YAZAR.
+   *
+   * `PublicSiteGuard` slug'ı çözdükten sonra çağırır; bundan sonra
+   * `TenantTxService.run()`, `IdempotencyService` ve uygunluk cache'i hiçbir
+   * değişiklik olmadan çalışır — public yol iç yolun altyapısını aynen kullanır.
+   *
+   * INVARIANT: yalnız BOŞ bir bağlam benimsenebilir. Kimliği doğrulanmış bir
+   * isteğin uçuş sırasında yeniden kiracılandırılması, bir kullanıcının
+   * token'ıyla başka kiracının verisine yazması demekti; bu yüzden burada
+   * sessiz bir `return` değil, `Error` var.
+   *
+   * Bağlam nesnesi YERİNDE güncelleniyor: `storage.run`u guard'dan yeniden
+   * girmek, o noktada başlamış olan interceptor/pipe zincirini kapsamazdı.
+   */
+  adoptPublicTenant(tenantId: string): void {
+    const ctx = this.get();
+    if (ctx === undefined) throw new Error('İstek bağlamı bulunamadı');
+    if (ctx.tenantId !== null || ctx.userId !== null || ctx.isPlatformAdmin) {
+      throw new Error('Kimliği doğrulanmış bir istek public kiracı bağlamına alınamaz');
+    }
+    ctx.tenantId = tenantId;
+    ctx.isPublicBooking = true;
   }
 
   requirePlatformAdmin(): RequestContext {

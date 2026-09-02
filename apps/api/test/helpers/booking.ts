@@ -20,6 +20,7 @@ export function tenantCtx(tenantId: string, userId: string | null = null): Reque
     sessionId: null,
     requestId: 'test',
     isPlatformAdmin: false,
+    isPublicBooking: false,
   };
 }
 

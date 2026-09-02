@@ -128,6 +128,84 @@ export class AppointmentsService {
     return this.present(created.appointment, created.services);
   }
 
+  /**
+   * Yetki kontrolü OLMADAN randevu yazar — online randevu sayfası için.
+   *
+   * `computeSlots` ile aynı kalıp ve aynı gerekçe: erişim kararı çağıran uçta
+   * (`PublicSiteGuard` + slot token doğrulaması) çoktan verilmiştir. Sahte bir
+   * `Principal` üretmek yerine kontrolü açıkça dışarıda bırakmak, hangi yolun
+   * yetkiden geçtiğini okunur kılıyor.
+   *
+   * ⚠️ PLANLAYICI PAYLAŞILIYOR. `buildPlan` / `assertSchedule` / `writePlan`
+   * ikinci bir kopyaya çıkarılmadı: buffer, yetkinlik ve çalışma saati
+   * kuralları iki yolda ayrışsaydı, ayrışma ancak üretimde — bir müşteri
+   * gelip yer bulamadığında — fark edilirdi.
+   *
+   * `prepare` callback'i randevu satırları yazılmadan ÖNCE, AYNI transaction
+   * içinde koşar. Online akışta tutmayı serbest bırakmak için kullanılıyor:
+   * hold hâlâ aktifken randevu yazılsaydı, randevu KENDİ tutmasına çakışırdı.
+   */
+  async createUnauthorized(input: {
+    branchId: string;
+    customerId: string;
+    startsAt: string;
+    services: AppointmentServiceInputDto[];
+    notes?: string | undefined;
+    prepare?: (tx: Tx) => Promise<void>;
+  }): Promise<AppointmentResponseDto> {
+    const startsAt = AppointmentsService.parseInstant(input.startsAt);
+
+    const created = await this.tx
+      .run(async (tx) => {
+        const plan = await this.buildPlan(tx, input.branchId, startsAt, input.services);
+        await AppointmentsService.assertSchedule(tx, input.branchId, plan);
+
+        if (input.prepare !== undefined) await input.prepare(tx);
+
+        const appointment = await repo.insertAppointment(tx, {
+          tenantId: this.tx.tenantId,
+          branchId: input.branchId,
+          customerId: input.customerId,
+          startsAt: plan.visibleStart,
+          endsAt: plan.visibleEnd,
+          notes: input.notes,
+          // Aktör YOK: randevuyu bir personel değil müşterinin kendisi açtı.
+          // `created_by`ye bir kullanıcı uydurmak, denetim kaydını yalan
+          // söyler hâle getirirdi.
+          createdBy: null,
+          origin: 'online',
+        });
+
+        await this.writePlan(tx, appointment.id, input.branchId, input.customerId, plan);
+
+        await repo.insertHistory(tx, {
+          tenantId: this.tx.tenantId,
+          appointmentId: appointment.id,
+          actorUserId: null,
+          action: 'created',
+          toStatus: appointment.status,
+          newStartsAt: appointment.startsAt,
+        });
+
+        await this.reminders.scheduleForAppointment(tx, {
+          tenantId: this.tx.tenantId,
+          appointmentId: appointment.id,
+          branchId: input.branchId,
+          startsAt: appointment.startsAt,
+          status: appointment.status,
+        });
+
+        const services = await repo.listAppointmentServices(tx, appointment.id);
+        return { appointment, services };
+      })
+      .catch((error: unknown) =>
+        this.translateWrite(error, input.branchId, startsAt, input.services),
+      );
+
+    this.cache.invalidateTenant(this.tx.tenantId);
+    return this.present(created.appointment, created.services);
+  }
+
   // ---------------------------------------------------------------------------
   // Okuma
   // ---------------------------------------------------------------------------
@@ -215,6 +293,16 @@ export class AppointmentsService {
     expectedVersion: number,
     input: RescheduleAppointmentDto,
   ): Promise<AppointmentResponseDto> {
+    return this.rescheduleInternal(principal, id, expectedVersion, input);
+  }
+
+  /** `principal === null` → self-servis yolu (bkz. `rescheduleUnauthorized`). */
+  private async rescheduleInternal(
+    principal: Principal | null,
+    id: string,
+    expectedVersion: number,
+    input: RescheduleAppointmentDto,
+  ): Promise<AppointmentResponseDto> {
     const startsAt = AppointmentsService.parseInstant(input.startsAt);
     let branchId = '';
     let entries: AppointmentServiceInputDto[] = [];
@@ -223,7 +311,7 @@ export class AppointmentsService {
       .run(async (tx) => {
         const current = await repo.findAppointmentById(tx, id);
         if (current === undefined) return undefined;
-        BranchAccessService.assertMembership(principal, current.branchId);
+        if (principal !== null) BranchAccessService.assertMembership(principal, current.branchId);
         AppointmentsService.assertMutable(current.status);
 
         branchId = current.branchId;
@@ -254,7 +342,7 @@ export class AppointmentsService {
         await repo.insertHistory(tx, {
           tenantId: this.tx.tenantId,
           appointmentId: id,
-          actorUserId: principal.userId,
+          actorUserId: principal?.userId ?? null,
           action: 'rescheduled',
           oldStartsAt: current.startsAt,
           newStartsAt: plan.visibleStart,
@@ -282,6 +370,30 @@ export class AppointmentsService {
     return this.present(payload.appointment, payload.services);
   }
 
+  /**
+   * Self-servis erteleme — aktör YOK (Batch 9.5).
+   *
+   * Erteleme, iptal + yeni randevu DEĞİL: `appointments.id` ve
+   * `appointment_history` zinciri korunuyor. Müşteri kartındaki geçmiş,
+   * "erteledi" ile "iptal edip yeniden aldı" arasındaki farkı görebilmeli.
+   *
+   * Sürüm kontrolü `expectedVersion` yerine SATIRIN KENDİ sürümüyle yapılıyor:
+   * müşterinin elinde bir ETag yok ve olması da beklenmez. Yarış hâlinde
+   * kaybeden taraf EXCLUDE constraint'ine takılır, sessizce üzerine yazmaz.
+   */
+  async rescheduleUnauthorized(
+    id: string,
+    startsAtIso: string,
+    reason?: string,
+  ): Promise<AppointmentResponseDto> {
+    const current = await this.tx.run((tx) => repo.findAppointmentById(tx, id));
+    if (current === undefined) throw AppError.notFound('Randevu bulunamadı');
+    return this.rescheduleInternal(null, id, current.version, {
+      startsAt: startsAtIso,
+      ...(reason === undefined ? {} : { reason }),
+    });
+  }
+
   // ---------------------------------------------------------------------------
   // İptal ve durum
   // ---------------------------------------------------------------------------
@@ -291,6 +403,19 @@ export class AppointmentsService {
     input: CancelAppointmentDto,
   ): Promise<AppointmentResponseDto> {
     const payload = await this.changeStatus(principal, id, 'cancelled', input.reason);
+    this.cache.invalidateTenant(this.tx.tenantId);
+    return payload;
+  }
+
+  /**
+   * Self-servis iptal — aktör YOK (Batch 9.5).
+   *
+   * Erişim kararı çağıran uçta, tek randevuya kapsanmış imzalı token'la
+   * verilmiştir. İptal penceresi kontrolü de orada; bu metot yalnız durum
+   * geçişini ve onun yan etkilerini (hatırlatma iptali, cache) yürütür.
+   */
+  async cancelUnauthorized(id: string, reason: string | undefined): Promise<AppointmentResponseDto> {
+    const payload = await this.changeStatus(null, id, 'cancelled', reason);
     this.cache.invalidateTenant(this.tx.tenantId);
     return payload;
   }
@@ -305,8 +430,16 @@ export class AppointmentsService {
     return payload;
   }
 
+  /**
+   * `principal === null` → self-servis yolu (Batch 9.5).
+   *
+   * Müşteri bir kullanıcı değil; şube üyeliği ve izin kontrolü onun için
+   * ANLAMSIZ. Erişim kararı çağıran uçta, tek randevuya kapsanmış imzalı
+   * token'la verilmiştir. Sahte bir `Principal` üretmek yerine `null` geçmek,
+   * hangi yolun yetkiden geçtiğini okunur bırakıyor.
+   */
   private async changeStatus(
-    principal: Principal,
+    principal: Principal | null,
     id: string,
     status: AppointmentStatus,
     reason: string | undefined,
@@ -315,7 +448,7 @@ export class AppointmentsService {
       .run(async (tx) => {
         const current = await repo.findAppointmentById(tx, id);
         if (current === undefined) return undefined;
-        BranchAccessService.assertMembership(principal, current.branchId);
+        if (principal !== null) BranchAccessService.assertMembership(principal, current.branchId);
 
         if (current.status === status) {
           const services = await repo.listAppointmentServices(tx, id);
@@ -333,6 +466,7 @@ export class AppointmentsService {
           );
         }
         if (
+          principal !== null &&
           transition.requiredPermission !== null &&
           !hasPermission(principal, transition.requiredPermission as Permission)
         ) {
@@ -347,7 +481,7 @@ export class AppointmentsService {
           ...(isCancel
             ? {
                 cancellationReason: reason ?? null,
-                cancelledBy: principal.userId,
+                cancelledBy: principal?.userId ?? null,
                 cancelledAt: new Date(),
               }
             : {}),
@@ -357,7 +491,7 @@ export class AppointmentsService {
         await repo.insertHistory(tx, {
           tenantId: this.tx.tenantId,
           appointmentId: id,
-          actorUserId: principal.userId,
+          actorUserId: principal?.userId ?? null,
           action: isCancel ? 'cancelled' : 'status_changed',
           fromStatus: current.status,
           toStatus: status,
@@ -384,30 +518,32 @@ export class AppointmentsService {
         // süresi dolmuşsa trigger hata fırlatır, transaction düşer ve randevu
         // tamamlanmaz (5.3 kabul kriteri).
         if (status === 'completed') {
+          const actor = AppointmentsService.requireLedgerActor(principal);
           await this.consumption.consumeForAppointment(tx, {
             tenantId: this.tx.tenantId,
             appointmentId: id,
-            actorUserId: principal.userId,
+            actorUserId: actor,
           });
           // Borç da AYNI transaction'da doğar (6.1). Paketten karşılanan
           // kalemler atlanır: o borç paket satıldığında zaten doğdu.
           await this.chargeGeneration.generateForAppointment(tx, {
             tenantId: this.tx.tenantId,
             appointmentId: id,
-            actorUserId: principal.userId,
+            actorUserId: actor,
           });
           // Prim de aynı transaction'da tahakkuk eder (6.4). Kural yoksa
           // sessizce hiçbir şey yazılmaz.
           await this.commissions.accrueForAppointment(tx, {
             tenantId: this.tx.tenantId,
             appointmentId: id,
-            actorUserId: principal.userId,
+            actorUserId: actor,
           });
         } else if (current.status === 'completed') {
+          const actor = AppointmentsService.requireLedgerActor(principal);
           await this.consumption.reverseForAppointment(tx, {
             tenantId: this.tx.tenantId,
             appointmentId: id,
-            actorUserId: principal.userId,
+            actorUserId: actor,
             reason,
           });
           // Sıra ÖNEMLİ: prim ters kaydı, ücret kalemleri `void` edilmeden
@@ -415,13 +551,13 @@ export class AppointmentsService {
           // kalemler üzerinden bulur.
           await this.commissions.reverse(tx, {
             tenantId: this.tx.tenantId,
-            actorUserId: principal.userId,
+            actorUserId: actor,
             reason: reason ?? 'Randevu tamamlaması geri alındı',
             chargeIds: await this.chargeGeneration.openChargeIdsForAppointment(tx, id),
           });
           await this.chargeGeneration.voidForAppointment(tx, {
             appointmentId: id,
-            actorUserId: principal.userId,
+            actorUserId: actor,
             reason,
           });
         }
@@ -785,6 +921,21 @@ export class AppointmentsService {
     return AppError.conflict(ERROR_CODES.VERSION_CONFLICT, 'Kayıt siz okuduktan sonra değişti', {
       detail: 'Kaydı yeniden okuyup değişikliği tekrar uygulayın.',
     });
+  }
+
+  /**
+   * Defter yazan geçişlerin AKTÖRÜ.
+   *
+   * Paket tüketimi, borç ve prim satırları "kim yaptı" bilgisini taşımak
+   * zorunda; aktörsüz bir tamamlama, denetim kaydında sahibi olmayan bir
+   * finansal hareket demekti. Self-servis yolu (Batch 9.5) zaten yalnız iptal
+   * ve erteleme yapıyor — bu kontrol o sözleşmenin kodla ifade edilmiş hâli.
+   */
+  private static requireLedgerActor(principal: Principal | null): string {
+    if (principal === null) {
+      throw AppError.forbidden('Bu durum değişikliği self-servis olarak yapılamaz');
+    }
+    return principal.userId;
   }
 
   private static parseInstant(value: string): Date {

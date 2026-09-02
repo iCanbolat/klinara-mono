@@ -38,6 +38,25 @@ export const textArray = customType<{ data: string[]; driverData: string | strin
   toDriver: (value) => `{${value.join(',')}}`,
 });
 
+/**
+ * `uuid[]` — slot tutmadaki hizmet listesi gibi sıralı kimlik dizileri.
+ *
+ * Sıra ANLAMLIDIR (çok hizmetli randevuda hizmetlerin uygulanma sırası),
+ * bu yüzden ayrı bir satır tablosu değil dizi: satır tablosu `sort_order`
+ * taşımak zorunda kalırdı ve tutma zaten geçici bir kayıt.
+ */
+export const uuidArray = customType<{ data: string[]; driverData: string | string[] }>({
+  dataType: () => 'uuid[]',
+  fromDriver: (value) => {
+    if (Array.isArray(value)) return value;
+    return String(value)
+      .replace(/^\{|\}$/g, '')
+      .split(',')
+      .filter((part) => part.length > 0);
+  },
+  toDriver: (value) => `{${value.join(',')}}`,
+});
+
 /** `inet` — istek IP'si (denetim ve hız sınırı kayıtlarında). */
 export const inet = customType<{ data: string }>({
   dataType: () => 'inet',

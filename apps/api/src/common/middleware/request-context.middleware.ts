@@ -64,6 +64,7 @@ export class RequestContextMiddleware implements NestMiddleware {
       sessionId: null,
       requestId,
       isPlatformAdmin: false,
+      isPublicBooking: false,
     };
 
     const bearer = RequestContextMiddleware.bearerOf(request);

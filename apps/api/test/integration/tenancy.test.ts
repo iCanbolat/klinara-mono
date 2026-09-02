@@ -255,6 +255,7 @@ describe('kiracılık ve RLS', () => {
           sessionId: null,
           requestId: 'test',
           isPlatformAdmin: false,
+          isPublicBooking: false,
         },
         async (tx) => {
           const result = await tx.execute(sql`select count(*)::int as n from branches`);

@@ -5,7 +5,7 @@ import { AppError } from '../errors/app-error';
 import { contextOf } from '../request-context';
 import { PrincipalService } from '../../modules/identity/principal.service';
 import { BranchAccessService } from '../../modules/tenancy/branch-access.service';
-import { PLATFORM_ADMIN_KEY, PUBLIC_KEY } from '../decorators/auth.decorators';
+import { EDGE_ONLY_KEY, PLATFORM_ADMIN_KEY, PUBLIC_KEY } from '../decorators/auth.decorators';
 
 /**
  * Kimlik guard'ı — global.
@@ -35,6 +35,8 @@ export class AuthGuard implements CanActivate {
     if (this.reflector.getAllAndOverride<boolean>(PLATFORM_ADMIN_KEY, targets) === true) {
       return true;
     }
+    // Kenar proxy'sinin kimliğini `EdgeAuthGuard` doğrular; JWT beklenmez.
+    if (this.reflector.getAllAndOverride<boolean>(EDGE_ONLY_KEY, targets) === true) return true;
 
     const request = context.switchToHttp().getRequest<Request>();
 

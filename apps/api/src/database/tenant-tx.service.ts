@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { emptyContext, RequestContextService } from '../common/request-context';
 import { DRIZZLE, type Database } from './database.constants';
-import { withAuthTx, withTenantTx, type Tx } from './tenant-tx';
+import { withAuthTx, withPublicTx, withTenantTx, type Tx } from './tenant-tx';
 
 /**
  * Kiracı kapsamlı transaction'ların tek giriş noktası.
@@ -43,6 +43,21 @@ export class TenantTxService {
     // sorguların politikada kullanıcıya daraltılabilmesini sağlar
     // (bkz. `tenants_auth_flow_read`).
     return withAuthTx(this.db, ctx, fn, options.actorUserId);
+  }
+
+  /**
+   * Public çözümleme transaction'ı — slug/konak adı → kiracı.
+   *
+   * TEK ÇAĞIRAN: `PublicSiteResolverService`. Kural bir yorum değil, ESLint
+   * kuralı ve bir testle zorlanıyor; bayrağın etki alanı ancak çağıran sayısı
+   * bir kaldığı sürece denetlenebilir.
+   *
+   * Dönen kiracı kimliği `RequestContextService.adoptPublicTenant` ile istek
+   * bağlamına yazılır; ondan sonrası olağan `run()` yoludur.
+   */
+  async runAsPublicLookup<T>(fn: (tx: Tx) => Promise<T>): Promise<T> {
+    const ctx = this.requestContext.get() ?? emptyContext();
+    return withPublicTx(this.db, ctx, fn);
   }
 
   /** Kiracıyı açıkça vererek koşan kiracı kapsamlı transaction. */

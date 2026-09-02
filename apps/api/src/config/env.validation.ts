@@ -506,6 +506,145 @@ export class EnvironmentVariables {
   @Min(1)
   @Max(720)
   MESSAGE_ACTION_TTL_HOURS: number = 48;
+
+  // --- Online randevu sayfası (Faz 9) ---
+  /**
+   * Platform subdomain'lerinin kök alan adı: `{slug}.{PUBLIC_BOOKING_DOMAIN}`.
+   *
+   * Yerelde `klinara.localhost` — `*.localhost` hosts dosyasına dokunmadan
+   * 127.0.0.1'e çözülür, yani geliştirme için wildcard DNS gerekmez.
+   */
+  @Expose()
+  @IsString()
+  @IsNotEmpty()
+  PUBLIC_BOOKING_DOMAIN: string = 'klinara.localhost';
+
+  /**
+   * Özel alan adlarının göstereceği CNAME hedefi.
+   *
+   * Boşsa kiracının kendi platform subdomain'i kullanılır — tek kiracılı
+   * kurulumda ayrı bir kenar adresi tanımlamaya gerek kalmıyor.
+   */
+  @Expose()
+  @IsOptional()
+  @IsString()
+  BOOKING_DNS_TARGET?: string;
+
+  /**
+   * Kenar proxy'sinin (Caddy on-demand TLS) iç uçlarda kullandığı token.
+   *
+   * `PLATFORM_ADMIN_TOKEN` ile aynı OLAMAZ (env doğrulaması reddeder): kenar
+   * proxy tek bir evet/hayır sorusunu cevaplayabilen bir kimlik bilgisi tutar,
+   * her kiracının verisine erişen değil.
+   */
+  @Expose()
+  @IsOptional()
+  @IsString()
+  EDGE_AUTH_TOKEN?: string;
+
+  /** Kaç ardışık başarısız DNS kontrolünden sonra alan adı `failed` olur. */
+  @Expose()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  BOOKING_DOMAIN_MAX_CHECK_ATTEMPTS: number = 10;
+
+  /** Slot tutma süresi. Dolduğunda slot otomatik serbest kalır (Batch 9.4). */
+  @Expose()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(60)
+  SLOT_HOLD_TTL_MINUTES: number = 10;
+
+  /** Bir IP/telefon aynı anda kaç aktif hold tutabilir (slot squatting sınırı). */
+  @Expose()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(10)
+  BOOKING_HOLD_MAX_ACTIVE: number = 2;
+
+  @Expose()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(60)
+  BOOKING_OTP_TTL_MINUTES: number = 5;
+
+  @Expose()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(10)
+  BOOKING_OTP_MAX_ATTEMPTS: number = 5;
+
+  @Expose()
+  @Type(() => Number)
+  @IsInt()
+  @Min(10)
+  BOOKING_OTP_RESEND_SECONDS: number = 60;
+
+  /** Telefon başına günlük OTP tavanı — doğrudan faturaya yazan saldırı yüzeyi. */
+  @Expose()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  BOOKING_OTP_MAX_PER_PHONE_PER_DAY: number = 10;
+
+  /** Site başına günlük OTP tavanı. */
+  @Expose()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  BOOKING_OTP_MAX_PER_SITE_PER_DAY: number = 500;
+
+  /** Public uçların kendi hız sınırı — iç API'nin sınırından bağımsız. */
+  @Expose()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  PUBLIC_RATE_LIMIT_MAX: number = 60;
+
+  @Expose()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1_000)
+  PUBLIC_RATE_LIMIT_WINDOW_MS: number = 60_000;
+
+  /** Public görsellerin CDN kökü. Varlık URL'leri imzasız ve değişmezdir. */
+  @Expose()
+  @IsString()
+  PUBLIC_ASSET_BASE_URL: string = '';
+
+  /** Public varlıkların depolama anahtarı öneki. */
+  @Expose()
+  @IsString()
+  @IsNotEmpty()
+  S3_PUBLIC_PREFIX: string = 'public';
+
+  @Expose()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  BOOKING_ASSET_MAX_BYTES: number = 5_242_880;
+
+  /** Opak `slotToken`ların ömrü. Randevu akışından uzun yaşamasının anlamı yok. */
+  @Expose()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(240)
+  SLOT_TOKEN_TTL_MINUTES: number = 30;
+
+  /** Self-servis bağlantısının ömrü (Batch 9.5). */
+  @Expose()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(8_760)
+  BOOKING_ACCESS_TOKEN_TTL_HOURS: number = 720;
 }
 
 export class EnvValidationError extends Error {
@@ -543,6 +682,21 @@ function crossFieldIssues(env: EnvironmentVariables): string[] {
   }
   if (env.PLATFORM_ADMIN_TOKEN !== undefined && env.PLATFORM_ADMIN_TOKEN.length < 32) {
     issues.push('PLATFORM_ADMIN_TOKEN: üretimde en az 32 karakter olmalı');
+  }
+  if (env.EDGE_AUTH_TOKEN !== undefined && env.EDGE_AUTH_TOKEN.length < 32) {
+    issues.push('EDGE_AUTH_TOKEN: üretimde en az 32 karakter olmalı');
+  }
+  // Kenar proxy'sinin token'ı platform yöneticisininkiyle AYNI olamaz: kenar
+  // yalnız bir evet/hayır sorusunu cevaplayabilmeli, kiracı verisine
+  // erişememeli.
+  if (
+    env.EDGE_AUTH_TOKEN !== undefined &&
+    env.EDGE_AUTH_TOKEN === env.PLATFORM_ADMIN_TOKEN
+  ) {
+    issues.push('EDGE_AUTH_TOKEN: PLATFORM_ADMIN_TOKEN ile aynı olamaz');
+  }
+  if (env.PUBLIC_ASSET_BASE_URL.startsWith('http://')) {
+    issues.push('PUBLIC_ASSET_BASE_URL: üretimde https:// olmalı');
   }
   return issues;
 }

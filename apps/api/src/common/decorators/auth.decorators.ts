@@ -1,5 +1,6 @@
 import { SetMetadata, UseGuards, applyDecorators } from '@nestjs/common';
 import type { Permission } from '@klinara/shared';
+import { EdgeAuthGuard } from '../guards/edge-auth.guard';
 import { PlatformAdminGuard } from '../guards/platform-admin.guard';
 
 export const PUBLIC_KEY = 'klinara:public';
@@ -8,6 +9,7 @@ export const PERMISSIONS_KEY = 'klinara:permissions';
 export const ANY_PERMISSIONS_KEY = 'klinara:anyPermissions';
 export const BRANCH_SCOPE_KEY = 'klinara:branchScope';
 export const PLATFORM_ADMIN_KEY = 'klinara:platformAdmin';
+export const EDGE_ONLY_KEY = 'klinara:edgeOnly';
 
 /**
  * Kimlik doğrulaması GEREKTİRMEYEN uç.
@@ -58,3 +60,14 @@ export const RequireBranchScope = () => SetMetadata(BRANCH_SCOPE_KEY, true);
 /** Platform yönetimi ucu — kiracı JWT'si değil, platform token'ı ile korunur. */
 export const PlatformAdminOnly = () =>
   applyDecorators(SetMetadata(PLATFORM_ADMIN_KEY, true), UseGuards(PlatformAdminGuard));
+
+/**
+ * Kenar proxy'sinin (Caddy) iç uçları — kiracı JWT'si değil, kenar token'ı.
+ *
+ * `@Public()` DEĞİL: uç kimlik doğrulaması yapar, yalnız kimliği kullanıcı
+ * değil altyapıdır. `@PlatformAdminOnly()` de değil — kenar proxy'sine her
+ * kiracıyı okuyup yazabilen bir token vermek, tek bir evet/hayır sorusu için
+ * fazlasıyla geniş olurdu.
+ */
+export const EdgeOnly = () =>
+  applyDecorators(SetMetadata(EDGE_ONLY_KEY, true), UseGuards(EdgeAuthGuard));

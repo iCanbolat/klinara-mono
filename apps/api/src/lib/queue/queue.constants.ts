@@ -20,6 +20,17 @@ export const QUEUES = {
   // Hatırlatma. İş randevuyla AYNI transaction'da yazılır (8.4): randevu
   // rollback olursa hatırlatma da olmaz.
   REMINDER_SEND: 'reminder.send',
+  // Alan adı doğrulaması. Aynı iki adımlı bölünme: cron kiracıları listeler,
+  // DNS sorgusu kiracı başına ayrı işte koşar — yavaş bir çözümleyici
+  // diğer kiracıları bekletmesin.
+  BOOKING_DOMAIN_VERIFY_SWEEP: 'booking.domain.verify.sweep',
+  BOOKING_DOMAIN_VERIFY_TENANT: 'booking.domain.verify.tenant',
+  // Slot tutma süresi dolduğunda rezervasyonu serbest bırakır (9.4).
+  //
+  // Kuyruk TEK dayanak DEĞİL: `expires_at` okuma anında da kontrol ediliyor
+  // (Faz 8 hatırlatma kalıbı). Kuyruk kapalıyken de doğru davranmalı.
+  BOOKING_HOLD_EXPIRE: 'booking.hold.expire',
+  BOOKING_HOLD_SWEEP: 'booking.hold.sweep',
 } as const;
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES];
@@ -41,4 +52,8 @@ export interface ScheduleDefinition {
 
 export const SCHEDULES: ScheduleDefinition[] = [
   { queue: QUEUES.PACKAGE_EXPIRE_SWEEP, cron: '15 3 * * *', timezone: 'Europe/Istanbul' },
+  // Klinik DNS kaydını girdikten sonra dakikalar içinde sonucu görmeli.
+  { queue: QUEUES.BOOKING_DOMAIN_VERIFY_SWEEP, cron: '*/5 * * * *', timezone: 'Europe/Istanbul' },
+  // Kaçan `sendAfter` işleri için emniyet süpürgesi.
+  { queue: QUEUES.BOOKING_HOLD_SWEEP, cron: '*/5 * * * *', timezone: 'Europe/Istanbul' },
 ];

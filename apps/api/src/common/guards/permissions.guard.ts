@@ -8,6 +8,7 @@ import { hasPermission } from '../../modules/identity/principal';
 import {
   ANY_PERMISSIONS_KEY,
   BRANCH_SCOPE_KEY,
+  EDGE_ONLY_KEY,
   PERMISSIONS_KEY,
   PLATFORM_ADMIN_KEY,
   PUBLIC_KEY,
@@ -34,6 +35,7 @@ export class PermissionsGuard implements CanActivate {
     if (this.reflector.getAllAndOverride<boolean>(PLATFORM_ADMIN_KEY, targets) === true) {
       return true;
     }
+    if (this.reflector.getAllAndOverride<boolean>(EDGE_ONLY_KEY, targets) === true) return true;
 
     const request = context.switchToHttp().getRequest<Request>();
     const principal = request.principal;

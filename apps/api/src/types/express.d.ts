@@ -1,6 +1,7 @@
 import type { RequestContext } from '../common/request-context';
 import type { Principal } from '../modules/identity/principal';
 import type { AppError } from '../common/errors/app-error';
+import type { PublicSiteContext } from '../modules/public/public-site-resolver.service';
 
 declare global {
   namespace Express {
@@ -30,6 +31,15 @@ declare global {
        * `AuthGuard` fırlatır.
        */
       authError?: AppError;
+
+      /**
+       * Çözümlenmiş randevu sayfası — `PublicSiteGuard` yazar.
+       *
+       * Yalnız public uçlarda dolu. Kiracı kimliği ayrıca istek bağlamına da
+       * yazılır (`adoptPublicTenant`); buradaki nesne controller'ın site ve
+       * varsayılan şube kimliğine ulaşması için.
+       */
+      publicSite?: PublicSiteContext;
     }
   }
 }

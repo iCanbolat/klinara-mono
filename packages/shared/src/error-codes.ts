@@ -94,6 +94,32 @@ export const ERROR_CODES = {
   /** Sağlayıcı kotası aşıldı; GEÇİCİ, yeniden denenir. */
   WHATSAPP_RATE_LIMITED: 'WHATSAPP_RATE_LIMITED',
 
+  // --- Online randevu sayfası (Faz 9) ---
+  /** Konak adı platform genelinde başka bir hesapta kayıtlı. */
+  HOST_TAKEN: 'HOST_TAKEN',
+  /** Alan adı doğrulaması başarısız — DNS kaydı bulunamadı ya da eşleşmedi. */
+  DOMAIN_VERIFICATION_FAILED: 'DOMAIN_VERIFICATION_FAILED',
+  /** Sayfa yayınlanmamış ya da içeriği yok. */
+  SITE_NOT_PUBLISHED: 'SITE_NOT_PUBLISHED',
+  /** Blok türü sözlükte yok, tema alanı tanımsız ya da sürüm bozuk. */
+  CONTENT_INVALID: 'CONTENT_INVALID',
+  /** Opak slot token'ı geçersiz, başka kiracıya ait ya da süresi dolmuş. */
+  SLOT_TOKEN_INVALID: 'SLOT_TOKEN_INVALID',
+  /** Slot tutma kaydı yok, serbest bırakılmış ya da başka siteye ait. */
+  HOLD_INVALID: 'HOLD_INVALID',
+  /** Tutma süresi doldu; slot serbest kaldı. */
+  HOLD_EXPIRED: 'HOLD_EXPIRED',
+  /** Aynı istemcinin aynı anda tutabileceği slot sayısı aşıldı. */
+  HOLD_LIMIT_REACHED: 'HOLD_LIMIT_REACHED',
+  /** Randevu oluşturmadan önce telefon doğrulaması gerekir. */
+  OTP_REQUIRED: 'OTP_REQUIRED',
+  /** Ardışık hatalı denemeler sonrası kod yandı; yeniden istenmeli. */
+  OTP_LOCKED: 'OTP_LOCKED',
+  /** Self-servis bağlantısı geçersiz, süresi dolmuş ya da tüketilmiş. */
+  BOOKING_TOKEN_INVALID: 'BOOKING_TOKEN_INVALID',
+  /** İptal/erteleme penceresi kapandı. */
+  CANCEL_WINDOW_CLOSED: 'CANCEL_WINDOW_CLOSED',
+
   // --- Kiracılık ---
   TENANT_CONTEXT_MISSING: 'TENANT_CONTEXT_MISSING',
   CONFLICT: 'CONFLICT',

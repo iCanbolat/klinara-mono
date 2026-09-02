@@ -22,6 +22,8 @@ import { CatalogModule } from './modules/catalog/catalog.module';
 import { AvailabilityCacheModule } from './modules/booking/availability-cache.module';
 import { PackagesModule } from './modules/packages/packages.module';
 import { BookingModule } from './modules/booking/booking.module';
+import { BookingPageModule } from './modules/booking-page/booking-page.module';
+import { PublicModule } from './modules/public/public.module';
 import { CrmModule } from './modules/crm/crm.module';
 import { FinanceModule } from './modules/finance/finance.module';
 import { FilesModule } from './modules/files/files.module';
@@ -79,6 +81,8 @@ import { MetricsModule } from './observability/metrics.module';
     FilesModule,
     FinanceModule,
     BookingModule,
+    BookingPageModule,
+    PublicModule,
     PackagesModule,
     IntegrationsModule,
     NotificationsModule,

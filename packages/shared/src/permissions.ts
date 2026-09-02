@@ -86,6 +86,18 @@ export const PERMISSIONS = {
    * hatası binlerce yanlış mesaj demektir, tek bir yanlış mesaj değil.
    */
   NOTIFICATION_MANAGE: 'notification:manage',
+
+  // --- Online randevu sayfası (Faz 9) ---
+  BOOKING_PAGE_READ: 'booking_page:read',
+  /**
+   * Sayfa ayarları, içerik/tema sürümleri, görseller ve ALAN ADLARI.
+   *
+   * `booking_page:read` üzerine binmez ve resepsiyona verilmez: yayınla
+   * düğmesi kiracının dışarıya görünen yüzünü değiştirir, alan adı kaydı ise
+   * platform genelinde tekil bir kaynağı tüketir.
+   */
+  BOOKING_PAGE_MANAGE: 'booking_page:manage',
+
   AUDIT_READ: 'audit:read',
 } as const;
 
@@ -182,6 +194,8 @@ export const ROLE_DEFINITIONS: RoleDefinition[] = [
       P.CONSENT_MANAGE,
       P.NOTIFICATION_SEND,
       P.NOTIFICATION_MANAGE,
+      P.BOOKING_PAGE_READ,
+      P.BOOKING_PAGE_MANAGE,
       P.AUDIT_READ,
     ],
   },
@@ -218,6 +232,7 @@ export const ROLE_DEFINITIONS: RoleDefinition[] = [
       P.FINANCE_PAYMENT_WRITE,
       P.CONSENT_MANAGE,
       P.NOTIFICATION_SEND,
+      P.BOOKING_PAGE_READ,
     ],
   },
   {

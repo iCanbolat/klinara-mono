@@ -483,11 +483,45 @@ describe('uygunluk motoru (Batch 3.2)', () => {
       // Her personel için 30 gün boyunca günde 6 dolu blok (~540 satır).
       // `hold` kaynağı seçildi: EXCLUDE constraint ve GiST indeksi randevu
       // makinesini kurmadan tam olarak aynı yükü görür.
+      //
+      // Batch 9.1'den beri `resource_bookings.hold_id` GERÇEK bir `slot_holds`
+      // satırına bakmak zorunda (FK 0037'de kapandı). Personel başına tek bir
+      // çapa hold açıyoruz: yükü taşıyan şey `resource_bookings` satır sayısı,
+      // hold sayısı değil — bu fixture uygunluk sorgusunu ölçüyor, tutma
+      // semantiğini değil.
+      const siteId = (
+        await database.ownerPool.query<{ id: string }>(
+          `insert into booking_sites (tenant_id, slug) values ($1, $2) returning id`,
+          [clinic.tenant.id, clinic.tenant.slug],
+        )
+      ).rows[0]!.id;
+
       for (const staffId of staffIds) {
+        const holdId = (
+          await database.ownerPool.query<{ id: string }>(
+            `insert into slot_holds
+               (tenant_id, branch_id, booking_site_id, token_hash, service_ids,
+                staff_profile_id, starts_at, ends_at, expires_at)
+             values ($1, $2, $3, encode(sha256($4::bytea), 'hex'), array[$5::uuid], $6,
+                     timestamptz '2026-09-01 09:00:00+03',
+                     timestamptz '2026-09-30 18:00:00+03',
+                     now() + interval '1 hour')
+             returning id`,
+            [
+              clinic.tenant.id,
+              clinic.branch.id,
+              siteId,
+              `perf-${staffId}`,
+              clinic.service.id,
+              staffId,
+            ],
+          )
+        ).rows[0]!.id;
+
         await database.ownerPool.query(
           `insert into resource_bookings
              (tenant_id, branch_id, resource_type, resource_id, source_type, hold_id, time_range)
-           select $1, $2, 'staff', $3, 'hold', gen_random_uuid(),
+           select $1, $2, 'staff', $3, 'hold', $4,
                   tstzrange(slot, slot + interval '45 minutes', '[)')
              from generate_series(
                     timestamptz '2026-09-01 09:00:00+03',
@@ -497,7 +531,7 @@ describe('uygunluk motoru (Batch 3.2)', () => {
                select d + (h || ' hours')::interval as slot
                  from generate_series(0, 5) h
              ) s`,
-          [clinic.tenant.id, clinic.branch.id, staffId],
+          [clinic.tenant.id, clinic.branch.id, staffId, holdId],
         );
       }
 

@@ -84,3 +84,45 @@ export async function withAuthTx<T>(
     return fn(tx);
   });
 }
+
+/**
+ * Public çözümleme transaction'ı — SLUG/KONAK ADI → KİRACI sorusu için.
+ *
+ * Online randevu sayfası kiracıyı seçmeden önce "bu slug kimin?" sorusunu
+ * cevaplamak zorundadır; `tenants` ve `booking_sites` politikaları bağlamsız
+ * bir sorguda boş küme döndürür. `app.public_flow` bu istisnayı AÇIK, tek
+ * isimli ve denetlenebilir kılar.
+ *
+ * `withAuthTx` YENİDEN KULLANILMADI: `app.auth_flow` bayrağı `users`,
+ * `credentials`, `auth_sessions`, `passkeys` ve `phone_verification_codes`
+ * politikalarında geçiyor. Kimlik akışlarının hepsinde parola/passkey ispatı
+ * var; randevu sayfasında hiçbir ispat yok — bayrağı paylaşmak, public
+ * modüldeki tek bir dikkatsiz sorgunun kimlik bilgisi okuyabilmesi demekti.
+ *
+ * SÖZLEŞME: `current_public_flow()` yalnız `booking_sites` ve
+ * `booking_site_domains` politikalarında geçer (0035). İkisi de dizin
+ * verisidir — müşteri, randevu, içerik veya tema taşımazlar. Kuralı doğrulayan
+ * bir entegrasyon testi var.
+ *
+ * Bu transaction bir kiracıyı SEÇER, işi yapmaz: çözümlemeden sonraki her
+ * sorgu `withTenantTx` altında, olağan izolasyon politikalarıyla koşar.
+ */
+export async function withPublicTx<T>(
+  db: Database,
+  ctx: RequestContext,
+  fn: (tx: Tx) => Promise<T>,
+): Promise<T> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`
+      select
+        set_config('app.public_flow',    'on', true),
+        set_config('app.auth_flow',      'off', true),
+        set_config('app.tenant_id',      '', true),
+        set_config('app.user_id',        '', true),
+        set_config('app.branch_id',      '', true),
+        set_config('app.request_id',     ${ctx.requestId}, true),
+        set_config('app.platform_admin', 'off', true)
+    `);
+    return fn(tx);
+  });
+}
