@@ -1,6 +1,17 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { ArrayMaxSize, ArrayNotEmpty, IsArray, IsISO8601, IsUUID } from 'class-validator';
+import {
+  ArrayMaxSize,
+  ArrayNotEmpty,
+  IsArray,
+  IsISO8601,
+  IsOptional,
+  IsUUID,
+  Matches,
+} from 'class-validator';
+
+/** `StaffRefService`in ürettiği biçim — base64url, 22 karakter. */
+export const STAFF_REF_PATTERN = /^[A-Za-z0-9_-]{22}$/;
 
 /** `?serviceIds=a,b` ve `?serviceIds=a&serviceIds=b` — ikisi de kabul. */
 const toStringArray = ({ value }: { value: unknown }): unknown => {
@@ -29,6 +40,45 @@ export class PublicAvailabilityQueryDto {
   @ApiProperty({ example: '2026-09-14T00:00:00+03:00' })
   @IsISO8601({ strict: true })
   to: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Belirli bir uygulayıcıyla süz. `GET /public/sites/:slug/staff` yanıtındaki opak referans.',
+  })
+  @IsOptional()
+  @Matches(STAFF_REF_PATTERN)
+  staffRef?: string;
+}
+
+export class PublicStaffQueryDto {
+  @ApiProperty({ format: 'uuid' })
+  @IsUUID()
+  branchId: string;
+
+  @ApiProperty({ type: [String], format: 'uuid' })
+  @Transform(toStringArray)
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayMaxSize(10)
+  @IsUUID(undefined, { each: true })
+  serviceIds: string[];
+}
+
+export class PublicStaffDto {
+  @ApiProperty({
+    description:
+      'Opak ve KALICI personel referansı. UUID değildir; URL ve cache anahtarında taşınabilir.',
+  })
+  staffRef: string;
+
+  @ApiProperty()
+  name: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  title: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  bio: string | null;
 }
 
 export class PublicSlotDto {
@@ -49,6 +99,11 @@ export class PublicSlotDto {
       'Personel ADI — yalnız `showStaffSelection` açık ve personel online görünürken. Kimlik ASLA dönmez.',
   })
   staffName?: string;
+
+  @ApiPropertyOptional({
+    description: 'Bu slotu karşılayacak uygulayıcının opak referansı (`/staff` ile aynı değer).',
+  })
+  staffRef?: string;
 }
 
 export class PublicAvailabilityDto {

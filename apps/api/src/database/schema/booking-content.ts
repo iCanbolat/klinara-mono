@@ -1,11 +1,18 @@
 import { bigint, boolean, index, integer, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { CONTENT_SCHEMA_VERSION } from '@klinara/shared';
 import { textArray } from './columns';
 import { tenants } from './tenancy';
 import { users } from './identity';
 import { bookingSites } from './booking-sites';
 
-/** Blok dokümanının şema sürümü — biçim değişikliği tek geçişlik dönüşüm olsun diye. */
-export const CONTENT_SCHEMA_VERSION = 1;
+/**
+ * Blok dokümanının şema sürümü — biçim değişikliği tek geçişlik dönüşüm olsun diye.
+ *
+ * Tanım `@klinara/shared`'te: sürüm numarasını yazan sunucu ile onu okuyan web
+ * istemcisi aynı sabiti görmek zorunda. Buradan re-export ediliyor ki mevcut
+ * `database/schema` import yolu bozulmasın.
+ */
+export { CONTENT_SCHEMA_VERSION };
 
 /**
  * Değişmez içerik sürümü.

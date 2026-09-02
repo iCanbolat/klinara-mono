@@ -27,6 +27,8 @@ export interface PublicSiteView {
   currency: string;
   locales: string[];
   defaultBranchId: string | null;
+  /** Kanonik adres — `is_primary` alan adından. Boş olabilir (alan adı yoksa). */
+  canonicalUrl: string;
   branches: PublicBranchView[];
   theme: unknown;
   sections: unknown[];
@@ -80,7 +82,8 @@ export class PublicSiteService {
       const assetIds = collectAssetIds(published);
       const assets = await repo.findAssetsByIds(tx, assetIds);
       const tenantDefaults = await loadTenantDefaults(tx);
-      return { published, settingsRow, branches, assets, tenantDefaults };
+      const canonicalHost = await repo.findCanonicalHost(tx, site.siteId);
+      return { published, settingsRow, branches, assets, tenantDefaults, canonicalHost };
     });
 
     if (payload === undefined) {
@@ -93,7 +96,7 @@ export class PublicSiteService {
       );
     }
 
-    const { published, settingsRow, branches, assets, tenantDefaults } = payload;
+    const { published, settingsRow, branches, assets, tenantDefaults, canonicalHost } = payload;
     const assetBaseUrl = this.config.get('PUBLIC_ASSET_BASE_URL', { infer: true });
     const index = buildAssetIndex(assets, assetBaseUrl);
 
@@ -106,6 +109,7 @@ export class PublicSiteService {
       currency: published.currency,
       locales: resolved.locales,
       defaultBranchId: published.defaultBranchId,
+      canonicalUrl: canonicalHost === undefined ? '' : `https://${canonicalHost}`,
       branches: branches.map(presentBranch),
       theme: resolveAssets(published.theme, index),
       sections: resolveAssets(published.sections, index) as unknown[],

@@ -6,6 +6,8 @@ import { TenantTxService } from '../../database/tenant-tx.service';
 import { AvailabilityService } from '../booking/availability.service';
 import * as pageRepo from '../booking-page/booking-page.repository';
 import { SlotTokenService } from './slot-token.service';
+import { StaffRefService } from './staff-ref.service';
+import { PublicStaffService } from './public-staff.service';
 import type { Tx } from '../../database/tenant-tx';
 import type { PublicSiteContext } from './public-site-resolver.service';
 
@@ -19,6 +21,8 @@ export interface PublicSlotView {
   slotToken: string;
   /** `showStaffSelection` açıkken personelin ADI; kimliği asla. */
   staffName?: string;
+  /** Aynı koşulda personelin OPAK referansı — seçim ve süzme bunun üzerinden. */
+  staffRef?: string;
 }
 
 export interface PublicAvailabilityView {
@@ -41,11 +45,19 @@ export class PublicAvailabilityService {
     private readonly tx: TenantTxService,
     private readonly availability: AvailabilityService,
     private readonly slotTokens: SlotTokenService,
+    private readonly staffRefs: StaffRefService,
+    private readonly staff: PublicStaffService,
   ) {}
 
   async findSlots(
     site: PublicSiteContext,
-    query: { branchId: string; serviceIds: string[]; from: string; to: string },
+    query: {
+      branchId: string;
+      serviceIds: string[];
+      from: string;
+      to: string;
+      staffRef?: string | undefined;
+    },
     now: Date = new Date(),
   ): Promise<PublicAvailabilityView> {
     assertWindow(query.from, query.to);
@@ -53,12 +65,28 @@ export class PublicAvailabilityService {
     const settings = await this.tx.run((tx) => pageRepo.findSettings(tx, site.siteId));
     const showStaff = settings?.showStaffSelection ?? true;
 
+    // Seçim kapalıyken gelen `staffRef` YOK SAYILIYOR, hata değil: ayarı kapatan
+    // bir klinik, eski bir bağlantıyla gelen ziyaretçiye hata göstermemeli.
+    // Motor `staffProfileId` alanını zaten destekliyor; burada yapılan tek şey
+    // opak referansı çözmek.
+    const staffProfileId =
+      showStaff && query.staffRef !== undefined
+        ? await this.staff.resolveRef(
+            site,
+            { branchId: query.branchId, serviceIds: query.serviceIds },
+            query.staffRef,
+          )
+        : undefined;
+
     const response = await this.availability.computeSlots(
       {
         branchId: query.branchId,
         serviceIds: query.serviceIds,
         from: query.from,
         to: query.to,
+        // `exactOptionalPropertyTypes` açık: alanı `undefined` ile GÖNDERMEK
+        // ile hiç göndermemek aynı şey değil.
+        ...(staffProfileId === undefined ? {} : { staffProfileId }),
       },
       now,
     );
@@ -92,7 +120,10 @@ export class PublicAvailabilityService {
           ),
         };
         const name = staffNames.get(staffProfileId);
-        if (showStaff && name !== undefined) view.staffName = name;
+        if (showStaff && name !== undefined) {
+          view.staffName = name;
+          view.staffRef = this.staffRefs.refFor(site.tenantId, staffProfileId);
+        }
         return view;
       }),
     };

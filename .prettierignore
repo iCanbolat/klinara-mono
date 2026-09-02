@@ -3,3 +3,5 @@ dist
 coverage
 pnpm-lock.yaml
 klinara-ios
+.next
+next-env.d.ts

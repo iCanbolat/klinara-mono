@@ -8,20 +8,25 @@
   "packageManager": "pnpm@10.20.0",
   "scripts": {
     "dev": "pnpm --filter @klinara/api dev",
-    "build": "pnpm --filter @klinara/shared build && pnpm --filter @klinara/api build",
+    "dev:api": "pnpm --filter @klinara/api dev",
+    "dev:web": "pnpm --filter @klinara/web-booking dev",
+    "dev:all": "pnpm --parallel --filter @klinara/api --filter @klinara/web-booking dev",
+    "build": "pnpm --filter @klinara/shared build && pnpm --filter @klinara/api build && pnpm --filter @klinara/web-booking build",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "typecheck": "pnpm --filter @klinara/shared build && pnpm -r typecheck",
-    "test": "pnpm --filter @klinara/shared build && pnpm --filter @klinara/api test",
+    "test": "pnpm --filter @klinara/shared build && pnpm --filter @klinara/api test && pnpm --filter @klinara/web-booking test",
     "db:generate": "pnpm --filter @klinara/api db:generate",
     "db:migrate": "pnpm --filter @klinara/api db:migrate",
     "db:seed": "pnpm --filter @klinara/api db:seed"
   },
   "devDependencies": {
     "@eslint/js": "^9.15.0",
+    "@next/eslint-plugin-next": "^16.3.4",
     "eslint": "^9.15.0",
     "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "prettier": "^3.3.3",
     "typescript": "^5.6.3",
     "typescript-eslint": "^8.15.0"

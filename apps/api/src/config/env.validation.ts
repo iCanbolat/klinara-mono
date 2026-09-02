@@ -618,6 +618,30 @@ export class EnvironmentVariables {
   @IsString()
   PUBLIC_ASSET_BASE_URL: string = '';
 
+  /**
+   * Yayın sonrası web istemcisinin cache'ini düşüren uç.
+   *
+   * BOŞSA purge yapılmaz ve bu bir hata değildir: API tek başına (web
+   * istemcisi olmadan) da çalışabilmeli. Purge ulaşmadığında `s-maxage=300`
+   * bayatlığı beş dakikayla sınırlıyor.
+   */
+  @Expose()
+  @IsString()
+  WEB_REVALIDATE_URL: string = '';
+
+  /** Purge ucunun paylaşılan sırrı. `WEB_REVALIDATE_URL` doluysa zorunlu. */
+  @Expose()
+  @IsOptional()
+  @IsString()
+  WEB_REVALIDATE_SECRET?: string;
+
+  @Expose()
+  @Type(() => Number)
+  @IsInt()
+  @Min(100)
+  @Max(30_000)
+  WEB_REVALIDATE_TIMEOUT_MS: number = 5_000;
+
   /** Public varlıkların depolama anahtarı öneki. */
   @Expose()
   @IsString()
@@ -697,6 +721,15 @@ function crossFieldIssues(env: EnvironmentVariables): string[] {
   }
   if (env.PUBLIC_ASSET_BASE_URL.startsWith('http://')) {
     issues.push('PUBLIC_ASSET_BASE_URL: üretimde https:// olmalı');
+  }
+  if (env.WEB_REVALIDATE_URL !== '') {
+    if (env.WEB_REVALIDATE_URL.startsWith('http://')) {
+      issues.push('WEB_REVALIDATE_URL: üretimde https:// olmalı');
+    }
+    // Sır olmadan uç, cache'i düşürebilen ANONİM bir tetikleyiciye dönerdi.
+    if ((env.WEB_REVALIDATE_SECRET ?? '').length < 32) {
+      issues.push('WEB_REVALIDATE_SECRET: WEB_REVALIDATE_URL doluyken en az 32 karakter olmalı');
+    }
   }
   return issues;
 }

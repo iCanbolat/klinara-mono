@@ -105,6 +105,8 @@ export const ERROR_CODES = {
   CONTENT_INVALID: 'CONTENT_INVALID',
   /** Opak slot token'ı geçersiz, başka kiracıya ait ya da süresi dolmuş. */
   SLOT_TOKEN_INVALID: 'SLOT_TOKEN_INVALID',
+  /** Opak personel referansı çözülemedi, başka kiracıya ya da şubeye ait. */
+  STAFF_REF_INVALID: 'STAFF_REF_INVALID',
   /** Slot tutma kaydı yok, serbest bırakılmış ya da başka siteye ait. */
   HOLD_INVALID: 'HOLD_INVALID',
   /** Tutma süresi doldu; slot serbest kaldı. */

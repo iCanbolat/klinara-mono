@@ -233,13 +233,221 @@ async function seed(): Promise<void> {
       [tenantId],
     );
 
+
+    // --- Faz 9/11 demo verisi: randevu sayfası ---------------------------------
+    // Amaç: `pnpm db:seed` sonrası `apps/web-booking` TEK komutla açılabilsin.
+    // Bunlar olmadan public çözümleme 404 döner ve web uygulaması hiç
+    // başlamaz. Satırlar `BookingSiteProvisioner`ın yaptığının aynısı — burada
+    // ham SQL çünkü seed HTTP katmanını değil veritabanını kuruyor.
+    const kadikoy = await client.query<{ id: string }>(
+      `select id from branches where tenant_id = $1 and slug = 'kadikoy'`,
+      [tenantId],
+    );
+    const kadikoyId = kadikoy.rows[0]?.id;
+
+    await client.query(
+      `update branches set phone = '+902121234567',
+                           address = 'Bağdat Cad. No:1, Kadıköy, İstanbul'
+        where tenant_id = $1 and slug = 'kadikoy'`,
+      [tenantId],
+    );
+    await client.query(
+      `update branches set phone = '+902129876543',
+                           address = 'Nispetiye Cad. No:10, Beşiktaş, İstanbul'
+        where tenant_id = $1 and slug = 'merkez'`,
+      [tenantId],
+    );
+
+    const site = await client.query<{ id: string }>(
+      `insert into booking_sites (tenant_id, slug, status, default_branch_id)
+       values ($1, (select slug from tenants where id = $1), 'draft', $2)
+       on conflict (tenant_id) do update set default_branch_id = excluded.default_branch_id
+       returning id`,
+      [tenantId, merkezId],
+    );
+    const siteId = site.rows[0]?.id;
+    if (siteId === undefined) throw new Error('Randevu sayfası oluşturulamadı');
+
+    const bookingHost = `${'demo-klinik'}.${env.PUBLIC_BOOKING_DOMAIN}`;
+    await client.query(
+      `insert into booking_site_domains
+         (tenant_id, booking_site_id, host, kind, verification_status,
+          verification_token, dns_target, is_primary)
+       values ($1, $2, $3::text, 'platform_subdomain', 'active', $4, $3::text, true)
+       on conflict (host) do nothing`,
+      [tenantId, siteId, bookingHost, randomBytes(24).toString('base64url')],
+    );
+
+    // Onam metni: randevu akışı zorunlu onay kutusu olmadan tamamlanamaz
+    // (`CONSENT_REQUIRED`), yani bu satır olmadan akış yerelde denenemezdi.
+    await client.query(
+      `insert into booking_site_settings
+         (tenant_id, booking_site_id, show_staff_selection, show_prices,
+          require_otp, otp_channel, consent_texts, locales, contact_email)
+       values ($1, $2, true, true, true, 'sms', $3::jsonb, '{tr}', 'iletisim@demo-klinik.test')
+       on conflict (booking_site_id) do update
+         set consent_texts = excluded.consent_texts,
+             show_staff_selection = excluded.show_staff_selection,
+             show_prices = excluded.show_prices`,
+      [
+        tenantId,
+        siteId,
+        JSON.stringify([
+          {
+            kind: 'kvkk_explicit',
+            text: 'Kişisel verilerimin randevu oluşturma amacıyla işlenmesine açık rıza veriyorum.',
+            required: true,
+          },
+          {
+            kind: 'marketing',
+            text: 'Kampanya ve duyurulardan haberdar olmak istiyorum.',
+            required: false,
+          },
+        ]),
+      ],
+    );
+
+    // Altı blok türünü de içeren yayınlanmış bir sürüm: renderer'ın her dalı
+    // yerelde görülebilsin. `content_hash` uygulamanın kanonik JSON'undan
+    // değil, burada sabit bir özet — seed'in amacı hash doğruluğu değil.
+    const sections = [
+      {
+        type: 'hero',
+        title: 'Demo Estetik Kliniği',
+        subtitle: 'Uzman kadromuzla cilt ve lazer bakımı. Online randevu birkaç adımda.',
+        ctaLabel: 'Hemen randevu al',
+      },
+      {
+        type: 'richText',
+        title: 'Hakkımızda',
+        body: '2015’ten beri **medikal estetik** alanında hizmet veriyoruz.\n\n- Sertifikalı uygulayıcılar\n- Tek kullanımlık ekipman\n- [Detaylı bilgi](https://ornek.test)',
+      },
+      { type: 'serviceList', title: 'Hizmetlerimiz' },
+      { type: 'contact', title: 'Şubelerimiz', showPhones: true, showAddresses: true },
+      { type: 'map', zoom: 14 },
+    ];
+    const theme = {
+      primaryColor: '#0F766E',
+      backgroundColor: '#FAF9F7',
+      textColor: '#1C1917',
+      fontFamily: 'inter',
+      radius: 'lg',
+    };
+    const seo = {
+      title: 'Demo Estetik Kliniği — Online Randevu',
+      description: 'Lazer epilasyon ve cilt bakımı için online randevu alın.',
+    };
+    const contentHash = createHash('sha256')
+      .update(JSON.stringify({ theme, sections, seo }))
+      .digest('hex');
+
+    const revision = await client.query<{ id: string }>(
+      `insert into booking_page_revisions
+         (tenant_id, booking_site_id, revision_number, theme, sections, seo, content_hash, created_by)
+       values ($1, $2, 1, $3::jsonb, $4::jsonb, $5::jsonb, $6, $7)
+       on conflict (booking_site_id, revision_number) do nothing
+       returning id`,
+      [
+        tenantId,
+        siteId,
+        JSON.stringify(theme),
+        JSON.stringify(sections),
+        JSON.stringify(seo),
+        contentHash,
+        ownerId,
+      ],
+    );
+    const revisionId =
+      revision.rows[0]?.id ??
+      (
+        await client.query<{ id: string }>(
+          `select id from booking_page_revisions where booking_site_id = $1 and revision_number = 1`,
+          [siteId],
+        )
+      ).rows[0]?.id;
+
+    await client.query(
+      `update booking_sites
+          set status = 'published',
+              published_revision_id = $2,
+              draft_revision_id = $2,
+              published_at = coalesce(published_at, now())
+        where id = $1`,
+      [siteId, revisionId],
+    );
+
+    // İkinci uygulayıcı — biri BİLEREK `is_visible_online = false`. Personel
+    // seçim ucunun "takvimde çalışıyor ama adı internette görünmesin" kuralını
+    // yerelde de sınayabilmek için.
+    const hiddenUser = await client.query<{ id: string }>(
+      `insert into users (email, full_name, password_hash, is_active)
+       values ('gizli.uygulayici@demo-klinik.test', 'Gizli Uygulayıcı', $1, true)
+       on conflict (email) where deleted_at is null do update set full_name = excluded.full_name
+       returning id`,
+      [passwordHash],
+    );
+    const hiddenUserId = hiddenUser.rows[0]?.id;
+    await client.query(
+      `insert into memberships (tenant_id, user_id, role_key, branch_id)
+       values ($1, $2, 'practitioner', $3) on conflict do nothing`,
+      [tenantId, hiddenUserId, merkezId],
+    );
+    const hiddenStaff = await client.query<{ id: string }>(
+      `insert into staff_profiles (tenant_id, user_id, primary_branch_id, title, is_visible_online)
+       values ($1, $2, $3, 'Cilt Bakım Uzmanı', false)
+       on conflict (tenant_id, user_id) where deleted_at is null
+       do update set is_visible_online = false
+       returning id`,
+      [tenantId, hiddenUserId, merkezId],
+    );
+    const hiddenStaffId = hiddenStaff.rows[0]?.id;
+
+    for (const service of services.rows) {
+      await client.query(
+        `insert into staff_services (tenant_id, staff_profile_id, service_id, branch_id)
+         values ($1, $2, $3, $4)
+         on conflict (tenant_id, staff_profile_id, service_id, branch_id) do nothing`,
+        [tenantId, hiddenStaffId, service.id, merkezId],
+      );
+      await client.query(
+        `insert into staff_services (tenant_id, staff_profile_id, service_id, branch_id)
+         values ($1, $2, $3, $4)
+         on conflict (tenant_id, staff_profile_id, service_id, branch_id) do nothing`,
+        [tenantId, staffId, service.id, kadikoyId],
+      );
+    }
+
+    for (const branchRow of [merkezId, kadikoyId]) {
+      for (const profile of [staffId, hiddenStaffId]) {
+        for (let day = 0; day <= 6; day += 1) {
+          const closed = day === 0;
+          await client.query(
+            `insert into branch_hours (tenant_id, branch_id, day_of_week, is_closed,
+                                       open_time, close_time)
+             values ($1, $2, $3, $4, $5, $6)
+             on conflict (branch_id, day_of_week) where deleted_at is null do nothing`,
+            [tenantId, branchRow, day, closed, closed ? null : '09:00', closed ? null : '18:00'],
+          );
+          await client.query(
+            `insert into staff_schedules (tenant_id, staff_profile_id, branch_id, day_of_week,
+                                          is_off, start_time, end_time)
+             values ($1, $2, $3, $4, $5, $6, $7)
+             on conflict (staff_profile_id, branch_id, day_of_week) where deleted_at is null
+             do nothing`,
+            [tenantId, profile, branchRow, day, closed, closed ? null : '09:00', closed ? null : '18:00'],
+          );
+        }
+      }
+    }
+
     process.stdout.write(
       `[seed] Demo kiracı hazır: ${tenantId} (slug: demo-klinik)\n` +
         `[seed] Merkez şube: ${merkezId}\n` +
         `[seed] Personel profili: ${staffId ?? '-'}\n` +
         `[seed] Giriş: ${DEMO_OWNER_EMAIL} / ${DEMO_PASSWORD}\n` +
         `[seed] Telefonla giriş (doğrulanmış): ${DEMO_OWNER_PHONE}\n` +
-        `[seed] Bekleyen davet token'ı: ${invitationToken}\n`,
+        `[seed] Bekleyen davet token'ı: ${invitationToken}\n` +
+        `[seed] Randevu sayfası: http://${bookingHost}:3001\n`,
     );
   } finally {
     await client.end();

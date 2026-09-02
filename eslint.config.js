@@ -1,9 +1,20 @@
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import prettier from 'eslint-config-prettier';
+import reactHooks from 'eslint-plugin-react-hooks';
+import nextPlugin from '@next/eslint-plugin-next';
 
 export default tseslint.config(
-  { ignores: ['**/dist/**', '**/node_modules/**', 'klinara-ios/**', '**/coverage/**'] },
+  {
+    ignores: [
+      '**/dist/**',
+      '**/node_modules/**',
+      'klinara-ios/**',
+      '**/coverage/**',
+      '**/.next/**',
+      '**/next-env.d.ts',
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
   {
@@ -51,6 +62,41 @@ export default tseslint.config(
               group: ['**/database/database.constants', '**/database/database.module'],
               message:
                 "Repository global `db` handle'ını kullanamaz. Fonksiyon imzasına `tx: Tx` ekleyin ve çağıranı `TenantTxService.run(...)` içine alın.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // --- Next uygulamaları ---
+    files: ['apps/web-*/**/*.{ts,tsx}'],
+    plugins: { 'react-hooks': reactHooks, '@next/next': nextPlugin },
+    rules: {
+      ...reactHooks.configs.recommended.rules,
+      ...nextPlugin.configs.recommended.rules,
+      ...nextPlugin.configs['core-web-vitals'].rules,
+      // RSC'de `await params` yaygın; Nest tarafındaki gerekçe burada geçerli değil.
+      '@typescript-eslint/no-misused-promises': 'off',
+      // App Router; `pages/` dizini yok ve olmayacak.
+      '@next/next/no-html-link-for-pages': 'off',
+    },
+  },
+  {
+    // Pazarlama blokları SUNUCU bileşeni olarak kalmak ZORUNDA: Radix'in tek
+    // bir importu istemci bundle'ını public sayfaya taşır ve 11.1'in
+    // Lighthouse >= 90 / LCP < 2.0 s kriterini sessizce düşürür. Sınır
+    // belgelenmiyor, zorlanıyor.
+    files: ['apps/web-*/src/components/blocks/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@radix-ui/*', '@/components/ui/*', '**/components/ui/*'],
+              message:
+                'Pazarlama blokları sunucu bileşenidir. Radix/shadcn yalnız /randevu ve /r rotalarında kullanılabilir.',
             },
           ],
         },

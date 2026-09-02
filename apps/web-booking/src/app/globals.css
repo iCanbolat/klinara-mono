@@ -1,0 +1,36 @@
+@import 'tailwindcss';
+
+@theme inline {
+  --color-brand: var(--brand-primary);
+  --color-surface: var(--brand-bg);
+  --color-ink: var(--brand-text);
+  --radius-brand: var(--brand-radius);
+  --font-brand: var(--brand-font);
+}
+
+:root {
+  /* Tema gelmeden önceki güvenli varsayılanlar; layout bunları ezer. */
+  --brand-primary: #0f766e;
+  --brand-bg: #faf9f7;
+  --brand-text: #1c1917;
+  --brand-radius: 10px;
+  --brand-font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background: var(--brand-bg);
+  color: var(--brand-text);
+  font-family: var(--brand-font);
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Klavye kullanıcısı için görünür odak — Radix dışındaki her yerde de. */
+:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}

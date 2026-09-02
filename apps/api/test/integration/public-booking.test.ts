@@ -154,6 +154,24 @@ describe('public randevu akışı: uygunluk, tutma, OTP, randevu, self-servis (9
     return '424242';
   }
 
+  describe('9.4 — tutma yanıtının saat biçimi', () => {
+    it('hold, slotun ŞUBE SAAT DİLİMİNDEKİ saatini aynen geri veriyor', async () => {
+      // Uygunluk ucu `toZonedIso` ile `+03:00` ofsetli dönüyor. Hold yanıtı
+      // `toISOString()` (UTC) verseydi kullanıcı 09:00 seçip özet ekranında
+      // 06:00 görürdü — aynı akış içinde aynı slot iki farklı saat.
+      const slot = await firstSlot();
+      const hold = await http(app)
+        .post('/api/v1/public/sites/klinik-x/holds')
+        .send({ slotToken: slot.slotToken })
+        .expect(201);
+
+      const body = hold.body as HoldBody & { endsAt: string };
+      expect(body.startsAt).toBe(slot.startsAt);
+      expect(body.endsAt).toBe(slot.endsAt);
+      expect(body.startsAt).toMatch(/[+-]\d{2}:\d{2}$/);
+    });
+  });
+
   describe('9.3 — public uygunluk', () => {
     it('KRİTİK: yanıtta HİÇBİR UUID yok', async () => {
       const res = await askSlots().expect(200);

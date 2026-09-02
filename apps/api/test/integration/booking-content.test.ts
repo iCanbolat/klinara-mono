@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
+import { QueueService } from '../../src/lib/queue/queue.service';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { createTestApp } from '../helpers/app';
 import { startTestDatabase, type TestDatabase } from '../helpers/database';
@@ -206,6 +207,7 @@ describe('randevu sayfası içeriği, teması ve public okuma (Batch 9.2)', () =
 
       expect(Object.keys(body).sort()).toEqual([
         'branches',
+        'canonicalUrl',
         'currency',
         'defaultBranchId',
         'locales',
@@ -319,6 +321,55 @@ describe('randevu sayfası içeriği, teması ve public okuma (Batch 9.2)', () =
       await http(app)
         .get('/api/v1/public/sites/klinik-x/services?branchId=00000000-0000-0000-0000-000000000000')
         .expect(404);
+    });
+  });
+
+  describe('yayında purge-on-publish (Ek D)', () => {
+    /**
+     * İşin YAYINLA AYNI transaction'da yazılması, "cache düştü ama içerik
+     * yayınlanmadı" durumunu yapısal olarak imkânsız kılıyor. Testler bu
+     * bağlantıyı doğruluyor — worker'ın kendisi ayrı bir birim testinde.
+     */
+    const spySend = () => vi.spyOn(app.get(QueueService), 'send').mockResolvedValue(undefined);
+
+    it('yayın işi kuyruğa slug ve sebeple yazılıyor', async () => {
+      const send = spySend();
+      await saveDraft({ sections: [{ type: 'hero', title: 'A' }] }).expect(200);
+      await publish().expect(200);
+
+      const call = send.mock.calls.find(([, queue]) => queue === 'booking.page.purge');
+      expect(call).toBeDefined();
+      expect(call?.[2]).toEqual({ slug: 'klinik-x', reason: 'publish' });
+      // İlk argüman transaction handle'ı: iş çağıranın transaction'ında.
+      expect(call?.[0]).toBeDefined();
+      send.mockRestore();
+    });
+
+    it('yayın BAŞARISIZ olduğunda iş yazılmıyor', async () => {
+      // İçeriksiz yayın 409 veriyor; transaction geri alınıyor ve onunla
+      // birlikte purge işi de yazılmamış olmalı.
+      const send = spySend();
+      await publish().expect(409);
+      expect(send.mock.calls.filter(([, q]) => q === 'booking.page.purge')).toHaveLength(0);
+      send.mockRestore();
+    });
+
+    it('yayından kaldırma ve geri alma da purge tetikliyor', async () => {
+      await saveDraft({ sections: [{ type: 'hero', title: 'A' }] }).expect(200);
+      await publish().expect(200);
+
+      const send = spySend();
+      await http(app).post('/api/v1/booking-page/unpublish').set(ownerAuth()).expect(200);
+      expect(send.mock.calls.some(([, q, data]) => q === 'booking.page.purge' && (data as { reason: string }).reason === 'unpublish')).toBe(true);
+      send.mockRestore();
+    });
+
+    it('QUEUE_ENABLED=false iken yayın YİNE başarılı', async () => {
+      // Testler kuyruk kapalı koşuyor; bu, purge'ün bir ÖN KOŞUL olmadığının
+      // kanıtı — kuyruksuz bir kurulumda da yayın çalışmalı.
+      await saveDraft({ sections: [{ type: 'hero', title: 'A' }] }).expect(200);
+      await publish().expect(200);
+      await http(app).get('/api/v1/public/sites/klinik-x').expect(200);
     });
   });
 

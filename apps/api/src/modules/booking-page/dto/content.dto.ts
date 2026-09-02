@@ -1,4 +1,13 @@
 import { ApiExtraModels, ApiProperty, ApiPropertyOptional, getSchemaPath } from '@nestjs/swagger';
+import {
+  BLOCK_TYPES,
+  CONTENT_LIMITS,
+  FONT_FAMILIES,
+  RADII,
+  type BlockType,
+  type FontFamily,
+  type Radius,
+} from '@klinara/shared';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -17,26 +26,27 @@ import {
 } from 'class-validator';
 
 /**
- * Blok sözlüğü v1.
+ * Blok sözlüğü v1 — DOĞRULAMA katmanı.
+ *
+ * Sözlüğün kendisi (`BLOCK_TYPES`, uzunluk sınırları, tema beyaz listeleri)
+ * `@klinara/shared`'te duruyor; burada yalnız o sabitlerin class-validator
+ * karşılığı var. İkiye bölünmesinin sebebi web istemcisi: aynı sınırları
+ * editör formunun da bilmesi gerekiyor ve Next'in `class-validator` çekmesi
+ * gerekmiyor.
  *
  * İçerik JSONB olarak saklanıyor ama gövde BURADAN geçmeden veritabanına
  * ulaşamıyor: `ValidationPipe` `whitelist: true` ile bilinmeyen alanları eler,
  * ayrımlı-birleşim (`discriminator`) ise sözlükte olmayan `type` değerini
  * REDDEDER. Sonuç: veritabanı asla renderer'ın çizemeyeceği bir blok tutmaz.
  *
- * Sözlüğü genişletmek bir migration değil, bu dosyaya bir sınıf eklemek —
- * tipli bir `booking_page_sections` tablosu yerine JSONB seçilmesinin sebebi
- * tam olarak bu.
+ * Sözlüğü genişletmek bir migration değil, shared'a bir tip + buraya bir sınıf
+ * eklemek — tipli bir `booking_page_sections` tablosu yerine JSONB seçilmesinin
+ * sebebi tam olarak bu.
  */
-export const BLOCK_TYPES = [
-  'hero',
-  'richText',
-  'carousel',
-  'serviceList',
-  'contact',
-  'map',
-] as const;
-export type BlockType = (typeof BLOCK_TYPES)[number];
+export { BLOCK_TYPES, type BlockType };
+
+/** Blok başlıklarının ortak üst sınırı — sözlükte hepsi aynı değeri taşıyor. */
+const BLOCK_TITLE_MAX = CONTENT_LIMITS.richText.title;
 
 abstract class BaseBlockDto {
   @ApiProperty({ enum: BLOCK_TYPES })
@@ -51,15 +61,15 @@ abstract class BaseBlockDto {
 }
 
 export class HeroBlockDto extends BaseBlockDto {
-  @ApiProperty({ maxLength: 120 })
+  @ApiProperty({ maxLength: CONTENT_LIMITS.hero.title })
   @IsString()
-  @MaxLength(120)
+  @MaxLength(CONTENT_LIMITS.hero.title)
   title: string;
 
-  @ApiPropertyOptional({ maxLength: 300 })
+  @ApiPropertyOptional({ maxLength: CONTENT_LIMITS.hero.subtitle })
   @IsOptional()
   @IsString()
-  @MaxLength(300)
+  @MaxLength(CONTENT_LIMITS.hero.subtitle)
   subtitle?: string;
 
   @ApiPropertyOptional({ format: 'uuid', description: 'Arka plan görseli (`tenant_assets`).' })
@@ -67,27 +77,27 @@ export class HeroBlockDto extends BaseBlockDto {
   @IsUUID()
   imageAssetId?: string;
 
-  @ApiPropertyOptional({ maxLength: 40, description: 'Randevu butonunun metni.' })
+  @ApiPropertyOptional({ maxLength: CONTENT_LIMITS.hero.ctaLabel, description: 'Randevu butonunun metni.' })
   @IsOptional()
   @IsString()
-  @MaxLength(40)
+  @MaxLength(CONTENT_LIMITS.hero.ctaLabel)
   ctaLabel?: string;
 }
 
 export class RichTextBlockDto extends BaseBlockDto {
-  @ApiPropertyOptional({ maxLength: 120 })
+  @ApiPropertyOptional({ maxLength: BLOCK_TITLE_MAX })
   @IsOptional()
   @IsString()
-  @MaxLength(120)
+  @MaxLength(BLOCK_TITLE_MAX)
   title?: string;
 
   /**
    * Markdown. HTML kabul EDİLMİYOR: kiracının kendi sayfasına keyfî işaretleme
    * koyabilmesi, kendi alan adımızdan servis edilen bir XSS yüzeyi demekti.
    */
-  @ApiProperty({ maxLength: 8_000, description: 'Markdown (HTML değil).' })
+  @ApiProperty({ maxLength: CONTENT_LIMITS.richText.body, description: 'Markdown (HTML değil).' })
   @IsString()
-  @MaxLength(8_000)
+  @MaxLength(CONTENT_LIMITS.richText.body)
   body: string;
 }
 
@@ -96,39 +106,42 @@ export class CarouselItemDto {
   @IsUUID()
   assetId: string;
 
-  @ApiPropertyOptional({ maxLength: 200, description: 'Erişilebilirlik için alternatif metin.' })
+  @ApiPropertyOptional({
+    maxLength: CONTENT_LIMITS.carousel.alt,
+    description: 'Erişilebilirlik için alternatif metin.',
+  })
   @IsOptional()
   @IsString()
-  @MaxLength(200)
+  @MaxLength(CONTENT_LIMITS.carousel.alt)
   alt?: string;
 
-  @ApiPropertyOptional({ maxLength: 120 })
+  @ApiPropertyOptional({ maxLength: CONTENT_LIMITS.carousel.caption })
   @IsOptional()
   @IsString()
-  @MaxLength(120)
+  @MaxLength(CONTENT_LIMITS.carousel.caption)
   caption?: string;
 }
 
 export class CarouselBlockDto extends BaseBlockDto {
-  @ApiPropertyOptional({ maxLength: 120 })
+  @ApiPropertyOptional({ maxLength: BLOCK_TITLE_MAX })
   @IsOptional()
   @IsString()
-  @MaxLength(120)
+  @MaxLength(BLOCK_TITLE_MAX)
   title?: string;
 
-  @ApiProperty({ type: [CarouselItemDto], maxItems: 20 })
+  @ApiProperty({ type: [CarouselItemDto], maxItems: CONTENT_LIMITS.carousel.items })
   @IsArray()
-  @ArrayMaxSize(20)
+  @ArrayMaxSize(CONTENT_LIMITS.carousel.items)
   @ValidateNested({ each: true })
   @Type(() => CarouselItemDto)
   items: CarouselItemDto[];
 }
 
 export class ServiceListBlockDto extends BaseBlockDto {
-  @ApiPropertyOptional({ maxLength: 120 })
+  @ApiPropertyOptional({ maxLength: BLOCK_TITLE_MAX })
   @IsOptional()
   @IsString()
-  @MaxLength(120)
+  @MaxLength(BLOCK_TITLE_MAX)
   title?: string;
 
   /**
@@ -138,19 +151,19 @@ export class ServiceListBlockDto extends BaseBlockDto {
    * olmadığına `services.is_online_bookable` karar verir. İçerik dokümanı bir
    * yetki kaynağı değildir.
    */
-  @ApiPropertyOptional({ type: [String], format: 'uuid', maxItems: 30 })
+  @ApiPropertyOptional({ type: [String], format: 'uuid', maxItems: CONTENT_LIMITS.serviceList.categoryIds })
   @IsOptional()
   @IsArray()
-  @ArrayMaxSize(30)
+  @ArrayMaxSize(CONTENT_LIMITS.serviceList.categoryIds)
   @IsUUID(undefined, { each: true })
   categoryIds?: string[];
 }
 
 export class ContactBlockDto extends BaseBlockDto {
-  @ApiPropertyOptional({ maxLength: 120 })
+  @ApiPropertyOptional({ maxLength: BLOCK_TITLE_MAX })
   @IsOptional()
   @IsString()
-  @MaxLength(120)
+  @MaxLength(BLOCK_TITLE_MAX)
   title?: string;
 
   @ApiPropertyOptional({ default: true, description: 'Şube telefonları gösterilsin mi.' })
@@ -170,11 +183,15 @@ export class MapBlockDto extends BaseBlockDto {
   @IsUUID()
   branchId?: string;
 
-  @ApiPropertyOptional({ minimum: 1, maximum: 20, default: 15 })
+  @ApiPropertyOptional({
+    minimum: CONTENT_LIMITS.map.zoom.min,
+    maximum: CONTENT_LIMITS.map.zoom.max,
+    default: CONTENT_LIMITS.map.zoom.default,
+  })
   @IsOptional()
   @IsInt()
-  @Min(1)
-  @Max(20)
+  @Min(CONTENT_LIMITS.map.zoom.min)
+  @Max(CONTENT_LIMITS.map.zoom.max)
   zoom?: number;
 }
 
@@ -208,15 +225,15 @@ export class ThemeDto {
    * Serbest bırakılsaydı `font-family` değeri sayfaya enjekte edilen bir CSS
    * parçası olurdu.
    */
-  @ApiPropertyOptional({ enum: ['system', 'inter', 'playfair', 'dm-sans', 'lora'] })
+  @ApiPropertyOptional({ enum: FONT_FAMILIES })
   @IsOptional()
-  @IsIn(['system', 'inter', 'playfair', 'dm-sans', 'lora'])
-  fontFamily?: string;
+  @IsIn(FONT_FAMILIES)
+  fontFamily?: FontFamily;
 
-  @ApiPropertyOptional({ enum: ['none', 'sm', 'md', 'lg', 'full'] })
+  @ApiPropertyOptional({ enum: RADII })
   @IsOptional()
-  @IsIn(['none', 'sm', 'md', 'lg', 'full'])
-  radius?: string;
+  @IsIn(RADII)
+  radius?: Radius;
 
   @ApiPropertyOptional({ format: 'uuid' })
   @IsOptional()
@@ -225,16 +242,16 @@ export class ThemeDto {
 }
 
 export class SeoDto {
-  @ApiPropertyOptional({ maxLength: 70 })
+  @ApiPropertyOptional({ maxLength: CONTENT_LIMITS.seo.title })
   @IsOptional()
   @IsString()
-  @MaxLength(70)
+  @MaxLength(CONTENT_LIMITS.seo.title)
   title?: string;
 
-  @ApiPropertyOptional({ maxLength: 160 })
+  @ApiPropertyOptional({ maxLength: CONTENT_LIMITS.seo.description })
   @IsOptional()
   @IsString()
-  @MaxLength(160)
+  @MaxLength(CONTENT_LIMITS.seo.description)
   description?: string;
 
   @ApiPropertyOptional({ format: 'uuid' })
@@ -260,7 +277,7 @@ export class UpdateBookingPageContentDto {
 
   @ApiProperty({
     isArray: true,
-    maxItems: 40,
+    maxItems: CONTENT_LIMITS.sections.max,
     oneOf: [
       { $ref: getSchemaPath(HeroBlockDto) },
       { $ref: getSchemaPath(RichTextBlockDto) },
@@ -271,7 +288,7 @@ export class UpdateBookingPageContentDto {
     ],
   })
   @IsArray()
-  @ArrayMaxSize(40)
+  @ArrayMaxSize(CONTENT_LIMITS.sections.max)
   @ValidateNested({ each: true })
   @Type(() => BaseBlockDto, {
     keepDiscriminatorProperty: true,

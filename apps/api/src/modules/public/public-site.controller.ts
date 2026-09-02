@@ -11,7 +11,10 @@ import {
   PublicAvailabilityDto,
   PublicAvailabilityQueryDto,
   PublicBranchDto,
+  PublicStaffDto,
+  PublicStaffQueryDto,
 } from './dto/public-availability.dto';
+import { PublicStaffService } from './public-staff.service';
 import { PublicSiteService, type PublicSiteView } from './public-site.service';
 import type { PublicCategoryView } from './present-public-site';
 import type { PublicSiteContext } from './public-site-resolver.service';
@@ -45,6 +48,7 @@ export class PublicSiteController {
   constructor(
     private readonly site: PublicSiteService,
     private readonly availability: PublicAvailabilityService,
+    private readonly staff: PublicStaffService,
   ) {}
 
   @Get()
@@ -97,6 +101,23 @@ export class PublicSiteController {
     const { view } = await this.site.getSite(siteOf(request));
     applyCache(response, CATALOG_CACHE, payloadETag(view.branches));
     return view.branches;
+  }
+
+  @Get('staff')
+  @ApiOperation({
+    summary: 'Seçilebilir uygulayıcılar',
+    description:
+      'Yalnız `is_visible_online` açık ve İSTENEN HİZMETLERİN HEPSİNDE yetkin personel. ' +
+      'Kimlik yerine opak ve kalıcı `staffRef` döner. `showStaffSelection` kapalıyken liste boştur.',
+  })
+  async staffOptions(
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+    @Query() query: PublicStaffQueryDto,
+  ): Promise<PublicStaffDto[]> {
+    const staff = await this.staff.list(siteOf(request), query);
+    applyCache(response, CATALOG_CACHE, payloadETag(staff));
+    return staff;
   }
 
   @Get('availability')

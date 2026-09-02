@@ -198,3 +198,83 @@ export async function findAssetsByIds(tx: Tx, ids: string[]): Promise<PublicAsse
     altText: (row['alt_text'] as string | null) ?? null,
   }));
 }
+
+/**
+ * Sitenin kanonik konak adı — `<link rel="canonical">`in kaynağı.
+ *
+ * Aynı içerik hem `{slug}.klinara.app`ten hem kiracının özel alan adından
+ * erişilebiliyor; ikisinin de indekslenmesi arama sonuçlarını kendi kendine
+ * böler. `is_primary` satırı bu ikilemin tek cevabı — istemcinin konak adından
+ * TÜRETMESİ yanlış olurdu, çünkü ziyaretçinin geldiği adres kanonik olan
+ * olmayabilir.
+ */
+export async function findCanonicalHost(tx: Tx, siteId: string): Promise<string | undefined> {
+  const result = await tx.execute<{ host: string }>(sql`
+    select host
+      from booking_site_domains
+     where booking_site_id = ${siteId}
+       and verification_status in ('active', 'dns_verified')
+     order by is_primary desc, kind = 'platform_subdomain' desc, created_at
+     limit 1
+  `);
+  return result.rows[0]?.host;
+}
+
+export interface OnlineStaffRow {
+  id: string;
+  name: string;
+  title: string | null;
+  bio: string | null;
+}
+
+/**
+ * Online randevuya açık, seçilebilir uygulayıcılar.
+ *
+ * Üç kural bir arada:
+ *
+ * 1. `is_visible_online` — bir uygulayıcı takvimde çalışıyor ama adının
+ *    internette görünmesini istemiyor olabilir. Gizli personelin SLOTU yine
+ *    çıkar (kapasite satılabilir kalsın), ama seçim listesinde yer almaz.
+ * 2. Yetkinlik TÜM istenen hizmetleri kapsamalı (`count(distinct …) = n`).
+ *    Randevu birden çok hizmetten oluşabiliyor ve motor onları tek kaynağa
+ *    zincirliyor; iki hizmetten yalnız birini yapabilen birini seçtirmek,
+ *    kullanıcıyı boş bir uygunluk ızgarasına götürürdü.
+ * 3. `branch_id is null` = kiracı genelinde yetkin; dolu = yalnız o şubede.
+ */
+export async function listOnlineBookableStaff(
+  tx: Tx,
+  params: { branchId: string; serviceIds: string[] },
+): Promise<OnlineStaffRow[]> {
+  const unique = [...new Set(params.serviceIds)];
+  if (unique.length === 0) return [];
+
+  // Drizzle `sql` şablonu JS dizisini tek parametre olarak BAĞLAMIYOR
+  // (`= any($1)` sessizce "array literal bozuk"a düşüyor); depodaki mevcut
+  // kalıp virgülle birleştirip `string_to_array` ile geri kurmak.
+  const result = await tx.execute<{
+    id: string;
+    name: string;
+    title: string | null;
+    bio: string | null;
+  }>(sql`
+    select sp.id,
+           coalesce(nullif(trim(u.full_name), ''), sp.title, '') as name,
+           sp.title,
+           sp.bio
+      from staff_profiles sp
+      join users u on u.id = sp.user_id
+      join staff_services ss on ss.staff_profile_id = sp.id
+     where sp.is_visible_online = true
+       and sp.is_active = true
+       and sp.deleted_at is null
+       and ss.is_active = true
+       and ss.deleted_at is null
+       and ss.service_id = any(string_to_array(${unique.join(',')}, ',')::uuid[])
+       and (ss.branch_id is null or ss.branch_id = ${params.branchId}::uuid)
+     group by sp.id, u.full_name, sp.title, sp.bio
+    having count(distinct ss.service_id) = ${unique.length}
+     order by name
+  `);
+
+  return result.rows.filter((row) => row.name !== '');
+}

@@ -36,6 +36,29 @@ services:
       timeout: 5s
       retries: 10
 
+  # Bucket'ı ve SADECE `public/` önekinin anonim okuma politikasını kurar.
+  #
+  # ⚠️ Politika bucket geneline verilemez: müşteri dosyaları (tıbbi fotoğraf,
+  # rapor) AYNI bucket'ta `{tenantId}/{customerId}/…` altında duruyor
+  # (`files.service.ts`), public randevu sayfası varlıkları ise
+  # `public/{tenantId}/…` altında (`assets.service.ts`). `mc anonymous set
+  # download local/klinara` yazmak, özel nitelikli sağlık verisini internete
+  # açmak demekti — önek şart.
+  minio-init:
+    image: minio/mc:latest
+    container_name: klinara-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    restart: 'no'
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 klinara klinara_dev_password &&
+      mc mb --ignore-existing local/klinara &&
+      mc anonymous set download local/klinara/public &&
+      echo '[minio-init] klinara bucket hazir, public/ oneki anonim okunabilir'
+      "
+
   mailhog:
     image: mailhog/mailhog:latest
     container_name: klinara-mailhog

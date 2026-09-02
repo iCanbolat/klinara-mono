@@ -31,6 +31,12 @@ export const QUEUES = {
   // (Faz 8 hatırlatma kalıbı). Kuyruk kapalıyken de doğru davranmalı.
   BOOKING_HOLD_EXPIRE: 'booking.hold.expire',
   BOOKING_HOLD_SWEEP: 'booking.hold.sweep',
+  // Yayın sonrası web istemcisinin tag cache'ini düşürür (Faz 11).
+  //
+  // Cron YOK: olay güdümlü. İş yayınla AYNI transaction'da yazılıyor, yani
+  // pointer geri alınırsa purge de yazılmaz — "yayınlanmamış içeriği
+  // yayınlanmış sanıp cache düşürmek" durumu yapısal olarak imkânsız.
+  BOOKING_PAGE_PURGE: 'booking.page.purge',
 } as const;
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES];

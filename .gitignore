@@ -9,3 +9,7 @@ coverage/
 .pnpm-store/
 .klinara-ios
 .claude
+# Next.js (Faz 11)
+.next/
+next-env.d.ts
+.turbo/

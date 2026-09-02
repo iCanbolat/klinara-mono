@@ -7,6 +7,7 @@ import { BookingPageService } from './booking-page.service';
 import { DomainsController } from './domains.controller';
 import { DomainsService } from './domains.service';
 import { DomainVerifyWorker } from './domain-verify.worker';
+import { BookingPagePurgeWorker } from './booking-page-purge.worker';
 
 /**
  * Randevu sayfasının YÖNETİM yüzü — kimlik doğrulamalı, izin bazlı.
@@ -23,6 +24,7 @@ import { DomainVerifyWorker } from './domain-verify.worker';
     DomainsService,
     AssetsService,
     DomainVerifyWorker,
+    BookingPagePurgeWorker,
   ],
   exports: [BookingPageService],
 })

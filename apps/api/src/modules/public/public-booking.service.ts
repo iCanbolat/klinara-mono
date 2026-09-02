@@ -136,8 +136,14 @@ export class PublicBookingService {
 
     return {
       holdToken: token,
-      startsAt: hold.startsAt.toISOString(),
-      endsAt: hold.endsAt.toISOString(),
+      // ⚠️ Slot token'ındaki ZONLU dizeler aynen geri veriliyor, `Date`ten
+      // yeniden üretilmiyor. Uygunluk ucu saatleri ŞUBE SAAT DİLİMİNDE
+      // (`toZonedIso`) döndürüyor; burada `toISOString()` yazmak aynı slotu
+      // aynı akış içinde iki farklı saat gibi göstermek demekti (09:00 seçilip
+      // özet ekranında 06:00 görünüyordu).
+      startsAt: claim.startsAt,
+      endsAt: claim.endsAt,
+      // `expiresAt` bir duvar saati değil, geri sayım için bir an: UTC doğru.
       expiresAt: hold.expiresAt.toISOString(),
       otpRequired: settings?.requireOtp ?? true,
       otpVerified: false,

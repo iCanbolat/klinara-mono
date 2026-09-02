@@ -5,6 +5,8 @@ import { PublicSiteController } from './public-site.controller';
 import { PublicSiteService } from './public-site.service';
 import { PublicAvailabilityService } from './public-availability.service';
 import { SlotTokenService } from './slot-token.service';
+import { StaffRefService } from './staff-ref.service';
+import { PublicStaffService } from './public-staff.service';
 import { PublicBookingController } from './public-booking.controller';
 import { PublicBookingService } from './public-booking.service';
 import { BookingOtpSender } from './booking-otp.sender';
@@ -40,11 +42,13 @@ import { IntegrationsModule } from '../integrations/integrations.module';
     PublicSiteService,
     PublicAvailabilityService,
     SlotTokenService,
+    StaffRefService,
+    PublicStaffService,
     PublicBookingService,
     BookingOtpSender,
     SelfServiceService,
     HoldExpiryWorker,
   ],
-  exports: [PublicSiteResolverService, PublicSiteGuard, SlotTokenService],
+  exports: [PublicSiteResolverService, PublicSiteGuard, SlotTokenService, StaffRefService],
 })
 export class PublicModule {}
