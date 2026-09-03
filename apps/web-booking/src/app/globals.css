@@ -2,10 +2,30 @@
 
 @theme inline {
   --color-brand: var(--brand-primary);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-ring: var(--brand-ring);
+  --color-brand-ink: var(--brand-ink);
   --color-surface: var(--brand-bg);
+  --color-card: var(--surface-card);
+  --color-raised: var(--surface-raised);
+  --color-line: var(--border-subtle);
+  --color-line-strong: var(--border-strong);
   --color-ink: var(--brand-text);
   --radius-brand: var(--brand-radius);
   --font-brand: var(--brand-font);
+
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.05), 0 1px 3px rgb(0 0 0 / 0.06);
+  --shadow-lift: 0 4px 12px rgb(0 0 0 / 0.07), 0 2px 4px rgb(0 0 0 / 0.05);
+
+  --animate-step-in: step-in var(--dur-base) var(--ease-out) both;
+  --animate-step-in-back: step-in-back var(--dur-base) var(--ease-out) both;
+  --animate-rise-in: rise-in var(--dur-base) var(--ease-out) both;
+  --animate-fade-in: fade-in var(--dur-base) var(--ease-out) both;
+  --animate-check-pop: check-pop 320ms var(--ease-out) both;
+  --animate-pulse-urgent: pulse-urgent 1.6s ease-in-out infinite;
+  --animate-shimmer: shimmer 1.4s linear infinite;
+  --animate-shake: shake 420ms ease-in-out both;
+  --animate-spin-slow: spin 700ms linear infinite;
 }
 
 :root {
@@ -15,6 +35,26 @@
   --brand-text: #1c1917;
   --brand-radius: 10px;
   --brand-font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  /*
+   * TÜREV yüzey ve çizgi renkleri.
+   *
+   * Kartlar eskiden `bg-white` / `border-black/15` ile sabitlenmişti: koyu bir
+   * `backgroundColor` seçen kiracıda arayüz okunmaz hâle geliyordu. Bu değerler
+   * kiracının kendi renklerinden `color-mix` ile türetildiği için `theme.ts`e
+   * yeni bir alan eklemeden her palette uyum sağlıyor.
+   */
+  --surface-card: color-mix(in oklab, var(--brand-bg) 55%, white);
+  --surface-raised: color-mix(in oklab, var(--brand-bg) 25%, white);
+  --border-subtle: color-mix(in oklab, var(--brand-text) 12%, transparent);
+  --border-strong: color-mix(in oklab, var(--brand-text) 22%, transparent);
+  --brand-soft: color-mix(in oklab, var(--brand-primary) 10%, transparent);
+  --brand-ring: color-mix(in oklab, var(--brand-primary) 35%, transparent);
+  --brand-ink: color-mix(in oklab, var(--brand-primary) 78%, black);
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 140ms;
+  --dur-base: 260ms;
 }
 
 html {
@@ -33,4 +73,120 @@ body {
 :focus-visible {
   outline: 2px solid var(--brand-primary);
   outline-offset: 2px;
+}
+
+/*
+ * Adım geçişleri YÖN DUYARLI: ileri giderken sağdan, geri dönerken soldan.
+ * Yönsüz bir fade, "geri" tuşunun gerçekten geri gittiğini anlatmaz.
+ */
+@keyframes step-in {
+  from {
+    opacity: 0;
+    transform: translate3d(12px, 4px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes step-in-back {
+  from {
+    opacity: 0;
+    transform: translate3d(-12px, 4px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Liste ögeleri: `--i` ile sıralı gecikme (bkz. `staggerStyle`). */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes check-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pulse-urgent {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: -160% 0;
+  }
+  to {
+    background-position: 260% 0;
+  }
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-5px);
+  }
+  40% {
+    transform: translateX(5px);
+  }
+  60% {
+    transform: translateX(-3px);
+  }
+  80% {
+    transform: translateX(3px);
+  }
+}
+
+/*
+ * Hareket duyarlılığı bir tercih değil ERİŞİLEBİLİRLİK gereği: vestibüler
+ * rahatsızlığı olan bir kullanıcı için kayan panel baş dönmesi demek. Süreyi
+ * sıfırlamak yerine 0.01ms yapmak, `animationend` bekleyen kodu da korur.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

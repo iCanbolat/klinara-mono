@@ -25,8 +25,10 @@ export function Alert({
     <div
       role={tone === 'error' ? 'alert' : 'status'}
       className={cn(
-        'flex items-start gap-3 border p-3 text-sm',
-        tone === 'error' ? 'border-red-300 bg-red-50 text-red-900' : 'border-black/15 bg-black/3',
+        'flex animate-rise-in items-start gap-3 border p-3 text-sm',
+        tone === 'error'
+          ? 'border-red-200 bg-red-50 text-red-900'
+          : 'border-line bg-raised',
         className,
       )}
       style={{ borderRadius: 'var(--brand-radius)' }}

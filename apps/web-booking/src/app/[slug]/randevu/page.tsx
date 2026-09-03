@@ -1,3 +1,4 @@
+import { BookingHeader } from '@/components/booking-header';
 import { BookingFlow } from '@/components/booking/booking-flow';
 import { fetchServices, fetchSite } from '@/lib/api-server';
 
@@ -15,7 +16,8 @@ export default async function BookingPage({ params }: { params: Promise<{ slug: 
   const [site, categories] = await Promise.all([fetchSite(slug), fetchServices(slug)]);
 
   return (
-    <main>
+    <main className="min-h-dvh">
+      <BookingHeader site={site} />
       <BookingFlow site={site} categories={categories} />
     </main>
   );
