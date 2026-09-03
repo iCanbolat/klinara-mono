@@ -49,6 +49,15 @@ import { IntegrationsModule } from '../integrations/integrations.module';
     SelfServiceService,
     HoldExpiryWorker,
   ],
-  exports: [PublicSiteResolverService, PublicSiteGuard, SlotTokenService, StaffRefService],
+  // `PublicSiteService` dışa açılıyor: yönetim tarafındaki taslak önizleme ucu
+  // aynı sunum boru hattını kullanmak zorunda. Dışa açılan tek şey SUNUM;
+  // public controller'lar ve guard'lar bu modülde kalmaya devam ediyor.
+  exports: [
+    PublicSiteResolverService,
+    PublicSiteGuard,
+    SlotTokenService,
+    StaffRefService,
+    PublicSiteService,
+  ],
 })
 export class PublicModule {}

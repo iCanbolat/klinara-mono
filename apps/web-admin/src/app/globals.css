@@ -1,0 +1,92 @@
+@import 'tailwindcss';
+
+/*
+ * Yönetim panelinin paleti SABİT.
+ *
+ * `apps/web-booking`te renkler kiracının temasından geliyordu; burada gelmiyor
+ * ve gelmemeli: yönetim arayüzünün kontrastı ve okunabilirliği bir kiracının
+ * marka renk seçimine emanet edilemez. Kiracı teması yalnız önizleme
+ * iframe'inin İÇİNDE yaşıyor, o da web-booking tarafından render ediliyor.
+ */
+
+@theme inline {
+  --color-canvas: var(--surface-canvas);
+  --color-card: var(--surface-card);
+  --color-muted: var(--surface-muted);
+  --color-ink: var(--text-ink);
+  --color-ink-soft: var(--text-soft);
+  --color-line: var(--border-subtle);
+  --color-line-strong: var(--border-strong);
+  --color-brand: var(--brand);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-soft: var(--brand-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+}
+
+:root {
+  --surface-canvas: #f8fafc;
+  --surface-card: #ffffff;
+  --surface-muted: #f1f5f9;
+  --text-ink: #0f172a;
+  --text-soft: #52627a;
+  --border-subtle: #e2e8f0;
+  --border-strong: #cbd5e1;
+
+  --brand: #0f766e;
+  --brand-ink: #ffffff;
+  --brand-soft: color-mix(in oklab, var(--brand) 12%, white);
+
+  --danger: #b91c1c;
+  --danger-soft: color-mix(in oklab, var(--danger) 10%, white);
+  --warn: #a16207;
+  --warn-soft: color-mix(in oklab, var(--warn) 12%, white);
+  --ok: #15803d;
+  --ok-soft: color-mix(in oklab, var(--ok) 12%, white);
+
+  --dur-base: 160ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+body {
+  background: var(--surface-canvas);
+  color: var(--text-ink);
+}
+
+/* Odak halkası HER ZAMAN görünür: editör tamamen klavyeyle kullanılabilmeli. */
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-rise {
+  animation: rise-in var(--dur-base) var(--ease-out) both;
+}
+
+/*
+ * Süre 0 değil 0.01ms: sıfır olsaydı `animationend` dinleyicileri hiç
+ * tetiklenmez ve onlara bağlı adım geçişleri takılırdı.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

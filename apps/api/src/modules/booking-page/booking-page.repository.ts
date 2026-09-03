@@ -16,6 +16,26 @@ export async function findSite(tx: Tx): Promise<BookingSiteRow | undefined> {
   return row;
 }
 
+/**
+ * Site satırını YAZMA KİLİDİ altında okur.
+ *
+ * `If-Match` kontrolü ile taslak işaretçisinin taşınması arasında bir yarış
+ * penceresi kalmasın diye: iki eş zamanlı kaydetmeden ikincisi kilidi bekler
+ * ve kilidi aldığında `draft_revision_id` çoktan taşınmış olur — sürüm
+ * karşılaştırması 409 verir. Kilit olmasaydı ikisi de kontrolü geçer,
+ * `(booking_site_id, revision_number)` UNIQUE'i 23505'e düşerdi: doğru sonuç
+ * ama istemciye anlamsız bir hata.
+ */
+export async function lockSite(tx: Tx, siteId: string): Promise<BookingSiteRow | undefined> {
+  const [row] = await tx
+    .select()
+    .from(bookingSites)
+    .where(eq(bookingSites.id, siteId))
+    .limit(1)
+    .for('update');
+  return row;
+}
+
 export async function findTenantSlug(tx: Tx, tenantId: string): Promise<string | undefined> {
   const [row] = await tx
     .select({ slug: tenants.slug })

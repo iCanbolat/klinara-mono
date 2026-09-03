@@ -17,8 +17,10 @@ const BASE_ENV = {
 
 describe('zarif kapanış', () => {
   it('kapanış sırasında AKTİF istek yarıda kesilmez, tamamlanır', async () => {
+    // `createTestApp` uygulamayı ZATEN dinlemeye alıyor (bkz. `helpers/app.ts`);
+    // ikinci bir `listen` Nest'te hata veriyor. Bu test gerçek bir sokete
+    // ihtiyaç duyan tek test olduğu için portu doğrudan sunucudan okuyor.
     const app: NestExpressApplication = await createTestApp({ controllers: [ProbeController] });
-    await app.listen(0, '127.0.0.1');
 
     const address = app.getHttpServer().address() as { port: number };
     const inflight = fetch(`http://127.0.0.1:${address.port}/api/v1/slow`);

@@ -83,6 +83,34 @@ export default tseslint.config(
     },
   },
   {
+    // Yetkili yukarı akış çağrıları YALNIZ Route Handler'da yapılabilir.
+    //
+    // Sebep Next 15'in bir kısıtı: `cookies().set()` bir RSC içinde çağrıldığında
+    // fırlıyor. Yetkili her çağrı, erişim token'ının süresi dolmuşsa yenileme ve
+    // cookie yazma gerektirebilir — bu iş RSC'de YAPILAMAZ. Kural yoruma
+    // bırakılsaydı, aylar sonra birinin bir layout'a `await callUpstream(...)`
+    // yazmasıyla sessizce kırılırdı ve hata mesajı sebebi anlatmazdı.
+    //
+    // Repository/`tx` kuralıyla aynı gerekçe: mimari sınır belgelenmiyor,
+    // zorlanıyor.
+    files: ['apps/web-admin/src/**/*.{ts,tsx}'],
+    ignores: ['apps/web-admin/src/app/api/**', 'apps/web-admin/src/lib/session/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/session/upstream', '@/lib/session/upstream', '**/session/store', '@/lib/session/store'],
+              message:
+                'Yukarı akış çağrısı ve cookie yazımı yalnız Route Handler içinde yapılabilir (RSC Set-Cookie yapamaz). Tarayıcıdan `lib/api/client.ts` kullanın.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // Pazarlama blokları SUNUCU bileşeni olarak kalmak ZORUNDA: Radix'in tek
     // bir importu istemci bundle'ını public sayfaya taşır ve 11.1'in
     // Lighthouse >= 90 / LCP < 2.0 s kriterini sessizce düşürür. Sınır

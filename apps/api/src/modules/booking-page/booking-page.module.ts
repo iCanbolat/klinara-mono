@@ -8,6 +8,7 @@ import { DomainsController } from './domains.controller';
 import { DomainsService } from './domains.service';
 import { DomainVerifyWorker } from './domain-verify.worker';
 import { BookingPagePurgeWorker } from './booking-page-purge.worker';
+import { PublicModule } from '../public/public.module';
 
 /**
  * Randevu sayfasının YÖNETİM yüzü — kimlik doğrulamalı, izin bazlı.
@@ -17,6 +18,9 @@ import { BookingPagePurgeWorker } from './booking-page-purge.worker';
  * fark edilmez kılardı.
  */
 @Module({
+  // Yalnız `PublicSiteService` için: taslak önizleme, yayınlanmış sayfayla
+  // AYNI presenter'dan geçmeli (bkz. `getDraftSite`).
+  imports: [PublicModule],
   controllers: [BookingPageController, DomainsController, AssetsController],
   providers: [
     BookingSiteProvisioner,

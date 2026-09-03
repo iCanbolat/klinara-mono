@@ -211,6 +211,7 @@ describe('randevu sayfası: site, alan adı ve public çözümleme (Batch 9.1)',
       await http(app)
         .put('/api/v1/booking-page/content')
         .set(ownerAuth())
+        .set('If-Match', 'W/"0"')
         .send({ sections: [{ type: 'hero', title: 'Klinik X' }] })
         .expect(200);
       await http(app).post('/api/v1/booking-page/publish').set(ownerAuth()).expect(200);
@@ -312,6 +313,7 @@ describe('randevu sayfası: site, alan adı ve public çözümleme (Batch 9.1)',
       await http(app)
         .put('/api/v1/booking-page/content')
         .set(ownerAuth())
+        .set('If-Match', 'W/"0"')
         .send({ sections: [] })
         .expect(200);
       await http(app).post('/api/v1/booking-page/publish').set(ownerAuth()).expect(200);

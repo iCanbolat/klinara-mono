@@ -71,6 +71,66 @@ export async function findPublishedSite(
   };
 }
 
+/**
+ * TASLAK (ya da açıkça istenen) revizyonu getirir.
+ *
+ * `findPublishedSite`in ikizi ve tek farkı hangi işaretçiyi izlediği:
+ * `published_revision_id` yerine `draft_revision_id`, ya da `revisionId`
+ * verilmişse doğrudan o revizyon. Sorgunun kopyalanmış görünmesi bilinçli —
+ * ortak bir "revizyon seç" parametresi, public sıcak yolunun sorgu planını
+ * bir yönetim özelliğine bağlardı.
+ *
+ * ⚠️ Revizyon SİTEYE ait olmak zorunda: `r.booking_site_id = s.id` koşulu olmadan bir
+ * kiracı, başka bir kiracının revizyon kimliğini tahmin edip içeriğini
+ * okuyabilirdi. RLS zaten kiracıyı süzüyor ama bu koşul, savunmanın tek bir
+ * katmana dayanmamasını sağlıyor.
+ */
+export async function findDraftSite(
+  tx: Tx,
+  siteId: string,
+  revisionId?: string,
+): Promise<PublicSiteRow | undefined> {
+  const result = await tx.execute<Record<string, unknown>>(sql`
+    select s.id            as site_id,
+           s.status::text  as status,
+           s.default_branch_id,
+           t.name          as tenant_name,
+           t.timezone,
+           t.currency,
+           r.id            as revision_id,
+           r.revision_number,
+           r.content_hash,
+           r.theme,
+           r.sections,
+           r.seo
+      from booking_sites s
+      join tenants t on t.id = s.tenant_id
+      left join booking_page_revisions r
+             on r.booking_site_id = s.id
+            and r.id = coalesce(${revisionId ?? null}::uuid, s.draft_revision_id, s.published_revision_id)
+     where s.id = ${siteId}
+       and s.deleted_at is null
+     limit 1
+  `);
+
+  const row = result.rows[0];
+  if (row === undefined) return undefined;
+  return {
+    siteId: row['site_id'] as string,
+    status: row['status'] as string,
+    defaultBranchId: (row['default_branch_id'] as string | null) ?? null,
+    tenantName: row['tenant_name'] as string,
+    timezone: row['timezone'] as string,
+    currency: row['currency'] as string,
+    revisionId: (row['revision_id'] as string | null) ?? null,
+    revisionNumber: (row['revision_number'] as number | null) ?? null,
+    contentHash: (row['content_hash'] as string | null) ?? null,
+    theme: (row['theme'] as Record<string, unknown> | null) ?? {},
+    sections: (row['sections'] as unknown[] | null) ?? [],
+    seo: (row['seo'] as Record<string, unknown> | null) ?? {},
+  };
+}
+
 export interface PublicBranchRow {
   id: string;
   name: string;

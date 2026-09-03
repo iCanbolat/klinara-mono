@@ -66,6 +66,7 @@ describe('public uygulayıcı seçimi (Ek C)', () => {
     await http(app)
       .put('/api/v1/booking-page/content')
       .set(ownerAuth())
+      .set('If-Match', 'W/"0"')
       .send({ sections: [{ type: 'hero', title: 'Klinik X' }] })
       .expect(200);
     await http(app).post('/api/v1/booking-page/publish').set(ownerAuth()).expect(200);
@@ -219,6 +220,7 @@ describe('public uygulayıcı seçimi (Ek C)', () => {
     await http(app)
       .put('/api/v1/booking-page/content')
       .set(auth(other.owner.tokens))
+      .set('If-Match', 'W/"0"')
       .send({ sections: [{ type: 'hero', title: 'Klinik Y' }] })
       .expect(200);
     await http(app).post('/api/v1/booking-page/publish').set(auth(other.owner.tokens)).expect(200);

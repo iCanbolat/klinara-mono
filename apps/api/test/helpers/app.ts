@@ -46,6 +46,29 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<NestE
     rawBody: true,
   });
   configureApp(app);
-  await app.init();
+
+  /**
+   * ⚠️ `init()` DEĞİL `listen()`: uygulama testin ömrü boyunca TEK BİR kez
+   * dinlemeye alınıyor.
+   *
+   * Sebebi supertest'in davranışı. `request(server)` çağrıldığında sunucu
+   * dinlemiyorsa supertest onu KENDİSİ `listen(0)` ile açıyor ve istek bitince
+   * `close()` ediyor (`supertest/lib/test.js`). `init()` ile bırakılan bir
+   * uygulamada bu, her istek başına bir aç-kapa demek — tam koşumda binlerce
+   * kez. İki sonucu var:
+   *
+   * 1. Eş zamanlı iki istek AYNI sunucuyu paylaşıyor; ilk biten `close()`
+   *    çağırıp soketi ötekinin altından çekiyor.
+   * 2. Kapanan efemeral portu, bir sonraki `listen(0)`a kadar makinedeki
+   *    BAŞKA bir süreç kapabiliyor. O aralıkta gönderilen istek başka bir
+   *    sunucuya düşüyor ve dönen yanıt bizim RFC 9457 biçimimizde OLMUYOR —
+   *    Ek P'de kayıtlı "tam koşumda rastgele bir dosya 401 alıyor, gövde
+   *    Anthropic API'sinin hata şekli" belirtisi tam olarak budur.
+   *
+   * Sunucu baştan dinlediği için supertest hiç `listen`/`close` yapmıyor;
+   * soket `app.close()`a kadar ayakta kalıyor. Port `0` (efemeral) ve adres
+   * `127.0.0.1`: testler dışarıdan erişilebilir bir port açmamalı.
+   */
+  await app.listen(0, '127.0.0.1');
   return app;
 }

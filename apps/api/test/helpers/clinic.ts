@@ -1,4 +1,5 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import { describeResponse } from './describe-response';
 import { auth, bootstrapTenant, http, inviteMember, type TenantFixture, type Tokens } from './identity';
 
 /**
@@ -106,6 +107,7 @@ export function weeklyStaffSchedule(
   );
 }
 
+/** Fixture adımının beklenen durumu döndüğünü doğrular. */
 async function expectOk<T>(
   promise: Promise<{ status: number; body: unknown }>,
   expected: number,
@@ -113,7 +115,7 @@ async function expectOk<T>(
 ): Promise<T> {
   const res = await promise;
   if (res.status !== expected) {
-    throw new Error(`${what} başarısız: ${res.status} ${JSON.stringify(res.body)}`);
+    throw new Error(`${what} başarısız: ${res.status} ${JSON.stringify(res.body)} ${describeResponse(res)}`);
   }
   return res.body as T;
 }

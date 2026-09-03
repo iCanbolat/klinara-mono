@@ -4,6 +4,7 @@ import { ERROR_CODES } from '@klinara/shared';
 import { canonicalJson } from '../../common/canonical-json';
 import { sha256 } from '../../common/crypto/tokens';
 import { AppError } from '../../common/errors/app-error';
+import { versionConflict } from '../../common/http/etag';
 import { RequestContextService } from '../../common/request-context';
 import { CONTENT_SCHEMA_VERSION } from '../../database/schema';
 import { TenantTxService } from '../../database/tenant-tx.service';
@@ -120,8 +121,21 @@ export class BookingPageService {
    * Mevcut taslağın üzerine yazmıyoruz: sürümler değişmez (`reject_mutation`)
    * ve her kaydetme geri alınabilir bir nokta bırakıyor. Editörün "geri al"ı
    * bu yüzden ayrı bir özellik değil, pointer taşımanın doğal sonucu.
+   *
+   * `expectedRevisionNumber` iyimser kilit (`If-Match`): istemcinin ÜZERİNE
+   * YAZDIĞINI SANDIĞI taslak sürümü. Yürürlükteki taslak başka biri tarafından
+   * ilerletilmişse yazım 409 ile reddedilir — sürümler değişmez olduğu için
+   * kaybolan bir şey olmuyor gibi görünse de, taslak İŞARETÇİSİ tek: koşulsuz
+   * taşımak öbür kullanıcının düzenlemesini editörde görünmez kılar ve
+   * yayınlanan içerik onun hiç görmediği bir şey olur.
+   *
+   * Taslağı olmayan sayfanın yürürlükteki sürümü `0`; yani ilk kaydetme
+   * `If-Match: W/"0"` ile gelir.
    */
-  async saveDraft(input: UpdateBookingPageContentDto): Promise<BookingPageContentDto> {
+  async saveDraft(
+    input: UpdateBookingPageContentDto,
+    expectedRevisionNumber: number,
+  ): Promise<BookingPageContentDto> {
     const document = {
       theme: input.theme ?? {},
       sections: input.sections,
@@ -131,6 +145,13 @@ export class BookingPageService {
 
     await this.tx.run(async (tx) => {
       const site = await this.provisioner.ensure(tx);
+      // Kilit kontrolden ÖNCE: aksi hâlde iki eş zamanlı kaydetme de kontrolü
+      // geçer ve ikincisi birincinin taslağını sessizce ilerletirdi — tam da
+      // `If-Match`in engellemek için var olduğu şey.
+      const locked = (await repo.lockSite(tx, site.id)) ?? site;
+      const current = await this.draftRevisionNumber(tx, locked.draftRevisionId);
+      if (current !== expectedRevisionNumber) throw versionConflict();
+
       const revision = await repo.insertRevision(tx, {
         tenantId: this.tx.tenantId,
         bookingSiteId: site.id,
@@ -185,6 +206,9 @@ export class BookingPageService {
   async rollback(revisionId: string): Promise<BookingPageContentDto> {
     await this.tx.run(async (tx) => {
       const site = await this.provisioner.ensure(tx);
+      // Geri alma da taslak işaretçisini taşıyor; `saveDraft` ile aynı kilidi
+      // alması ikisinin araya girmesini engelliyor.
+      await repo.lockSite(tx, site.id);
       const revision = await repo.findRevisionOfSite(tx, site.id, revisionId);
       if (revision === undefined) throw AppError.notFound('İçerik sürümü bulunamadı');
 
@@ -227,6 +251,13 @@ export class BookingPageService {
       const rows = await repo.listRevisions(tx, site.id, REVISION_HISTORY_LIMIT);
       return rows.map((row) => summarizeRevision(row, site.publishedRevisionId));
     });
+  }
+
+  /** Yürürlükteki taslak sürüm numarası; taslak yoksa `0`. `If-Match` tokenı. */
+  private async draftRevisionNumber(tx: Tx, draftRevisionId: string | null): Promise<number> {
+    if (draftRevisionId === null) return 0;
+    const revision = await repo.findRevision(tx, draftRevisionId);
+    return revision?.revisionNumber ?? 0;
   }
 
   private present(payload: {

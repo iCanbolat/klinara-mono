@@ -1,5 +1,6 @@
 import request from 'supertest';
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import { describeResponse } from './describe-response';
 
 /**
  * Kimlik fixture'ları.
@@ -63,7 +64,9 @@ export async function bootstrapTenant(
     });
 
   if (created.status !== 201) {
-    throw new Error(`Kiracı oluşturulamadı: ${created.status} ${JSON.stringify(created.body)}`);
+    throw new Error(
+      `Kiracı oluşturulamadı: ${created.status} ${JSON.stringify(created.body)} ${describeResponse(created)}`,
+    );
   }
 
   const body = created.body as TenantFixture & {
@@ -75,7 +78,9 @@ export async function bootstrapTenant(
     .send({ password, fullName: 'Klinik Sahibi' });
 
   if (accepted.status !== 200) {
-    throw new Error(`Davet kabul edilemedi: ${accepted.status} ${JSON.stringify(accepted.body)}`);
+    throw new Error(
+      `Davet kabul edilemedi: ${accepted.status} ${JSON.stringify(accepted.body)} ${describeResponse(accepted)}`,
+    );
   }
 
   const tokens = (accepted.body as LoginBody).tokens;
@@ -125,7 +130,7 @@ export async function invite(
 
   if (invitation.status !== 201) {
     throw new Error(
-      `Davet oluşturulamadı: ${invitation.status} ${JSON.stringify(invitation.body)}`,
+      `Davet oluşturulamadı: ${invitation.status} ${JSON.stringify(invitation.body)} ${describeResponse(invitation)}`,
     );
   }
 
@@ -135,7 +140,9 @@ export async function invite(
     .send({ password: options.password ?? DEFAULT_PASSWORD, fullName: options.fullName });
 
   if (accepted.status !== 200) {
-    throw new Error(`Davet kabul edilemedi: ${accepted.status} ${JSON.stringify(accepted.body)}`);
+    throw new Error(
+      `Davet kabul edilemedi: ${accepted.status} ${JSON.stringify(accepted.body)} ${describeResponse(accepted)}`,
+    );
   }
   return accepted.body as LoginBody;
 }

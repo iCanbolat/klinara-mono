@@ -40,6 +40,13 @@ export const publicEnv = {
   assetBaseUrl: (process.env.NEXT_PUBLIC_ASSET_BASE_URL ?? '').replace(/\/$/, ''),
   /** Yerelde konak adı çözümlemesini atlamak için; üretimde yok sayılır. */
   devSlug: process.env.NEXT_PUBLIC_DEV_SLUG ?? '',
+  /**
+   * Yönetim panelinin origin'i — `/_preview` rotasının `postMessage` kontrolü.
+   *
+   * Boşsa önizleme rotası KAPALI. Bu rota kiracının alan adı altında keyfî
+   * içerik render edebildiği için, hedef origin bilinmeden açık olmamalı.
+   */
+  adminOrigin: (process.env.NEXT_PUBLIC_ADMIN_ORIGIN ?? '').replace(/\/$/, ''),
 } as const;
 
 export const isProduction = serverEnv.nodeEnv === 'production';

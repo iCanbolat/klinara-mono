@@ -71,6 +71,7 @@ describe('public randevu akışı: uygunluk, tutma, OTP, randevu, self-servis (9
     await http(app)
       .put('/api/v1/booking-page/content')
       .set(ownerAuth())
+      .set('If-Match', 'W/"0"')
       .send({ sections: [{ type: 'hero', title: 'Klinik X' }] })
       .expect(200);
     if (consent) {
@@ -200,7 +201,12 @@ describe('public randevu akışı: uygunluk, tutma, OTP, randevu, self-servis (9
       const slot = await firstSlot();
 
       const other = await bootstrapTenant(app, { slug: 'klinik-z' });
-      await http(app).put('/api/v1/booking-page/content').set(auth(other.owner.tokens)).send({ sections: [] }).expect(200);
+      await http(app)
+        .put('/api/v1/booking-page/content')
+        .set(auth(other.owner.tokens))
+        .set('If-Match', 'W/"0"')
+        .send({ sections: [] })
+        .expect(200);
       await http(app).post('/api/v1/booking-page/publish').set(auth(other.owner.tokens)).expect(200);
 
       const res = await http(app)

@@ -42,9 +42,13 @@ const CACHE_MAX_ENTRIES = 500;
  * lookahead'i kazanıyor ve middleware o yol için hiç koşmuyor. Dışlamayı
  * kaldırmak güvenli, çünkü uygulamanın `public/` altında servis edilen varlığı
  * yok — görseller CDN'den geliyor.
+ *
+ * `_preview` dışlanıyor: yönetim panelinin önizleme iframe'i o rotayı yüklüyor
+ * ve dışlanmasaydı `[slug]` segmenti onu da yutar, "_preview" bir slug sanılıp
+ * API'ye sorulurdu (Faz 11.1'de `/robots.txt` ile yaşanan hatanın aynısı).
  */
 export const config = {
-  matcher: ['/((?!api|_next).*)'],
+  matcher: ['/((?!api|_next|_preview).*)'],
 };
 
 /**
@@ -61,6 +65,7 @@ Allow: /
 Disallow: /randevu
 Disallow: /r/
 Disallow: /api/
+Disallow: /_preview
 `;
 
 const ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">` +

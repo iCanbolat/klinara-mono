@@ -58,8 +58,18 @@ describe('randevu sayfası içeriği, teması ve public okuma (Batch 9.2)', () =
 
   const ownerAuth = () => auth(clinic.owner.tokens);
 
-  const saveDraft = (body: object) =>
-    http(app).put('/api/v1/booking-page/content').set(ownerAuth()).send(body);
+  /**
+   * `ifMatch` = üzerine yazdığımızı sandığımız TASLAK sürüm numarası; taslağı
+   * olmayan sayfada `0`. Varsayılanı 0 tutup sıralı kaydetmelerde açıkça
+   * vermek, testin iyimser kilidi de sınamasını sağlıyor: yanlış sürümle
+   * çağıran her test 409 alır.
+   */
+  const saveDraft = (body: object, ifMatch = 0) =>
+    http(app)
+      .put('/api/v1/booking-page/content')
+      .set(ownerAuth())
+      .set('If-Match', `W/"${String(ifMatch)}"`)
+      .send(body);
 
   const publish = () => http(app).post('/api/v1/booking-page/publish').set(ownerAuth());
 
@@ -112,7 +122,7 @@ describe('randevu sayfası içeriği, teması ve public okuma (Batch 9.2)', () =
   describe('sürümler', () => {
     it('her kaydetme YENİ ve değişmez bir sürüm yazar', async () => {
       await saveDraft({ sections: [{ type: 'hero', title: 'Birinci' }] }).expect(200);
-      const second = await saveDraft({ sections: [{ type: 'hero', title: 'İkinci' }] }).expect(200);
+      const second = await saveDraft({ sections: [{ type: 'hero', title: 'İkinci' }] }, 1).expect(200);
       expect((second.body as ContentBody).draft?.revisionNumber).toBe(2);
 
       const revisions = await http(app)
@@ -146,7 +156,7 @@ describe('randevu sayfası içeriği, teması ve public okuma (Batch 9.2)', () =
         sections: [{ subtitle: 'Alt başlık', title: 'Klinik X', type: 'hero' }],
         theme: { fontFamily: 'inter', primaryColor: '#0F766E' },
       };
-      const second = await saveDraft(shuffled).expect(200);
+      const second = await saveDraft(shuffled, 1).expect(200);
 
       expect((second.body as ContentBody).draft?.contentHash).toBe(
         (first.body as ContentBody).draft?.contentHash,
@@ -158,7 +168,7 @@ describe('randevu sayfası içeriği, teması ve public okuma (Batch 9.2)', () =
       const firstRevision = (first.body as ContentBody).draft!.id;
       await publish().expect(200);
 
-      await saveDraft({ sections: [{ type: 'hero', title: 'Yeni' }] }).expect(200);
+      await saveDraft({ sections: [{ type: 'hero', title: 'Yeni' }] }, 1).expect(200);
       await publish().expect(200);
 
       const live = await http(app).get('/api/v1/public/sites/klinik-x').expect(200);
@@ -173,6 +183,60 @@ describe('randevu sayfası içeriği, teması ve public okuma (Batch 9.2)', () =
       expect(((rolledBack.body as PublicSiteBody).sections[0] as { title: string }).title).toBe(
         'Eski',
       );
+    });
+
+    it('KRİTİK: If-Match ZORUNLU — başlıksız kaydetme 428', async () => {
+      const res = await http(app)
+        .put('/api/v1/booking-page/content')
+        .set(ownerAuth())
+        .send({ sections: [] })
+        .expect(428);
+      expect((res.body as Problem).code).toBe('VERSION_CONFLICT');
+    });
+
+    it('If-Match biçimsizse 400', async () => {
+      await http(app)
+        .put('/api/v1/booking-page/content')
+        .set(ownerAuth())
+        .set('If-Match', 'çöp')
+        .send({ sections: [] })
+        .expect(400);
+    });
+
+    it('KRİTİK: bayat If-Match 409 — başkasının taslağı EZİLMİYOR', async () => {
+      await saveDraft({ sections: [{ type: 'hero', title: 'Birinci' }] }).expect(200);
+      // İkinci kullanıcı hâlâ sürüm 0'ı elinde sanıyor.
+      const stale = await saveDraft({ sections: [{ type: 'hero', title: 'Ezen' }] }).expect(409);
+      expect((stale.body as Problem).code).toBe('VERSION_CONFLICT');
+
+      // Taslak işaretçisi TAŞINMAMIŞ olmalı: yeni bir sürüm de yazılmamış.
+      const content = await http(app)
+        .get('/api/v1/booking-page/content')
+        .set(ownerAuth())
+        .expect(200);
+      const body = content.body as ContentBody;
+      expect(body.draft?.revisionNumber).toBe(1);
+      expect((body.sections[0] as { title: string }).title).toBe('Birinci');
+      expect(content.headers['etag']).toBe('W/"1"');
+
+      // Doğru sürümle yeniden denemek çalışıyor.
+      await saveDraft({ sections: [{ type: 'hero', title: 'Ezen' }] }, 1).expect(200);
+    });
+
+    it('geri alma sonrası If-Match tokenı ESKİ sürüme döner', async () => {
+      const first = await saveDraft({ sections: [{ type: 'hero', title: 'Eski' }] }).expect(200);
+      const firstRevision = (first.body as ContentBody).draft!.id;
+      await saveDraft({ sections: [{ type: 'hero', title: 'Yeni' }] }, 1).expect(200);
+
+      const rolled = await http(app)
+        .post(`/api/v1/booking-page/content/rollback/${firstRevision}`)
+        .set(ownerAuth())
+        .expect(200);
+      expect(rolled.headers['etag']).toBe('W/"1"');
+
+      // Geri almadan ÖNCEKİ token (2) artık bayat.
+      await saveDraft({ sections: [] }, 2).expect(409);
+      await saveDraft({ sections: [] }, 1).expect(200);
     });
 
     it('içeriği olmayan sayfa yayınlanamaz', async () => {
@@ -248,7 +312,7 @@ describe('randevu sayfası içeriği, teması ve public okuma (Batch 9.2)', () =
 
     it('yayın ETag’i değiştirir', async () => {
       const before = (await http(app).get('/api/v1/public/sites/klinik-x')).headers['etag'];
-      await saveDraft({ sections: [{ type: 'hero', title: 'Değişti' }] }).expect(200);
+      await saveDraft({ sections: [{ type: 'hero', title: 'Değişti' }] }, 1).expect(200);
       await publish().expect(200);
       const after = (await http(app).get('/api/v1/public/sites/klinik-x')).headers['etag'];
       expect(after).not.toBe(before);

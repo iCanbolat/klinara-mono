@@ -1,4 +1,17 @@
+import type { PublicImage } from '@klinara/shared';
 import type { PublicAssetRow, PublicBranchRow, PublicServiceRow } from './public-content.repository';
+
+/**
+ * `collectAssetIds` ve `resolveAssets` ARTIK BURADA DEĞİL: `@klinara/shared`te.
+ *
+ * Yönetim paneli kaydedilmemiş taslağı önizlerken aynı dönüşümü istemcide
+ * yapmak zorunda ve ikinci bir kopya, bir gün birinin yeni bir `*AssetId`
+ * alanını tanıyıp öbürünün tanımaması demekti — fark tam olarak önizlemenin
+ * var olma sebebini çürüterek ortaya çıkardı. Buradan yeniden dışa
+ * aktarılıyorlar ki bu modülün çağıranları tek bir yerden okusun.
+ */
+export { collectAssetIds, resolveAssets } from '@klinara/shared';
+export type { PublicImage } from '@klinara/shared';
 
 /**
  * Public yanıtın ALAN BEYAZ LİSTESİ.
@@ -8,13 +21,6 @@ import type { PublicAssetRow, PublicBranchRow, PublicServiceRow } from './public
  * dokunulmadan public bir sayfada belirmemeli. Bir entegrasyon testi dönen
  * anahtarları donmuş bir listeyle karşılaştırıyor.
  */
-
-export interface PublicImage {
-  url: string;
-  alt: string | null;
-  width: number | null;
-  height: number | null;
-}
 
 export interface PublicBranchView {
   id: string;
@@ -114,50 +120,4 @@ export function buildAssetIndex(
     });
   }
   return index;
-}
-
-/** İçerik dokümanında geçen tüm `assetId` alanlarını toplar. */
-export function collectAssetIds(document: {
-  theme: Record<string, unknown>;
-  sections: unknown[];
-  seo: Record<string, unknown>;
-}): string[] {
-  const ids = new Set<string>();
-  const visit = (value: unknown): void => {
-    if (Array.isArray(value)) {
-      for (const item of value) visit(item);
-      return;
-    }
-    if (value === null || typeof value !== 'object') return;
-    for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
-      if (typeof entry === 'string' && /AssetId$|^assetId$/.test(key)) ids.add(entry);
-      else visit(entry);
-    }
-  };
-  visit(document.theme);
-  visit(document.sections);
-  visit(document.seo);
-  return [...ids];
-}
-
-/**
- * Dokümandaki `assetId` alanlarını çözülmüş görsellerle DEĞİŞTİRİR.
- *
- * İstemci `logoAssetId` görüp ikinci bir istek atmak zorunda kalmasın; sayfa
- * tek çağrıda render edilebilmeli.
- */
-export function resolveAssets(value: unknown, index: Map<string, PublicImage>): unknown {
-  if (Array.isArray(value)) return value.map((item) => resolveAssets(item, index));
-  if (value === null || typeof value !== 'object') return value;
-
-  const result: Record<string, unknown> = {};
-  for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
-    if (typeof entry === 'string' && /AssetId$|^assetId$/.test(key)) {
-      const field = key === 'assetId' ? 'image' : key.replace(/AssetId$/, '');
-      result[field] = index.get(entry) ?? null;
-      continue;
-    }
-    result[key] = resolveAssets(entry, index);
-  }
-  return result;
 }

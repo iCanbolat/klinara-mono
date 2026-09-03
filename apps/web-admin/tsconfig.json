@@ -1,0 +1,39 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": { "@/*": ["./src/*"] },
+
+    // --- Nest biçimli tabanın web için ZORUNLU override'ları ---
+    // Taban `module: commonjs` + `moduleResolution: node` + `lib: ["ES2023"]`
+    // (DOM yok) + `types: ["node"]` ile Nest'e göre kurulu.
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "jsx": "preserve",
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "experimentalDecorators": false,
+    "emitDecoratorMetadata": false,
+    "allowJs": true,
+    "incremental": true,
+    "plugins": [{ "name": "next" }]
+
+    // strict, exactOptionalPropertyTypes, noUncheckedIndexedAccess ve
+    // noUnusedLocals BİLEREK korunuyor: repo geri kalanıyla aynı disiplin.
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "test/**/*.ts",
+    "test/**/*.tsx",
+    "next-env.d.ts",
+    ".next/types/**/*.ts",
+    "*.config.ts",
+    "*.config.mts",
+    "*.config.mjs"
+  ],
+  "exclude": ["node_modules", ".next"]
+}

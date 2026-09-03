@@ -96,14 +96,80 @@ export class PublicSiteService {
       );
     }
 
+    const view = this.buildView(site.slug, payload);
+    return {
+      view,
+      etag: contentETag(payload.published.revisionNumber ?? 0, payload.published.contentHash ?? ''),
+    };
+  }
+
+  /**
+   * Taslak (ya da belirli bir) revizyonun önizlemesi — YÖNETİM tarafı için.
+   *
+   * `getSite` ile AYNI sunum boru hattını koşuyor ve bu, ucun bütün gerekçesi:
+   * editörün ikinci bir renderer'a sahip olması, "önizlemede güzeldi ama
+   * yayında bozuk" sınıfı hataların kaynağıdır. Tek presenter, iki giriş noktası.
+   *
+   * Yetkilendirme burada YOK — çağıran `BookingPageController` ve orada
+   * `booking_page:read` zorunlu. Bu servis public modülünde yaşadığı için
+   * kendi başına bir yetki kararı vermiyor; `getSite` de vermiyordu.
+   *
+   * HİÇ İÇERİK KAYDEDİLMEMİŞSE 404 DEĞİL, BOŞ BİR GÖRÜNÜM döner (`revision
+   * .number = 0`). Editörün canlı önizlemesi bu görünümü bir TABAN olarak
+   * kullanıyor — şubeler, ayarlar, para birimi, kanonik adres — ve üstüne
+   * kullanıcının o an yazdığı dokümanı biniyor. 404 dönseydi yeni bir kiracı
+   * ilk kaydetmeye kadar hiçbir şey göremezdi; oysa önizlemenin en çok
+   * gerektiği an tam da o an. `revisionId` AÇIKÇA verilmişse kural eskisi gibi:
+   * çözülemeyen revizyon 404'tür.
+   */
+  async getDraftSite(
+    slug: string,
+    siteId: string,
+    revisionId: string | undefined,
+  ): Promise<PublicSiteView> {
+    const payload = await this.tx.run(async (tx) => {
+      const published = await repo.findDraftSite(tx, siteId, revisionId);
+      if (published === undefined) return undefined;
+      // AÇIKÇA bir revizyon istendi ve çözülemedi: yok, ya da başka bir
+      // kiracının. İkisini ayırt etmiyoruz — "var ama senin değil" demek bir
+      // bilgi sızıntısıdır.
+      if (revisionId !== undefined && published.revisionId === null) return undefined;
+
+      const settingsRow = await pageRepo.findSettings(tx, siteId);
+      const branches = await repo.listPublicBranches(tx);
+      const assetIds = collectAssetIds(published);
+      const assets = await repo.findAssetsByIds(tx, assetIds);
+      const tenantDefaults = await loadTenantDefaults(tx);
+      const canonicalHost = await repo.findCanonicalHost(tx, siteId);
+      return { published, settingsRow, branches, assets, tenantDefaults, canonicalHost };
+    });
+
+    if (payload === undefined) {
+      throw new AppError(404, ERROR_CODES.NOT_FOUND, 'Önizlenecek içerik bulunamadı');
+    }
+
+    return this.buildView(slug, payload);
+  }
+
+  /** İki giriş noktasının paylaştığı sunum. */
+  private buildView(
+    slug: string,
+    payload: {
+      published: repo.PublicSiteRow;
+      settingsRow: Awaited<ReturnType<typeof pageRepo.findSettings>>;
+      branches: Awaited<ReturnType<typeof repo.listPublicBranches>>;
+      assets: Awaited<ReturnType<typeof repo.findAssetsByIds>>;
+      tenantDefaults: Awaited<ReturnType<typeof loadTenantDefaults>>;
+      canonicalHost: string | undefined;
+    },
+  ): PublicSiteView {
     const { published, settingsRow, branches, assets, tenantDefaults, canonicalHost } = payload;
     const assetBaseUrl = this.config.get('PUBLIC_ASSET_BASE_URL', { infer: true });
     const index = buildAssetIndex(assets, assetBaseUrl);
-
     const resolved = resolveSettings(settingsRow, tenantDefaults);
 
-    const view: PublicSiteView = {
-      slug: site.slug,
+    return {
+      slug,
       name: published.tenantName,
       timezone: published.timezone,
       currency: published.currency,
@@ -119,11 +185,6 @@ export class PublicSiteService {
         number: published.revisionNumber ?? 0,
         contentHash: published.contentHash ?? '',
       },
-    };
-
-    return {
-      view,
-      etag: contentETag(published.revisionNumber ?? 0, published.contentHash ?? ''),
     };
   }
 
