@@ -67,8 +67,8 @@ export function LoginForm(): ReactNode {
   }
 
   return (
-    <div className="rounded-lg border border-line bg-card p-5 shadow-sm">
-      <h1 className="mb-4 text-lg font-semibold text-ink">{t('auth.login.title')}</h1>
+    <div className="rounded-xl border border-border bg-card p-6">
+      <h1 className="text-title-m mb-5 text-foreground">{t('auth.login.title')}</h1>
 
       <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-3">
         <Field
@@ -96,7 +96,7 @@ export function LoginForm(): ReactNode {
 
       <div className="mt-4 flex flex-col gap-2">
         <PasskeyButton onStep={handleStep} onError={setError} />
-        <a href="/parola/unuttum" className="text-center text-sm text-ink-soft underline">
+        <a href="/parola/unuttum" className="text-center text-sm text-muted-foreground underline">
           {t('auth.login.forgot')}
         </a>
       </div>

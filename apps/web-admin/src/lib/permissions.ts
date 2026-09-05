@@ -45,8 +45,17 @@ export interface NavItem {
   /** Rota — `href` olarak kullanılıyor. */
   path: string;
   labelKey: string;
-  /** Menüde görünmesi için GEREKEN izinlerin hepsi. */
+  /** Menüde görünmesi için GEREKEN izinlerin hepsi (VE). */
   requires: readonly string[];
+  /**
+   * Bunlardan EN AZ BİRİ de gerekiyor (VEYA).
+   *
+   * Raporlar için eklendi: ciroyu `report.revenue:read`, doluluk ve no-show'u
+   * `appointment:read.all` açıyor ve bir rolün ikisine birden sahip olması
+   * şart değil. Yalnız VE ile ifade etmek, muhasebeciyi (takvim izni yok) ya
+   * da resepsiyonu (ciro izni yok) menüden tamamen düşürürdü.
+   */
+  requiresAny?: readonly string[] | undefined;
 }
 
 /**
@@ -60,6 +69,16 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { path: '/sayfa', labelKey: 'nav.page', requires: [PERMISSIONS.BOOKING_PAGE_READ] },
   { path: '/icerik', labelKey: 'nav.content', requires: [PERMISSIONS.BOOKING_PAGE_READ] },
   { path: '/alan-adlari', labelKey: 'nav.domains', requires: [PERMISSIONS.BOOKING_PAGE_READ] },
+  {
+    path: '/raporlar',
+    labelKey: 'nav.reports',
+    requires: [],
+    requiresAny: [
+      PERMISSIONS.REPORT_REVENUE_READ,
+      PERMISSIONS.APPOINTMENT_READ_ALL,
+      PERMISSIONS.REPORT_PERFORMANCE_READ_OWN,
+    ],
+  },
   { path: '/hesap', labelKey: 'nav.account', requires: [] },
 ];
 
@@ -70,7 +89,14 @@ export const NAV_ITEMS: readonly NavItem[] = [
  * durur, ekran okuyucuya okunur ve "neden tıklayamıyorum" sorusu üretir.
  */
 export function visibleNav(permissions: readonly string[]): NavItem[] {
-  return NAV_ITEMS.filter((item) => can(permissions, ...item.requires));
+  return NAV_ITEMS.filter((item) => allows(permissions, item));
+}
+
+/** Bir menü ögesinin iki koşulu: hepsi (`requires`) ve en az biri (`requiresAny`). */
+function allows(permissions: readonly string[], item: NavItem): boolean {
+  if (!can(permissions, ...item.requires)) return false;
+  if (item.requiresAny === undefined) return true;
+  return canAny(permissions, ...item.requiresAny);
 }
 
 /** Bir rota bu izinlerle açılabilir mi (doğrudan URL kontrolü). */
@@ -80,5 +106,5 @@ export function canOpenPath(permissions: readonly string[], path: string): boole
     .filter((item) => path === item.path || path.startsWith(`${item.path}/`))
     .sort((a, b) => b.path.length - a.path.length)[0];
   if (match === undefined) return true;
-  return can(permissions, ...match.requires);
+  return allows(permissions, match);
 }

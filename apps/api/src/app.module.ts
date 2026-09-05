@@ -21,6 +21,7 @@ import { IdentityModule } from './modules/identity/identity.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { AvailabilityCacheModule } from './modules/booking/availability-cache.module';
 import { PackagesModule } from './modules/packages/packages.module';
+import { ReportingModule } from './modules/reporting/reporting.module';
 import { BookingModule } from './modules/booking/booking.module';
 import { BookingPageModule } from './modules/booking-page/booking-page.module';
 import { PublicModule } from './modules/public/public.module';
@@ -84,6 +85,7 @@ import { MetricsModule } from './observability/metrics.module';
     BookingPageModule,
     PublicModule,
     PackagesModule,
+    ReportingModule,
     IntegrationsModule,
     NotificationsModule,
     StaffModule,

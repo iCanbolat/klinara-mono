@@ -7,10 +7,10 @@ import { statusView, type StatusTone } from '@/lib/domains/status';
 import { t } from '@/i18n/tr';
 
 const TONE_CLASS: Record<StatusTone, string> = {
-  ok: 'bg-ok-soft text-ink border-ok',
-  warn: 'bg-warn-soft text-ink border-warn',
-  danger: 'bg-danger-soft text-ink border-danger',
-  info: 'bg-muted text-ink-soft border-line-strong',
+  ok: 'border-success/30 bg-success-soft text-success',
+  warn: 'border-warning/30 bg-warning-soft text-warning',
+  danger: 'border-destructive/30 bg-destructive-soft text-destructive',
+  info: 'border-border bg-muted text-muted-foreground',
 };
 
 const ICONS = { check: Check, clock: Clock, alert: AlertTriangle, pause: Pause } as const;
@@ -27,7 +27,7 @@ export function StatusBadge({ status }: { status: DomainVerificationStatus }): R
   const Icon = ICONS[view.icon];
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs ${TONE_CLASS[view.tone]}`}
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${TONE_CLASS[view.tone]}`}
     >
       <Icon aria-hidden="true" className="h-3.5 w-3.5" />
       {t(view.labelKey)}

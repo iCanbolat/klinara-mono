@@ -30,6 +30,24 @@
  *   müşteri sayfası ekleyiverelim"i güvenlik açısından kritik bir dosyada
  *   GÖRÜNÜR BİR DIFF hâline getiriyor.
  *
+ * RAPORLAR (10.1) — yukarıdaki kuralın İSTİSNASI DEĞİL, TANIMININ DIŞI
+ *
+ * `reports/*` listede ve olması gerekiyor. Klinik operasyonunu dışarıda tutma
+ * gerekçesi "yazma yüzeyini ve müşteri kaydını panele açmayalım"dı; rapor
+ * uçları ikisini de yapmıyor:
+ *
+ * - Hepsi SALT OKUNUR. `POST .../export`in gövdesi bir kayıt değil bir filtre;
+ *   sunucuda hiçbir şey yazmıyor (dinamik `:name` yolu da yok, her rapor kendi
+ *   statik iznini taşıyor).
+ * - Yanıtlar TOPLU. Müşteri kimliği, telefonu, notu dönmüyor; retention raporu
+ *   bunu bir testle sabitliyor.
+ * - Daraltma sunucuda: şube üyeliği ve `report.performance:read.own` kilidi
+ *   `report-scope.ts`te, proxy'nin bileceği bir şey değil.
+ *
+ * Yani buradaki satırlar bir müşteri sayfasına giden kapıyı aralamıyor. Tek
+ * tek yazılmalarının sebebi de bu: `reports/` önekine joker vermek, yarın
+ * eklenecek bir `reports/customers/:id` ucunu sessizce açardı.
+ *
  * TEK İSTİSNA: `GET service-categories`
  *
  * `serviceList` bloğu kategori kimlikleriyle süzülüyor ve editörün o kimlikleri
@@ -75,6 +93,19 @@ const RULES: readonly Rule[] = [
 
   // --- Katalog: yalnız kategori ADLARI (yukarıdaki tek istisna) ---
   { methods: ['GET'], pattern: /^service-categories$/ },
+
+  // --- Raporlar (10.1): salt okunur, toplu veri ---
+  // Şube seçici `GET branches`i kullanıyor; o zaten listede.
+  {
+    methods: ['GET'],
+    pattern: /^reports\/(occupancy|revenue|staff-performance|no-show|retention)$/,
+  },
+  { methods: ['GET'], pattern: /^reports\/packages\/(outstanding|expiring|usage)$/ },
+  // CSV indirme. `POST` ama yazmıyor — gövde filtre taşıyor, kayıt değil.
+  {
+    methods: ['POST'],
+    pattern: /^reports\/(occupancy|revenue|staff-performance|no-show|retention)\/export$/,
+  },
 
   // --- Randevu sayfası: Faz 11.5 ve 11.6'nın tüm yüzeyi ---
   { methods: ['GET', 'PUT'], pattern: /^booking-page$/ },

@@ -26,6 +26,7 @@ export const MESSAGES = {
   'nav.page': 'Randevu sayfası',
   'nav.content': 'İçerik ve tema',
   'nav.domains': 'Alan adları',
+  'nav.reports': 'Raporlar',
   'nav.account': 'Hesabım',
   'nav.logout': 'Çıkış yap',
   'nav.skipToContent': 'İçeriğe geç',
@@ -201,6 +202,126 @@ export const MESSAGES = {
   'account.sessions': 'Açık oturumlar',
   'account.sessionCurrent': 'Bu cihaz',
   'account.logoutAll': 'Tüm cihazlardan çıkış yap',
+
+  // --- Raporlar (10.1) ---
+  'reports.title': 'Raporlar',
+  'reports.occupancy': 'Doluluk',
+  'reports.occupancyHint': 'Personelin müsait dakikalarının ne kadarı dolu.',
+  'reports.revenue': 'Ciro',
+  'reports.revenueHint': 'Tahakkuk eden ve tahsil edilen, ayrı ayrı.',
+  'reports.staffPerformance': 'Personel performansı',
+  'reports.staffPerformanceHint': 'İşlem sayısı, ciro, prim ve doluluk.',
+  'reports.noShow': 'Gelmeme ve iptal',
+  'reports.noShowHint': 'Randevu başına gelmeme ve iptal oranı.',
+  'reports.retention': 'Kazanım ve geri dönüş',
+  'reports.retentionHint': 'Yeni müşteri, geri gelen müşteri ve geliş kaynağı.',
+  'reports.period': 'Dönem',
+  'reports.branch': 'Şube',
+  'reports.allBranches': 'Tüm şubeler',
+  'reports.groupBy': 'Kırılım',
+  'reports.compare': 'Önceki dönemle karşılaştır',
+  'reports.export': 'CSV indir',
+  'reports.exporting': 'Hazırlanıyor…',
+  'reports.empty': 'Bu dönemde gösterilecek veri yok.',
+  'reports.scopeOwn': 'Yalnız kendi verileriniz gösteriliyor.',
+  'reports.deltaUnavailable': 'Önceki dönem boş olduğu için karşılaştırılamıyor.',
+  'reports.cohortWarning':
+    'Kohort oranları dönem bugüne yakınsa düşük görünür: müşterilerin 90 günü henüz dolmamış olabilir.',
+  'reports.revenueRowsNote':
+    'Kırılım satırlarının tahsilat toplamı genel toplamdan küçük olabilir: eski bir borca bu dönemde yapılan tahsilatın bağlanacağı kalem bu dönemde değildir.',
+
+  // Kolon başlıkları
+  'reports.col.group': 'Kırılım',
+  'reports.col.bookedMinutes': 'Dolu dakika',
+  'reports.col.availableMinutes': 'Müsait dakika',
+  'reports.col.occupancyRate': 'Doluluk',
+  'reports.col.accrued': 'Tahakkuk',
+  'reports.col.collected': 'Tahsilat',
+  'reports.col.staff': 'Personel',
+  'reports.col.completedServices': 'Tamamlanan işlem',
+  'reports.col.commission': 'Prim',
+  'reports.col.total': 'Toplam',
+  'reports.col.completed': 'Tamamlanan',
+  'reports.col.noShow': 'Gelmedi',
+  'reports.col.cancelled': 'İptal',
+  'reports.col.noShowRate': 'Gelmeme oranı',
+  'reports.col.cancellationRate': 'İptal oranı',
+  'reports.col.source': 'Geliş kaynağı',
+  'reports.col.customers': 'Müşteri',
+  'reports.col.cohort': 'Süre',
+  'reports.col.returned': 'Geri dönen',
+  'reports.col.rate': 'Oran',
+
+  // Özet kartları
+  'reports.summary.newCustomers': 'Yeni müşteri',
+  'reports.summary.returningCustomers': 'Geri gelen',
+  'reports.summary.activeCustomers': 'Aktif müşteri',
+  'reports.summary.origin': 'Randevu kaynağı',
+  'reports.origin.internal': 'Klinikten',
+  'reports.origin.online': 'Online',
+  'reports.sourceUnknown': 'Belirtilmemiş',
+
+  // --- Kabuk ---
+  'shell.brand': 'Klinara',
+  'shell.toggleSidebar': 'Menüyü aç/kapat',
+  'shell.userMenu': 'Kullanıcı menüsü',
+  'shell.security': 'Güvenlik',
+  'shell.branch': 'Şube',
+  'shell.allBranches': 'Tüm şubeler',
+  'shell.breadcrumb': 'Neredesiniz',
+
+  // Panel kartlarının açıklamaları — menü etiketleri tek başına ne yapıldığını anlatmıyor.
+  'home.greeting': 'Merhaba, {name}',
+  'home.subtitle': 'Kliniğinizin online görünürlüğünü ve raporlarını buradan yönetiyorsunuz.',
+  'home.desc./sayfa': 'Randevu sayfasının adresi, görünürlüğü ve randevu davranışı.',
+  'home.desc./icerik': 'Sayfa blokları, görseller, tema ve SEO ayarları.',
+  'home.desc./alan-adlari': 'Kendi alan adınızı bağlayın, DNS ve sertifika durumunu izleyin.',
+  'home.desc./raporlar': 'Doluluk, ciro, personel performansı, gelmeme ve kazanım.',
+
+  // --- Durumlar ---
+  'state.emptyTitle': 'Burada henüz bir şey yok',
+  'state.errorTitle': 'Bir şeyler ters gitti',
+  'state.errorBody': 'İşlem tamamlanamadı. Tekrar deneyebilir ya da sayfayı yenileyebilirsiniz.',
+  'state.notFoundTitle': 'Sayfa bulunamadı',
+  'state.notFoundBody': 'Aradığınız sayfa taşınmış ya da hiç var olmamış olabilir.',
+  'state.backHome': 'Panele dön',
+
+  // --- Bildirimler ---
+  'toast.saved': 'Kaydedildi',
+  'toast.copied': 'Panoya kopyalandı',
+  'toast.exported': 'Dosya indiriliyor',
+  'toast.failed': 'İşlem başarısız',
+
+  // --- Randevu sayfası ayarları ---
+  'page.noDomain': 'Henüz bir alan adı yok.',
+  'page.behaviour': 'Randevu davranışı',
+  'page.showStaffSelection': 'Uygulayıcı seçimi gösterilsin',
+  'page.showPrices': 'Fiyatlar gösterilsin',
+  'page.allowReschedule': 'Erteleme yapılabilsin',
+  'page.requireOtp': 'Telefon doğrulaması (OTP) zorunlu',
+  'page.holdTtlMinutes': 'Slot tutma süresi (dakika)',
+  'editor.revision': 'sürüm {number}',
+  'editor.seoTitle': 'Başlık',
+  'editor.seoDescription': 'Açıklama',
+  'editor.selectBlock': 'Düzenlemek için bir blok seçin.',
+  'editor.primaryColor': 'Birincil renk',
+  'editor.backgroundColor': 'Arka plan',
+  'editor.textColor': 'Metin rengi',
+  'editor.fontFamily': 'Yazı tipi',
+  'editor.radius': 'Köşe yarıçapı',
+  'editor.logo': 'Logo',
+  'editor.published': 'Sayfa yayınlandı',
+
+  // Geri alınamaz eylemlerin onayları
+  'account.removePasskeyTitle': 'Passkey silinsin mi?',
+  'account.removePasskeyBody':
+    'Bu cihazla bir daha passkey ile giriş yapamazsınız. İşlem geri alınamaz.',
+  'account.revokeSessionTitle': 'Oturum sonlandırılsın mı?',
+  'account.revokeSessionBody':
+    'Bu cihazdaki oturum kapatılır ve yeniden giriş yapılması gerekir.',
+  'account.logoutAllTitle': 'Tüm cihazlardan çıkılsın mı?',
+  'account.logoutAllBody':
+    'Bu oturum dışındaki bütün oturumlar kapatılır. Ekibinizin yeniden giriş yapması gerekir.',
 } as const;
 
 export type MessageKey = keyof typeof MESSAGES;

@@ -123,6 +123,12 @@ enum Permissions {
     /// Parasal rapor izni. Yükümlülük raporu ve süre dolumu listesindeki tutar
     /// alanları buna bakar — izin yoksa sunucu tutarı `null` döner.
     static let reportRevenueRead = "report.revenue:read"
+    /// Uygulayıcının YALNIZ kendi performans raporu (10.1).
+    ///
+    /// `report.revenue:read` üzerine binmez ve onun dar bir hâli değildir: tek
+    /// başına hiçbir şubenin cirosunu açmaz. Daraltmayı sunucu yapıyor ve
+    /// yanıttaki `scope` alanı bunu söylüyor.
+    static let reportPerformanceReadOwn = "report.performance:read.own"
     /// Borç kalemi, tahsilat ve kasa görüntüleme (Faz 6). Cari hesap bölümü ve
     /// kasa ekranları buna bakar.
     static let financePaymentRead = "finance.payment:read"

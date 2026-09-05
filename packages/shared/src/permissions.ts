@@ -69,6 +69,16 @@ export const PERMISSIONS = {
   // muhasebe primi GÖRÜR ama kuralını değiştiremez.
   FINANCE_COMMISSION_WRITE: 'finance.commission:write',
   REPORT_REVENUE_READ: 'report.revenue:read',
+  /**
+   * Uygulayıcının YALNIZ KENDİ performans raporunu görmesi (10.1).
+   *
+   * `report.revenue:read` üzerine BİNMEZ ve onun dar bir hâli DEĞİLDİR: bu izin
+   * tek başına hiçbir şubenin cirosunu açmaz, yalnız taşıyıcının kendi
+   * satırını açar. Daraltmayı istemci değil sunucu yapar — principal
+   * `staff_profiles.user_id` üzerinden çözülür ve sorgu zorla kendi
+   * `staff_profile_id`'sine kilitlenir.
+   */
+  REPORT_PERFORMANCE_READ_OWN: 'report.performance:read.own',
 
   // --- Onam / KVKK ---
   CONSENT_READ: 'consent:read',
@@ -255,6 +265,9 @@ export const ROLE_DEFINITIONS: RoleDefinition[] = [
       P.PACKAGE_READ,
       P.CONSENT_READ,
       P.NOTIFICATION_READ,
+      // Kendi işlem sayısı, cirosu, primi ve doluluğu. Ciro raporunun tamamı
+      // DEĞİL — `report.revenue:read` bu rolde bilerek yok.
+      P.REPORT_PERFORMANCE_READ_OWN,
     ],
   },
 ];

@@ -69,20 +69,20 @@ export function CategoryPicker({
 
   return (
     <fieldset className="flex flex-col gap-1.5 border-0 p-0">
-      <legend className="text-sm font-medium text-ink">{label}</legend>
-      <p className="text-xs text-ink-soft">{t('category.all')}</p>
+      <legend className="text-sm font-medium text-foreground">{label}</legend>
+      <p className="text-xs text-muted-foreground">{t('category.all')}</p>
 
-      {state === 'loading' ? <p className="text-sm text-ink-soft">{t('category.loading')}</p> : null}
+      {state === 'loading' ? <p className="text-sm text-muted-foreground">{t('category.loading')}</p> : null}
 
       {state === 'unavailable' ? (
         <>
-          <p className="text-sm text-ink-soft">{t('category.unavailable')}</p>
-          <p className="text-sm text-ink">{t('category.selectedCount', { count: selected.length })}</p>
+          <p className="text-sm text-muted-foreground">{t('category.unavailable')}</p>
+          <p className="text-sm text-foreground">{t('category.selectedCount', { count: selected.length })}</p>
         </>
       ) : null}
 
       {state === 'ready' ? (
-        <div className="flex max-h-56 flex-col gap-1 overflow-y-auto rounded-md border border-line p-2">
+        <div className="flex max-h-56 flex-col gap-1 overflow-y-auto rounded-md border border-border p-2">
           {categories.map((category) => {
             const checked = selected.includes(category.id);
             return (
@@ -107,7 +107,7 @@ export function CategoryPicker({
                 />
                 <span>{category.name}</span>
                 {category.isActive ? null : (
-                  <span aria-hidden="true" className="text-xs text-ink-soft">
+                  <span aria-hidden="true" className="text-xs text-muted-foreground">
                     {`(${t('category.inactive')})`}
                   </span>
                 )}
@@ -123,15 +123,15 @@ export function CategoryPicker({
                 disabled={readOnly}
                 onChange={() => toggle(id, false)}
               />
-              <span className="text-ink-soft">{t('category.unknown', { id: id.slice(0, 8) })}</span>
+              <span className="text-muted-foreground">{t('category.unknown', { id: id.slice(0, 8) })}</span>
             </label>
           ))}
         </div>
       ) : null}
 
-      {full ? <p className="text-xs text-ink-soft">{t('category.full', { max: maxItems })}</p> : null}
+      {full ? <p className="text-xs text-muted-foreground">{t('category.full', { max: maxItems })}</p> : null}
       {error !== undefined ? (
-        <span role="alert" className="text-xs text-danger">
+        <span role="alert" className="text-xs text-destructive">
           {error}
         </span>
       ) : null}

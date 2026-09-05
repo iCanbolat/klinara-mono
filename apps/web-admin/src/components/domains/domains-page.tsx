@@ -10,6 +10,8 @@ import { diagnose } from '@/lib/domains/diagnose';
 import { can } from '@/lib/permissions';
 import { useSession } from '@/components/session/session-provider';
 import { t } from '@/i18n/tr';
+import { Skeleton } from '@/components/ui/skeleton';
+import { PageHeader } from '@/components/ui/page-header';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -131,26 +133,26 @@ export function DomainsPage(): ReactNode {
 
   return (
     <div className="flex max-w-3xl flex-col gap-4">
-      <h1 className="text-xl font-semibold text-ink">{t('domains.title')}</h1>
+      <PageHeader title={t('domains.title')} />
       {error !== null ? <Alert tone="danger">{error}</Alert> : null}
 
       {domains === null ? (
-        <p className="text-sm text-ink-soft">{t('common.loading')}</p>
+        <Skeleton className="h-24 w-full rounded-xl" />
       ) : (
         domains.map((domain) => (
           <Card key={domain.id}>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="min-w-0">
-                <p className="truncate font-medium text-ink">{domain.host}</p>
+                <p className="truncate font-medium text-foreground">{domain.host}</p>
                 {domain.isPrimary ? (
-                  <p className="text-xs text-ink-soft">{t('page.canonicalUrl')}</p>
+                  <p className="text-xs text-muted-foreground">{t('page.canonicalUrl')}</p>
                 ) : null}
               </div>
               <StatusBadge status={domain.verificationStatus} />
             </div>
 
             {domain.kind === 'platform_subdomain' ? (
-              <p className="mt-2 text-xs text-ink-soft">{t('domains.platformNote')}</p>
+              <p className="mt-2 text-xs text-muted-foreground">{t('domains.platformNote')}</p>
             ) : null}
 
             {domain.verificationStatus === 'failed' ? (
@@ -164,8 +166,8 @@ export function DomainsPage(): ReactNode {
 
             {domain.dnsInstructions !== null ? (
               <div className="mt-3">
-                <p className="text-sm font-medium text-ink">{t('domains.dnsTitle')}</p>
-                <p className="mb-2 text-xs text-ink-soft">{t('domains.dnsDescription')}</p>
+                <p className="text-sm font-medium text-foreground">{t('domains.dnsTitle')}</p>
+                <p className="mb-2 text-xs text-muted-foreground">{t('domains.dnsDescription')}</p>
                 <div className="flex flex-col gap-2">
                   <DnsRecord
                     type="TXT"

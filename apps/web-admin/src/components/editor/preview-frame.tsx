@@ -43,7 +43,7 @@ export function PreviewFrame({ payload }: { payload: unknown }): ReactNode {
 
   if (origin === '') {
     return (
-      <p className="p-4 text-sm text-ink-soft">
+      <p className="p-4 text-sm text-muted-foreground">
         Önizleme yapılandırılmamış (NEXT_PUBLIC_BOOKING_PREVIEW_ORIGIN).
       </p>
     );
@@ -58,7 +58,7 @@ export function PreviewFrame({ payload }: { payload: unknown }): ReactNode {
       // veriliyor (renderer bir React uygulaması) ama `allow-top-navigation`
       // YOK — iframe içindeki bir şey yönetim panelini başka yere götüremesin.
       sandbox="allow-scripts allow-same-origin"
-      className="h-full w-full rounded-md border border-line bg-white"
+      className="h-full w-full rounded-md border border-border bg-white"
     />
   );
 }

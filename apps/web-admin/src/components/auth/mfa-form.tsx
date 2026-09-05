@@ -78,17 +78,17 @@ export function MfaForm(): ReactNode {
   }
 
   return (
-    <div className="rounded-lg border border-line bg-card p-5 shadow-sm">
-      <h1 className="text-lg font-semibold text-ink">
+    <div className="rounded-xl border border-border bg-card p-6">
+      <h1 className="text-lg font-semibold text-foreground">
         {configured === false ? t('auth.mfa.setupTitle') : t('auth.mfa.title')}
       </h1>
-      <p className="mt-1 mb-4 text-sm text-ink-soft">
+      <p className="mt-1 mb-4 text-sm text-muted-foreground">
         {configured === false ? t('auth.mfa.setupDescription') : t('auth.mfa.description')}
       </p>
 
       {secret !== null && backupCodes === null ? (
         <div className="mb-4 rounded-md bg-muted p-3">
-          <p className="mb-1 text-xs text-ink-soft">Kurulum anahtarı</p>
+          <p className="mb-1 text-xs text-muted-foreground">Kurulum anahtarı</p>
           <code className="block break-all text-sm">{secret.secret}</code>
         </div>
       ) : null}

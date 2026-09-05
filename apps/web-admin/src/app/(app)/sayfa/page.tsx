@@ -7,10 +7,13 @@ import { describeProblem, networkError } from '@/lib/problem';
 import { can } from '@/lib/permissions';
 import { useSession } from '@/components/session/session-provider';
 import { PermissionGate } from '@/components/session/permission-gate';
+import { toast } from 'sonner';
 import { t } from '@/i18n/tr';
 import { Alert } from '@/components/ui/alert';
+import { PageHeader } from '@/components/ui/page-header';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardTitle } from '@/components/ui/card';
-import { Field } from '@/components/ui/field';
+import { Field, FieldSwitch } from '@/components/ui/field';
 
 /** Batch 11.5 — randevu sayfası davranış ayarları. */
 function Settings(): ReactNode {
@@ -43,6 +46,9 @@ function Settings(): ReactNode {
     setError(null);
     try {
       setPage(await api.put<BookingPage>('booking-page', patch));
+      // Anahtarlar anında değiştiği için kaydedildiğini SÖYLEYEN bir şey lazım;
+      // aksi hâlde kullanıcı sunucuya gidip gitmediğini bilemiyor.
+      toast.success(t('toast.saved'));
     } catch (caught) {
       setError(toMessage(caught));
     } finally {
@@ -51,63 +57,73 @@ function Settings(): ReactNode {
   }
 
   if (page === null) {
-    return <p className="text-sm text-ink-soft">{error ?? t('common.loading')}</p>;
+    // Hata varsa metin, yoksa iskelet: "Yükleniyor…" yazısı yükleme SÜRESİNCE
+    // sayfanın nasıl bir şey olduğunu hiç anlatmıyordu.
+    return error !== null ? (
+      <Alert tone="danger">{error}</Alert>
+    ) : (
+      <div className="flex max-w-2xl flex-col gap-4" aria-busy="true">
+        <Skeleton className="h-9 w-64" />
+        <Skeleton className="h-28 rounded-xl" />
+        <Skeleton className="h-64 rounded-xl" />
+      </div>
+    );
   }
 
   const settings = page.settings;
 
   return (
     <div className="flex max-w-2xl flex-col gap-4">
-      <h1 className="text-xl font-semibold text-ink">{t('page.title')}</h1>
+      <PageHeader title={t('page.title')} />
       {error !== null ? <Alert tone="danger">{error}</Alert> : null}
 
       <Card>
         <CardTitle>{t('page.canonicalUrl')}</CardTitle>
         <p className="text-sm">
           {page.canonicalUrl === '' ? (
-            <span className="text-ink-soft">Henüz bir alan adı yok.</span>
+            <span className="text-muted-foreground">{t('page.noDomain')}</span>
           ) : (
             <a href={page.canonicalUrl} className="underline" target="_blank" rel="noreferrer">
               {page.canonicalUrl}
             </a>
           )}
         </p>
-        <p className="mt-2 text-sm text-ink-soft">
+        <p className="mt-2 text-sm text-muted-foreground">
           {t(`page.status.${page.status}` as 'page.status.draft')}
           {page.hasUnpublishedChanges ? ` · ${t('page.unpublishedChanges')}` : ''}
         </p>
       </Card>
 
       <Card>
-        <CardTitle>Randevu davranışı</CardTitle>
+        <CardTitle>{t('page.behaviour')}</CardTitle>
         <div className="flex flex-col gap-3">
-          <Toggle
-            label="Uygulayıcı seçimi gösterilsin"
+          <FieldSwitch
+            label={t('page.showStaffSelection')}
             checked={settings.showStaffSelection}
             disabled={!canManage || saving}
-            onChange={(showStaffSelection) => void update({ showStaffSelection })}
+            onCheckedChange={(showStaffSelection) => void update({ showStaffSelection })}
           />
-          <Toggle
-            label="Fiyatlar gösterilsin"
+          <FieldSwitch
+            label={t('page.showPrices')}
             checked={settings.showPrices}
             disabled={!canManage || saving}
-            onChange={(showPrices) => void update({ showPrices })}
+            onCheckedChange={(showPrices) => void update({ showPrices })}
           />
-          <Toggle
-            label="Erteleme yapılabilsin"
+          <FieldSwitch
+            label={t('page.allowReschedule')}
             checked={settings.allowReschedule}
             disabled={!canManage || saving}
-            onChange={(allowReschedule) => void update({ allowReschedule })}
+            onCheckedChange={(allowReschedule) => void update({ allowReschedule })}
           />
-          <Toggle
-            label="Telefon doğrulaması (OTP) zorunlu"
+          <FieldSwitch
+            label={t('page.requireOtp')}
             checked={settings.requireOtp}
             disabled={!canManage || saving}
-            onChange={(requireOtp) => void update({ requireOtp })}
+            onCheckedChange={(requireOtp) => void update({ requireOtp })}
           />
 
           <Field
-            label="Slot tutma süresi (dakika)"
+            label={t('page.holdTtlMinutes')}
             type="number"
             min={SETTINGS_LIMITS.holdTtlMinutes.min}
             max={SETTINGS_LIMITS.holdTtlMinutes.max}
@@ -132,45 +148,22 @@ function Settings(): ReactNode {
           </Alert>
         ) : null}
         <dl className="grid grid-cols-2 gap-2 text-sm">
-          <dt className="text-ink-soft">En erken randevu</dt>
+          <dt className="text-muted-foreground">En erken randevu</dt>
           <dd>{settings.minLeadMinutes} dk sonra</dd>
-          <dt className="text-ink-soft">En geç randevu</dt>
+          <dt className="text-muted-foreground">En geç randevu</dt>
           <dd>{settings.maxAdvanceDays} gün sonra</dd>
-          <dt className="text-ink-soft">İptal penceresi</dt>
+          <dt className="text-muted-foreground">İptal penceresi</dt>
           <dd>{settings.cancelWindowHours} saat</dd>
         </dl>
       </Card>
 
       {canManage ? null : (
-        <p className="text-sm text-ink-soft">{t('editor.readOnly')}</p>
+        <p className="text-sm text-muted-foreground">{t('editor.readOnly')}</p>
       )}
     </div>
   );
 }
 
-function Toggle({
-  label,
-  checked,
-  disabled,
-  onChange,
-}: {
-  label: string;
-  checked: boolean;
-  disabled: boolean;
-  onChange: (value: boolean) => void;
-}): ReactNode {
-  return (
-    <label className="flex items-center justify-between gap-3 text-sm">
-      {label}
-      <input
-        type="checkbox"
-        checked={checked}
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.checked)}
-      />
-    </label>
-  );
-}
 
 function toMessage(caught: unknown): string {
   return caught instanceof ApiProblemError

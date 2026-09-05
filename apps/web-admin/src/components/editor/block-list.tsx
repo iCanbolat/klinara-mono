@@ -86,12 +86,12 @@ export function BlockList({
               onDragEnd={() => setDragging(null)}
               className={cn(
                 'flex items-center gap-1 rounded-md border px-2 py-1.5',
-                selected === index ? 'border-brand bg-brand-soft' : 'border-line bg-card',
+                selected === index ? 'border-primary bg-accent' : 'border-border bg-card',
                 dragging === index && 'opacity-50',
               )}
             >
               {readOnly ? null : (
-                <GripVertical aria-hidden="true" className="h-4 w-4 shrink-0 text-ink-soft" />
+                <GripVertical aria-hidden="true" className="h-4 w-4 shrink-0 text-muted-foreground" />
               )}
 
               <button
@@ -101,7 +101,7 @@ export function BlockList({
               >
                 {label}
                 {hidden ? (
-                  <span className="ml-2 text-xs text-ink-soft">({t('editor.blockHidden')})</span>
+                  <span className="ml-2 text-xs text-muted-foreground">({t('editor.blockHidden')})</span>
                 ) : null}
               </button>
 
@@ -116,7 +116,7 @@ export function BlockList({
                     onClick={() => move(index, -1)}
                     disabled={!canMove(sections.length, index, -1)}
                     aria-label={t('editor.moveUp', { block: label })}
-                    className="rounded p-1 text-ink-soft hover:bg-muted disabled:opacity-30"
+                    className="rounded p-1 text-muted-foreground hover:bg-muted disabled:opacity-30"
                   >
                     <ChevronUp aria-hidden="true" className="h-4 w-4" />
                   </button>
@@ -125,7 +125,7 @@ export function BlockList({
                     onClick={() => move(index, 1)}
                     disabled={!canMove(sections.length, index, 1)}
                     aria-label={t('editor.moveDown', { block: label })}
-                    className="rounded p-1 text-ink-soft hover:bg-muted disabled:opacity-30"
+                    className="rounded p-1 text-muted-foreground hover:bg-muted disabled:opacity-30"
                   >
                     <ChevronDown aria-hidden="true" className="h-4 w-4" />
                   </button>
@@ -134,7 +134,7 @@ export function BlockList({
                     onClick={() => onToggleVisible(index)}
                     aria-label={`${label}: ${hidden ? 'göster' : 'gizle'}`}
                     aria-pressed={hidden}
-                    className="rounded p-1 text-ink-soft hover:bg-muted"
+                    className="rounded p-1 text-muted-foreground hover:bg-muted"
                   >
                     {hidden ? (
                       <EyeOff aria-hidden="true" className="h-4 w-4" />
@@ -146,7 +146,7 @@ export function BlockList({
                     type="button"
                     onClick={() => onRemove(index)}
                     aria-label={t('editor.removeBlock', { block: label })}
-                    className="rounded p-1 text-ink-soft hover:bg-muted"
+                    className="rounded p-1 text-muted-foreground hover:bg-muted"
                   >
                     <Trash2 aria-hidden="true" className="h-4 w-4" />
                   </button>

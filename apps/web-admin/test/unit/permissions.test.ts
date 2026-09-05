@@ -58,6 +58,33 @@ describe('izne göre navigasyon', () => {
     expect(canOpenPath([], '/hesap/guvenlik')).toBe(true);
   });
 
+  // ---------------------------------------------------------------------------
+  describe('raporlar menüsü (10.1)', () => {
+    const REVENUE = PERMISSIONS.REPORT_REVENUE_READ;
+    const CALENDAR = PERMISSIONS.APPOINTMENT_READ_ALL;
+    const OWN = PERMISSIONS.REPORT_PERFORMANCE_READ_OWN;
+
+    it('`requiresAny` VEYA olarak çalışıyor', () => {
+      // Muhasebecide takvim izni yok, resepsiyonda ciro izni yok; ikisi de
+      // raporlar menüsünü GÖRMELİ. Yalnız VE ile ifade etseydik ikisi de
+      // menüden düşerdi.
+      expect(visibleNav([REVENUE]).map((item) => item.path)).toContain('/raporlar');
+      expect(visibleNav([CALENDAR]).map((item) => item.path)).toContain('/raporlar');
+      expect(visibleNav([OWN]).map((item) => item.path)).toContain('/raporlar');
+    });
+
+    it('hiçbiri yoksa menüde YOK', () => {
+      expect(visibleNav([]).map((item) => item.path)).not.toContain('/raporlar');
+    });
+
+    it('doğrudan URL kontrolü aynı kuralı uyguluyor', () => {
+      expect(canOpenPath([REVENUE], '/raporlar')).toBe(true);
+      expect(canOpenPath([REVENUE], '/raporlar/ciro')).toBe(true);
+      expect(canOpenPath([], '/raporlar')).toBe(false);
+      expect(canOpenPath([], '/raporlar/ciro')).toBe(false);
+    });
+  });
+
   it('tanımsız rota engellenmiyor — kapı burada değil', () => {
     // Yetkinin otoritesi API'nin PermissionsGuard'ı; buradaki liste bir
     // kullanılabilirlik katmanı. Bilinmeyen bir rotayı burada reddetmek yanlış

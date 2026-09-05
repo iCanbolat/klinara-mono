@@ -21,6 +21,7 @@ struct MockGraph {
     let notifications: MockNotificationsService
     let messages: MockMessagesService
     let whatsapp: MockWhatsAppService
+    let reports: MockReportsService
     let clock: BranchClock
 
     /// Nişantaşı şubesi: mock çalışma saatlerinin ve personel şablonunun
@@ -57,6 +58,10 @@ struct MockGraph {
         notifications = MockNotificationsService(booking: booking)
         messages = MockMessagesService()
         whatsapp = MockWhatsAppService(messages: messages)
+        // Rapor mock'u başka bir servise BAĞLANMIYOR ve bu kasıtlı: raporlar
+        // türetilmiş veridir ve mock'un onları gerçekten hesaplaması,
+        // sunucudaki SQL'in ikinci bir uygulamasını yazmak olurdu.
+        reports = MockReportsService()
         notes = MockNotesService(booking: booking, canReadMedical: canReadMedical)
         files = MockFilesService(canReadMedical: canReadMedical)
         clock = BranchClock(timeZoneIdentifier: MockBookingSeed.timezone)

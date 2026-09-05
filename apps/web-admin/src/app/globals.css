@@ -1,5 +1,5 @@
 @import 'tailwindcss';
-
+@import 'tw-animate-css';
 /*
  * Yönetim panelinin paleti SABİT.
  *
@@ -7,59 +7,215 @@
  * ve gelmemeli: yönetim arayüzünün kontrastı ve okunabilirliği bir kiracının
  * marka renk seçimine emanet edilemez. Kiracı teması yalnız önizleme
  * iframe'inin İÇİNDE yaşıyor, o da web-booking tarafından render ediliyor.
+ *
+ * Değerlerin tek otoritesi iOS tasarım sistemi:
+ * `klinara-ios/klinara-ios/Assets.xcassets/*.colorset/Contents.json`.
+ * Buradaki her renk oradan birebir kopyalandı; web'e özel renk UYDURULMADI.
+ *
+ * İsimlendirme shadcn/ui sözlüğü (`--background`, `--foreground`, `--primary`…)
+ * çünkü `ui/` altındaki komponentler bu adları bekliyor. iOS karşılıkları
+ * yorumda duruyor.
  */
 
-@theme inline {
-  --color-canvas: var(--surface-canvas);
-  --color-card: var(--surface-card);
-  --color-muted: var(--surface-muted);
-  --color-ink: var(--text-ink);
-  --color-ink-soft: var(--text-soft);
-  --color-line: var(--border-subtle);
-  --color-line-strong: var(--border-strong);
-  --color-brand: var(--brand);
-  --color-brand-ink: var(--brand-ink);
-  --color-brand-soft: var(--brand-soft);
-  --color-danger: var(--danger);
-  --color-danger-soft: var(--danger-soft);
-  --color-warn: var(--warn);
-  --color-warn-soft: var(--warn-soft);
-  --color-ok: var(--ok);
-  --color-ok-soft: var(--ok-soft);
-}
-
 :root {
-  --surface-canvas: #f8fafc;
-  --surface-card: #ffffff;
-  --surface-muted: #f1f5f9;
-  --text-ink: #0f172a;
-  --text-soft: #52627a;
-  --border-subtle: #e2e8f0;
-  --border-strong: #cbd5e1;
+  /* ---- shadcn semantik tokenları (iOS light değerleri) ---- */
+  --background: #faf8f5; /* Surface — bilinçli olarak saf beyaz DEĞİL */
+  --foreground: #2e3532; /* Charcoal */
 
-  --brand: #0f766e;
-  --brand-ink: #ffffff;
-  --brand-soft: color-mix(in oklab, var(--brand) 12%, white);
+  --card: #ffffff; /* SurfaceRaised */
+  --card-foreground: #2e3532; /* Charcoal */
+  --popover: #ffffff; /* SurfaceRaised */
+  --popover-foreground: #2e3532; /* Charcoal */
 
-  --danger: #b91c1c;
-  --danger-soft: color-mix(in oklab, var(--danger) 10%, white);
-  --warn: #a16207;
-  --warn-soft: color-mix(in oklab, var(--warn) 12%, white);
-  --ok: #15803d;
-  --ok-soft: color-mix(in oklab, var(--ok) 12%, white);
+  --primary: #7f9a76; /* BrandSage */
+  --primary-foreground: #ffffff; /* SurfaceRaised */
 
-  --dur-base: 160ms;
+  --secondary: #eaf0e7; /* BrandSageSoft */
+  --secondary-foreground: #5e7856; /* BrandSageDeep */
+  --accent: #eaf0e7; /* BrandSageSoft */
+  --accent-foreground: #5e7856; /* BrandSageDeep */
+
+  --muted: #ede9e3; /* DisabledFill */
+  --muted-foreground: #6e7a74; /* CharcoalMuted */
+
+  --destructive: #a6483c; /* Danger */
+  --destructive-foreground: #ffffff;
+
+  --border: #dfd9d0; /* BorderNeutral */
+  --input: #dfd9d0; /* BorderNeutral */
+  --ring: #7f9a76; /* BorderFocus */
+
+  /*
+   * Klinara uzantıları — shadcn sözlüğünde karşılığı yok ama panel muhtaç.
+   *
+   * iOS'ta uyarı ile hata aynı rengi (Danger) paylaşıyor; panelde paylaşamaz:
+   * alan adı DNS durumunda "bekliyor" ile "hata" farklı şeyler ve kullanıcıyı
+   * bekleyen bir kaydı arıza sanıp uğraşmaya iter. `--warning` uydurma bir renk
+   * değil, iOS `ColorSwatchPicker`ın 8'li resmi paletinden (#8C6A3F).
+   */
+  --success: #5e7856; /* BrandSageDeep */
+  --success-soft: #eaf0e7; /* BrandSageSoft */
+  --warning: #8c6a3f; /* ColorSwatchPicker paleti */
+  --warning-soft: color-mix(in oklab, var(--warning) 12%, white);
+  --destructive-soft: color-mix(in oklab, var(--destructive) 10%, white);
+
+  /* Grafik serileri — iOS takvim paletinden, birbirinden ayırt edilebilir sıra. */
+  --chart-1: #7f9a76;
+  --chart-2: #3f6e8c;
+  --chart-3: #8c6a3f;
+  --chart-4: #7a5a8c;
+  --chart-5: #4a4f52;
+
+  /* Kenar çubuğu — shadcn `sidebar` bloğunun beklediği ayrı token ailesi. */
+  --sidebar: #ffffff;
+  --sidebar-foreground: #2e3532;
+  --sidebar-primary: #7f9a76;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #eaf0e7;
+  --sidebar-accent-foreground: #5e7856;
+  --sidebar-border: #dfd9d0;
+  --sidebar-ring: #7f9a76;
+
+  /*
+   * KlinaraMetrics.controlRadius = 12. shadcn'in türetmesi (sm=r-4, md=r-2,
+   * lg=r, xl=r+4) tam oturuyor: rounded-sm=8 (segment pill), rounded-lg=12
+   * (buton/input/chip), rounded-xl=16 (cardRadius).
+   */
+  --radius: 0.75rem;
+
+  /* KlinaraMetrics.Motion — snappy 0.2 ve smooth 0.28. */
+  --dur-base: 200ms;
+  --dur-step: 280ms;
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-body {
-  background: var(--surface-canvas);
-  color: var(--text-ink);
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-soft: var(--destructive-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* iOS ile aynı iki aile: gövde Manrope, başlık Source Serif 4. */
+  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-source-serif), ui-serif, Georgia, serif;
+}
+
+/*
+ * KlinaraTextStyle'ın web karşılığı.
+ *
+ * Boyut/tracking değerleri iOS'tan birebir (pt → px). `lineSpacing: 3` SwiftUI'da
+ * satır ARASINA eklenen boşluk demek; web'de line-height = boyut + 3.
+ */
+@utility text-display-l {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 34px;
+  letter-spacing: -0.6px;
+  line-height: 1.15;
+}
+
+@utility text-display-m {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 28px;
+  letter-spacing: -0.4px;
+  line-height: 1.2;
+}
+
+@utility text-title-m {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: 22px;
+  letter-spacing: -0.2px;
+  line-height: 1.25;
+}
+
+@utility text-body-l {
+  font-family: var(--font-sans);
+  font-weight: 400;
+  font-size: 17px;
+  line-height: 20px;
+}
+
+@utility text-body-m {
+  font-family: var(--font-sans);
+  font-weight: 400;
+  font-size: 15px;
+  line-height: 18px;
+}
+
+@utility text-body-emphasis {
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: 15px;
+  line-height: 18px;
+}
+
+@utility text-label {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 1.2px;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    border-color: var(--border);
+  }
+
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-size: 15px;
+    line-height: 1.5;
+  }
 }
 
 /* Odak halkası HER ZAMAN görünür: editör tamamen klavyeyle kullanılabilmeli. */
 :focus-visible {
-  outline: 2px solid var(--brand);
+  outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
 

@@ -8,8 +8,6 @@ import { PackageDefinitionsService } from './package-definitions.service';
 import { PackageExpiryWorker } from './package-expiry.worker';
 import { PackageOperationsController } from './package-operations.controller';
 import { PackageOperationsService } from './package-operations.service';
-import { PackageReportsController } from './package-reports.controller';
-import { PackageReportsService } from './package-reports.service';
 
 /**
  * NOT: `customer-packages/:id` yolları `customers/:id/packages` ile aynı
@@ -22,14 +20,12 @@ import { PackageReportsService } from './package-reports.service';
     PackageDefinitionsController,
     CustomerPackagesController,
     PackageOperationsController,
-    PackageReportsController,
   ],
   providers: [
     PackageDefinitionsService,
     CustomerPackagesService,
     PackageConsumptionService,
     PackageOperationsService,
-    PackageReportsService,
     PackageExpiryWorker,
   ],
   exports: [

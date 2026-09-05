@@ -25,7 +25,7 @@ export function DnsRecord({
   value: string;
 }): ReactNode {
   return (
-    <div className="grid gap-2 rounded-md border border-line bg-muted p-3 sm:grid-cols-[6rem_1fr_1fr]">
+    <div className="grid gap-2 rounded-md border border-border bg-muted p-3 sm:grid-cols-[6rem_1fr_1fr]">
       <CopyField label={t('domains.recordType')} value={type} />
       <CopyField label={t('domains.recordName')} value={name} />
       <CopyField label={t('domains.recordValue')} value={value} />
@@ -48,7 +48,7 @@ function CopyField({ label, value }: { label: string; value: string }): ReactNod
 
   return (
     <div className="min-w-0">
-      <p className="mb-1 text-xs text-ink-soft">{label}</p>
+      <p className="mb-1 text-xs text-muted-foreground">{label}</p>
       <div className="flex items-center gap-1">
         <code className="min-w-0 flex-1 truncate rounded bg-card px-2 py-1 text-xs" title={value}>
           {value}
@@ -57,7 +57,7 @@ function CopyField({ label, value }: { label: string; value: string }): ReactNod
           type="button"
           onClick={() => void copy()}
           aria-label={`${label}: ${t('common.copy')}`}
-          className="rounded p-1.5 text-ink-soft hover:bg-card"
+          className="rounded p-1.5 text-muted-foreground hover:bg-card"
         >
           <Copy aria-hidden="true" className="h-3.5 w-3.5" />
         </button>

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { sql, type SQL } from 'drizzle-orm';
-import { ERROR_CODES, PERMISSIONS } from '@klinara/shared';
-import { AppError } from '../../common/errors/app-error';
+import { PERMISSIONS } from '@klinara/shared';
+import { assertRange } from '../../common/dto/date-range.dto';
 import {
   DEFAULT_PAGE_SIZE,
   MAX_PAGE_SIZE,
@@ -112,7 +112,7 @@ export class PackageReportsService {
     const limit = Math.min(query.limit ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
     const cursor = decodeCursor(query.cursor);
     const showMoney = hasPermission(principal, PERMISSIONS.REPORT_REVENUE_READ);
-    PackageReportsService.assertRange(query.from, query.to);
+    assertRange(query.from, query.to);
 
     const rows = await this.tx.run(async (tx) => {
       const result = await tx.execute<Record<string, unknown>>(sql`
@@ -174,7 +174,7 @@ export class PackageReportsService {
   /** Dönem içindeki defter hareketleri — satılan, tüketilen, iade, süre dolumu. */
   async usage(query: UsageReportQueryDto): Promise<UsageReportDto> {
     const groupBy = query.groupBy ?? 'service';
-    PackageReportsService.assertRange(query.from, query.to);
+    assertRange(query.from, query.to);
 
     const grouping =
       groupBy === 'branch'
@@ -241,13 +241,5 @@ export class PackageReportsService {
       };
     }
     return { id: sql`i.service_id`, label: sql`i.service_name`, join: sql`` };
-  }
-
-  private static assertRange(from: string, to: string): void {
-    if (new Date(to).getTime() <= new Date(from).getTime()) {
-      throw new AppError(400, ERROR_CODES.VALIDATION_FAILED, 'Aralık geçersiz', {
-        detail: '`to` değeri `from` değerinden büyük olmalıdır (yarı açık aralık).',
-      });
-    }
   }
 }

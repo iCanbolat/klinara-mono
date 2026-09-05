@@ -74,7 +74,7 @@ export function CarouselItems({
 
   return (
     <fieldset className="flex flex-col gap-2 border-0 p-0">
-      <legend className="text-sm font-medium text-ink">{label}</legend>
+      <legend className="text-sm font-medium text-foreground">{label}</legend>
 
       {/* `polite`: sıralama kullanıcının kendi eylemi, sözünü kesmemeli. */}
       <span role="status" aria-live="polite" className="sr-only">
@@ -82,16 +82,16 @@ export function CarouselItems({
       </span>
 
       {items.length === 0 ? (
-        <p className="text-sm text-ink-soft">{t('carousel.empty')}</p>
+        <p className="text-sm text-muted-foreground">{t('carousel.empty')}</p>
       ) : (
         <ol className="flex flex-col gap-2">
           {items.map((item, index) => (
             <li
               key={index}
-              className="flex flex-col gap-1.5 rounded-md border border-line bg-card p-2"
+              className="flex flex-col gap-1.5 rounded-md border border-border bg-card p-2"
             >
               <div className="flex items-center gap-1">
-                <span className="flex-1 text-xs font-medium text-ink-soft">
+                <span className="flex-1 text-xs font-medium text-muted-foreground">
                   {t('carousel.item', { position: index + 1 })}
                 </span>
                 {readOnly ? null : (
@@ -105,7 +105,7 @@ export function CarouselItems({
                       onClick={() => move(index, -1)}
                       disabled={index === 0}
                       aria-label={t('carousel.moveUp', { position: index + 1 })}
-                      className="rounded p-1 text-ink-soft hover:bg-muted disabled:opacity-30"
+                      className="rounded p-1 text-muted-foreground hover:bg-muted disabled:opacity-30"
                     >
                       <ChevronUp aria-hidden="true" className="h-4 w-4" />
                     </button>
@@ -114,7 +114,7 @@ export function CarouselItems({
                       onClick={() => move(index, 1)}
                       disabled={index === items.length - 1}
                       aria-label={t('carousel.moveDown', { position: index + 1 })}
-                      className="rounded p-1 text-ink-soft hover:bg-muted disabled:opacity-30"
+                      className="rounded p-1 text-muted-foreground hover:bg-muted disabled:opacity-30"
                     >
                       <ChevronDown aria-hidden="true" className="h-4 w-4" />
                     </button>
@@ -124,7 +124,7 @@ export function CarouselItems({
                         onChange(items.filter((_, position) => position !== index))
                       }
                       aria-label={t('carousel.remove', { position: index + 1 })}
-                      className="rounded p-1 text-ink-soft hover:bg-muted"
+                      className="rounded p-1 text-muted-foreground hover:bg-muted"
                     >
                       <Trash2 aria-hidden="true" className="h-4 w-4" />
                     </button>
@@ -139,7 +139,7 @@ export function CarouselItems({
                   onChange={(event) => patch(index, { assetId: event.target.value })}
                   disabled={readOnly}
                   aria-label={t('carousel.image', { position: index + 1 })}
-                  className="h-9 rounded-md border border-line-strong bg-card px-2 text-sm"
+                  className="h-9 rounded-md border border-border bg-card px-2 text-sm"
                 >
                   {/*
                     Kütüphanede olmayan bir kimlik (başka bir kullanıcının
@@ -159,24 +159,24 @@ export function CarouselItems({
               </label>
 
               <label className="flex flex-col gap-1">
-                <span className="text-xs text-ink-soft">{t('carousel.alt')}</span>
+                <span className="text-xs text-muted-foreground">{t('carousel.alt')}</span>
                 <input
                   value={item.alt ?? ''}
                   onChange={(event) => patch(index, { alt: event.target.value })}
                   maxLength={LIMITS.alt}
                   readOnly={readOnly}
-                  className="h-9 rounded-md border border-line-strong bg-card px-2 text-sm"
+                  className="h-9 rounded-md border border-border bg-card px-2 text-sm"
                 />
               </label>
 
               <label className="flex flex-col gap-1">
-                <span className="text-xs text-ink-soft">{t('carousel.caption')}</span>
+                <span className="text-xs text-muted-foreground">{t('carousel.caption')}</span>
                 <input
                   value={item.caption ?? ''}
                   onChange={(event) => patch(index, { caption: event.target.value })}
                   maxLength={LIMITS.caption}
                   readOnly={readOnly}
-                  className="h-9 rounded-md border border-line-strong bg-card px-2 text-sm"
+                  className="h-9 rounded-md border border-border bg-card px-2 text-sm"
                 />
               </label>
             </li>
@@ -205,19 +205,19 @@ export function CarouselItems({
               onChange={(event) => void addUploaded(event)}
               disabled={library.uploading || full}
               aria-label={t('asset.upload')}
-              className="text-xs text-ink-soft"
+              className="text-xs text-muted-foreground"
             />
           </div>
           {full ? (
-            <p className="text-xs text-ink-soft">{t('carousel.full', { max: LIMITS.items })}</p>
+            <p className="text-xs text-muted-foreground">{t('carousel.full', { max: LIMITS.items })}</p>
           ) : null}
         </div>
       )}
 
-      {library.uploading ? <p className="text-xs text-ink-soft">{t('asset.uploading')}</p> : null}
+      {library.uploading ? <p className="text-xs text-muted-foreground">{t('asset.uploading')}</p> : null}
       {library.error !== null ? <Alert tone="danger">{library.error}</Alert> : null}
       {error !== undefined ? (
-        <span role="alert" className="text-xs text-danger">
+        <span role="alert" className="text-xs text-destructive">
           {error}
         </span>
       ) : null}

@@ -42,7 +42,9 @@ struct ManagementHomeView: View {
                     if session.canAny(
                         Permissions.packageRead,
                         Permissions.reportRevenueRead,
-                        Permissions.financeCommissionRead
+                        Permissions.financeCommissionRead,
+                        Permissions.appointmentReadAll,
+                        Permissions.reportPerformanceReadOwn
                     ) {
                         reportsCard
                     }
@@ -240,6 +242,20 @@ struct ManagementHomeView: View {
 
     private var reportsCard: some View {
         KlinaraCard(title: "Raporlar") {
+            if session.canAny(
+                Permissions.appointmentReadAll,
+                Permissions.reportRevenueRead,
+                Permissions.reportPerformanceReadOwn
+            ) {
+                KlinaraNavigationRow(
+                    label: "Klinik raporları",
+                    detail: "Doluluk, ciro, personel performansı, gelmeme ve kazanım",
+                    icon: "chart.line.uptrend.xyaxis"
+                ) {
+                    ReportsHomeView(session: session)
+                }
+                KlinaraDivider()
+            }
             if session.canAny(Permissions.packageRead, Permissions.reportRevenueRead) {
                 KlinaraNavigationRow(
                     label: "Paket raporları",

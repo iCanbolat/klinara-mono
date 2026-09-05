@@ -37,6 +37,13 @@ export const QUEUES = {
   // pointer geri alınırsa purge de yazılmaz — "yayınlanmamış içeriği
   // yayınlanmış sanıp cache düşürmek" durumu yapısal olarak imkânsız.
   BOOKING_PAGE_PURGE: 'booking.page.purge',
+  // Rapor özetleri (10.1). Aynı iki adımlı bölünme: cron kiracıları listeler,
+  // hesap kiracı başına ayrı işte ve RLS altında koşar.
+  //
+  // Bu işler GERÇEĞİN KAYNAĞI DEĞİL — raporlar snapshot olmadan da doğru
+  // çalışır, yalnız yavaşlar. Kuyruk kapalıyken hiçbir rapor bozulmaz.
+  REPORT_SNAPSHOT_SWEEP: 'report.snapshot.sweep',
+  REPORT_SNAPSHOT_TENANT: 'report.snapshot.tenant',
 } as const;
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES];
@@ -62,4 +69,7 @@ export const SCHEDULES: ScheduleDefinition[] = [
   { queue: QUEUES.BOOKING_DOMAIN_VERIFY_SWEEP, cron: '*/5 * * * *', timezone: 'Europe/Istanbul' },
   // Kaçan `sendAfter` işleri için emniyet süpürgesi.
   { queue: QUEUES.BOOKING_HOLD_SWEEP, cron: '*/5 * * * *', timezone: 'Europe/Istanbul' },
+  // Paket süre dolumundan (03:15) SONRA: süresi dolan paketler o gece
+  // kapanıyor ve rapor onları kapanmış görmeli.
+  { queue: QUEUES.REPORT_SNAPSHOT_SWEEP, cron: '40 3 * * *', timezone: 'Europe/Istanbul' },
 ];

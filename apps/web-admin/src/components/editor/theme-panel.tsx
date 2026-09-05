@@ -4,6 +4,8 @@ import type { ReactNode } from 'react';
 import type { FontFamily, Radius, ThemeInput } from '@klinara/shared';
 import { THEME_FONT_OPTIONS, THEME_RADIUS_OPTIONS } from '@/lib/editor/block-schema';
 import { AssetPicker } from './asset-picker';
+import { FieldSelect } from '@/components/ui/field';
+import { t } from '@/i18n/tr';
 
 /**
  * Tema paneli.
@@ -26,58 +28,52 @@ export function ThemePanel({
   return (
     <div className="flex flex-col gap-3">
       <ColorField
-        label="Birincil renk"
+        label={t('editor.primaryColor')}
         value={theme.primaryColor ?? '#0F766E'}
         readOnly={readOnly}
         onChange={(primaryColor) => onChange({ ...theme, primaryColor })}
       />
       <ColorField
-        label="Arka plan"
+        label={t('editor.backgroundColor')}
         value={theme.backgroundColor ?? '#FFFFFF'}
         readOnly={readOnly}
         onChange={(backgroundColor) => onChange({ ...theme, backgroundColor })}
       />
       <ColorField
-        label="Metin rengi"
+        label={t('editor.textColor')}
         value={theme.textColor ?? '#1C1917'}
         readOnly={readOnly}
         onChange={(textColor) => onChange({ ...theme, textColor })}
       />
 
-      <label className="flex flex-col gap-1.5 text-sm">
-        Yazı tipi
-        <select
-          value={theme.fontFamily ?? 'system'}
-          disabled={readOnly}
-          onChange={(event) => onChange({ ...theme, fontFamily: event.target.value as FontFamily })}
-          className="h-10 rounded-md border border-line-strong bg-card px-2"
-        >
-          {THEME_FONT_OPTIONS.map((font) => (
-            <option key={font} value={font}>
-              {font}
-            </option>
-          ))}
-        </select>
-      </label>
+      <FieldSelect
+        label={t('editor.fontFamily')}
+        value={theme.fontFamily ?? 'system'}
+        disabled={readOnly}
+        onChange={(event) => onChange({ ...theme, fontFamily: event.target.value as FontFamily })}
+      >
+        {THEME_FONT_OPTIONS.map((font) => (
+          <option key={font} value={font}>
+            {font}
+          </option>
+        ))}
+      </FieldSelect>
 
-      <label className="flex flex-col gap-1.5 text-sm">
-        Köşe yarıçapı
-        <select
-          value={theme.radius ?? 'md'}
-          disabled={readOnly}
-          onChange={(event) => onChange({ ...theme, radius: event.target.value as Radius })}
-          className="h-10 rounded-md border border-line-strong bg-card px-2"
-        >
+      <FieldSelect
+        label={t('editor.radius')}
+        value={theme.radius ?? 'md'}
+        disabled={readOnly}
+        onChange={(event) => onChange({ ...theme, radius: event.target.value as Radius })}
+      >
           {THEME_RADIUS_OPTIONS.map((radius) => (
-            <option key={radius} value={radius}>
-              {radius}
-            </option>
-          ))}
-        </select>
-      </label>
+          <option key={radius} value={radius}>
+            {radius}
+          </option>
+        ))}
+      </FieldSelect>
 
       <AssetPicker
-        label="Logo"
+        label={t('editor.logo')}
         assetId={theme.logoAssetId ?? null}
         readOnly={readOnly}
         onChange={(logoAssetId) => onChange(withLogo(theme, logoAssetId))}
@@ -121,14 +117,14 @@ function ColorField({
       <span className="flex items-center gap-2">
         {/* Hex metni de gösteriliyor: renk seçici tek başına, seçilen değerin
             ne olduğunu markasını bilen bir kullanıcıya söylemez. */}
-        <code className="text-xs text-ink-soft">{value.toUpperCase()}</code>
+        <code className="text-xs text-muted-foreground">{value.toUpperCase()}</code>
         <input
           type="color"
           value={value}
           disabled={readOnly}
           onChange={(event) => onChange(event.target.value)}
           aria-label={label}
-          className="h-8 w-12 rounded border border-line-strong"
+          className="h-9 w-12 cursor-pointer rounded-lg border border-border"
         />
       </span>
     </label>

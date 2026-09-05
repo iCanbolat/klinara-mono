@@ -6,6 +6,13 @@ import { ApiProblemError, sessionCall } from '@/lib/api/client';
 import { describeProblem, networkError } from '@/lib/problem';
 import { t } from '@/i18n/tr';
 import { Alert } from '@/components/ui/alert';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
 
@@ -59,17 +66,23 @@ export function SessionExpiredDialog({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="session-expired-title"
-    >
-      <div className="w-full max-w-sm rounded-lg border border-line bg-card p-5 shadow-lg animate-rise">
-        <h2 id="session-expired-title" className="text-base font-semibold text-ink">
-          {t('auth.expired.title')}
-        </h2>
-        <p className="mt-1 mb-4 text-sm text-ink-soft">{t('auth.expired.description')}</p>
+    /*
+      Radix `Dialog` — elle yazılmış modal DEĞİL.
+
+      Oturum düştüğünde odak DİYALOĞUN İÇİNDE kalmalı: arkadaki sayfa artık
+      yetkisiz ve kullanıcının sekme ile oraya kaçıp boş formlarla uğraşması
+      anlamsız. Odak tuzağı, Escape ve gövde kaydırma kilidi Radix'ten geliyor.
+
+      `open` sabit `true` ve kapatma yolu YOK: bu diyalog ancak yeniden giriş
+      yapılınca kapanır (bileşen unmount olur). `onOpenChange` verilmediği için
+      Escape ve dışarı tıklama kapatmıyor — bilinçli.
+    */
+    <Dialog open>
+      <DialogContent showCloseButton={false} className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>{t('auth.expired.title')}</DialogTitle>
+          <DialogDescription>{t('auth.expired.description')}</DialogDescription>
+        </DialogHeader>
 
         <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-3">
           <Field
@@ -93,7 +106,7 @@ export function SessionExpiredDialog({
             {t('auth.expired.submit')}
           </Button>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

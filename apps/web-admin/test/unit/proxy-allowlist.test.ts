@@ -105,6 +105,12 @@ describe('yönetim proxy beyaz listesi', () => {
 
   it('klinik operasyonu yüzeyinin TAMAMI kapsam dışı', () => {
     // Kapsam kararı gereği; buraya bir kural eklemek bilinçli bir sürtünme.
+    //
+    // `reports/revenue` bu listeden 10.1'de ÇIKARILDI ve bu bilinçli bir
+    // karar: rapor uçları salt okunur ve toplu veri döndürüyor, müşteri kaydı
+    // ya da yazma yüzeyi açmıyorlar (gerekçe `proxy-allowlist.ts` başlığında,
+    // kapsamı da aşağıdaki "raporlar" bloğunda sınanıyor). Listenin geri
+    // kalanı olduğu gibi duruyor.
     for (const path of [
       'appointments',
       `appointments/${UUID}`,
@@ -119,7 +125,6 @@ describe('yönetim proxy beyaz listesi', () => {
       'staff',
       'services',
       'schedules',
-      'reports/revenue',
     ]) {
       for (const method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']) {
         expect(isAllowedProxyPath(path, method), `${method} ${path}`).toBe(false);
@@ -170,5 +175,60 @@ describe('yönetim proxy beyaz listesi', () => {
   it('metot büyük/küçük harften bağımsız', () => {
     expect(isAllowedProxyPath('me', 'get')).toBe(true);
     expect(isAllowedProxyPath('booking-page', 'put')).toBe(true);
+  });
+
+  // -------------------------------------------------------------------------
+  describe('raporlar (10.1)', () => {
+    it('beş rapor ucu ve paket raporları GET ile geçiyor', () => {
+      for (const path of [
+        'reports/occupancy',
+        'reports/revenue',
+        'reports/staff-performance',
+        'reports/no-show',
+        'reports/retention',
+        'reports/packages/outstanding',
+        'reports/packages/expiring',
+        'reports/packages/usage',
+      ]) {
+        expect(isAllowedProxyPath(path, 'GET'), path).toBe(true);
+      }
+    });
+
+    it('dışa aktarım YALNIZ POST ve yalnız `/export` ile', () => {
+      expect(isAllowedProxyPath('reports/revenue/export', 'POST')).toBe(true);
+      // Rapor ucunun kendisine POST edilemez: okuma ucu, yazma değil.
+      expect(isAllowedProxyPath('reports/revenue', 'POST')).toBe(false);
+      // Dışa aktarım GET değil (gövde bir filtre taşıyor).
+      expect(isAllowedProxyPath('reports/revenue/export', 'GET')).toBe(false);
+      // Paket raporlarının dışa aktarımı YOK.
+      expect(isAllowedProxyPath('reports/packages/usage/export', 'POST')).toBe(false);
+    });
+
+    it('`reports/` önekine JOKER verilmemiş', () => {
+      // Kural tek tek yazıldı; joker olsaydı yarın eklenecek bir
+      // `reports/customers/:id` ucu sessizce açılırdı.
+      for (const path of [
+        'reports',
+        'reports/',
+        'reports/customers',
+        'reports/commissions',
+        'reports/occupancy/extra',
+        'reports/packages',
+      ]) {
+        expect(isAllowedProxyPath(path, 'GET'), path).toBe(false);
+      }
+    });
+
+    it('rapor yolları da yol geçişine kapalı', () => {
+      expect(isAllowedProxyPath('reports/../me', 'GET')).toBe(false);
+      expect(isAllowedProxyPath('reports%2F..%2Fme', 'GET')).toBe(false);
+    });
+
+    it('klinik operasyonu HÂLÂ dışarıda', () => {
+      // Raporların eklenmesi o sınırı gevşetmedi.
+      for (const path of ['appointments', 'customers', 'payments', 'charges', 'packages']) {
+        expect(isAllowedProxyPath(path, 'GET'), path).toBe(false);
+      }
+    });
   });
 });

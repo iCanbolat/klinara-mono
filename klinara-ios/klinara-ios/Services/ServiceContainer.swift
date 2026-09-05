@@ -22,6 +22,7 @@ final class ServiceContainer {
     let notifications: any NotificationsService
     let messages: any MessagesService
     let whatsapp: any WhatsAppService
+    let reports: any ReportsService
 
     /// Mock kullanılıyorsa geliştirici senaryo menüsü açılır.
     let mockAuth: MockAuthService?
@@ -44,6 +45,7 @@ final class ServiceContainer {
         notifications: any NotificationsService,
         messages: any MessagesService,
         whatsapp: any WhatsAppService,
+        reports: any ReportsService,
         mockAuth: MockAuthService?,
         mockDataScenario: MockDataScenario? = nil
     ) {
@@ -62,6 +64,7 @@ final class ServiceContainer {
         self.notifications = notifications
         self.messages = messages
         self.whatsapp = whatsapp
+        self.reports = reports
         self.mockAuth = mockAuth
         self.mockDataScenario = mockDataScenario
     }
@@ -85,6 +88,7 @@ final class ServiceContainer {
             notifications: LiveNotificationsService(client: client),
             messages: LiveMessagesService(client: client),
             whatsapp: LiveWhatsAppService(client: client),
+            reports: LiveReportsService(client: client),
             mockAuth: nil
         )
     }
@@ -144,6 +148,7 @@ final class ServiceContainer {
             notifications: notifications,
             messages: messages,
             whatsapp: whatsapp,
+            reports: MockReportsService(),
             mockAuth: mockAuth,
             mockDataScenario: data
         )

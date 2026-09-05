@@ -24,8 +24,21 @@ import { validateSections, validateSeo } from '@/lib/editor/validate';
 import { clearDraft, readDraft, saveDraft, shouldRestore } from '@/lib/editor/draft-recovery';
 import { useAssetLibrary } from '@/lib/editor/use-asset-library';
 import { useSession } from '@/components/session/session-provider';
+import { toast } from 'sonner';
 import { t } from '@/i18n/tr';
 import { Alert } from '@/components/ui/alert';
+import { Field, FieldTextarea } from '@/components/ui/field';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { BlockList } from './block-list';
 import { BlockForm } from './block-form';
@@ -69,11 +82,11 @@ export function ContentEditor(): ReactNode {
       const [loadedPage, loadedContent, loadedBranches] = await Promise.all([
         api.get<BookingPage>('booking-page'),
         api.get<BookingPageContent>('booking-page/content'),
-        api.get<Branch[]>('branches'),
+        api.get<{ data: Branch[] }>('branches'),
       ]);
       setPage(loadedPage);
       setContent(loadedContent);
-      setBranches(loadedBranches);
+      setBranches(loadedBranches.data);
       setSections(loadedContent.sections);
       setTheme(loadedContent.theme);
       setSeo(loadedContent.seo);
@@ -257,6 +270,7 @@ export function ContentEditor(): ReactNode {
       // ekranında duran değişiklikler değil, başkasının taslağı yayına çıkardı.
       if (dirty && !(await save())) return;
       setPage(await api.post<BookingPage>('booking-page/publish'));
+      toast.success(t('editor.published'));
     } catch (caught) {
       setError(toMessage(caught));
     } finally {
@@ -286,25 +300,30 @@ export function ContentEditor(): ReactNode {
         onPublish={() => void publish()}
       />
 
-      <div className="flex min-h-0 flex-1">
-        <section className="w-64 shrink-0 overflow-y-auto border-r border-line p-3">
-          <div className="mb-2 flex gap-1" role="tablist" aria-label={t('editor.title')}>
-            {(['content', 'theme', 'seo'] as const).map((value) => (
-              <button
-                key={value}
-                type="button"
-                role="tab"
-                aria-selected={tab === value}
-                onClick={() => setTab(value)}
-                className={`rounded px-2 py-1 text-xs ${tab === value ? 'bg-brand-soft font-medium' : 'text-ink-soft'}`}
-              >
-                {t(value === 'content' ? 'editor.blocks' : value === 'theme' ? 'editor.theme' : 'editor.seo')}
-              </button>
-            ))}
-          </div>
+      {/*
+        Üç panel yalnız GENİŞ ekranda yan yana: 64+80 rem-dışı sabit genişlik +
+        önizleme, 1280px altında hiçbirine yer bırakmıyordu ve sayfa yatay
+        kayıyordu. Dar ekranda paneller alt alta geçiyor, önizleme gizleniyor —
+        önizlemeyi 300px genişlikte göstermek zaten yanıltıcı olurdu.
+      */}
+      <div className="flex min-h-0 flex-1 flex-col xl:flex-row">
+        <section className="w-full shrink-0 overflow-y-auto border-b border-border p-4 xl:w-64 xl:border-r xl:border-b-0">
+          {/*
+            Radix `Tabs` — elle yazılmış `role="tablist"` DEĞİL.
 
-          {tab === 'content' ? (
-            <>
+            Öncekinde `tabpanel` hiç yoktu ve ok tuşlarıyla sekmeler arasında
+            gezilemiyordu: ekran okuyucu "sekme 1/3" diyip sonra hangi panelin
+            ona ait olduğunu söyleyemiyordu. Roving tabindex ve `aria-controls`
+            artık kütüphaneden geliyor.
+          */}
+          <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)}>
+            <TabsList className="mb-3 w-full">
+              <TabsTrigger value="content">{t('editor.blocks')}</TabsTrigger>
+              <TabsTrigger value="theme">{t('editor.theme')}</TabsTrigger>
+              <TabsTrigger value="seo">{t('editor.seo')}</TabsTrigger>
+            </TabsList>
+
+          <TabsContent value="content">
               <BlockList
                 sections={sections}
                 selected={selected}
@@ -349,45 +368,39 @@ export function ContentEditor(): ReactNode {
                   ))}
                 </div>
               )}
-            </>
-          ) : null}
+          </TabsContent>
 
-          {tab === 'theme' ? (
+          <TabsContent value="theme">
             <ThemePanel
               theme={theme}
               readOnly={readOnly}
               onChange={(next) => mutate(() => setTheme(next))}
             />
-          ) : null}
+          </TabsContent>
 
-          {tab === 'seo' ? (
-            <div className="flex flex-col gap-3">
-              <label className="flex flex-col gap-1.5 text-sm">
-                Başlık
-                <input
-                  value={seo.title ?? ''}
-                  onChange={(event) => mutate(() => setSeo({ ...seo, title: event.target.value }))}
-                  readOnly={readOnly}
-                  className="h-10 rounded-md border border-line-strong bg-card px-2"
-                />
-              </label>
-              <label className="flex flex-col gap-1.5 text-sm">
-                Açıklama
-                <textarea
-                  value={seo.description ?? ''}
-                  onChange={(event) =>
-                    mutate(() => setSeo({ ...seo, description: event.target.value }))
-                  }
-                  readOnly={readOnly}
-                  rows={3}
-                  className="rounded-md border border-line-strong bg-card p-2"
-                />
-              </label>
+          <TabsContent value="seo">
+            <div className="flex flex-col gap-4">
+              <Field
+                label={t('editor.seoTitle')}
+                value={seo.title ?? ''}
+                onChange={(event) => mutate(() => setSeo({ ...seo, title: event.target.value }))}
+                readOnly={readOnly}
+              />
+              <FieldTextarea
+                label={t('editor.seoDescription')}
+                value={seo.description ?? ''}
+                onChange={(event) =>
+                  mutate(() => setSeo({ ...seo, description: event.target.value }))
+                }
+                readOnly={readOnly}
+                rows={3}
+              />
             </div>
-          ) : null}
+          </TabsContent>
+          </Tabs>
         </section>
 
-        <section className="w-80 shrink-0 overflow-y-auto border-r border-line p-3">
+        <section className="w-full shrink-0 overflow-y-auto border-b border-border p-4 xl:w-80 xl:border-r xl:border-b-0">
           {restored ? (
             <Alert tone="info" className="mb-3">
               {t('editor.draftRestored')}
@@ -399,7 +412,7 @@ export function ContentEditor(): ReactNode {
             </Alert>
           ) : null}
           {selectedBlock === undefined || selected === null ? (
-            <p className="text-sm text-ink-soft">Düzenlemek için bir blok seçin.</p>
+            <p className="text-sm text-muted-foreground">{t('editor.selectBlock')}</p>
           ) : (
             <BlockForm
               block={selectedBlock}
@@ -412,46 +425,45 @@ export function ContentEditor(): ReactNode {
           )}
         </section>
 
-        <section className="min-w-0 flex-1 p-3">
+        <section className="hidden min-w-0 flex-1 p-4 xl:block">
           <PreviewFrame payload={preview} />
         </section>
       </div>
 
-      {conflict ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label={t('editor.conflictTitle')}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-        >
-          <div className="w-full max-w-md rounded-lg border border-line bg-card p-5">
-            <h2 className="mb-2 text-base font-semibold">{t('editor.conflictTitle')}</h2>
-            <p className="mb-4 text-sm text-ink-soft">{t('editor.conflictDescription')}</p>
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  setConflict(false);
-                  void load();
-                }}
-              >
-                {t('editor.conflictReload')}
-              </Button>
-              <Button
-                variant="danger"
-                size="sm"
-                onClick={() => {
-                  setConflict(false);
-                  void save(true);
-                }}
-              >
-                {t('editor.conflictOverwrite')}
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {/*
+        Çakışma diyaloğu Radix `AlertDialog` ile.
+
+        Kapatma yolu YOK (`X` ve dışarı tıklama kapatmıyor): kullanıcı iki
+        seçenekten birini seçmeli. Modalı kapatıp taslakla oynamaya devam etmek,
+        kaydedilemeyeceğini bilmediği bir düzenleme yapmasına yol açardı.
+      */}
+      <AlertDialog open={conflict}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('editor.conflictTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('editor.conflictDescription')}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                setConflict(false);
+                void load();
+              }}
+            >
+              {t('editor.conflictReload')}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-white hover:bg-destructive/90"
+              onClick={() => {
+                setConflict(false);
+                void save(true);
+              }}
+            >
+              {t('editor.conflictOverwrite')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

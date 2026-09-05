@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsIn, IsISO8601, IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import { DateRangeQueryDto } from '../../../common/dto/date-range.dto';
 
 export const OUTSTANDING_GROUPINGS = ['service', 'customer', 'branch'] as const;
 export const USAGE_GROUPINGS = ['service', 'branch'] as const;
@@ -22,15 +23,7 @@ export class OutstandingReportQueryDto {
   groupBy?: (typeof OUTSTANDING_GROUPINGS)[number];
 }
 
-export class ExpiringReportQueryDto {
-  @ApiProperty({ example: '2026-09-01T00:00:00+03:00' })
-  @IsISO8601({ strict: true })
-  from: string;
-
-  @ApiProperty({ example: '2026-10-01T00:00:00+03:00', description: 'HARİÇ (yarı açık aralık)' })
-  @IsISO8601({ strict: true })
-  to: string;
-
+export class ExpiringReportQueryDto extends DateRangeQueryDto {
   @ApiPropertyOptional({ format: 'uuid' })
   @IsOptional()
   @IsUUID()
@@ -50,15 +43,7 @@ export class ExpiringReportQueryDto {
   cursor?: string;
 }
 
-export class UsageReportQueryDto {
-  @ApiProperty({ example: '2026-09-01T00:00:00+03:00' })
-  @IsISO8601({ strict: true })
-  from: string;
-
-  @ApiProperty({ example: '2026-10-01T00:00:00+03:00', description: 'HARİÇ (yarı açık aralık)' })
-  @IsISO8601({ strict: true })
-  to: string;
-
+export class UsageReportQueryDto extends DateRangeQueryDto {
   @ApiPropertyOptional({ format: 'uuid' })
   @IsOptional()
   @IsUUID()

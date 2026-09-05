@@ -325,14 +325,24 @@ describe('uygunluk motoru (Batch 3.2)', () => {
   // -------------------------------------------------------------------------
   describe('pencere kuralları', () => {
     it('minimum önden süre yakın slotları eler', async () => {
+      // Sınır MONDAY'e GÖRE hesaplanıyor, sabit bir sayı değil.
+      //
+      // Eskiden `3` yazıyordu ve "MONDAY bugünden çok ileride" varsayımına
+      // dayanıyordu; o varsayım takvim MONDAY'e üç gün kala kendiliğinden
+      // çürüdü ve test, kodda hiçbir şey değişmeden kırmızıya döndü. Sınırı
+      // hedef günden bir gün geriye koymak, testi hangi tarihte koşulursa
+      // koşulsun anlamlı tutuyor.
+      const daysUntilMonday = Math.ceil(
+        (new Date(`${MONDAY}T00:00:00+03:00`).getTime() - Date.now()) / 86_400_000,
+      );
       await http(app)
         .patch('/api/v1/tenant/settings')
         .set(auth(clinic.owner.tokens))
-        .send({ maxAdvanceDays: 3 })
+        .send({ maxAdvanceDays: Math.max(daysUntilMonday - 1, 0) })
         .expect(200);
 
       const { body } = await ask();
-      // MONDAY bugünden çok ileride; 3 günlük sınır her şeyi eler.
+      // MONDAY pencerenin DIŞINDA kalıyor; hiçbir slot dönmemeli.
       expect(body.slots).toHaveLength(0);
     });
 

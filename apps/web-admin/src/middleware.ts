@@ -52,8 +52,15 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 }
 
 export const config = {
-  // `api` hariç: oturum ve proxy uçlarının kendi kontrolleri var ve buradan
-  // geçmeleri 401 yerine 307 dönmelerine yol açardı — istemci JSON beklerken
-  // HTML alırdı.
-  matcher: ['/((?!api|_next|favicon.ico).*)'],
+  /*
+   * `api` hariç: oturum ve proxy uçlarının kendi kontrolleri var ve buradan
+   * geçmeleri 401 yerine 307 dönmelerine yol açardı — istemci JSON beklerken
+   * HTML alırdı.
+   *
+   * Statik dosyalar da hariç. Değilse GİRİŞ EKRANININ KENDİ LOGOSU
+   * yönlendiriliyor: oturumsuz kullanıcı `/brand/klinara-mark.png` isteyince
+   * 307 ile `/giris`e atılıyor ve tarayıcı HTML'i resim sanıp kırık ikon
+   * çiziyordu. Uzantısı olan hiçbir yol bir sayfa rotası değil.
+   */
+  matcher: ['/((?!api|_next|.*\\.[a-zA-Z0-9]+$).*)'],
 };

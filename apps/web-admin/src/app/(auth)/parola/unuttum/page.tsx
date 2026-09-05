@@ -34,8 +34,8 @@ export default function ForgotPage(): ReactNode {
   }
 
   return (
-    <div className="rounded-lg border border-line bg-card p-5 shadow-sm">
-      <h1 className="mb-4 text-lg font-semibold text-ink">{t('auth.forgot.title')}</h1>
+    <div className="rounded-xl border border-border bg-card p-6">
+      <h1 className="text-title-m mb-5 text-foreground">{t('auth.forgot.title')}</h1>
       {sent ? (
         <Alert tone="ok">{t('auth.forgot.sent')}</Alert>
       ) : (
@@ -54,7 +54,7 @@ export default function ForgotPage(): ReactNode {
           </Button>
         </form>
       )}
-      <a href="/giris" className="mt-4 block text-center text-sm text-ink-soft underline">
+      <a href="/giris" className="mt-4 block text-center text-sm text-muted-foreground underline">
         {t('common.back')}
       </a>
     </div>

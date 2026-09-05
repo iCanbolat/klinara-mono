@@ -15,10 +15,12 @@ import {
 } from './dto/package-report.dto';
 
 /**
- * Paket raporları.
+ * Paket raporları (5.4).
  *
- * Faz 6 ve 10.1 kardeş controller'ları getirdiğinde ayrı bir `ReportingModule`e
- * taşınabilir; şimdiden ayrı modül açmak boş bir kabuk olurdu.
+ * 10.1'de `modules/packages`ten buraya TAŞINDI — o dosyanın kendi notu bunu
+ * öngörüyordu ve kardeş controller'lar (doluluk, ciro, performans) geldiğinde
+ * artık boş bir kabuk değil. Taşıma davranışı değiştirmedi: yol, izinler ve
+ * yanıt gövdeleri aynı.
  */
 @ApiTags('reports')
 @ApiBearerAuth('bearerAuth')

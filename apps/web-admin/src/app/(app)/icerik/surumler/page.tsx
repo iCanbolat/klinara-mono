@@ -8,6 +8,8 @@ import { can } from '@/lib/permissions';
 import { useSession } from '@/components/session/session-provider';
 import { PermissionGate } from '@/components/session/permission-gate';
 import { t } from '@/i18n/tr';
+import { Skeleton } from '@/components/ui/skeleton';
+import { PageHeader } from '@/components/ui/page-header';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 
@@ -52,22 +54,22 @@ function Revisions(): ReactNode {
 
   return (
     <div className="flex max-w-2xl flex-col gap-4">
-      <h1 className="text-xl font-semibold text-ink">{t('editor.revisions')}</h1>
+      <PageHeader title={t('editor.revisions')} />
       {error !== null ? <Alert tone="danger">{error}</Alert> : null}
 
       {/* Sınır GİZLENMİYOR: kullanıcı 51. sürümün nereye gittiğini sormadan
           önce cevabı görsün. */}
-      <p className="text-sm text-ink-soft">
+      <p className="text-sm text-muted-foreground">
         Son {REVISION_HISTORY_LIMIT} sürüm gösterilir.
       </p>
 
       {revisions === null ? (
-        <p className="text-sm text-ink-soft">{t('common.loading')}</p>
+        <Skeleton className="h-24 w-full rounded-xl" />
       ) : (
         <table className="w-full text-sm">
           <caption className="sr-only">{t('editor.revisions')}</caption>
           <thead>
-            <tr className="border-b border-line text-left text-xs text-ink-soft">
+            <tr className="border-b border-border text-left text-xs text-muted-foreground">
               <th scope="col" className="py-2">Sürüm</th>
               <th scope="col">Tarih</th>
               <th scope="col">Durum</th>
@@ -76,12 +78,12 @@ function Revisions(): ReactNode {
           </thead>
           <tbody>
             {revisions.map((revision) => (
-              <tr key={revision.id} className="border-b border-line">
+              <tr key={revision.id} className="border-b border-border">
                 <td className="py-2">{revision.revisionNumber}</td>
                 <td>{new Date(revision.createdAt).toLocaleString('tr-TR')}</td>
                 <td>
                   {revision.isPublished ? (
-                    <span className="rounded-full border border-ok bg-ok-soft px-2 py-0.5 text-xs">
+                    <span className="rounded-full border border-success bg-success-soft px-2 py-0.5 text-xs">
                       {t('editor.revisionCurrent')}
                     </span>
                   ) : null}

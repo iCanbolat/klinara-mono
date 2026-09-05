@@ -6,8 +6,10 @@ import type { PasskeyInfo, SessionInfo, TotpStatus } from '@klinara/shared';
 import { ApiProblemError, api } from '@/lib/api/client';
 import { describeProblem, networkError } from '@/lib/problem';
 import { t } from '@/i18n/tr';
+import { PageHeader } from '@/components/ui/page-header';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { ConfirmButton } from '@/components/ui/confirm-button';
 import { Card, CardTitle } from '@/components/ui/card';
 
 interface Listed<T> {
@@ -89,7 +91,7 @@ export default function SecurityPage(): ReactNode {
 
   return (
     <div className="flex max-w-2xl flex-col gap-4">
-      <h1 className="text-xl font-semibold text-ink">{t('account.security')}</h1>
+      <PageHeader title={t('account.security')} />
       {error !== null ? <Alert tone="danger">{error}</Alert> : null}
 
       <Card>
@@ -106,19 +108,23 @@ export default function SecurityPage(): ReactNode {
       <Card>
         <CardTitle>{t('account.passkeys')}</CardTitle>
         {passkeys.length === 0 ? (
-          <p className="mb-3 text-sm text-ink-soft">Kayıtlı passkey yok.</p>
+          <p className="mb-3 text-sm text-muted-foreground">Kayıtlı passkey yok.</p>
         ) : (
           <ul className="mb-3 flex flex-col gap-1 text-sm">
             {passkeys.map((passkey) => (
               <li key={passkey.id} className="flex items-center justify-between">
                 <span>{passkey.deviceLabel ?? passkey.id.slice(0, 8)}</span>
-                <Button
+                <ConfirmButton
                   size="sm"
                   variant="ghost"
-                  onClick={() => void api.delete(`auth/passkeys/${passkey.id}`).then(load)}
+                  destructive
+                  title={t('account.removePasskeyTitle')}
+                  description={t('account.removePasskeyBody')}
+                  confirmLabel={t('common.delete')}
+                  onConfirm={() => void api.delete(`auth/passkeys/${passkey.id}`).then(load)}
                 >
                   {t('common.delete')}
-                </Button>
+                </ConfirmButton>
               </li>
             ))}
           </ul>
@@ -136,19 +142,36 @@ export default function SecurityPage(): ReactNode {
               <span className="min-w-0 truncate">
                 {session.deviceLabel ?? session.authMethod}
                 {session.current ? ` · ${t('account.sessionCurrent')}` : ''}
-                <span className="text-ink-soft"> · {session.ip ?? '—'}</span>
+                <span className="text-muted-foreground"> · {session.ip ?? '—'}</span>
               </span>
               {session.current ? null : (
-                <Button size="sm" variant="ghost" onClick={() => void revoke(session.id)}>
+                <ConfirmButton
+                  size="sm"
+                  variant="ghost"
+                  destructive
+                  title={t('account.revokeSessionTitle')}
+                  description={t('account.revokeSessionBody')}
+                  confirmLabel={t('common.delete')}
+                  onConfirm={() => void revoke(session.id)}
+                >
                   {t('common.delete')}
-                </Button>
+                </ConfirmButton>
               )}
             </li>
           ))}
         </ul>
-        <Button size="sm" variant="danger" loading={busy} onClick={() => void logoutAll()}>
+        <ConfirmButton
+          size="sm"
+          variant="danger"
+          destructive
+          loading={busy}
+          title={t('account.logoutAllTitle')}
+          description={t('account.logoutAllBody')}
+          confirmLabel={t('account.logoutAll')}
+          onConfirm={() => void logoutAll()}
+        >
           {t('account.logoutAll')}
-        </Button>
+        </ConfirmButton>
       </Card>
     </div>
   );

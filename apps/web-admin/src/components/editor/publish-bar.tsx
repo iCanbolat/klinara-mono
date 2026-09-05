@@ -3,8 +3,17 @@
 import { useState, type ReactNode } from 'react';
 import type { BookingPage, RevisionSummary } from '@klinara/shared';
 import { t } from '@/i18n/tr';
-import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 /**
  * Kaydet / yayınla çubuğu.
@@ -37,19 +46,19 @@ export function PublishBar({
   const [confirming, setConfirming] = useState(false);
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-card px-4 py-2">
-      <div className="text-sm text-ink-soft">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-card px-4 py-2">
+      <div className="text-sm text-muted-foreground">
         {page !== null ? (
           <>
-            <span className="font-medium text-ink">{t(`page.status.${page.status}` as 'page.status.draft')}</span>
-            {draft !== null ? <span> · sürüm {draft.revisionNumber}</span> : null}
+            <span className="font-medium text-foreground">{t(`page.status.${page.status}` as 'page.status.draft')}</span>
+            {draft !== null ? <span> · {t('editor.revision', { number: draft.revisionNumber })}</span> : null}
             {page.hasUnpublishedChanges ? <span> · {t('page.unpublishedChanges')}</span> : null}
           </>
         ) : null}
       </div>
 
       {readOnly ? (
-        <span className="text-sm text-ink-soft">{t('editor.readOnly')}</span>
+        <span className="text-sm text-muted-foreground">{t('editor.readOnly')}</span>
       ) : (
         <div className="flex items-center gap-2">
           <Button variant="secondary" size="sm" loading={saving} disabled={!dirty} onClick={onSave}>
@@ -61,35 +70,24 @@ export function PublishBar({
         </div>
       )}
 
-      {confirming ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label={t('editor.publish')}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-        >
-          <div className="w-full max-w-md rounded-lg border border-line bg-card p-5">
-            <h2 className="mb-2 text-base font-semibold">{t('editor.publish')}</h2>
-            <Alert tone="info" className="mb-4">
-              {t('editor.publishStaleness')}
-            </Alert>
-            <div className="flex justify-end gap-2">
-              <Button variant="ghost" size="sm" onClick={() => setConfirming(false)}>
-                {t('common.cancel')}
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => {
-                  setConfirming(false);
-                  onPublish();
-                }}
-              >
-                {t('editor.publish')}
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {/*
+        Yayınlama onayı Radix `AlertDialog` ile: yıkıcı olmayan ama GERİ ALINMAZ
+        bir eylem, kullanıcı bir yere kaçmadan onaylamalı. Odak tuzağı, Escape
+        ve gövde kaydırma kilidi kütüphaneden geliyor — elle yazılmış modalda
+        üçü de yoktu.
+      */}
+      <AlertDialog open={confirming} onOpenChange={setConfirming}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('editor.publish')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('editor.publishStaleness')}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={onPublish}>{t('editor.publish')}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

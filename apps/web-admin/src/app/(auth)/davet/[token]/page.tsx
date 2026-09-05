@@ -84,7 +84,7 @@ export default function InvitePage(): ReactNode {
 
   if (notice !== null) {
     return (
-      <div className="rounded-lg border border-line bg-card p-5 shadow-sm">
+      <div className="rounded-xl border border-border bg-card p-6">
         <Alert tone="ok">{notice}</Alert>
         <a href="/giris" className="mt-4 block text-center text-sm underline">
           {t('auth.login.submit')}
@@ -94,10 +94,10 @@ export default function InvitePage(): ReactNode {
   }
 
   return (
-    <div className="rounded-lg border border-line bg-card p-5 shadow-sm">
-      <h1 className="mb-1 text-lg font-semibold text-ink">{t('auth.invite.title')}</h1>
+    <div className="rounded-xl border border-border bg-card p-6">
+      <h1 className="mb-1 text-lg font-semibold text-foreground">{t('auth.invite.title')}</h1>
       {preview !== null ? (
-        <p className="mb-4 text-sm text-ink-soft">
+        <p className="mb-4 text-sm text-muted-foreground">
           {preview.tenantName} · {preview.roleName} · {preview.email}
         </p>
       ) : null}

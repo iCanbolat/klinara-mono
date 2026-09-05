@@ -63,9 +63,9 @@ export function TenantPicker(): ReactNode {
   }
 
   return (
-    <div className="rounded-lg border border-line bg-card p-5 shadow-sm">
-      <h1 className="text-lg font-semibold text-ink">{t('auth.tenant.title')}</h1>
-      <p className="mt-1 mb-4 text-sm text-ink-soft">{t('auth.tenant.description')}</p>
+    <div className="rounded-xl border border-border bg-card p-6">
+      <h1 className="text-lg font-semibold text-foreground">{t('auth.tenant.title')}</h1>
+      <p className="mt-1 mb-4 text-sm text-muted-foreground">{t('auth.tenant.description')}</p>
 
       {error !== null ? (
         <Alert tone="danger" className="mb-3">
@@ -74,7 +74,7 @@ export function TenantPicker(): ReactNode {
       ) : null}
 
       {tenants === null ? (
-        <p className="text-sm text-ink-soft">{t('common.loading')}</p>
+        <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
       ) : (
         <ul className="flex flex-col gap-2">
           {tenants.map((tenant) => (
@@ -86,7 +86,7 @@ export function TenantPicker(): ReactNode {
                 onClick={() => void choose(tenant.id)}
               >
                 <span>{tenant.name}</span>
-                <span className="text-xs text-ink-soft">{tenant.roles.join(', ')}</span>
+                <span className="text-xs text-muted-foreground">{tenant.roles.join(', ')}</span>
               </Button>
             </li>
           ))}

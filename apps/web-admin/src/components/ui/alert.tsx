@@ -3,11 +3,15 @@ import { cn } from '@/lib/cn';
 
 export type AlertTone = 'info' | 'danger' | 'warn' | 'ok';
 
+/*
+ * iOS `ErrorBanner`ın web karşılığı: yumuşak dolgu + tam tonlu kenarlık,
+ * `controlRadius` (12px), gölge yok.
+ */
 const TONES: Record<AlertTone, string> = {
-  info: 'bg-muted border-line-strong text-ink',
-  danger: 'bg-danger-soft border-danger text-ink',
-  warn: 'bg-warn-soft border-warn text-ink',
-  ok: 'bg-ok-soft border-ok text-ink',
+  info: 'border-border bg-muted text-foreground',
+  danger: 'border-destructive/35 bg-destructive-soft text-foreground',
+  warn: 'border-warning/35 bg-warning-soft text-foreground',
+  ok: 'border-success/35 bg-success-soft text-foreground',
 };
 
 /**
@@ -29,9 +33,9 @@ export function Alert({
   return (
     <div
       role={tone === 'danger' || tone === 'warn' ? 'alert' : 'status'}
-      className={cn('rounded-md border px-3 py-2 text-sm', TONES[tone], className)}
+      className={cn('rounded-lg border px-4 py-3 text-sm', TONES[tone], className)}
     >
-      {title !== undefined ? <p className="font-medium">{title}</p> : null}
+      {title !== undefined ? <p className="text-body-emphasis">{title}</p> : null}
       {children}
     </div>
   );

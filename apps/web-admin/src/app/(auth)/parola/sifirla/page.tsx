@@ -37,8 +37,8 @@ function ResetForm(): ReactNode {
   }
 
   return (
-    <div className="rounded-lg border border-line bg-card p-5 shadow-sm">
-      <h1 className="mb-4 text-lg font-semibold text-ink">{t('auth.reset.title')}</h1>
+    <div className="rounded-xl border border-border bg-card p-6">
+      <h1 className="text-title-m mb-5 text-foreground">{t('auth.reset.title')}</h1>
       {done ? (
         <>
           <Alert tone="ok">{t('auth.reset.done')}</Alert>

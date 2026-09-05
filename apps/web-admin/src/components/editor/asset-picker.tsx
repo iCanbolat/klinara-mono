@@ -35,14 +35,14 @@ export function AssetPicker({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-sm font-medium text-ink">{label}</span>
+      <span className="text-sm font-medium text-foreground">{label}</span>
 
       <select
         value={assetId ?? ''}
         onChange={(event) => onChange(event.target.value === '' ? null : event.target.value)}
         disabled={readOnly}
         aria-label={label}
-        className="h-10 rounded-md border border-line-strong bg-card px-2 text-sm"
+        className="h-10 rounded-md border border-border bg-card px-2 text-sm"
       >
         <option value="">— yok —</option>
         {library.assets.map((asset) => (
@@ -59,10 +59,10 @@ export function AssetPicker({
           onChange={(event) => void upload(event)}
           disabled={library.uploading}
           aria-label={t('asset.upload')}
-          className="text-xs text-ink-soft"
+          className="text-xs text-muted-foreground"
         />
       )}
-      {library.uploading ? <p className="text-xs text-ink-soft">{t('asset.uploading')}</p> : null}
+      {library.uploading ? <p className="text-xs text-muted-foreground">{t('asset.uploading')}</p> : null}
       {library.error !== null ? <Alert tone="danger">{library.error}</Alert> : null}
     </div>
   );

@@ -124,12 +124,20 @@ interface RequestOptions {
   retried?: boolean;
 }
 
-async function request<T>(
+/**
+ * Ham istek: başlıklar, 401 yenilemesi ve tekrar denemesi.
+ *
+ * `request`ten AYRILDI çünkü CSV indirme aynı oturum davranışını istiyor ama
+ * gövdeyi JSON olarak ayrıştıramaz. Ayırmadan önceki tek alternatif, indirme
+ * için ikinci bir fetch yolu yazmaktı — ve o yol 401'i, yenilemeyi ve oturum
+ * bitişi duyurusunu kendi başına yeniden uygulamak zorunda kalırdı.
+ */
+async function send(
   method: string,
   path: string,
-  options: RequestOptions = {},
-): Promise<T> {
-  const headers = new Headers({ accept: 'application/json' });
+  options: RequestOptions & { accept?: string } = {},
+): Promise<Response> {
+  const headers = new Headers({ accept: options.accept ?? 'application/json' });
   if (options.body !== undefined) headers.set('content-type', 'application/json');
   if (options.idempotencyKey !== undefined) headers.set('idempotency-key', options.idempotencyKey);
   if (options.ifMatch !== undefined) headers.set('if-match', options.ifMatch);
@@ -149,12 +157,22 @@ async function request<T>(
       // Kilidi al, yenile, isteği BİR KEZ tekrarla. İkinci bir tekrar yok:
       // yenileme başarılı olup istek yine 401 dönüyorsa sorun token değil.
       const refreshed = await refreshSession(true);
-      if (refreshed) return request<T>(method, path, { ...options, retried: true });
+      if (refreshed) return send(method, path, { ...options, retried: true });
     }
     clearSessionExpiry();
     announceExpiry();
     throw new SessionExpiredError();
   }
+
+  return response;
+}
+
+async function request<T>(
+  method: string,
+  path: string,
+  options: RequestOptions = {},
+): Promise<T> {
+  const response = await send(method, path, options);
 
   if (response.status === 204) return undefined as T;
 
@@ -163,6 +181,53 @@ async function request<T>(
     throw new ApiProblemError(toProblem(payload, response.status), retryAfter(response));
   }
   return payload as T;
+}
+
+/**
+ * Dosya indirir — CSV dışa aktarım.
+ *
+ * `<a href download>` KULLANILMIYOR. İki sebep: uç `POST` (gövde bir filtre
+ * taşıyor, sorgu dizgesine sığmaz) ve oturum bitmişse bir anchor sessizce
+ * giriş sayfasının HTML'ini `.csv` diye indirirdi. Buradan geçince 401,
+ * yenileme ve problem belgesi olağan yolla işleniyor.
+ *
+ * Dosya adı sunucunun `Content-Disposition` başlığından okunuyor; istemci
+ * ikinci bir ad üretmiyor ki indirilen dosyayla sunucudaki rapor aynı adı
+ * taşısın.
+ */
+export async function downloadFile(
+  path: string,
+  body: unknown,
+  options: RequestOptions = {},
+): Promise<void> {
+  const response = await send('POST', path, { ...options, body, accept: 'text/csv' });
+
+  if (!response.ok) {
+    const payload: unknown = await safeJson(response);
+    throw new ApiProblemError(toProblem(payload, response.status), retryAfter(response));
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  try {
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filenameFrom(response.headers.get('content-disposition'));
+    // Belgeye EKLENİYOR: Firefox eklenmemiş bir anchor'ın tıklamasını yok
+    // sayıyor.
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+  } finally {
+    // Sekme kapanana kadar bellekte kalmasın; tıklama zaten senkron başladı.
+    URL.revokeObjectURL(url);
+  }
+}
+
+/** `attachment; filename="rapor.csv"` → `rapor.csv`. */
+function filenameFrom(header: string | null): string {
+  const match = header === null ? null : /filename="([^"]+)"/.exec(header);
+  return match?.[1] ?? 'rapor.csv';
 }
 
 async function safeJson(response: Response): Promise<unknown> {

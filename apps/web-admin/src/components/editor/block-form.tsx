@@ -48,7 +48,7 @@ export function BlockForm({
 
   return (
     <div className="flex flex-col gap-3">
-      <h2 className="text-sm font-semibold text-ink">{t(BLOCK_LABEL_KEY[block.type])}</h2>
+      <h2 className="text-sm font-semibold text-foreground">{t(BLOCK_LABEL_KEY[block.type])}</h2>
 
       {BLOCK_FIELDS[block.type].map((field) => {
         const value = record[field.key];
@@ -60,17 +60,17 @@ export function BlockForm({
           case 'textarea':
             return (
               <label key={field.key} className="flex flex-col gap-1.5">
-                <span className="text-sm font-medium text-ink">{label}</span>
+                <span className="text-sm font-medium text-foreground">{label}</span>
                 <textarea
                   value={typeof value === 'string' ? value : ''}
                   onChange={(event) => set(field.key, event.target.value)}
                   maxLength={field.max}
                   rows={10}
                   readOnly={readOnly}
-                  className="rounded-md border border-line-strong bg-card p-2 font-mono text-sm"
+                  className="rounded-md border border-border bg-card p-2 font-mono text-sm"
                 />
                 {error !== undefined ? (
-                  <span role="alert" className="text-xs text-danger">
+                  <span role="alert" className="text-xs text-destructive">
                     {error}
                   </span>
                 ) : null}
@@ -110,12 +110,12 @@ export function BlockForm({
           case 'branch':
             return (
               <label key={field.key} className="flex flex-col gap-1.5">
-                <span className="text-sm font-medium text-ink">{label}</span>
+                <span className="text-sm font-medium text-foreground">{label}</span>
                 <select
                   value={typeof value === 'string' ? value : ''}
                   onChange={(event) => set(field.key, event.target.value)}
                   disabled={readOnly}
-                  className="h-10 rounded-md border border-line-strong bg-card px-2 text-sm"
+                  className="h-10 rounded-md border border-border bg-card px-2 text-sm"
                 >
                   <option value="">Tümü</option>
                   {branches.map((branch) => (

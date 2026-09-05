@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react';
+import { BranchProvider } from '@/components/session/branch-provider';
 import { SessionProvider } from '@/components/session/session-provider';
 import { Sidebar } from '@/components/shell/sidebar';
 import { Topbar } from '@/components/shell/topbar';
+import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { t } from '@/i18n/tr';
 
 /**
@@ -15,21 +17,28 @@ import { t } from '@/i18n/tr';
 export default function AppLayout({ children }: { children: ReactNode }): ReactNode {
   return (
     <SessionProvider>
-      <a
-        href="#main"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:rounded focus:bg-card focus:px-3 focus:py-2"
-      >
-        {t('nav.skipToContent')}
-      </a>
-      <div className="flex min-h-screen flex-col">
-        <Topbar />
-        <div className="flex flex-1">
+      <BranchProvider>
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-lg focus:bg-card focus:px-3 focus:py-2"
+        >
+          {t('nav.skipToContent')}
+        </a>
+        <SidebarProvider>
           <Sidebar />
-          <main id="main" className="flex-1 p-6">
-            {children}
-          </main>
-        </div>
-      </div>
+          <SidebarInset>
+            <Topbar />
+            {/*
+              Genişlik sınırı bilinçli: 24"lük bir ekranda tam genişlik bir tablo
+              satırının gözle takip edilemeyeceği kadar uzun olur. İçerik dolgusu
+              iOS `screenInset` (24) ile aynı.
+            */}
+            <main id="main" className="mx-auto w-full max-w-6xl flex-1 p-6 md:p-8">
+              {children}
+            </main>
+          </SidebarInset>
+        </SidebarProvider>
+      </BranchProvider>
     </SessionProvider>
   );
 }
