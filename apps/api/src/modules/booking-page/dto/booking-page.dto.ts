@@ -1,46 +1,31 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import {
-  IsArray,
-  IsBoolean,
-  IsEmail,
-  IsIn,
-  IsInt,
-  IsOptional,
-  IsString,
-  IsUUID,
-  Max,
-  MaxLength,
-  Min,
-  ValidateNested,
-} from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsBoolean, IsEmail, IsIn, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
 import type { BookingOtpChannel } from '../../../database/schema';
 
 export const BOOKING_SITE_STATUSES = ['draft', 'published', 'unpublished'] as const;
 
 /**
- * Randevu anında gösterilen onam metni.
+ * Yayındaki onam metninin ÖZETİ — ayarların parçası, ama SALT OKUNUR.
  *
- * Metnin kendisi burada duruyor çünkü Faz 7 (onam şablonları) bu fazdan SONRA
- * geliyor. 9.4 gösterilen metnin birebir kopyasını ve `sha256`'sını
- * `booking_consent_acceptances`a yazar; Batch 7.2 satırları `consent_records`a
- * taşır ve buradaki alan şablon referansına döner.
+ * Metin ve sürüm geçmişi `/consent-document` ucundan yönetiliyor: onam metni
+ * bir ayar değil, sürümlü ve yayınlandıktan sonra değişmez bir belge. Ayarlar
+ * kaydedilirken yanlışlıkla üzerine yazılabilmesi bunun tam tersi olurdu.
  */
-export class ConsentTextDto {
-  @ApiProperty({ example: 'kvkk_explicit', maxLength: 60 })
-  @IsString()
-  @MaxLength(60)
-  kind: string;
+export class ActiveConsentSummaryDto {
+  @ApiProperty({ format: 'uuid' })
+  id: string;
 
-  @ApiProperty({ maxLength: 8_000 })
-  @IsString()
-  @MaxLength(8_000)
-  text: string;
+  @ApiProperty({ example: 3 })
+  version: number;
 
-  @ApiPropertyOptional({ default: true, description: 'İşaretlenmeden randevu alınamaz.' })
-  @IsOptional()
-  @IsBoolean()
-  required?: boolean;
+  @ApiProperty({ example: 'tr' })
+  locale: string;
+
+  @ApiProperty()
+  sha256: string;
+
+  @ApiProperty()
+  publishedAt: string;
 }
 
 export class BookingSiteSettingsDto {
@@ -74,8 +59,12 @@ export class BookingSiteSettingsDto {
   @ApiProperty({ enum: ['whatsapp', 'sms'] })
   otpChannel: BookingOtpChannel;
 
-  @ApiProperty({ type: [ConsentTextDto] })
-  consentTexts: ConsentTextDto[];
+  @ApiProperty({
+    type: ActiveConsentSummaryDto,
+    nullable: true,
+    description: 'Yayında onam metni yoksa `null` — bu hâlde site YAYINLANAMAZ.',
+  })
+  consent: ActiveConsentSummaryDto | null;
 
   @ApiProperty({ type: [String] })
   locales: string[];
@@ -153,13 +142,6 @@ export class UpdateBookingPageDto {
   @IsOptional()
   @IsIn(['whatsapp', 'sms'])
   otpChannel?: BookingOtpChannel;
-
-  @ApiPropertyOptional({ type: [ConsentTextDto], maxItems: 10 })
-  @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => ConsentTextDto)
-  consentTexts?: ConsentTextDto[];
 
   @ApiPropertyOptional()
   @IsOptional()

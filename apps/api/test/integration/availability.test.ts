@@ -11,6 +11,7 @@ import {
   type ClinicFixture,
 } from '../helpers/clinic';
 import { createAppointment, tenantCtx } from '../helpers/booking';
+import { shiftDays, upcomingBerlinDstFallback, upcomingMonday } from '../helpers/dates';
 import { DRIZZLE, type Database } from '../../src/database/database.constants';
 import { AvailabilityCacheService } from '../../src/modules/booking/availability-cache.service';
 
@@ -26,8 +27,17 @@ interface AvailabilityBody {
   slots: SlotBody[];
 }
 
-/** Sabit bir Pazartesi — testler takvimin kendisini sınıyor, bugünü değil. */
-const MONDAY = '2026-09-07';
+/**
+ * Gelecekteki bir Pazartesi — testler takvimin kendisini sınıyor, bugünü değil.
+ * Sabit yazılırsa o gün geldiğinde min-lead penceresi slotları eler; bkz.
+ * `helpers/dates.ts`.
+ */
+const MONDAY = upcomingMonday();
+/** MONDAY'den bir önceki gün: Pazar, şubenin kapalı olduğu gün. */
+const SUNDAY = shiftDays(MONDAY, -1);
+/** Performans fixture'ının 29 günlük penceresi (uç en fazla 31 güne izin verir). */
+const PERF_FROM = MONDAY;
+const PERF_TO = shiftDays(MONDAY, 29);
 const at = (hhmm: string, day = MONDAY) => new Date(`${day}T${hhmm}:00+03:00`);
 
 describe('uygunluk motoru (Batch 3.2)', () => {
@@ -83,9 +93,9 @@ describe('uygunluk motoru (Batch 3.2)', () => {
 
       // 09:00–18:00 arası 30 dk’lık hizmet: 09:00 … 17:30 = 35 slot.
       expect(body.slots).toHaveLength(35);
-      expect(body.slots[0]?.startsAt).toBe('2026-09-07T09:00:00+03:00');
-      expect(body.slots[0]?.endsAt).toBe('2026-09-07T09:30:00+03:00');
-      expect(body.slots.at(-1)?.startsAt).toBe('2026-09-07T17:30:00+03:00');
+      expect(body.slots[0]?.startsAt).toBe(`${MONDAY}T09:00:00+03:00`);
+      expect(body.slots[0]?.endsAt).toBe(`${MONDAY}T09:30:00+03:00`);
+      expect(body.slots.at(-1)?.startsAt).toBe(`${MONDAY}T17:30:00+03:00`);
       expect(body.slots[0]?.staffProfileIds).toEqual([clinic.practitioner.staffProfileId]);
     });
 
@@ -95,9 +105,9 @@ describe('uygunluk motoru (Batch 3.2)', () => {
       const { body } = await ask({ serviceIds: clinic.service.id });
 
       expect(body.slots).toHaveLength(33);
-      expect(body.slots[0]?.startsAt).toBe('2026-09-07T09:00:00+03:00');
-      expect(body.slots.at(-1)?.startsAt).toBe('2026-09-07T17:00:00+03:00');
-      expect(body.slots.at(-1)?.endsAt).toBe('2026-09-07T18:00:00+03:00');
+      expect(body.slots[0]?.startsAt).toBe(`${MONDAY}T09:00:00+03:00`);
+      expect(body.slots.at(-1)?.startsAt).toBe(`${MONDAY}T17:00:00+03:00`);
+      expect(body.slots.at(-1)?.endsAt).toBe(`${MONDAY}T18:00:00+03:00`);
     });
 
     it('ardışık iki hizmette toplam süre KESİNTİSİZ blok olarak aranır', async () => {
@@ -107,12 +117,12 @@ describe('uygunluk motoru (Batch 3.2)', () => {
 
       // 5 + 60 + 10 (ilk) + 0 + 30 + 0 (ikinci) = 105 dk işgal,
       // görünen süre 105 - 5 - 0 = 100 dk.
-      expect(body.slots[0]?.startsAt).toBe('2026-09-07T09:00:00+03:00');
-      expect(body.slots[0]?.endsAt).toBe('2026-09-07T10:40:00+03:00');
+      expect(body.slots[0]?.startsAt).toBe(`${MONDAY}T09:00:00+03:00`);
+      expect(body.slots[0]?.endsAt).toBe(`${MONDAY}T10:40:00+03:00`);
       // Izgara 15 dk: 100 dk'lık blok 18:00'e TAM oturmaz. 16:30 başlangıcı
       // 18:10'da biterdi, o yüzden son slot 16:15–17:55'tir.
-      expect(body.slots.at(-1)?.startsAt).toBe('2026-09-07T16:15:00+03:00');
-      expect(body.slots.at(-1)?.endsAt).toBe('2026-09-07T17:55:00+03:00');
+      expect(body.slots.at(-1)?.startsAt).toBe(`${MONDAY}T16:15:00+03:00`);
+      expect(body.slots.at(-1)?.endsAt).toBe(`${MONDAY}T17:55:00+03:00`);
     });
 
     it('mola aralığına denk gelen slotlar çıkarılır', async () => {
@@ -134,8 +144,8 @@ describe('uygunluk motoru (Batch 3.2)', () => {
 
     it('kapalı günde slot üretmez', async () => {
       const { body } = await ask({
-        from: '2026-09-06T00:00:00+03:00', // Pazar
-        to: '2026-09-06T23:59:59+03:00',
+        from: `${SUNDAY}T00:00:00+03:00`, // Pazar
+        to: `${SUNDAY}T23:59:59+03:00`,
       });
       expect(body.slots).toHaveLength(0);
     });
@@ -240,7 +250,7 @@ describe('uygunluk motoru (Batch 3.2)', () => {
         .expect(200);
 
       const { body } = await ask();
-      expect(body.slots[0]?.endsAt).toBe('2026-09-07T09:45:00+03:00');
+      expect(body.slots[0]?.endsAt).toBe(`${MONDAY}T09:45:00+03:00`);
     });
 
     it('personelin izinli günü tüm slotları kapatır', async () => {
@@ -282,7 +292,7 @@ describe('uygunluk motoru (Batch 3.2)', () => {
     });
 
     it('HAFTALIK tekrarlı istisna sonraki haftalarda da kapatır', async () => {
-      // İlk oluşum 31 Ağustos Pazartesi; iki hafta sonrası 14 Eylül.
+      // İlk oluşum MONDAY'den iki hafta ÖNCEKİ pazartesi; tekrar MONDAY'e düşer.
       await http(app)
         .post('/api/v1/schedule-exceptions')
         .set(auth(clinic.owner.tokens))
@@ -290,12 +300,12 @@ describe('uygunluk motoru (Batch 3.2)', () => {
         .send({
           staffProfileId: clinic.practitioner.staffProfileId,
           branchId: clinic.branch.id,
-          startsAt: '2026-08-31T10:00:00+03:00',
-          endsAt: '2026-08-31T11:00:00+03:00',
+          startsAt: `${shiftDays(MONDAY, -14)}T10:00:00+03:00`,
+          endsAt: `${shiftDays(MONDAY, -14)}T11:00:00+03:00`,
           recurrenceType: 'weekly',
           recurrenceIntervalWeeks: 1,
           recurrenceWeekdays: [1],
-          recurrenceUntil: '2026-12-31T00:00:00+03:00',
+          recurrenceUntil: `${shiftDays(MONDAY, 120)}T00:00:00+03:00`,
         })
         .expect(201);
 
@@ -352,8 +362,8 @@ describe('uygunluk motoru (Batch 3.2)', () => {
         .query({
           branchId: clinic.branch.id,
           serviceIds: clinic.quickService.id,
-          from: '2026-09-01T00:00:00+03:00',
-          to: '2026-11-01T00:00:00+03:00',
+          from: `${MONDAY}T00:00:00+03:00`,
+          to: `${shiftDays(MONDAY, 61)}T00:00:00+03:00`,
         })
         .set(auth(clinic.owner.tokens))
         .set(branchHeader(clinic.branch.id));
@@ -369,8 +379,19 @@ describe('uygunluk motoru (Batch 3.2)', () => {
       const ownerAuth = auth(clinic.owner.tokens);
 
       // Türkiye kalıcı UTC+3'tedir; DST doğruluğunu sınamak için yaz saati
-      // uygulayan bir şube kuruyoruz. 25 Ekim 2026 Berlin'de saatlerin geri
-      // alındığı gündür (CEST +02:00 → CET +01:00).
+      // uygulayan bir şube kuruyoruz. Ekim'in son Pazarı Berlin'de saatlerin
+      // geri alındığı gündür (CEST +02:00 → CET +01:00); geçiş gününü sabit
+      // yazmak yerine gelecekteki İLKİNİ hesaplıyoruz.
+      const transition = upcomingBerlinDstFallback(); // Pazar
+      const beforeDay = shiftDays(transition, -2); // Cuma, hâlâ CEST
+
+      // Geçiş günü bir yıl kadar ileride olabilir; varsayılan 180 günlük
+      // ileriye rezervasyon sınırı onu pencerenin dışında bırakırdı.
+      await http(app)
+        .patch('/api/v1/tenant/settings')
+        .set(ownerAuth)
+        .send({ maxAdvanceDays: 730 })
+        .expect(200);
       const created = await http(app)
         .post('/api/v1/branches')
         .set(ownerAuth)
@@ -406,15 +427,21 @@ describe('uygunluk motoru (Batch 3.2)', () => {
           .set(ownerAuth)
           .set(branchHeader(berlinId));
 
-      const before = await query('2026-10-23T00:00:00+02:00', '2026-10-23T23:59:59+02:00');
-      const after = await query('2026-10-25T00:00:00+02:00', '2026-10-25T23:59:59+01:00');
+      const before = await query(
+        `${beforeDay}T00:00:00+02:00`,
+        `${beforeDay}T23:59:59+02:00`,
+      );
+      const after = await query(
+        `${transition}T00:00:00+02:00`,
+        `${transition}T23:59:59+01:00`,
+      );
 
       const firstBefore = (before.body as AvailabilityBody).slots[0];
       const firstAfter = (after.body as AvailabilityBody).slots[0];
 
       // Yerel saat iki günde de 09:00 — kayma YOK.
-      expect(firstBefore?.startsAt).toBe('2026-10-23T09:00:00+02:00');
-      expect(firstAfter?.startsAt).toBe('2026-10-25T09:00:00+01:00');
+      expect(firstBefore?.startsAt).toBe(`${beforeDay}T09:00:00+02:00`);
+      expect(firstAfter?.startsAt).toBe(`${transition}T09:00:00+01:00`);
 
       // Aynı sayıda slot: geçiş günü de normal bir iş günüdür.
       expect((after.body as AvailabilityBody).slots).toHaveLength(
@@ -513,8 +540,7 @@ describe('uygunluk motoru (Batch 3.2)', () => {
                (tenant_id, branch_id, booking_site_id, token_hash, service_ids,
                 staff_profile_id, starts_at, ends_at, expires_at)
              values ($1, $2, $3, encode(sha256($4::bytea), 'hex'), array[$5::uuid], $6,
-                     timestamptz '2026-09-01 09:00:00+03',
-                     timestamptz '2026-09-30 18:00:00+03',
+                     $7::timestamptz, $8::timestamptz,
                      now() + interval '1 hour')
              returning id`,
             [
@@ -524,6 +550,8 @@ describe('uygunluk motoru (Batch 3.2)', () => {
               `perf-${staffId}`,
               clinic.service.id,
               staffId,
+              `${PERF_FROM}T09:00:00+03:00`,
+              `${PERF_TO}T18:00:00+03:00`,
             ],
           )
         ).rows[0]!.id;
@@ -533,15 +561,19 @@ describe('uygunluk motoru (Batch 3.2)', () => {
              (tenant_id, branch_id, resource_type, resource_id, source_type, hold_id, time_range)
            select $1, $2, 'staff', $3, 'hold', $4,
                   tstzrange(slot, slot + interval '45 minutes', '[)')
-             from generate_series(
-                    timestamptz '2026-09-01 09:00:00+03',
-                    timestamptz '2026-09-30 09:00:00+03',
-                    interval '1 day') d
+             from generate_series($5::timestamptz, $6::timestamptz, interval '1 day') d
              cross join lateral (
                select d + (h || ' hours')::interval as slot
                  from generate_series(0, 5) h
              ) s`,
-          [clinic.tenant.id, clinic.branch.id, staffId, holdId],
+          [
+            clinic.tenant.id,
+            clinic.branch.id,
+            staffId,
+            holdId,
+            `${PERF_FROM}T09:00:00+03:00`,
+            `${PERF_TO}T09:00:00+03:00`,
+          ],
         );
       }
 
@@ -555,8 +587,8 @@ describe('uygunluk motoru (Batch 3.2)', () => {
           .query({
             branchId: clinic.branch.id,
             serviceIds: clinic.quickService.id,
-            from: '2026-09-01T00:00:00+03:00',
-            to: '2026-09-30T00:00:00+03:00',
+            from: `${PERF_FROM}T00:00:00+03:00`,
+            to: `${PERF_TO}T00:00:00+03:00`,
           })
           .set(ownerAuth)
           .set(branchHeader(clinic.branch.id));

@@ -2,13 +2,20 @@ import type { PublicBookingSettings, PublicSlot } from '@klinara/shared';
 import type { StoredHold } from '@/lib/hold-storage';
 import type { UserFacingError } from '@/lib/errors';
 
+/**
+ * ⚠️ `consent` adımı `identity`den ÖNCE.
+ *
+ * KVKK aydınlatması, kişisel veri toplanmadan önce gösterilmek zorunda ve
+ * `identity` adımı telefon numarası alıp OTP gönderiyor. Ters sıra, aydınlatma
+ * yükümlülüğünü müşterinin numarasını aldıktan sonraya bırakırdı.
+ */
 export const ALL_STEPS = [
   'branch',
   'service',
   'staff',
   'datetime',
-  'identity',
   'consent',
+  'identity',
   'confirm',
   'done',
 ] as const;
@@ -26,7 +33,7 @@ export function stepsFor(settings: PublicBookingSettings): Step[] {
   return ALL_STEPS.filter((step) => {
     if (step === 'staff') return settings.showStaffSelection;
     if (step === 'identity') return settings.requireOtp;
-    if (step === 'consent') return settings.requiredConsents.length > 0;
+    if (step === 'consent') return settings.consent !== null;
     return true;
   });
 }
@@ -54,7 +61,13 @@ export interface BookingState {
    * da yoktu: ekranda gösterilen şey "şu kadar saniye sonra tekrar deneyin".
    */
   otpLockedSeconds: number | null;
-  consents: Record<string, boolean>;
+  /**
+   * TEK zorunlu KVKK onayı işaretlendi mi.
+   *
+   * Faz 7 daraltılmadan önce bu bir `Record<kind, boolean>`ti; artık tek onam
+   * olduğu için tek bayrak — sözlük, olmayan bir çeşitliliği modelliyordu.
+   */
+  consentAccepted: boolean;
   result: { appointmentId: string; manageToken: string } | null;
 }
 
@@ -73,7 +86,7 @@ export type BookingAction =
   | { type: 'otpSent'; phone: string }
   | { type: 'otpVerified' }
   | { type: 'otpLocked'; seconds: number }
-  | { type: 'toggleConsent'; kind: string }
+  | { type: 'toggleConsent' }
   | { type: 'submitting' }
   | { type: 'submitted'; result: { appointmentId: string; manageToken: string } }
   | { type: 'error'; error: UserFacingError | null };
@@ -93,7 +106,7 @@ export function initialState(overrides: Partial<BookingState> = {}): BookingStat
     submitting: false,
     otpSent: false,
     otpLockedSeconds: null,
-    consents: {},
+    consentAccepted: false,
     result: null,
     ...overrides,
   };
@@ -194,11 +207,7 @@ export function reducer(state: BookingState, action: BookingAction): BookingStat
       return { ...state, otpLockedSeconds: action.seconds };
 
     case 'toggleConsent':
-      return {
-        ...state,
-        consents: { ...state.consents, [action.kind]: !(state.consents[action.kind] ?? false) },
-        error: null,
-      };
+      return { ...state, consentAccepted: !state.consentAccepted, error: null };
 
     case 'submitting':
       return { ...state, submitting: true, error: null };
@@ -225,9 +234,7 @@ export function canAdvance(state: BookingState, settings: PublicBookingSettings)
     case 'identity':
       return state.hold?.otpVerified === true || !settings.requireOtp;
     case 'consent':
-      return settings.requiredConsents
-        .filter((consent) => consent.required)
-        .every((consent) => state.consents[consent.kind] === true);
+      return state.consentAccepted;
     default:
       return true;
   }

@@ -5,6 +5,7 @@ import { staffProfiles } from './staff';
 import { customers } from './crm';
 import { appointments } from './appointments';
 import { bookingSites } from './booking-sites';
+import { consentDocuments } from './consent';
 
 export const slotHoldStatus = pgEnum('slot_hold_status', [
   'active',
@@ -82,11 +83,14 @@ export const bookingOtpChallenges = pgTable(
 );
 
 /**
- * Onam kanıtı — Faz 7'ye GEÇİCİ köprü.
+ * Onam kabul kanıtı — KALICI tablo.
  *
- * Gösterilen metnin birebir kopyası ve hash'i bugünden toplanıyor; Batch 7.2
- * satırları `consent_records`a taşıyıp `consentRecordId`yi dolduracak. Kayıtlar
- * değişmez: sonradan düzeltilebilen bir onam kanıtı, kanıt değildir.
+ * 9.4'te Faz 7'ye geçici bir köprü olarak açılmıştı; Faz 7 tek zorunlu KVKK
+ * onayına daraltılınca `consent_records` hiç yazılmadı ve kanıtın kalıcı evi
+ * burası oldu. Eksik olan tek şey sürümdü: artık `consentDocumentId` /
+ * `consentVersion` ile yayınlanmış metne bağlanıyor.
+ *
+ * Kayıtlar değişmez: sonradan düzeltilebilen bir onam kanıtı, kanıt değildir.
  */
 export const bookingConsentAcceptances = pgTable(
   'booking_consent_acceptances',
@@ -105,15 +109,22 @@ export const bookingConsentAcceptances = pgTable(
     kind: text('kind').notNull(),
     textBody: text('text_body').notNull(),
     textSha256: text('text_sha256').notNull(),
+    /** 0043 öncesi satırlarda null; kanıt `textBody`/`textSha256` ile tamdır. */
+    consentDocumentId: uuid('consent_document_id').references(() => consentDocuments.id),
+    consentVersion: integer('consent_version'),
+    locale: text('locale'),
     acceptedAt: timestamp('accepted_at', { withTimezone: true }).notNull().defaultNow(),
     ip: inet('ip'),
     userAgent: text('user_agent'),
-    /** Faz 7.2 dolduracak. */
-    consentRecordId: uuid('consent_record_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    index('booking_consent_acceptances_appt_idx').on(table.tenantId, table.appointmentId),
+    index('booking_consent_acceptances_appointment_idx').on(table.tenantId, table.appointmentId),
+    index('booking_consent_acceptances_customer_idx').on(
+      table.tenantId,
+      table.customerId,
+      table.acceptedAt,
+    ),
   ],
 );
 

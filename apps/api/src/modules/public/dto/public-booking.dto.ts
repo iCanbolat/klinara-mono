@@ -1,15 +1,15 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
-  ArrayMaxSize,
-  IsArray,
   IsEmail,
   IsIn,
+  IsInt,
   IsOptional,
   IsString,
   IsUUID,
   Matches,
   MaxLength,
+  Min,
   MinLength,
   ValidateNested,
 } from 'class-validator';
@@ -60,19 +60,20 @@ export class VerifyOtpDto {
   code: string;
 }
 
+/**
+ * TEK zorunlu KVKK/aydınlatma onayının kabulü.
+ *
+ * Metin GÖNDERİLMEZ: kanıt olarak saklanan gövde sunucunun yayındaki
+ * dokümanından okunur. İstemcinin beyanı kanıt zincirine girmez; yalnız
+ * "bunu gördüm" iddiasını `version` + `sha256` ile taşır ve sunucu ikisini de
+ * yayındakiyle karşılaştırır.
+ */
 export class ConsentAcceptanceDto {
-  @ApiProperty({ example: 'kvkk_explicit' })
-  @IsString()
-  @MaxLength(60)
-  kind: string;
+  @ApiProperty({ example: 3, description: 'Gösterilen metnin sürümü.' })
+  @IsInt()
+  @Min(1)
+  version: number;
 
-  /**
-   * İstemcinin GÖRDÜĞÜ metnin hash'i.
-   *
-   * Sunucu bunu kendi ayarından hesapladığıyla karşılaştırır ve eşleşmezse
-   * reddeder. Böylece "müşteriye ne gösterildi" sorusu, ayarlar sonradan
-   * değişse bile cevaplanabilir kalıyor.
-   */
   @ApiProperty({ example: '9f3c…', description: 'Gösterilen metnin sha256’sı.' })
   @Matches(/^[0-9a-f]{64}$/)
   textSha256: string;
@@ -106,12 +107,19 @@ export class PublicCreateAppointmentDto {
   @MaxLength(500)
   notes?: string;
 
-  @ApiProperty({ type: [ConsentAcceptanceDto], maxItems: 10 })
-  @IsArray()
-  @ArrayMaxSize(10)
-  @ValidateNested({ each: true })
+  /**
+   * ZORUNLU — ama DTO seviyesinde optional.
+   *
+   * Eksik onay `VALIDATION_FAILED` değil `CONSENT_REQUIRED` dönmeli: istemci
+   * bu iki koda farklı tepki veriyor (biri onay kutusunu işaretletir, öbürü
+   * jenerik bir form hatası gösterir). Zorunluluğu servis (`assertConsent`)
+   * uyguluyor.
+   */
+  @ApiProperty({ type: ConsentAcceptanceDto, description: 'Zorunlu; eksikse `CONSENT_REQUIRED`.' })
+  @IsOptional()
+  @ValidateNested()
   @Type(() => ConsentAcceptanceDto)
-  consents: ConsentAcceptanceDto[];
+  consent?: ConsentAcceptanceDto;
 }
 
 export class PublicAppointmentDto {

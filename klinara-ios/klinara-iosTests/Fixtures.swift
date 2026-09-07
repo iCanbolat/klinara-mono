@@ -475,6 +475,17 @@ enum Fixtures {
             "appointmentId": null,
             "customerVisible": false
           }
+        },
+        {
+          "kind": "consent",
+          "id": "6b2f4d31-9c1a-4f0e-8b77-1f0a5c2d3e44",
+          "occurredAt": "2026-08-26T09:10:00.000Z",
+          "payload": {
+            "consentKind": "kvkk_explicit",
+            "version": 2,
+            "locale": "tr",
+            "textSha256": "3a7bd3e2360a3d29eea436fcfb7e44c735d117c42d1c1835420b6b9942dd4f1b"
+          }
         }
       ],
       "pageInfo": {

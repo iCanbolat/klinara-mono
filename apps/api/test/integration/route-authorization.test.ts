@@ -183,8 +183,6 @@ describe('rota × yetki kapsamı', () => {
      * listede durmaları o işin borcunu görünür tutuyor.
      */
     const notYetEnforced = [
-      'consent:read', // Faz 7 (onam ve KVKK) — henüz yazılmadı
-      'consent:manage',
       'audit:read', // denetim kaydını OKUYAN bir uç yok (audit_log yalnız yazılıyor)
       'appointment:reopen', // tamamlanmış randevuyu geri açma ucu yok
       'resource:read', // eski kapsamdan kalan anahtarlar; yerlerini STAFF/SCHEDULE aldı

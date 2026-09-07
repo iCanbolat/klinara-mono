@@ -17,6 +17,7 @@ export type Recovery =
   | 'go-identity'
   | 'lock-otp'
   | 'highlight-consent'
+  | 'reload-consent'
   | 'countdown'
   | 'field-errors'
   | 'expired-link';
@@ -69,7 +70,7 @@ const MESSAGES: Record<string, { message: string; recovery: Recovery }> = {
     recovery: 'none',
   },
   [ERROR_CODES.CONSENT_REQUIRED]: {
-    message: 'Devam etmek için zorunlu onayı işaretlemeniz gerekiyor.',
+    message: 'Devam etmek için aydınlatma metnini onaylamanız gerekiyor.',
     recovery: 'highlight-consent',
   },
   [ERROR_CODES.CANCEL_WINDOW_CLOSED]: {
@@ -107,6 +108,20 @@ export function describeError(error: unknown): UserFacingError {
       recovery: 'none',
       retryAfterSeconds: null,
       requestId: null,
+      fieldErrors: [],
+    };
+  }
+
+  // `CONSENT_REQUIRED` İKİ ayrı durumu taşıyor ve ayrımı yalnız durum kodu
+  // veriyor: 400 "kutuyu işaretlemedin", 409 "metin sen bakarken güncellendi".
+  // Tek mesaj kullanılsaydı 409 alan kullanıcıya, zaten işaretlediği kutuyu
+  // işaretlemesi söylenirdi — çıkışı olmayan bir döngü.
+  if (error.code === ERROR_CODES.CONSENT_REQUIRED && error.status === 409) {
+    return {
+      message: 'Aydınlatma metni güncellendi. Güncel metni görmek için sayfayı yenileyin.',
+      recovery: 'reload-consent',
+      retryAfterSeconds: error.retryAfterSeconds,
+      requestId: error.problem.requestId === '' ? null : error.problem.requestId,
       fieldErrors: [],
     };
   }

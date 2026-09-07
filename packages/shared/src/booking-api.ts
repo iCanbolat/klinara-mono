@@ -48,12 +48,30 @@ export interface PublicCategory {
   services: PublicService[];
 }
 
-export interface RequiredConsent {
-  kind: string;
+/**
+ * Randevu akışında gösterilen TEK zorunlu KVKK/aydınlatma onayı.
+ *
+ * Faz 7 daraltıldı: treatment onamı klinik içi ayrı akışa taşındı, marketing ve
+ * photo_usage onamları MVP'den çıktı. Bu yüzden dizi değil, tek belge.
+ */
+export interface BookingConsent {
+  documentId: string;
+  version: number;
+  locale: string;
   text: string;
-  /** İstemci randevu oluştururken bunu aynen geri gönderir. */
+  /** İstemci randevu oluştururken `version` ile birlikte bunu aynen geri gönderir. */
   textSha256: string;
-  required: boolean;
+}
+
+/**
+ * Randevu isteğinde giden kabul beyanı.
+ *
+ * Metin GÖNDERİLMEZ: kanıt olarak saklanan gövde sunucunun yayındaki
+ * dokümanından okunur, istemcinin beyanından değil.
+ */
+export interface BookingConsentAcceptanceInput {
+  version: number;
+  textSha256: string;
 }
 
 export interface PublicBookingSettings {
@@ -66,7 +84,8 @@ export interface PublicBookingSettings {
   allowReschedule: boolean;
   requireOtp: boolean;
   otpChannel: string;
-  requiredConsents: RequiredConsent[];
+  /** Yayında onam metni yoksa `null`; bu hâlde site zaten yayınlanamaz. */
+  consent: BookingConsent | null;
 }
 
 export interface PublicSitePayload {

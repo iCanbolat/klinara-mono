@@ -15,9 +15,9 @@ import { QueueService } from '../../lib/queue/queue.service';
 import * as domainRepo from './domains.repository';
 import * as repo from './booking-page.repository';
 import type {
+  ActiveConsentSummaryDto,
   BookingPageDto,
   BookingSiteSettingsDto,
-  ConsentTextDto,
   UpdateBookingPageDto,
 } from './dto/booking-page.dto';
 import type {
@@ -44,6 +44,7 @@ export class BookingPageService {
       return {
         site,
         settings: await repo.findSettings(tx, site.id),
+        consent: await repo.findActiveConsentSummary(tx, site.id),
         domains: await domainRepo.listDomains(tx, site.id),
         tenantDefaults: await loadTenantDefaults(tx),
       };
@@ -76,13 +77,6 @@ export class BookingPageService {
         'contactEmail',
       ] as const) {
         if (input[key] !== undefined) patch[key] = input[key];
-      }
-      if (input.consentTexts !== undefined) {
-        patch['consentTexts'] = input.consentTexts.map((consent) => ({
-          kind: consent.kind,
-          text: consent.text,
-          required: consent.required ?? true,
-        }));
       }
       if (Object.keys(patch).length > 0) await repo.updateSettings(tx, site.id, patch);
     });
@@ -182,6 +176,15 @@ export class BookingPageService {
           { detail: 'Önce sayfa içeriğini kaydedin.' },
         );
       }
+      // KVKK onayı ancak metin YAYINDA iken gerçekten zorunludur. Onam metni
+      // olmayan bir site yayına çıkabilseydi, randevu akışı ya onaysız
+      // tamamlanır ya da her istek `CONSENT_REQUIRED` ile düşerdi — ikisi de
+      // kliniğin fark etmeyeceği bir hata.
+      if ((await repo.findSettings(tx, site.id))?.activeConsentDocumentId == null) {
+        throw new AppError(409, ERROR_CODES.CONSENT_REQUIRED, 'Onam metni yayınlanmamış', {
+          detail: 'Sayfayı yayınlamadan önce KVKK aydınlatma metnini yayınlayın.',
+        });
+      }
       await repo.updateSite(tx, site.id, {
         status: 'published',
         publishedRevisionId: target,
@@ -263,10 +266,11 @@ export class BookingPageService {
   private present(payload: {
     site: repo.BookingSiteRow;
     settings: repo.BookingSiteSettingsRow | undefined;
+    consent: ActiveConsentSummaryDto | null;
     domains: domainRepo.BookingSiteDomainRow[];
     tenantDefaults: TenantDefaults;
   }): BookingPageDto {
-    const { site, settings, domains, tenantDefaults } = payload;
+    const { site, settings, consent, domains, tenantDefaults } = payload;
     const primary = domains.find((domain) => domain.isPrimary) ?? domains[0];
 
     return {
@@ -278,7 +282,7 @@ export class BookingPageService {
       canonicalUrl: primary === undefined ? '' : `https://${primary.host}`,
       hasUnpublishedChanges:
         site.draftRevisionId !== null && site.draftRevisionId !== site.publishedRevisionId,
-      settings: resolveSettings(settings, tenantDefaults),
+      settings: resolveSettings(settings, tenantDefaults, consent),
     };
   }
 }
@@ -321,6 +325,7 @@ export async function loadTenantDefaults(tx: Tx): Promise<TenantDefaults> {
 export function resolveSettings(
   settings: repo.BookingSiteSettingsRow | undefined,
   defaults: TenantDefaults,
+  consent: ActiveConsentSummaryDto | null = null,
 ): BookingSiteSettingsDto {
   const usesTenantDefaults =
     settings === undefined ||
@@ -339,7 +344,7 @@ export function resolveSettings(
     allowReschedule: settings?.allowReschedule ?? true,
     requireOtp: settings?.requireOtp ?? true,
     otpChannel: settings?.otpChannel ?? 'whatsapp',
-    consentTexts: (settings?.consentTexts ?? []) as ConsentTextDto[],
+    consent,
     locales: settings?.locales ?? ['tr'],
     contactEmail: settings?.contactEmail ?? null,
   };

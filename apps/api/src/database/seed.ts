@@ -278,33 +278,42 @@ async function seed(): Promise<void> {
       [tenantId, siteId, bookingHost, randomBytes(24).toString('base64url')],
     );
 
-    // Onam metni: randevu akışı zorunlu onay kutusu olmadan tamamlanamaz
-    // (`CONSENT_REQUIRED`), yani bu satır olmadan akış yerelde denenemezdi.
     await client.query(
       `insert into booking_site_settings
          (tenant_id, booking_site_id, show_staff_selection, show_prices,
-          require_otp, otp_channel, consent_texts, locales, contact_email)
-       values ($1, $2, true, true, true, 'sms', $3::jsonb, '{tr}', 'iletisim@demo-klinik.test')
+          require_otp, otp_channel, locales, contact_email)
+       values ($1, $2, true, true, true, 'sms', '{tr}', 'iletisim@demo-klinik.test')
        on conflict (booking_site_id) do update
-         set consent_texts = excluded.consent_texts,
-             show_staff_selection = excluded.show_staff_selection,
+         set show_staff_selection = excluded.show_staff_selection,
              show_prices = excluded.show_prices`,
-      [
-        tenantId,
-        siteId,
-        JSON.stringify([
-          {
-            kind: 'kvkk_explicit',
-            text: 'Kişisel verilerimin randevu oluşturma amacıyla işlenmesine açık rıza veriyorum.',
-            required: true,
-          },
-          {
-            kind: 'marketing',
-            text: 'Kampanya ve duyurulardan haberdar olmak istiyorum.',
-            required: false,
-          },
-        ]),
-      ],
+      [tenantId, siteId],
+    );
+
+    // Onam metni: randevu akışı zorunlu KVKK onayı olmadan tamamlanamaz
+    // (`CONSENT_REQUIRED`) ve site onam metni yayınlanmadan yayına ÇIKAMAZ,
+    // yani bu satır olmadan akış yerelde hiç denenemezdi.
+    const consentBody =
+      'Kişisel verilerimin randevu oluşturma amacıyla işlenmesine ve tarafımla ' +
+      'iletişime geçilmesine, aydınlatma metnini okuduğumu beyan ederek açık rıza veriyorum.';
+    // `do nothing`: yayınlanmış bir onam metni DEĞİŞMEZ (trigger reddeder),
+    // yani seed'in ikinci koşusu üzerine yazamaz — zaten yazmamalı da.
+    await client.query(
+      `insert into consent_documents
+         (tenant_id, booking_site_id, kind, version, locale, body, sha256, status, published_at)
+       values ($1, $2, 'kvkk_explicit', 1, 'tr', $3, encode(digest($3, 'sha256'), 'hex'),
+               'published', now())
+       on conflict (booking_site_id, kind, version) do nothing`,
+      [tenantId, siteId, consentBody],
+    );
+    const consentResult = await client.query<{ id: string }>(
+      `select id from consent_documents
+        where booking_site_id = $1 and kind = 'kvkk_explicit' and version = 1`,
+      [siteId],
+    );
+    await client.query(
+      `update booking_site_settings set active_consent_document_id = $2
+        where booking_site_id = $1`,
+      [siteId, consentResult.rows[0]?.id],
     );
 
     // Altı blok türünü de içeren yayınlanmış bir sürüm: renderer'ın her dalı

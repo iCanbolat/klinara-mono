@@ -319,13 +319,17 @@ export interface CustomerNoteRevision {
   editedAt: string;
 }
 
-export const TIMELINE_KINDS = ['appointment', 'note'] as const;
+export const TIMELINE_KINDS = ['appointment', 'note', 'consent'] as const;
 export type TimelineKind = (typeof TIMELINE_KINDS)[number];
 
 /**
- * ⚠️ Zaman tüneli YALNIZ randevu ve not içeriyor. Paket satışı/tüketimi ve
- * tahsilat defterde duruyor ama bu sorguya eklenmedi (Faz 5'ten devreden açık
- * madde). Ekran bu boşluğu dipnotla belirtmeli, sessizce gizlememeli.
+ * ⚠️ Zaman tüneli randevu, not ve onam kabulü içeriyor. Paket satışı/tüketimi
+ * ve tahsilat defterde duruyor ama bu sorguya eklenmedi (Faz 5'ten devreden
+ * açık madde). Ekran bu boşluğu dipnotla belirtmeli, sessizce gizlememeli.
+ *
+ * `consent` kolunun payload'ında metnin GÖVDESİ yoktur (`consentKind`,
+ * `version`, `locale`, `textSha256`): 20k'lık bir aydınlatma metni her zaman
+ * çizelgesi sayfasına binerdi. Tam kanıt `GET /consent-acceptances`ten gelir.
  */
 export interface TimelineEntry {
   kind: TimelineKind;

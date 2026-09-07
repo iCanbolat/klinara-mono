@@ -179,6 +179,13 @@ export function BookingFlow({
     if (described.recovery === 'lock-otp') {
       dispatch({ type: 'otpLocked', seconds: described.retryAfterSeconds ?? 60 });
     }
+    // Onam metni sen bakarken yeni bir sürüme geçti. Kullanıcıyı ESKİ metnin
+    // onayıyla bırakmıyoruz: kutu temizleniyor ve akış onam adımına dönüyor;
+    // güncel metin sayfa yenilendiğinde geliyor (sürüm sunucudan okunuyor).
+    if (described.recovery === 'reload-consent') {
+      if (state.consentAccepted) dispatch({ type: 'toggleConsent' });
+      dispatch({ type: 'goto', step: 'consent' });
+    }
     dispatch({ type: 'error', error: described });
   }
 
@@ -255,9 +262,16 @@ export function BookingFlow({
     if (state.hold === null || state.submitting) return;
     dispatch({ type: 'submitting' });
     try {
-      const consents = site.settings.requiredConsents
-        .filter((consent) => state.consents[consent.kind] === true)
-        .map((consent) => ({ kind: consent.kind, textSha256: consent.textSha256 }));
+      // Metin GÖNDERİLMİYOR: sunucu kanıt olarak kendi yayınladığı gövdeyi
+      // saklıyor. İstemci yalnız "bunu gördüm" iddiasını sürüm + hash ile
+      // taşıyor; ikisi de yayındakiyle eşleşmezse istek reddediliyor.
+      const consent =
+        site.settings.consent === null || !state.consentAccepted
+          ? undefined
+          : {
+              version: site.settings.consent.version,
+              textSha256: site.settings.consent.textSha256,
+            };
 
       const result = await bookingApi.post<{ appointmentId: string; manageToken: string }>(
         `sites/${site.slug}/appointments`,
@@ -265,7 +279,7 @@ export function BookingFlow({
           holdToken: state.hold.holdToken,
           fullName,
           ...(email === '' ? {} : { email }),
-          consents,
+          ...(consent === undefined ? {} : { consent }),
         },
         { idempotencyKey: state.hold.idempotencyKey },
       );
@@ -408,13 +422,13 @@ export function BookingFlow({
                 />
               )}
 
-              {state.step === 'consent' && (
+              {state.step === 'consent' && site.settings.consent !== null && (
                 <ConsentStep
-                  consents={site.settings.requiredConsents}
-                  values={state.consents}
+                  consent={site.settings.consent}
+                  accepted={state.consentAccepted}
                   highlightMissing={state.error?.recovery === 'highlight-consent'}
-                  onToggle={(kind) => {
-                    dispatch({ type: 'toggleConsent', kind });
+                  onToggle={() => {
+                    dispatch({ type: 'toggleConsent' });
                   }}
                 />
               )}

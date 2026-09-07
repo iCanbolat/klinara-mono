@@ -9,6 +9,7 @@ import { startTestDatabase, type TestDatabase } from '../helpers/database';
 import { auth, http, PLATFORM_TOKEN } from '../helpers/identity';
 import { branchHeader, setupClinic, type ClinicFixture } from '../helpers/clinic';
 import { GraphMock } from '../helpers/whatsapp';
+import { upcomingMonday } from '../helpers/dates';
 
 interface Problem {
   code: string;
@@ -39,7 +40,7 @@ const VERIFY_TOKEN = 'yerel-webhook-dogrulama-tokeni';
 const WABA_ID = '102290129340398';
 
 /** Gelecekteki bir pazartesi — iptal penceresinin AÇIK olduğu bir tarih. */
-const MONDAY = '2026-09-07';
+const MONDAY = upcomingMonday();
 const at = (hhmm: string) => `${MONDAY}T${hhmm}:00+03:00`;
 
 describe('WhatsApp gelen webhook (Batch 8.3)', () => {

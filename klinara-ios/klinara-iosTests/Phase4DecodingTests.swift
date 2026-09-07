@@ -96,7 +96,7 @@ struct Phase4DecodingTests {
     func decodesMixedTimeline() throws {
         let page = try Fixtures.decode(Page<TimelineEntry>.self, from: Fixtures.timelinePage)
 
-        #expect(page.data.count == 2)
+        #expect(page.data.count == 3)
         // `occurredAt` azalan sırada: en yeni olay başta.
         #expect(page.data[0].occurredAt > page.data[1].occurredAt)
 
@@ -112,6 +112,16 @@ struct Phase4DecodingTests {
             return
         }
         #expect(note.kind == .treatment)
+
+        // Faz 7'nin kolu. Payload'da metnin GÖVDESİ yok — bilerek: 20 bin
+        // karakterlik bir aydınlatma metni her sayfaya binmemeli.
+        guard case .consent(_, let consent) = page.data[2] else {
+            Issue.record("Üçüncü olay onam olmalıydı")
+            return
+        }
+        #expect(consent.consentKind == "kvkk_explicit")
+        #expect(consent.version == 2)
+        #expect(consent.textSha256.count == 64)
     }
 
     /// Zaman çizelgesindeki randevu `startsAt`i `+00:00` offset'iyle geliyor,
@@ -131,7 +141,7 @@ struct Phase4DecodingTests {
         #expect(payload.endsAt > payload.startsAt)
     }
 
-    /// Faz 5, 6 ve 7 zaman çizelgesine kendi kolunu ekleyecek. Bilinmeyen bir
+    /// Faz 5 ve 6 zaman çizelgesine kendi kolunu ekleyecek. Bilinmeyen bir
     /// `kind` çözümlemeyi patlatırsa eski istemci yeni sunucuda müşteri kartını
     /// **hiç açamaz** — en pahalı uyumluluk hatası bu.
     @Test("Bilinmeyen olay türü çözümlemeyi PATLATMAZ")

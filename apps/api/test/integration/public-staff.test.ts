@@ -3,10 +3,17 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { createTestApp } from '../helpers/app';
 import { startTestDatabase, type TestDatabase } from '../helpers/database';
 import { auth, http, inviteMember, PLATFORM_TOKEN } from '../helpers/identity';
-import { setupClinic, weeklyStaffSchedule, type ClinicFixture } from '../helpers/clinic';
+import {
+  publishConsent,
+  setupClinic,
+  weeklyStaffSchedule,
+  type ClinicFixture,
+} from '../helpers/clinic';
+import { upcomingMonday } from '../helpers/dates';
 
 const ROOT_DOMAIN = 'klinara.localhost';
-const MONDAY = '2026-09-07';
+/** Gelecekteki bir pazartesi — min-lead penceresi slotları elemesin diye. */
+const MONDAY = upcomingMonday();
 const UUID_PATTERN = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
 interface StaffOption {
@@ -69,6 +76,8 @@ describe('public uygulayıcı seçimi (Ek C)', () => {
       .set('If-Match', 'W/"0"')
       .send({ sections: [{ type: 'hero', title: 'Klinik X' }] })
       .expect(200);
+    // Onam metni yayında olmadan site yayınlanamaz (Faz 7).
+    await publishConsent(app, clinic.owner.tokens);
     await http(app).post('/api/v1/booking-page/publish').set(ownerAuth()).expect(200);
   }
 
@@ -223,6 +232,7 @@ describe('public uygulayıcı seçimi (Ek C)', () => {
       .set('If-Match', 'W/"0"')
       .send({ sections: [{ type: 'hero', title: 'Klinik Y' }] })
       .expect(200);
+    await publishConsent(app, other.owner.tokens);
     await http(app).post('/api/v1/booking-page/publish').set(auth(other.owner.tokens)).expect(200);
 
     const res = await http(app)

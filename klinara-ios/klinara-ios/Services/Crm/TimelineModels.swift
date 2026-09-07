@@ -2,9 +2,9 @@ import Foundation
 
 /// Müşteri zaman çizelgesi — `GET /customers/:id/timeline`.
 ///
-/// Sunucu randevu ve notları `union all` ile TEK sorguda, tek sıralamada
-/// birleştiriyor; sözleşme her kolun `kind` + `payload` döndürmesi. Faz 5
-/// (paket), Faz 6 (tahsilat) ve Faz 7 (onam) buraya kendi kolunu ekleyecek.
+/// Sunucu randevu, not ve onam kabullerini `union all` ile TEK sorguda, tek
+/// sıralamada birleştiriyor; sözleşme her kolun `kind` + `payload` döndürmesi.
+/// Faz 5 (paket) ve Faz 6 (tahsilat) buraya kendi kolunu ekleyecek.
 
 /// Tek bir olay.
 ///
@@ -19,11 +19,13 @@ nonisolated enum TimelineEntry: Decodable, Sendable, Identifiable, Equatable {
 
     case appointment(TimelineHeader, AppointmentTimelinePayload)
     case note(TimelineHeader, NoteTimelinePayload)
+    case consent(TimelineHeader, ConsentTimelinePayload)
     case unknown(TimelineHeader, kind: String)
 
     var header: TimelineHeader {
         switch self {
-        case .appointment(let header, _), .note(let header, _), .unknown(let header, _):
+        case .appointment(let header, _), .note(let header, _), .consent(let header, _),
+            .unknown(let header, _):
             return header
         }
     }
@@ -53,6 +55,11 @@ nonisolated enum TimelineEntry: Decodable, Sendable, Identifiable, Equatable {
             )
         case "note":
             self = .note(header, try container.decode(NoteTimelinePayload.self, forKey: .payload))
+        case "consent":
+            self = .consent(
+                header,
+                try container.decode(ConsentTimelinePayload.self, forKey: .payload)
+            )
         default:
             self = .unknown(header, kind: kind)
         }
@@ -80,6 +87,20 @@ nonisolated struct AppointmentTimelinePayload: Decodable, Sendable, Equatable {
     /// Kuruş. Randevunun kendisinde durmuyor, kalemlerin **snapshot**
     /// fiyatlarından toplanıyor: katalog zammı geçmişi bozmasın (Faz 3 kararı).
     let totalMinor: Int
+}
+
+/// Onam kabulü (Faz 7).
+///
+/// Metnin **gövdesi yok**: bir aydınlatma metni 20 bin karaktere kadar
+/// çıkabiliyor ve her zaman çizelgesi sayfasına binmemeli. Kanıtın tamamı
+/// (gövde, IP, user-agent) ayrı bir uçtan çekiliyor. Ekranda gösterilecek şey
+/// **hangi sürümün** kabul edildiği: "kabul etti" tek başına kanıt değil.
+nonisolated struct ConsentTimelinePayload: Decodable, Sendable, Equatable {
+    let consentKind: String
+    /// 0043 öncesi kabullerde `nil` — o satırlar bir sürüme bağlanamadı.
+    let version: Int?
+    let locale: String?
+    let textSha256: String
 }
 
 nonisolated struct NoteTimelinePayload: Decodable, Sendable, Equatable {

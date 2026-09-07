@@ -111,7 +111,7 @@ describe('yönetim proxy beyaz listesi', () => {
     expect(isAllowedProxyPath('service-categories', 'PUT')).toBe(false);
   });
 
-  it('PARA, PAKET, ONAM ve DENETİM yüzeyi hâlâ tamamen kapsam dışı', () => {
+  it('PARA, PAKET ve DENETİM yüzeyi hâlâ tamamen kapsam dışı', () => {
     // Faz 12 klinik operasyonunu açtı ama bunları AÇMADI ve açmamalı:
     // Faz 12'nin hiçbir ekranı bu uçları istemiyor. Kural aynı — uç buraya
     // yazılmadıkça geçmez.
@@ -131,6 +131,8 @@ describe('yönetim proxy beyaz listesi', () => {
       'package-definitions',
       'customer-packages',
       `customer-packages/${UUID}/refund`,
+      // Faz 7 daraltılınca bu iki tablo HİÇ yazılmadı; uçları yok, kapıları
+      // da kapalı kalıyor.
       'consent-templates',
       'consent-records',
       'messages',
@@ -140,6 +142,27 @@ describe('yönetim proxy beyaz listesi', () => {
         expect(isAllowedProxyPath(path, method), `${method} ${path}`).toBe(false);
       }
     }
+  });
+
+  // -------------------------------------------------------------------------
+  describe('onam metni (Faz 7)', () => {
+    it('sürümlü onam metni yüzeyi geçiyor', () => {
+      expect(isAllowedProxyPath('consent-document', 'GET')).toBe(true);
+      expect(isAllowedProxyPath('consent-document/draft', 'PUT')).toBe(true);
+      expect(isAllowedProxyPath('consent-document/publish', 'POST')).toBe(true);
+      expect(isAllowedProxyPath('consent-document/versions', 'GET')).toBe(true);
+      expect(isAllowedProxyPath('consent-acceptances', 'GET')).toBe(true);
+    });
+
+    it('yöntem daraltması korunuyor', () => {
+      // Yayınlanmış metin DEĞİŞTİRİLEMEZ ve SİLİNEMEZ; kapı da öyle.
+      expect(isAllowedProxyPath('consent-document', 'PUT')).toBe(false);
+      expect(isAllowedProxyPath('consent-document', 'DELETE')).toBe(false);
+      expect(isAllowedProxyPath('consent-document/draft', 'DELETE')).toBe(false);
+      expect(isAllowedProxyPath('consent-document/versions', 'POST')).toBe(false);
+      // Kabul kanıtı yalnız OKUNUR — panelden yazılamaz.
+      expect(isAllowedProxyPath('consent-acceptances', 'POST')).toBe(false);
+    });
   });
 
   // -------------------------------------------------------------------------

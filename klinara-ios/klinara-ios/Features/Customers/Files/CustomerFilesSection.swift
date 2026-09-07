@@ -5,6 +5,12 @@ import SwiftUI
 /// Fotoğraf ve belge **ayrı** çiziliyor: fotoğraf sağlık verisidir (KVKK m.6),
 /// kimlik fotokopisi değildir. Sunucu ayrımı `customer_files.kind` üzerinden
 /// yapıyor ve klinik fotoğrafları izinsiz kullanıcıya hiç döndürmüyor.
+///
+/// **Dışa paylaşım yok ve olmayacak.** Faz 7 daraltılırken `photo_usage`
+/// onamı MVP'den çıkarıldı ve fotoğrafların klinik dışına çıkmaması bir
+/// eksiklik değil, verilmiş bir karar oldu: paylaşım ucu olmayınca ona bağlı
+/// bir rıza da gerekmiyor. Fotoğraflara erişim yalnız kimlik doğrulamalı,
+/// kısa ömürlü imzalı URL'lerle ve her okuma KVKK erişim kaydına yazılarak.
 struct CustomerFilesSection: View {
 
     let session: AppSession

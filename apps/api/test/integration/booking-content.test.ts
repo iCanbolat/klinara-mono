@@ -4,7 +4,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { createTestApp } from '../helpers/app';
 import { startTestDatabase, type TestDatabase } from '../helpers/database';
 import { auth, bootstrapTenant, http, PLATFORM_TOKEN, type TenantFixture } from '../helpers/identity';
-import { setupClinic, type ClinicFixture } from '../helpers/clinic';
+import { CONSENT_BODY, publishConsent, setupClinic, type ClinicFixture } from '../helpers/clinic';
 
 const ROOT_DOMAIN = 'klinara.localhost';
 const ASSET_BASE = 'https://cdn.klinara.test';
@@ -54,6 +54,9 @@ describe('randevu sayfası içeriği, teması ve public okuma (Batch 9.2)', () =
   beforeEach(async () => {
     await database.truncateAll();
     clinic = await setupClinic(app, { slug: 'klinik-x' });
+    // Onam metni yayında olmadan site yayınlanamaz (Faz 7) — bu dosyanın
+    // neredeyse her testi yayın yapıyor.
+    await publishConsent(app, clinic.owner.tokens);
   });
 
   const ownerAuth = () => auth(clinic.owner.tokens);
@@ -318,22 +321,35 @@ describe('randevu sayfası içeriği, teması ve public okuma (Batch 9.2)', () =
       expect(after).not.toBe(before);
     });
 
-    it('onam metinlerinin hash’i yanıtta döner', async () => {
+    it('onam metni sürümü ve hash’i yanıtta döner', async () => {
+      const res = await http(app).get('/api/v1/public/sites/klinik-x').expect(200);
+      const consent = (res.body as PublicSiteBody).settings['consent'] as {
+        documentId: string;
+        version: number;
+        locale: string;
+        text: string;
+        textSha256: string;
+      };
+      expect(consent).toMatchObject({ version: 1, locale: 'tr', text: CONSENT_BODY });
+      expect(consent.textSha256).toMatch(/^[0-9a-f]{64}$/);
+    });
+
+    it('onam metni yayınlanmamışsa sayfa YAYINLANAMAZ', async () => {
+      // Bu tek testte onam metnini geri alamayız (yayınlanmış metin değişmez),
+      // bu yüzden onamsız yeni bir kiracıyla sınıyoruz.
+      const bare = await setupClinic(app, { slug: 'klinik-z' });
       await http(app)
-        .put('/api/v1/booking-page')
-        .set(ownerAuth())
-        .send({ consentTexts: [{ kind: 'kvkk_explicit', text: 'Açık rıza metni.' }] })
+        .put('/api/v1/booking-page/content')
+        .set(auth(bare.owner.tokens))
+        .set('If-Match', 'W/"0"')
+        .send({ sections: [{ type: 'hero', title: 'Klinik Z' }] })
         .expect(200);
 
-      const res = await http(app).get('/api/v1/public/sites/klinik-x').expect(200);
-      const consents = (res.body as PublicSiteBody).settings['requiredConsents'] as {
-        kind: string;
-        textSha256: string;
-        required: boolean;
-      }[];
-      expect(consents).toHaveLength(1);
-      expect(consents[0]).toMatchObject({ kind: 'kvkk_explicit', required: true });
-      expect(consents[0]?.textSha256).toMatch(/^[0-9a-f]{64}$/);
+      const res = await http(app)
+        .post('/api/v1/booking-page/publish')
+        .set(auth(bare.owner.tokens))
+        .expect(409);
+      expect((res.body as Problem).code).toBe('CONSENT_REQUIRED');
     });
   });
 

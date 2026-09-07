@@ -43,7 +43,7 @@ export function CustomersPage(): ReactNode {
           signal: controller.signal,
         });
         if (controller.signal.aborted) return;
-        setTags(result.data);
+        setTags(result.data ?? []);
       } catch {
         // Sessiz: etiketler yalnız bir süzgeç. Liste onlarsız da çalışıyor
         // ve ekrana kırmızı bir satır basmak görünen veriyle çelişirdi.

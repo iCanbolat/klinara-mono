@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ERROR_CODES } from '@klinara/shared';
@@ -9,6 +8,7 @@ import { TenantTxService } from '../../database/tenant-tx.service';
 import { loadTenantDefaults, resolveSettings } from '../booking-page/booking-page.service';
 import * as pageRepo from '../booking-page/booking-page.repository';
 import * as repo from './public-content.repository';
+import { findActiveConsent, type ActiveConsentRow } from './public-consent.repository';
 import {
   buildAssetIndex,
   collectAssetIds,
@@ -40,7 +40,7 @@ export interface PublicSiteView {
 /**
  * Public tarafa açılan ayarlar — yönetim DTO'sunun ALT KÜMESİ.
  *
- * `contactEmail`, `consentTexts`in tam metni ve `otpChannel` gibi alanların
+ * `contactEmail`, onam metninin tam gövdesi ve `otpChannel` gibi alanların
  * bir kısmı bilerek burada: randevu akışı onlara ihtiyaç duyuyor. Ama
  * `usesTenantDefaults` gibi yönetim ayrıntıları YOK — public sayfanın
  * kliniğin iç yapılandırmasını bilmesi gerekmiyor.
@@ -55,7 +55,20 @@ export interface PublicBookingSettingsView {
   allowReschedule: boolean;
   requireOtp: boolean;
   otpChannel: string;
-  requiredConsents: { kind: string; text: string; textSha256: string; required: boolean }[];
+  /**
+   * TEK zorunlu KVKK/aydınlatma onayı.
+   *
+   * Faz 7 daraltıldı: treatment onamı klinik içi ayrı akışa taşındı, marketing
+   * ve photo_usage onamları MVP'den çıktı — bu yüzden dizi değil, tek belge.
+   * Yayında metin yoksa `null`; o hâlde site zaten yayınlanamaz.
+   */
+  consent: {
+    documentId: string;
+    version: number;
+    locale: string;
+    text: string;
+    textSha256: string;
+  } | null;
 }
 
 @Injectable()
@@ -83,7 +96,8 @@ export class PublicSiteService {
       const assets = await repo.findAssetsByIds(tx, assetIds);
       const tenantDefaults = await loadTenantDefaults(tx);
       const canonicalHost = await repo.findCanonicalHost(tx, site.siteId);
-      return { published, settingsRow, branches, assets, tenantDefaults, canonicalHost };
+      const consent = await findActiveConsent(tx, site.siteId);
+      return { published, settingsRow, branches, assets, tenantDefaults, canonicalHost, consent };
     });
 
     if (payload === undefined) {
@@ -141,7 +155,8 @@ export class PublicSiteService {
       const assets = await repo.findAssetsByIds(tx, assetIds);
       const tenantDefaults = await loadTenantDefaults(tx);
       const canonicalHost = await repo.findCanonicalHost(tx, siteId);
-      return { published, settingsRow, branches, assets, tenantDefaults, canonicalHost };
+      const consent = await findActiveConsent(tx, siteId);
+      return { published, settingsRow, branches, assets, tenantDefaults, canonicalHost, consent };
     });
 
     if (payload === undefined) {
@@ -161,9 +176,11 @@ export class PublicSiteService {
       assets: Awaited<ReturnType<typeof repo.findAssetsByIds>>;
       tenantDefaults: Awaited<ReturnType<typeof loadTenantDefaults>>;
       canonicalHost: string | undefined;
+      consent: ActiveConsentRow | undefined;
     },
   ): PublicSiteView {
-    const { published, settingsRow, branches, assets, tenantDefaults, canonicalHost } = payload;
+    const { published, settingsRow, branches, assets, tenantDefaults, canonicalHost, consent } =
+      payload;
     const assetBaseUrl = this.config.get('PUBLIC_ASSET_BASE_URL', { infer: true });
     const index = buildAssetIndex(assets, assetBaseUrl);
     const resolved = resolveSettings(settingsRow, tenantDefaults);
@@ -180,7 +197,7 @@ export class PublicSiteService {
       theme: resolveAssets(published.theme, index),
       sections: resolveAssets(published.sections, index) as unknown[],
       seo: resolveAssets(published.seo, index),
-      settings: toPublicSettings(resolved),
+      settings: toPublicSettings(resolved, consent),
       revision: {
         number: published.revisionNumber ?? 0,
         contentHash: published.contentHash ?? '',
@@ -219,6 +236,7 @@ export class PublicSiteService {
 
 function toPublicSettings(
   resolved: ReturnType<typeof resolveSettings>,
+  consent: ActiveConsentRow | undefined,
 ): PublicBookingSettingsView {
   return {
     minLeadMinutes: resolved.minLeadMinutes,
@@ -230,25 +248,18 @@ function toPublicSettings(
     allowReschedule: resolved.allowReschedule,
     requireOtp: resolved.requireOtp,
     otpChannel: resolved.otpChannel,
-    // Metnin HASH'i de dönüyor: istemci randevu oluştururken aynı hash'i geri
-    // gönderiyor ve sunucu eşleşmezse reddediyor. Böylece "müşteriye ne
-    // gösterildi" sorusu yıllar sonra kanıtlanabilir kalıyor (9.4).
-    requiredConsents: resolved.consentTexts.map((consent) => ({
-      kind: consent.kind,
-      text: consent.text,
-      textSha256: consentHash(consent.text),
-      required: consent.required ?? true,
-    })),
+    // Sürüm ve hash de dönüyor: istemci randevu oluştururken ikisini de aynen
+    // geri gönderiyor, sunucu eşleşmezse reddediyor. Böylece "müşteriye hangi
+    // metnin HANGİ SÜRÜMÜ gösterildi" yıllar sonra kanıtlanabilir kalıyor.
+    consent:
+      consent === undefined
+        ? null
+        : {
+            documentId: consent.id,
+            version: consent.version,
+            locale: consent.locale,
+            text: consent.body,
+            textSha256: consent.sha256,
+          },
   };
-}
-
-/**
- * Onam metninin hash'i.
- *
- * `common/crypto/tokens.ts`teki `sha256` ile aynı algoritma; ayrı durmasının
- * sebebi burada hash'lenen şeyin bir SIR değil, bir BELGE olması — ikisi bir
- * gün farklı normalizasyon isteyebilir (örn. satır sonu birleştirme).
- */
-function consentHash(text: string): string {
-  return createHash('sha256').update(text, 'utf8').digest('hex');
 }

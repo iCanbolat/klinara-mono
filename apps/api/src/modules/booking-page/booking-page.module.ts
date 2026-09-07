@@ -30,6 +30,6 @@ import { PublicModule } from '../public/public.module';
     DomainVerifyWorker,
     BookingPagePurgeWorker,
   ],
-  exports: [BookingPageService],
+  exports: [BookingPageService, BookingSiteProvisioner],
 })
 export class BookingPageModule {}

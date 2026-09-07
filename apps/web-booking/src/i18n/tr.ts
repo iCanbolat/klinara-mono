@@ -82,9 +82,14 @@ export const MESSAGES = {
   'booking.otp.label': 'Doğrulama kodu',
   'booking.otp.digit': '{index}. hane',
 
-  'booking.consent.title': 'Onaylar',
-  'booking.consent.subtitle': 'Devam etmek için zorunlu onayları işaretleyin.',
+  'booking.consent.title': 'Aydınlatma ve açık rıza',
+  'booking.consent.subtitle':
+    'Devam etmek için metni okuyup onayladığınızı işaretleyin. Onay olmadan randevu oluşturulamaz.',
   'booking.consent.required': 'Zorunlu',
+  'booking.consent.documentLabel': 'KVKK aydınlatma metni',
+  'booking.consent.version': 'Metin sürümü',
+  'booking.consent.checkboxLabel':
+    'Yukarıdaki aydınlatma metnini okudum; kişisel verilerimin işlenmesine açık rıza veriyorum.',
 
   'booking.confirm.title': 'Bilgileriniz',
   'booking.confirm.subtitle': 'Son bir kez kontrol edin ve randevunuzu oluşturun.',

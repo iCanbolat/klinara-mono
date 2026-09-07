@@ -31,15 +31,18 @@ export const OTP_CHANNELS = ['whatsapp', 'sms'] as const;
 export type OtpChannel = (typeof OTP_CHANNELS)[number];
 
 /**
- * Randevu anında gösterilen onam metni.
+ * Yayındaki onam metninin ÖZETİ — ayarların bir parçası, ama salt okunur.
  *
- * Metin burada duruyor çünkü Faz 7 (versiyonlu onam şablonları) bu fazdan SONRA
- * geliyor; Batch 7.2 bu alanı şablon referansına çevirecek.
+ * Metnin kendisi ve sürüm geçmişi ayrı uçtan (`/consent-document`) geliyor:
+ * onam metni ayar değil, sürümlü ve yayınlandıktan sonra değişmez bir BELGE.
+ * Ayarlar kaydedilirken yanlışlıkla üzerine yazılabilmesi bunun tersi olurdu.
  */
-export interface ConsentText {
-  kind: string;
-  text: string;
-  required?: boolean;
+export interface ActiveConsentSummary {
+  id: string;
+  version: number;
+  locale: string;
+  sha256: string;
+  publishedAt: string;
 }
 
 /** Çözülmüş (etkin) ayarlar — override ?? kiracı varsayılanı. */
@@ -55,7 +58,8 @@ export interface BookingSiteSettings {
   allowReschedule: boolean;
   requireOtp: boolean;
   otpChannel: OtpChannel;
-  consentTexts: ConsentText[];
+  /** Yayında onam metni yoksa `null` — bu hâlde site YAYINLANAMAZ. */
+  consent: ActiveConsentSummary | null;
   locales: string[];
   contactEmail: string | null;
 }
@@ -92,7 +96,6 @@ export interface UpdateBookingPageInput {
   allowReschedule?: boolean;
   requireOtp?: boolean;
   otpChannel?: OtpChannel;
-  consentTexts?: ConsentText[];
   contactEmail?: string | null;
 }
 
@@ -102,7 +105,6 @@ export const SETTINGS_LIMITS = {
   maxAdvanceDays: { min: 1, max: 730 },
   cancelWindowHours: { min: 0, max: 720 },
   holdTtlMinutes: { min: 1, max: 60 },
-  consentTexts: { maxItems: 10, kind: 60, text: 8_000 },
 } as const;
 
 // ---------------------------------------------------------------------------

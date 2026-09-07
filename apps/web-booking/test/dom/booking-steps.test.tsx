@@ -24,7 +24,7 @@ const settings = (overrides: Partial<PublicBookingSettings> = {}): PublicBooking
   allowReschedule: true,
   requireOtp: true,
   otpChannel: 'sms',
-  requiredConsents: [],
+  consent: null,
   ...overrides,
 });
 
@@ -210,19 +210,40 @@ describe('özet paneli', () => {
 });
 
 describe('onam adımı', () => {
-  const consents = [
-    { kind: 'kvkk', text: 'Aydınlatma metnini okudum.', required: true, textSha256: 'a' },
-    { kind: 'sms', text: 'SMS almak istiyorum.', required: false, textSha256: 'b' },
-  ];
+  const consent = {
+    documentId: 'doc-1',
+    version: 3,
+    locale: 'tr',
+    text: 'Kişisel verilerimin işlenmesine açık rıza veriyorum.',
+    textSha256: 'a'.repeat(64),
+  };
 
-  it('sunucu CONSENT_REQUIRED dediğinde eksik ZORUNLU onam işaretleniyor', () => {
+  it('metnin TAMAMINI ve sürümünü gösteriyor', () => {
     render(
-      <ConsentStep consents={consents} values={{ sms: true }} onToggle={vi.fn()} highlightMissing />,
+      <ConsentStep
+        consent={consent}
+        accepted={false}
+        onToggle={vi.fn()}
+        highlightMissing={false}
+      />,
     );
-    const boxes = screen.getAllByRole('checkbox');
-    expect(boxes[0]).toHaveAttribute('aria-invalid', 'true');
-    // İsteğe bağlı onam hiçbir zaman hata göstermez.
-    expect(boxes[1]).not.toHaveAttribute('aria-invalid', 'true');
+    // Onam, kendi metnini göstermeden alınamaz.
+    expect(screen.getByText(consent.text)).toBeInTheDocument();
+    expect(screen.getByText(/3/)).toBeInTheDocument();
+    expect(screen.getAllByRole('checkbox')).toHaveLength(1);
+  });
+
+  it('sunucu CONSENT_REQUIRED dediğinde onay kutusu işaretleniyor', () => {
+    const { rerender } = render(
+      <ConsentStep consent={consent} accepted={false} onToggle={vi.fn()} highlightMissing />,
+    );
+    expect(screen.getByRole('checkbox')).toHaveAttribute('aria-invalid', 'true');
+
+    // Onaylanmışken hata göstermiyor: kullanıcı zaten yapması geneni yaptı.
+    rerender(
+      <ConsentStep consent={consent} accepted onToggle={vi.fn()} highlightMissing />,
+    );
+    expect(screen.getByRole('checkbox')).not.toHaveAttribute('aria-invalid', 'true');
   });
 });
 

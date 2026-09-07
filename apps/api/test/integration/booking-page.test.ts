@@ -9,6 +9,7 @@ import { auth, bootstrapTenant, http, PLATFORM_TOKEN, type TenantFixture } from 
 import { DRIZZLE, type Database } from '../../src/database/database.constants';
 import { withPublicTx } from '../../src/database/tenant-tx';
 import { emptyContext } from '../../src/common/request-context';
+import { publishConsent } from '../helpers/clinic';
 
 const EDGE_TOKEN = 'kenar-proxy-tokeni-32-karakterden-daha-uzun';
 const ROOT_DOMAIN = 'klinara.localhost';
@@ -214,6 +215,8 @@ describe('randevu sayfası: site, alan adı ve public çözümleme (Batch 9.1)',
         .set('If-Match', 'W/"0"')
         .send({ sections: [{ type: 'hero', title: 'Klinik X' }] })
         .expect(200);
+      // Onam metni yayında olmadan site yayınlanamaz (Faz 7).
+      await publishConsent(app, clinic.owner.tokens);
       await http(app).post('/api/v1/booking-page/publish').set(ownerAuth()).expect(200);
     }
 
@@ -316,6 +319,7 @@ describe('randevu sayfası: site, alan adı ve public çözümleme (Batch 9.1)',
         .set('If-Match', 'W/"0"')
         .send({ sections: [] })
         .expect(200);
+      await publishConsent(app, clinic.owner.tokens);
       await http(app).post('/api/v1/booking-page/publish').set(ownerAuth()).expect(200);
 
       const counts = await withPublicTx(db, emptyContext(), async (tx) => {

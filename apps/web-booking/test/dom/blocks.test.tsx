@@ -84,7 +84,7 @@ describe('hizmet listesi — showPrices', () => {
         allowReschedule: true,
         requireOtp: true,
         otpChannel: 'sms',
-        requiredConsents: [],
+        consent: null,
       },
       revision: { number: 1, contentHash: 'x' },
     });

@@ -204,7 +204,6 @@ describe('yönetim API sözleşmesi — shared ile DTO arasında sapma yok', () 
       holdTtlMinutes: 15,
       showPrices: false,
       otpChannel: 'sms',
-      consentTexts: [{ kind: 'kvkk_explicit', text: 'Metin', required: true }],
       contactEmail: 'iletisim@klinikx.com',
     };
     expect(validateSync(plainToInstance(UpdateBookingPageDto, settings))).toHaveLength(0);

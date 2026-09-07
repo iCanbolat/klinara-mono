@@ -20,10 +20,13 @@ const settings = (overrides: Partial<PublicBookingSettings> = {}): PublicBooking
   allowReschedule: true,
   requireOtp: true,
   otpChannel: 'sms',
-  requiredConsents: [
-    { kind: 'kvkk_explicit', text: 'Metin', textSha256: 'a'.repeat(64), required: true },
-    { kind: 'marketing', text: 'Metin', textSha256: 'b'.repeat(64), required: false },
-  ],
+  consent: {
+    documentId: 'doc-1',
+    version: 1,
+    locale: 'tr',
+    text: 'Aydınlatma metni',
+    textSha256: 'a'.repeat(64),
+  },
   ...overrides,
 });
 
@@ -52,7 +55,18 @@ describe('adım dizisi ayarlardan türüyor', () => {
 
   it('requireOtp kapalıyken identity, onam yokken consent adımı yok', () => {
     expect(stepsFor(settings({ requireOtp: false }))).not.toContain('identity');
-    expect(stepsFor(settings({ requiredConsents: [] }))).not.toContain('consent');
+    expect(stepsFor(settings({ consent: null }))).not.toContain('consent');
+  });
+
+  /**
+   * KVKK aydınlatması kişisel veri toplanmadan ÖNCE gösterilmek zorunda ve
+   * `identity` adımı telefon numarası alıp OTP gönderiyor.
+   */
+  it('KRİTİK: onam adımı kimlik/OTP adımından ÖNCE geliyor', () => {
+    const steps = stepsFor(settings());
+    expect(steps.indexOf('consent')).toBeLessThan(steps.indexOf('identity'));
+    expect(nextStep(steps, 'datetime')).toBe('consent');
+    expect(nextStep(steps, 'consent')).toBe('identity');
   });
 
   it('staff adımı atlandığında sıradaki adım datetime', () => {
@@ -151,16 +165,15 @@ describe('ilerleme koşulları', () => {
     expect(canAdvance(state, settings({ requireOtp: false }))).toBe(true);
   });
 
-  it('ZORUNLU onam işaretlenmeden consent adımından geçilemiyor', () => {
+  it('onam işaretlenmeden consent adımından geçilemiyor', () => {
     const base = initialState({ step: 'consent' });
     expect(canAdvance(base, settings())).toBe(false);
 
-    // İsteğe bağlı onam tek başına yetmiyor.
-    const optionalOnly = reducer(base, { type: 'toggleConsent', kind: 'marketing' });
-    expect(canAdvance(optionalOnly, settings())).toBe(false);
+    const accepted = reducer(base, { type: 'toggleConsent' });
+    expect(canAdvance(accepted, settings())).toBe(true);
 
-    const required = reducer(optionalOnly, { type: 'toggleConsent', kind: 'kvkk_explicit' });
-    expect(canAdvance(required, settings())).toBe(true);
+    // Aynı eylem geri de alıyor: kutunun işareti kaldırılınca akış kapanmalı.
+    expect(canAdvance(reducer(accepted, { type: 'toggleConsent' }), settings())).toBe(false);
   });
 
   it('hold olmadan datetime adımından geçilemiyor', () => {

@@ -158,7 +158,7 @@ export async function countChallengesSince(
   return result.rows[0]?.n ?? 0;
 }
 
-// --- Onam (Faz 7 stub'ı) ---
+// --- Onam kabul kanıtı (Faz 7) ---
 
 export async function insertConsentAcceptance(
   tx: Tx,

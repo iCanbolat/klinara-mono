@@ -92,6 +92,9 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { path: '/sayfa', labelKey: 'nav.page', requires: [PERMISSIONS.BOOKING_PAGE_READ] },
   { path: '/icerik', labelKey: 'nav.content', requires: [PERMISSIONS.BOOKING_PAGE_READ] },
   { path: '/alan-adlari', labelKey: 'nav.domains', requires: [PERMISSIONS.BOOKING_PAGE_READ] },
+  // Onam metni randevu sayfasının ALTINDA ama ayrı: sayfa ayarı değil,
+  // sürümlü ve yayınlandıktan sonra değişmeyen bir belge (Faz 7).
+  { path: '/onam', labelKey: 'nav.consent', requires: [PERMISSIONS.CONSENT_READ] },
   {
     path: '/raporlar',
     labelKey: 'nav.reports',

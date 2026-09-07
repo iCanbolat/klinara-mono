@@ -20,6 +20,19 @@ import { Button } from '@/components/ui/button';
  * "bu müşteriye hiç paket satılmamış" diye düşünmesine yol açardı — oysa
  * satılmış olabilir ve bu akış onu göstermiyor.
  */
+/** `payload` gevşek tipli (`Record<string, unknown>`); sürüm sayı ya da yok. */
+function consentVersion(payload: Record<string, unknown>): string {
+  const version = payload['version'];
+  return typeof version === 'number' ? String(version) : '—';
+}
+
+/** Ham `kind` değerleri ekranda görünmemeli; sözleşme İngilizce, arayüz Türkçe. */
+const KIND_LABELS: Record<string, string> = {
+  appointment: t('customers.timeline.kind.appointment'),
+  note: t('customers.timeline.kind.note'),
+  consent: t('customers.timeline.kind.consent'),
+};
+
 export function TimelinePanel({ customerId }: { customerId: string }): ReactNode {
   const [entries, setEntries] = useState<TimelineEntry[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -80,13 +93,23 @@ export function TimelinePanel({ customerId }: { customerId: string }): ReactNode
       <ol className="flex flex-col gap-2">
         {(entries ?? []).map((entry) => (
           <li key={`${entry.kind}-${entry.id}`} className="rounded-lg border border-border p-2 text-sm">
-            <span className="mr-2 text-xs uppercase text-muted-foreground">{entry.kind}</span>
+            <span className="mr-2 text-xs uppercase text-muted-foreground">
+              {KIND_LABELS[entry.kind] ?? entry.kind}
+            </span>
             <time dateTime={entry.occurredAt} className="tabular-nums">
               {new Intl.DateTimeFormat('tr-TR', {
                 dateStyle: 'medium',
                 timeStyle: 'short',
               }).format(new Date(entry.occurredAt))}
             </time>
+            {/* Onam satırı SÜRÜMÜ taşıyor: "kabul etti" tek başına kanıt
+                değil, hangi metni kabul ettiği kanıt. Metnin tamamı burada
+                değil — `consent-acceptances` ucundan çekiliyor. */}
+            {entry.kind === 'consent' ? (
+              <span className="ml-2 text-xs text-muted-foreground">
+                {t('customers.timeline.consentVersion')} {consentVersion(entry.payload)}
+              </span>
+            ) : null}
           </li>
         ))}
       </ol>

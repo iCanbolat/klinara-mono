@@ -4,6 +4,7 @@ import { textArray } from './columns';
 import { tenants } from './tenancy';
 import { users } from './identity';
 import { bookingSites } from './booking-sites';
+import { consentDocuments } from './consent';
 
 /**
  * Blok dokümanının şema sürümü — biçim değişikliği tek geçişlik dönüşüm olsun diye.
@@ -75,7 +76,8 @@ export const bookingSiteSettings = pgTable('booking_site_settings', {
   allowReschedule: boolean('allow_reschedule').notNull().default(true),
   requireOtp: boolean('require_otp').notNull().default(true),
   otpChannel: bookingOtpChannel('otp_channel').notNull().default('whatsapp'),
-  consentTexts: jsonb('consent_texts').notNull().default([]),
+  /** Yayındaki KVKK onam metni. Site ancak bu dolu iken yayınlanabilir. */
+  activeConsentDocumentId: uuid('active_consent_document_id').references(() => consentDocuments.id),
   locales: textArray('locales').notNull(),
   contactEmail: text('contact_email'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

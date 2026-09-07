@@ -24,10 +24,11 @@
  *   proxy'sinin sertifika sorusudur, `platform/*` kiracı-üstüdür.
  * - **`public/*`**: bu uygulamanın public yüzeyi okumak için hiçbir sebebi yok;
  *   taslak önizlemenin yetkili karşılığı `booking-page/preview`.
- * - **Finans, paket, onam, bildirim, denetim** (`payments`, `charges`, `cash`,
- *   `commission*`, `packages`, `customer-packages`, `consent*`, `messages`,
- *   `audit*`): Faz 12 bunların HİÇBİRİNİ istemiyor. Kural aynı: uç buraya
- *   yazılmadıkça geçmez.
+ * - **Finans, paket, bildirim, denetim** (`payments`, `charges`, `cash`,
+ *   `commission*`, `packages`, `customer-packages`, `messages`, `audit*`):
+ *   Faz 12 bunların HİÇBİRİNİ istemiyor. Kural aynı: uç buraya yazılmadıkça
+ *   geçmez. `consent-templates` / `consent-records` de burada: Faz 7
+ *   daraltılınca o tablolar HİÇ yazılmadı, dolayısıyla o uçlar YOK.
  *
  * KLİNİK OPERASYONU — Faz 12'de AÇILDI, gerekçesi değişti
  *
@@ -154,6 +155,15 @@ const RULES: readonly Rule[] = [
   { methods: ['GET'], pattern: /^booking-page\/assets$/ },
   { methods: ['POST'], pattern: /^booking-page\/assets\/(presign|confirm)$/ },
   { methods: ['DELETE'], pattern: new RegExp(`^booking-page/assets/${UUID}$`) },
+
+  // --- Onam metni (Faz 7) ---
+  // Yalnız `consent-document*` ve `consent-acceptances`. `consent-templates` /
+  // `consent-records` KAPALI kalıyor: Faz 7 daraltılınca hiç yazılmadılar.
+  { methods: ['GET'], pattern: /^consent-document$/ },
+  { methods: ['PUT'], pattern: /^consent-document\/draft$/ },
+  { methods: ['POST'], pattern: /^consent-document\/publish$/ },
+  { methods: ['GET'], pattern: /^consent-document\/versions$/ },
+  { methods: ['GET'], pattern: /^consent-acceptances$/ },
 
   { methods: ['GET', 'POST'], pattern: /^booking-page\/domains$/ },
   { methods: ['DELETE'], pattern: new RegExp(`^booking-page/domains/${UUID}$`) },

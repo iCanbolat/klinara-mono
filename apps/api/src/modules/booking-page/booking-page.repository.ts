@@ -113,6 +113,42 @@ export async function updateSettings(
   return row;
 }
 
+/**
+ * Yayındaki onam metninin özeti — gövde OLMADAN.
+ *
+ * Ayarlar ekranı 20k'lık bir metni taşımamalı; gövde `/consent-document`
+ * ucundan geliyor. Yayının tek kaynağı `active_consent_document_id` pointer'ı
+ * (`published_revision_id` ile aynı gerekçe: `status`'a bakmak ikinci bir
+ * gerçek yaratırdı).
+ */
+export async function findActiveConsentSummary(
+  tx: Tx,
+  siteId: string,
+): Promise<{ id: string; version: number; locale: string; sha256: string; publishedAt: string } | null> {
+  const result = await tx.execute<{
+    id: string;
+    version: number;
+    locale: string;
+    sha256: string;
+    published_at: Date;
+  }>(sql`
+    select d.id, d.version, d.locale, d.sha256, d.published_at
+      from booking_site_settings s
+      join consent_documents d on d.id = s.active_consent_document_id
+     where s.booking_site_id = ${siteId}
+     limit 1
+  `);
+  const row = result.rows[0];
+  if (row === undefined) return null;
+  return {
+    id: row.id,
+    version: Number(row.version),
+    locale: row.locale,
+    sha256: row.sha256,
+    publishedAt: new Date(row.published_at).toISOString(),
+  };
+}
+
 // --- İçerik sürümleri ---
 
 export async function findRevision(

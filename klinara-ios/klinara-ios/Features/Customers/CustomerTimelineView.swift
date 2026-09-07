@@ -89,9 +89,23 @@ struct CustomerTimelineView: View {
             }
             .buttonStyle(.plain)
 
+        case .consent(_, let payload):
+            // Onam satırı SÜRÜMÜ taşıyor: "kabul etti" tek başına kanıt değil,
+            // hangi metni kabul ettiği kanıt. Metnin gövdesi burada yok —
+            // 20 bin karakterlik bir aydınlatma metni listeye binmemeli.
+            KlinaraRow(
+                label: "KVKK onayı",
+                detail: (payload.version.map { "Sürüm \($0) · " } ?? "")
+                    + clock.formatDateTime(entry.occurredAt)
+            ) {
+                Image(systemName: "checkmark.seal")
+                    .font(.system(size: 13))
+                    .foregroundStyle(KlinaraColor.charcoalMuted)
+            }
+
         case .unknown(_, let kind):
             // Bilinmeyen olay YUTULMUYOR: sunucu yeni bir kol eklediğinde
-            // (paket, tahsilat, onam) eski istemci geçmişi eksik göstermemeli.
+            // (paket, tahsilat) eski istemci geçmişi eksik göstermemeli.
             KlinaraRow(
                 label: "Bu sürümde gösterilemeyen kayıt",
                 detail: "\(kind) · \(clock.formatDateTime(entry.occurredAt))"

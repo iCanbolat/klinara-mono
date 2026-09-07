@@ -17,7 +17,7 @@ import type { CustomerNoteKind } from '../../../database/schema/crm';
 export const CUSTOMER_NOTE_KINDS = ['general', 'treatment', 'internal'] as const;
 
 /** Zaman çizelgesindeki bir olayın türü. Faz 5/6/7 kendi kolunu ekleyecek. */
-export const TIMELINE_KINDS = ['appointment', 'note'] as const;
+export const TIMELINE_KINDS = ['appointment', 'note', 'consent'] as const;
 export type TimelineKind = (typeof TIMELINE_KINDS)[number];
 
 export class CustomerNoteResponseDto {

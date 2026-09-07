@@ -1,8 +1,7 @@
-import { createHash } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { sql } from 'drizzle-orm';
-import { ERROR_CODES } from '@klinara/shared';
+import { CONSENT_KIND, ERROR_CODES } from '@klinara/shared';
 import { generateNumericCode, generateOpaqueToken, safeEqual, sha256 } from '../../common/crypto/tokens';
 import { AppError } from '../../common/errors/app-error';
 import { isPgError, PG_ERROR } from '../../common/errors/db-errors';
@@ -14,6 +13,7 @@ import { AvailabilityCacheService } from '../booking/availability-cache.service'
 import { AppointmentsService } from '../booking/appointments.service';
 import * as appointmentRepo from '../booking/appointments.repository';
 import * as pageRepo from '../booking-page/booking-page.repository';
+import { findActiveConsent, type ActiveConsentRow } from './public-consent.repository';
 import { BookingOtpSender } from './booking-otp.sender';
 import * as repo from './holds.repository';
 import { SlotTokenService } from './slot-token.service';
@@ -23,12 +23,6 @@ import type {
   HoldResponseDto,
   PublicCreateAppointmentDto,
 } from './dto/public-booking.dto';
-
-interface ConsentSetting {
-  kind: string;
-  text: string;
-  required?: boolean;
-}
 
 /** İstek izi — onam kanıtına yazılır. */
 export interface ClientMeta {
@@ -300,7 +294,8 @@ export class PublicBookingService {
       if ((settings?.requireOtp ?? true) && hold.otpVerifiedAt === null) {
         throw new AppError(400, ERROR_CODES.OTP_REQUIRED, 'Telefon doğrulaması gerekli');
       }
-      assertConsents((settings?.consentTexts ?? []) as ConsentSetting[], input.consents);
+      const consent = await findActiveConsent(tx, site.siteId);
+      assertConsent(consent, input.consent);
 
       const phone = hold.verifiedPhone;
       const customerId = await resolveCustomer(tx, site.tenantId, {
@@ -310,10 +305,10 @@ export class PublicBookingService {
         gender: input.gender ?? null,
       });
 
-      return { hold, settings, customerId };
+      return { hold, customerId, consent };
     });
 
-    const { hold, settings, customerId } = prepared;
+    const { hold, customerId, consent } = prepared;
     const services = hold.serviceIds.map((serviceId) => ({
       serviceId,
       staffProfileId: hold.staffProfileId ?? '',
@@ -339,25 +334,23 @@ export class PublicBookingService {
     // düşmüş bir transaction'da devam edilemez.
     const manageToken = generateOpaqueToken();
     await this.tx.run(async (tx) => {
-      for (const consent of input.consents) {
-        const setting = ((settings?.consentTexts ?? []) as ConsentSetting[]).find(
-          (item) => item.kind === consent.kind,
-        );
-        if (setting === undefined) continue;
-        await repo.insertConsentAcceptance(tx, {
-          tenantId: site.tenantId,
-          bookingSiteId: site.siteId,
-          appointmentId: appointment.id,
-          customerId,
-          kind: consent.kind,
-          // Metnin BİREBİR kopyası saklanıyor: ayarlardaki metin yarın
-          // değişse bile "bu müşteriye ne gösterildi" cevaplanabilir kalıyor.
-          textBody: setting.text,
-          textSha256: consent.textSha256,
-          ip: meta.ip,
-          userAgent: meta.userAgent,
-        });
-      }
+      await repo.insertConsentAcceptance(tx, {
+        tenantId: site.tenantId,
+        bookingSiteId: site.siteId,
+        appointmentId: appointment.id,
+        customerId,
+        kind: CONSENT_KIND,
+        consentDocumentId: consent.id,
+        consentVersion: consent.version,
+        locale: consent.locale,
+        // Metnin BİREBİR kopyası saklanıyor: yayındaki metin yarın yeni bir
+        // sürüme geçse bile "bu müşteriye ne gösterildi" cevaplanabilir kalıyor.
+        // Gövde DOKÜMANDAN geliyor, istemcinin beyanından değil.
+        textBody: consent.body,
+        textSha256: consent.sha256,
+        ip: meta.ip,
+        userAgent: meta.userAgent,
+      });
 
       await tx.execute(sql`
         insert into booking_access_tokens (tenant_id, appointment_id, token_hash, expires_at)
@@ -464,22 +457,27 @@ export class PublicBookingService {
  * gördüğü metnin hash'i sunucununkiyle tutmuyorsa, arada kalmış eski bir
  * sürüm onaylanmış demektir ve bu kabul edilemez.
  */
-function assertConsents(settings: ConsentSetting[], provided: ConsentAcceptanceDto[]): void {
-  const required = settings.filter((setting) => setting.required !== false);
-
-  for (const setting of required) {
-    const match = provided.find((item) => item.kind === setting.kind);
-    if (match === undefined) {
-      throw new AppError(400, ERROR_CODES.CONSENT_REQUIRED, 'Zorunlu onay alınmadı', {
-        detail: `Eksik onay: ${setting.kind}`,
-      });
-    }
-    const expected = createHash('sha256').update(setting.text, 'utf8').digest('hex');
-    if (match.textSha256 !== expected) {
-      throw AppError.conflict(ERROR_CODES.CONSENT_REQUIRED, 'Onay metni güncellenmiş', {
-        detail: 'Lütfen sayfayı yenileyip güncel metni onaylayın.',
-      });
-    }
+function assertConsent(
+  active: ActiveConsentRow | undefined,
+  provided: ConsentAcceptanceDto | undefined,
+): asserts active is ActiveConsentRow {
+  // Yayında onam metni yoksa randevu ALINAMAZ. Site yayını zaten bunu
+  // engelliyor (`BookingPageService.publish`); burası son savunma hattı.
+  if (active === undefined) {
+    throw new AppError(409, ERROR_CODES.CONSENT_REQUIRED, 'Onam metni yayınlanmamış', {
+      detail: 'Klinik henüz KVKK aydınlatma metnini yayınlamadı.',
+    });
+  }
+  if (provided === undefined) {
+    throw new AppError(400, ERROR_CODES.CONSENT_REQUIRED, 'Zorunlu onay alınmadı');
+  }
+  // Sürüm VE hash birlikte kontrol ediliyor. Yalnız hash yeterdi ama sürüm
+  // uyuşmazlığı istemciye "metin değişti" demenin en açık yolu; yalnız sürüm
+  // ise gövdenin aynılığını kanıtlamazdı.
+  if (provided.version !== active.version || provided.textSha256 !== active.sha256) {
+    throw AppError.conflict(ERROR_CODES.CONSENT_REQUIRED, 'Onay metni güncellenmiş', {
+      detail: 'Lütfen sayfayı yenileyip güncel metni onaylayın.',
+    });
   }
 }
 

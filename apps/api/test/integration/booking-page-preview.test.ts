@@ -3,7 +3,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { createTestApp } from '../helpers/app';
 import { startTestDatabase, type TestDatabase } from '../helpers/database';
 import { auth, http, PLATFORM_TOKEN } from '../helpers/identity';
-import { setupClinic, type ClinicFixture } from '../helpers/clinic';
+import { publishConsent, setupClinic, type ClinicFixture } from '../helpers/clinic';
 
 const ROOT_DOMAIN = 'klinara.localhost';
 const ASSET_BASE = 'https://cdn.klinara.test';
@@ -94,6 +94,7 @@ describe('randevu sayfası taslak önizlemesi (Batch 11.5)', () => {
       ],
       seo: { title: 'Klinik X', description: 'Online randevu' },
     }).expect(200);
+    await publishConsent(app, clinic.owner.tokens);
     await http(app).post('/api/v1/booking-page/publish').set(ownerAuth()).expect(200);
 
     const previewBody = (await preview().expect(200)).body as SiteView;

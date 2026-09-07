@@ -244,3 +244,21 @@ export async function setupClinic(
     customer,
   };
 }
+
+/**
+ * Yayınlanmış bir KVKK onam metni bırakır.
+ *
+ * Faz 7 ile randevu sayfası, onam metni YAYINDA olmadan yayınlanamıyor
+ * (`CONSENT_REQUIRED`) — yani `booking-page/publish` çağıran her fixture'ın ön
+ * koşulu bu. Her dosyada tekrarlamak yerine burada bir kez.
+ */
+export const CONSENT_BODY = 'Açık rıza metni.';
+
+export async function publishConsent(
+  app: NestExpressApplication,
+  tokens: Tokens,
+  body: string = CONSENT_BODY,
+): Promise<void> {
+  await http(app).put('/api/v1/consent-document/draft').set(auth(tokens)).send({ body }).expect(200);
+  await http(app).post('/api/v1/consent-document/publish').set(auth(tokens)).expect(200);
+}

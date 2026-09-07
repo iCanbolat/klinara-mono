@@ -125,9 +125,9 @@ interface TimelineFilters {
  * Randevu ve notları TEK sorguda, tek sıralamada birleştirir.
  *
  * `union all` kolları ayrı ayrı sayfalanamaz — ortak `(occurred_at, id)`
- * anahtarı üzerinde sıralanıp tek cursor'la ilerliyor. Faz 5 (paket), Faz 6
- * (tahsilat) ve Faz 7 (onam) buraya kendi kolunu ekleyecek; sözleşme her kolun
- * `kind` + `payload` döndürmesi.
+ * anahtarı üzerinde sıralanıp tek cursor'la ilerliyor. Faz 5 (paket) ve Faz 6
+ * (tahsilat) buraya kendi kolunu ekleyecek; sözleşme her kolun `kind` +
+ * `payload` döndürmesi. Faz 7'nin kolu (`consent`) aşağıda.
  */
 export async function listTimeline(tx: Tx, filters: TimelineFilters): Promise<TimelineRow[]> {
   const result = await tx.execute<TimelineRow>(sql`
@@ -168,6 +168,23 @@ export async function listTimeline(tx: Tx, filters: TimelineFilters): Promise<Ti
        where n.customer_id = ${filters.customerId}::uuid
          and n.deleted_at is null
          and (${filters.canReadMedical} or n.kind = 'general')
+
+      union all
+
+      -- Onam kabulü (Faz 7). Metnin GÖVDESİ payload'a KONMUYOR: 20k'lık bir
+      -- aydınlatma metni her zaman çizelgesi sayfasına binerdi. Kanıtın tamamı
+      -- GET /consent-acceptances?customerId= ucundan çekiliyor.
+      select 'consent'::text as kind,
+             c.id,
+             c.accepted_at as occurred_at,
+             jsonb_build_object(
+               'consentKind', c.kind,
+               'version',     c.consent_version,
+               'locale',      c.locale,
+               'textSha256',  c.text_sha256
+             ) as payload
+        from booking_consent_acceptances c
+       where c.customer_id = ${filters.customerId}::uuid
     )
     select kind, id::text, occurred_at, payload
       from events

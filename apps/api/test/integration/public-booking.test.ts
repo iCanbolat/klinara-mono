@@ -3,10 +3,12 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { createTestApp } from '../helpers/app';
 import { startTestDatabase, type TestDatabase } from '../helpers/database';
 import { auth, bootstrapTenant, http, PLATFORM_TOKEN } from '../helpers/identity';
-import { setupClinic, type ClinicFixture } from '../helpers/clinic';
+import { CONSENT_BODY, publishConsent, setupClinic, type ClinicFixture } from '../helpers/clinic';
+import { shiftDays, upcomingMonday } from '../helpers/dates';
 
 const ROOT_DOMAIN = 'klinara.localhost';
-const MONDAY = '2026-09-07';
+/** Gelecekteki bir pazartesi — min-lead penceresi slotları elemesin diye. */
+const MONDAY = upcomingMonday();
 const UUID_PATTERN = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
 interface SlotBody {
@@ -67,20 +69,15 @@ describe('public randevu akışı: uygunluk, tutma, OTP, randevu, self-servis (9
 
   const ownerAuth = () => auth(clinic.owner.tokens);
 
-  async function publishSite(consent = true): Promise<void> {
+  async function publishSite(): Promise<void> {
     await http(app)
       .put('/api/v1/booking-page/content')
       .set(ownerAuth())
       .set('If-Match', 'W/"0"')
       .send({ sections: [{ type: 'hero', title: 'Klinik X' }] })
       .expect(200);
-    if (consent) {
-      await http(app)
-        .put('/api/v1/booking-page')
-        .set(ownerAuth())
-        .send({ consentTexts: [{ kind: 'kvkk_explicit', text: 'Açık rıza metni.' }] })
-        .expect(200);
-    }
+    // Onam metni yayında olmadan site yayınlanamaz (Faz 7).
+    await publishConsent(app, clinic.owner.tokens);
     await http(app).post('/api/v1/booking-page/publish').set(ownerAuth()).expect(200);
   }
 
@@ -102,11 +99,14 @@ describe('public randevu akışı: uygunluk, tutma, OTP, randevu, self-servis (9
     return slot;
   }
 
-  const consentHash = async (): Promise<string> => {
+  /** Public ucun DÖNDÜĞÜ sürüm ve hash — istemci ikisini de aynen geri gönderir. */
+  const publicConsent = async (): Promise<{ version: number; textSha256: string }> => {
     const site = await http(app).get('/api/v1/public/sites/klinik-x').expect(200);
-    const consents = (site.body as { settings: { requiredConsents: { textSha256: string }[] } })
-      .settings.requiredConsents;
-    return consents[0]!.textSha256;
+    const consent = (
+      site.body as { settings: { consent: { version: number; textSha256: string } | null } }
+    ).settings.consent;
+    if (consent === null) throw new Error('Yayında onam metni yok');
+    return { version: consent.version, textSha256: consent.textSha256 };
   };
 
   async function bookThroughFlow(): Promise<{ appointmentId: string; manageToken: string }> {
@@ -134,7 +134,7 @@ describe('public randevu akışı: uygunluk, tutma, OTP, randevu, self-servis (9
       .send({
         holdToken,
         fullName: 'Ayşe Yılmaz',
-        consents: [{ kind: 'kvkk_explicit', textSha256: await consentHash() }],
+        consent: await publicConsent(),
       })
       .expect(201);
 
@@ -207,6 +207,7 @@ describe('public randevu akışı: uygunluk, tutma, OTP, randevu, self-servis (9
         .set('If-Match', 'W/"0"')
         .send({ sections: [] })
         .expect(200);
+      await publishConsent(app, other.owner.tokens);
       await http(app).post('/api/v1/booking-page/publish').set(auth(other.owner.tokens)).expect(200);
 
       const res = await http(app)
@@ -227,7 +228,7 @@ describe('public randevu akışı: uygunluk, tutma, OTP, randevu, self-servis (9
     });
 
     it('aşırı geniş aralık reddedilir', async () => {
-      await askSlots({ to: '2026-12-31T23:59:00+03:00' }).expect(400);
+      await askSlots({ to: `${shiftDays(MONDAY, 60)}T23:59:00+03:00` }).expect(400);
     });
 
     it('Cache-Control ve ETag döner', async () => {
@@ -298,7 +299,7 @@ describe('public randevu akışı: uygunluk, tutma, OTP, randevu, self-servis (9
       const res = await http(app)
         .post('/api/v1/public/sites/klinik-x/appointments')
         .set('idempotency-key', 'expired-hold')
-        .send({ holdToken, fullName: 'Ayşe', consents: [] })
+        .send({ holdToken, fullName: 'Ayşe' })
         .expect(409);
       expect((res.body as Problem).code).toBe('HOLD_EXPIRED');
     });
@@ -347,7 +348,7 @@ describe('public randevu akışı: uygunluk, tutma, OTP, randevu, self-servis (9
       const res = await http(app)
         .post('/api/v1/public/sites/klinik-x/appointments')
         .set('idempotency-key', 'no-otp')
-        .send({ holdToken, fullName: 'Ayşe', consents: [] })
+        .send({ holdToken, fullName: 'Ayşe' })
         .expect(400);
       expect((res.body as Problem).code).toBe('OTP_REQUIRED');
     });
@@ -447,7 +448,7 @@ describe('public randevu akışı: uygunluk, tutma, OTP, randevu, self-servis (9
       const res = await http(app)
         .post('/api/v1/public/sites/klinik-x/appointments')
         .set('idempotency-key', 'no-consent')
-        .send({ holdToken, fullName: 'Ayşe', consents: [] })
+        .send({ holdToken, fullName: 'Ayşe' })
         .expect(400);
       expect((res.body as Problem).code).toBe('CONSENT_REQUIRED');
     });
@@ -474,7 +475,7 @@ describe('public randevu akışı: uygunluk, tutma, OTP, randevu, self-servis (9
         .send({
           holdToken,
           fullName: 'Ayşe',
-          consents: [{ kind: 'kvkk_explicit', textSha256: 'a'.repeat(64) }],
+          consent: { version: 1, textSha256: 'a'.repeat(64) },
         })
         .expect(409);
       expect((res.body as Problem).code).toBe('CONSENT_REQUIRED');
@@ -482,11 +483,20 @@ describe('public randevu akışı: uygunluk, tutma, OTP, randevu, self-servis (9
 
     it('onam kanıtı metnin BİREBİR kopyasıyla saklanır ve DEĞİŞTİRİLEMEZ', async () => {
       const { appointmentId } = await bookThroughFlow();
-      const { rows } = await database.ownerPool.query<{ text_body: string; kind: string }>(
-        `select text_body, kind from booking_consent_acceptances where appointment_id = $1`,
+      const { rows } = await database.ownerPool.query<{
+        text_body: string;
+        kind: string;
+        consent_version: number;
+      }>(
+        `select text_body, kind, consent_version
+           from booking_consent_acceptances where appointment_id = $1`,
         [appointmentId],
       );
-      expect(rows[0]).toMatchObject({ kind: 'kvkk_explicit', text_body: 'Açık rıza metni.' });
+      expect(rows[0]).toMatchObject({
+        kind: 'kvkk_explicit',
+        text_body: CONSENT_BODY,
+        consent_version: 1,
+      });
 
       await expect(
         database.ownerPool.query(`update booking_consent_acceptances set kind = 'x'`),
@@ -501,7 +511,7 @@ describe('public randevu akışı: uygunluk, tutma, OTP, randevu, self-servis (9
         .expect(201);
       await http(app)
         .post('/api/v1/public/sites/klinik-x/appointments')
-        .send({ holdToken: (hold.body as HoldBody).holdToken, fullName: 'Ayşe', consents: [] })
+        .send({ holdToken: (hold.body as HoldBody).holdToken, fullName: 'Ayşe' })
         .expect(400);
     });
 

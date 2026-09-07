@@ -17,4 +17,5 @@ export * from './reminders';
 export * from './booking-sites';
 export * from './booking-content';
 export * from './booking-holds';
+export * from './consent';
 export * from './reporting';
