@@ -56,6 +56,20 @@ export class RequestContextMiddleware implements NestMiddleware {
     return platformToken !== undefined && bearer.length > 0 && safeEqual(bearer, platformToken);
   }
 
+  /**
+   * Destek erişiminin süresi doldu mu (Batch 10.3).
+   *
+   * Tarih tanımsızsa süre yoktur — üretimde env doğrulaması bunu zaten
+   * reddeder; yerel geliştirme ve testler tarihsiz çalışabilsin diye burada
+   * sessizce geçerli sayılır.
+   */
+  private isPlatformTokenExpired(now: number): boolean {
+    const notAfter = this.config.get('PLATFORM_ADMIN_TOKEN_NOT_AFTER', { infer: true });
+    if (notAfter === undefined) return false;
+    const parsed = Date.parse(notAfter);
+    return Number.isFinite(parsed) && parsed <= now;
+  }
+
   private async resolveContext(request: Request, requestId: string): Promise<RequestContext> {
     const base: RequestContext = {
       tenantId: null,
@@ -69,7 +83,13 @@ export class RequestContextMiddleware implements NestMiddleware {
 
     const bearer = RequestContextMiddleware.bearerOf(request);
     if (bearer === '') return base;
-    if (this.isPlatformToken(bearer)) return { ...base, isPlatformAdmin: true };
+    if (this.isPlatformToken(bearer)) {
+      if (this.isPlatformTokenExpired(Date.now())) {
+        request.platformTokenExpired = true;
+        return base;
+      }
+      return { ...base, isPlatformAdmin: true };
+    }
 
     try {
       const claims = await this.tokens.verifyAccess(bearer);

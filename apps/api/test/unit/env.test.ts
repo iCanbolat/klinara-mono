@@ -140,4 +140,41 @@ describe('üretime özgü kurallar', () => {
       /APP_BASE_URL/,
     );
   });
+  // --- Batch 10.3 ---
+
+  it('üretimde süreç-içi hız sınırı sayacı reddedilir', () => {
+    // İki instance'ta süreç-içi sayaç, sınırı sessizce ikiye katlar.
+    expect(() => validateEnv({ ...PROD, RATE_LIMIT_STORAGE: 'memory' })).toThrow(
+      /RATE_LIMIT_STORAGE/,
+    );
+  });
+
+  it('üretimde platform token’ı SÜRESİZ olamaz', () => {
+    expect(() =>
+      validateEnv({ ...PROD, PLATFORM_ADMIN_TOKEN: 'p'.repeat(40) }),
+    ).toThrow(/PLATFORM_ADMIN_TOKEN_NOT_AFTER/);
+  });
+
+  it('platform token’ının ömrü 90 günü aşamaz', () => {
+    const farFuture = new Date(Date.now() + 200 * 24 * 60 * 60 * 1_000).toISOString();
+    expect(() =>
+      validateEnv({
+        ...PROD,
+        PLATFORM_ADMIN_TOKEN: 'p'.repeat(40),
+        PLATFORM_ADMIN_TOKEN_NOT_AFTER: farFuture,
+      }),
+    ).toThrow(/90 gün/);
+  });
+
+  it('SÜRESİ GEÇMİŞ platform token’ı açılışı engellemez — yalnız platform uçları kapanır', () => {
+    // Süresi dolmuş bir destek token'ı yüzünden tüm API'nin açılmaması,
+    // korumanın kendisinden büyük bir hasar olurdu.
+    expect(() =>
+      validateEnv({
+        ...PROD,
+        PLATFORM_ADMIN_TOKEN: 'p'.repeat(40),
+        PLATFORM_ADMIN_TOKEN_NOT_AFTER: '2020-01-01T00:00:00Z',
+      }),
+    ).not.toThrow();
+  });
 });

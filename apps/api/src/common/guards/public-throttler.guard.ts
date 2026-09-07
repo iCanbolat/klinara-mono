@@ -1,9 +1,19 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import type { ExecutionContext } from '@nestjs/common';
-import { ThrottlerGuard, type ThrottlerLimitDetail } from '@nestjs/throttler';
+import { ConfigService } from '@nestjs/config';
+import { Reflector } from '@nestjs/core';
+import {
+  ThrottlerGuard,
+  ThrottlerStorage,
+  type ThrottlerLimitDetail,
+  type ThrottlerModuleOptions,
+} from '@nestjs/throttler';
+import { THROTTLER_LIMIT, THROTTLER_OPTIONS } from '@nestjs/throttler/dist/throttler.constants';
 import { ERROR_CODES } from '@klinara/shared';
 import type { Request, Response } from 'express';
 import { AppError } from '../errors/app-error';
+import type { EnvironmentVariables } from '../../config/env.validation';
+import type { ThrottlerRequest } from '@nestjs/throttler/dist/throttler.guard.interface';
 
 /**
  * Public randevu uçlarının hız sınırı.
@@ -19,9 +29,51 @@ import { AppError } from '../errors/app-error';
  * 2. **`Retry-After` başlığı.** `AppThrottlerGuard` gövdede süreyi söylüyor
  *    ama başlığı yazmıyor; bir tarayıcı istemcisi ve CDN için standart olan
  *    şey başlık.
+ *
+ * 3. **Kendi bütçesi (Batch 10.3).** Uç bazlı `@Throttle` yazılmamış public
+ *    uçlar bugüne kadar İÇ API'nin bütçesine (`RATE_LIMIT_MAX`, dakikada 300)
+ *    düşüyordu. `PUBLIC_RATE_LIMIT_MAX` / `PUBLIC_RATE_LIMIT_WINDOW_MS`
+ *    Faz 9'da tanımlanmış ama HİÇBİR YERDE OKUNMAMIŞTI — public trafiğin ayrı
+ *    bir bütçesi olduğu sanılıyordu, oysa yoktu. Uç bazlı sınırlar (OTP:
+ *    dakikada 5) olduğu gibi kalır ve bu varsayılanı EZER.
  */
 @Injectable()
 export class PublicThrottlerGuard extends ThrottlerGuard {
+  private readonly publicLimit: number;
+  private readonly publicWindowMs: number;
+
+  constructor(
+    @Inject(THROTTLER_OPTIONS) options: ThrottlerModuleOptions,
+    @Inject(ThrottlerStorage) storageService: ThrottlerStorage,
+    reflector: Reflector,
+    config: ConfigService<EnvironmentVariables, true>,
+  ) {
+    super(options, storageService, reflector);
+    this.publicLimit = config.get('PUBLIC_RATE_LIMIT_MAX', { infer: true });
+    this.publicWindowMs = config.get('PUBLIC_RATE_LIMIT_WINDOW_MS', { infer: true });
+  }
+
+  /**
+   * Ucun kendi `@Throttle`ı yoksa public bütçesini uygula.
+   *
+   * Sınırın nereden geldiğini burada yeniden sormak zorundayız: `handleRequest`
+   * kendisine gelen sayıyı, ucun mu yoksa varsayılanın mı verdiğini bilmez.
+   */
+  protected override handleRequest(request: ThrottlerRequest): Promise<boolean> {
+    const routeLimit: unknown = this.reflector.getAllAndOverride(
+      THROTTLER_LIMIT + request.throttler.name,
+      [request.context.getHandler(), request.context.getClass()],
+    );
+    if (routeLimit !== undefined) return super.handleRequest(request);
+
+    return super.handleRequest({
+      ...request,
+      limit: this.publicLimit,
+      ttl: this.publicWindowMs,
+      blockDuration: this.publicWindowMs,
+    });
+  }
+
   protected override getTracker(request: Request): Promise<string> {
     const slug = (request.params as Record<string, string | undefined>)['slug'] ?? '-';
     // `request.ip` `trust proxy` sayesinde gerçek istemciyi verir

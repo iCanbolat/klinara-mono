@@ -29,6 +29,18 @@ const MESSAGE_BY_CODE: Partial<Record<string, MessageKey>> = {
   [ERROR_CODES.ACCOUNT_LOCKED]: 'error.accountLocked',
   [ERROR_CODES.MFA_INVALID]: 'error.mfaInvalid',
   [ERROR_CODES.HOST_TAKEN]: 'domains.hostTaken',
+
+  // Klinik operasyonu (Faz 12). Bu kodların sunucudaki `detail`i çoğu zaman
+  // geliştiriciye yazılmış; kullanıcıya KURTARMA ADIMINI söyleyen metin
+  // burada. `SLOT_CONFLICT` özel bir durum: metin bir yönlendirme, asıl
+  // cevap `conflict.ts`in çıkardığı ALTERNATİF SAATLER.
+  [ERROR_CODES.SLOT_CONFLICT]: 'error.slotConflict',
+  [ERROR_CODES.RESOURCE_UNAVAILABLE]: 'error.resourceUnavailable',
+  [ERROR_CODES.OUTSIDE_WORKING_HOURS]: 'error.outsideWorkingHours',
+  [ERROR_CODES.INVALID_STATUS_TRANSITION]: 'error.invalidStatusTransition',
+  [ERROR_CODES.VERSION_CONFLICT]: 'error.versionConflict',
+  [ERROR_CODES.BRANCH_FORBIDDEN]: 'error.branchForbidden',
+  [ERROR_CODES.IDEMPOTENCY_CONFLICT]: 'error.idempotencyConflict',
 };
 
 export function isProblem(value: unknown): value is ProblemDetails {

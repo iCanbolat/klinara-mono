@@ -15,6 +15,12 @@ const BASE: Record<string, string> = {
   // Uç bazlı hız sınırları (giriş: dakikada 10) testleri birbirine bağlar;
   // sayaç kapalı koşar. Hız sınırının KENDİSİ ayrı bir dosyada, açıkken sınanır.
   RATE_LIMIT_ENABLED: 'false',
+  // Aşırı yük koruması KAPALI koşar. Testler tek süreçte onlarca uygulama
+  // kurar, konteyner başlatır ve migration koşturur; bu iş event loop'u
+  // saniyelerce bloke eder ve koruma açık kalsaydı ilgisiz testler rastgele
+  // 503 alırdı. Korumanın KENDİSİ kendi dosyasında, açıkken sınanıyor
+  // (overload.test.ts).
+  OVERLOAD_PROTECTION_ENABLED: 'false',
   WEBAUTHN_RP_ID: 'localhost',
   WEBAUTHN_ORIGINS: 'http://localhost:5173',
   // pg-boss kendi şemasını kurar ve arka planda bakım koşturur; testler

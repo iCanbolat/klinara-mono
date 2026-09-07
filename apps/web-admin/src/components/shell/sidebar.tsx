@@ -2,7 +2,19 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { BarChart3, FileText, Globe, LayoutPanelTop, UserCog, type LucideIcon } from 'lucide-react';
+import {
+  BarChart3,
+  CalendarDays,
+  Clock,
+  FileText,
+  Globe,
+  LayoutPanelTop,
+  Scissors,
+  Users,
+  UserCog,
+  UsersRound,
+  type LucideIcon,
+} from 'lucide-react';
 import type { ReactNode } from 'react';
 import { visibleNav } from '@/lib/permissions';
 import { useSession } from '@/components/session/session-provider';
@@ -28,6 +40,11 @@ import {
  * Eşleşmeyen bir rota olursa ikon çizilmiyor — menü yine de çalışıyor.
  */
 const ICONS: Record<string, LucideIcon> = {
+  '/takvim': CalendarDays,
+  '/musteriler': Users,
+  '/katalog': Scissors,
+  '/personel': UsersRound,
+  '/calisma-saatleri': Clock,
   '/sayfa': LayoutPanelTop,
   '/icerik': FileText,
   '/alan-adlari': Globe,

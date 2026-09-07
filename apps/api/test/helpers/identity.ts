@@ -11,6 +11,14 @@ import { describeResponse } from './describe-response';
  */
 
 export const PLATFORM_TOKEN = 'platform-admin-test-tokeni-32-karakterden-uzun';
+
+/**
+ * Destek erişimi gerekçesiz kullanılamaz (Batch 10.3): platform uçları
+ * `X-Support-Reason` başlığı ister ve her çağrıyı `platform_access_log`a yazar.
+ */
+export const supportReason = (reason = 'test kiracisi kurulumu') => ({
+  'x-support-reason': reason,
+});
 export const DEFAULT_PASSWORD = 'cok-gizli-parola-123';
 
 export interface Tokens {
@@ -56,6 +64,7 @@ export async function bootstrapTenant(
   const created = await http(app)
     .post('/api/v1/platform/tenants')
     .set('authorization', `Bearer ${PLATFORM_TOKEN}`)
+    .set(supportReason())
     .send({
       slug: options.slug,
       name: options.name ?? options.slug,

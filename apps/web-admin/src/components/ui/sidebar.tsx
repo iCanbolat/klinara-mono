@@ -606,10 +606,21 @@ function SidebarMenuSkeleton({
 }: React.ComponentProps<"div"> & {
   showIcon?: boolean
 }) {
-  // Random width between 50 to 90%.
+  // İskelet çubuklarının genişliği %50–90 arasında DEĞİŞİR ki tek tip bir
+  // blok yerine metin gibi görünsün. Değer `useMemo` içinde `Math.random()`
+  // ile üretiliyordu; `useMemo` saf olmak zorundadır ve React onu istediği
+  // zaman yeniden çalıştırabilir — ayrıca sunucuda üretilen genişlik
+  // istemcidekiyle uyuşmayıp hidrasyon uyarısı verir.
+  //
+  // Yerine `useId`den türetilen deterministik bir genişlik: aynı bileşen
+  // her zaman aynı genişliği alır, farklı bileşenler farklı genişlik alır,
+  // sunucu ve istemci aynı sonucu üretir.
+  const id = React.useId()
   const width = React.useMemo(() => {
-    return `${Math.floor(Math.random() * 40) + 50}%`
-  }, [])
+    let hash = 0
+    for (let i = 0; i < id.length; i += 1) hash = (hash * 31 + id.charCodeAt(i)) | 0
+    return `${(Math.abs(hash) % 40) + 50}%`
+  }, [id])
 
   return (
     <div

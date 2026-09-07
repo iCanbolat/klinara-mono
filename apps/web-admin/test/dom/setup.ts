@@ -28,5 +28,5 @@ if (typeof window !== 'undefined' && window.matchMedia === undefined) {
     addListener: () => undefined,
     removeListener: () => undefined,
     dispatchEvent: () => false,
-  })) as typeof window.matchMedia;
+  }));
 }

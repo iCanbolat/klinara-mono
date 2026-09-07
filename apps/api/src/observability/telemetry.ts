@@ -1,3 +1,4 @@
+import type { Span } from '@opentelemetry/api';
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
@@ -5,6 +6,17 @@ import { resourceFromAttributes } from '@opentelemetry/resources';
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
 import * as Sentry from '@sentry/node';
 import type { EnvironmentVariables } from '../config/env.validation';
+import { sanitizeUrl } from './redaction';
+
+/**
+ * Trace ve hata raporunda URL'i sırlarından arındırır.
+ *
+ * Log tarafındaki serializer yalnız pino'yu kapsıyor; OpenTelemetry'nin http
+ * enstrümantasyonu ve Sentry URL'i KENDİLERİ okur. Üçünün de aynı fonksiyondan
+ * geçmesi kasıtlı: sır bir yerde gizlenip diğerinde açık kalırsa gizleme
+ * hiçbir şey ifade etmez — sır zaten dışarı çıkmıştır.
+ */
+const URL_ATTRIBUTES = ['url.full', 'url.path', 'url.query', 'http.url', 'http.target'];
 
 let sdk: NodeSDK | undefined;
 
@@ -30,6 +42,15 @@ export function initTelemetry(env: EnvironmentVariables): void {
         getNodeAutoInstrumentations({
           // Dosya sistemi izleri gürültüden ibaret, kapalı.
           '@opentelemetry/instrumentation-fs': { enabled: false },
+          '@opentelemetry/instrumentation-http': {
+            applyCustomAttributesOnSpan: (span: Span) => {
+              for (const attribute of URL_ATTRIBUTES) {
+                const current = (span as unknown as { attributes?: Record<string, unknown> })
+                  .attributes?.[attribute];
+                if (typeof current === 'string') span.setAttribute(attribute, sanitizeUrl(current));
+              }
+            },
+          },
         }),
       ],
     });
@@ -53,6 +74,12 @@ export function initTelemetry(env: EnvironmentVariables): void {
             delete event.request.headers.authorization;
             delete event.request.headers.cookie;
           }
+          // URL'in kendisi bir kimlik bilgisi taşıyabilir (davet token'ı,
+          // randevu erişim token'ı, imzalı yükleme URL'i).
+          if (typeof event.request.url === 'string') {
+            event.request.url = sanitizeUrl(event.request.url);
+          }
+          delete event.request.query_string;
         }
         return event;
       },

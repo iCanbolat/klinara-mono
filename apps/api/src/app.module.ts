@@ -6,7 +6,13 @@ import { ProblemDetailsFilter } from './common/filters/problem-details.filter';
 import { AppThrottlerGuard } from './common/guards/app-throttler.guard';
 import { AuthGuard } from './common/guards/auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
+import { BodyShapeMiddleware } from './common/middleware/body-shape.middleware';
 import { RequestContextMiddleware } from './common/middleware/request-context.middleware';
+import { OverloadGuard } from './common/overload/overload.guard';
+import { PlatformAccessModule } from './common/platform/platform-access.module';
+import { OverloadModule } from './common/overload/overload.module';
+import { PgThrottlerStorage } from './common/rate-limit/pg-throttler.storage';
+import { RateLimitModule } from './common/rate-limit/rate-limit.module';
 import { validationExceptionFactory } from './common/pipes/validation-exception.factory';
 import { validateEnv, type EnvironmentVariables } from './config/env.validation';
 import { DatabaseModule } from './database/database.module';
@@ -49,9 +55,16 @@ import { MetricsModule } from './observability/metrics.module';
       validate: validateEnv,
     }),
     LoggingModule,
+    OverloadModule,
+    PlatformAccessModule,
     ThrottlerModule.forRootAsync({
-      inject: [ConfigService],
-      useFactory: (config: ConfigService<EnvironmentVariables, true>) => ({
+      imports: [RateLimitModule],
+      inject: [ConfigService, PgThrottlerStorage],
+      useFactory: (config: ConfigService<EnvironmentVariables, true>, storage: PgThrottlerStorage) => ({
+        // Sayaç süreç-içi bir `Map` değil, PAYLAŞILAN bir tablodur (10.3):
+        // iki instance aynı bütçeyi harcar. `RATE_LIMIT_STORAGE=memory` eski
+        // davranışa döner ve üretimde reddedilir.
+        storage,
         throttlers: [
           {
             ttl: config.get('RATE_LIMIT_WINDOW_MS', { infer: true }),
@@ -95,8 +108,11 @@ import { MetricsModule } from './observability/metrics.module';
   providers: [
     { provide: APP_FILTER, useClass: ProblemDetailsFilter },
     // Guard SIRASI önemlidir ve kayıt sırasıyla belirlenir:
-    // hız sınırı → kimlik → yetki. Kimlik çözülmeden yetki bakılamaz;
-    // hız sınırı ise en ucuz kontrol olduğu için en önde durur.
+    // aşırı yük → hız sınırı → kimlik → yetki. Kimlik çözülmeden yetki
+    // bakılamaz; hız sınırı ondan ucuzdur; aşırı yük kontrolü ise bir alan
+    // okumasıdır ve doluluk hâlinde sayaç için veritabanına gitmenin bile
+    // maliyeti vardır — bu yüzden en önde durur.
+    { provide: APP_GUARD, useClass: OverloadGuard },
     { provide: APP_GUARD, useClass: AppThrottlerGuard },
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
@@ -115,6 +131,8 @@ import { MetricsModule } from './observability/metrics.module';
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
-    consumer.apply(RequestContextMiddleware).forRoutes('*');
+    // Sıra ÖNEMLİ: gövde biçimi kontrolü istek bağlamından sonra koşar ki
+    // reddedilen istek de bir `requestId` ile loglanabilsin.
+    consumer.apply(RequestContextMiddleware, BodyShapeMiddleware).forRoutes('*');
   }
 }

@@ -21,7 +21,9 @@ import { applyClearAll, readAccess } from '@/lib/session/store';
  *
  * ⚠️ BU DOSYA BİR TÜNEL OLABİLİRDİ. Yakalayıcı bir rota, isteğe kullanıcının
  * oturum token'ını ekleyip `/api/v1`in köküne gönderiyor. Tek savunma
- * `proxy-allowlist.ts` — ve o dosya kendi 40 vakalık testine sahip.
+ * `proxy-allowlist.ts` — ve o dosyanın her kuralı için üç vaka var (izinli
+ * metot, izinsiz metot, kardeş yol). Sayı bilerek yazılmıyor: eskisi "40
+ * vakalık" diyordu ve gerçek sayı 18'di.
  *
  * ⚠️ BU PROXY ASLA YENİLEME YAPMAZ. Yukarı akış `TOKEN_EXPIRED` dediğinde 401'i
  * bir sinyal başlığıyla geçiriyor ve yenilemeyi İSTEMCİYE bırakıyor. Sebep

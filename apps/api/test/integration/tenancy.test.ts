@@ -4,7 +4,7 @@ import { sql } from 'drizzle-orm';
 import pg from 'pg';
 import { createTestApp } from '../helpers/app';
 import { startTestDatabase, type TestDatabase } from '../helpers/database';
-import { auth, bootstrapTenant, http, PLATFORM_TOKEN } from '../helpers/identity';
+import { auth, bootstrapTenant, http, PLATFORM_TOKEN, supportReason } from '../helpers/identity';
 import { DRIZZLE, PG_POOL, type Database } from '../../src/database/database.constants';
 import { withTenantTx } from '../../src/database/tenant-tx';
 
@@ -101,6 +101,7 @@ describe('kiracılık ve RLS', () => {
       const res = await http(app)
         .post('/api/v1/platform/tenants')
         .set('authorization', `Bearer ${PLATFORM_TOKEN}`)
+        .set(supportReason())
         .send({
           slug: 'ayni-slug',
           name: 'İkinci',
@@ -115,6 +116,7 @@ describe('kiracılık ve RLS', () => {
       const res = await http(app)
         .post('/api/v1/platform/tenants')
         .set('authorization', `Bearer ${PLATFORM_TOKEN}`)
+        .set(supportReason())
         .send({
           slug: 'admin',
           name: 'Admin',
@@ -130,6 +132,7 @@ describe('kiracılık ve RLS', () => {
       const res = await http(app)
         .post('/api/v1/platform/tenants')
         .set('authorization', `Bearer ${PLATFORM_TOKEN}`)
+        .set(supportReason())
         .send({
           slug: 'tz-testi',
           name: 'TZ',

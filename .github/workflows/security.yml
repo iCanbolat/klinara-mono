@@ -1,0 +1,42 @@
+# Bağımlılık taraması — Batch 10.3'ün CI kapısı.
+#
+# Kapsamı BİLEREK dar: tam hat (lint → typecheck → test → build → migrate →
+# deploy) Batch 10.4'ün işi. Bu dosya o hattı beklemeden çalışması gereken tek
+# kontrolü kurar — yeni bir yüksek/kritik zafiyet bağımlılık ağacına girdiği
+# gün derlemenin kırılması.
+#
+# Not: `pnpm.overrides` (kök package.json) postcss, esbuild ve qs'i yamalı
+# sürümlere sabitler. Üçü de geçişli bağımlılıktır (next, drizzle-kit,
+# supertest) ve doğrudan yükseltilemezler; override, "bekleyip umut etmek" ile
+# "bağımlılığı çatallamak" arasındaki tek makul yol.
+name: security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Zafiyet, kod değişmeden de ortaya çıkar: haftalık tarama, hareketsiz bir
+    # deponun sessizce savunmasız kalmasını engeller.
+    - cron: '0 6 * * 1'
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Bağımlılıkları kur
+        run: pnpm install --frozen-lockfile
+
+      # `--audit-level high`: orta seviye bulgular kapıyı kapatmaz ama raporda
+      # görünür. Kapının her uyarıda kapanması, kapının kapatılmasıyla sonuçlanır.
+      - name: Zafiyet taraması
+        run: pnpm audit --audit-level high

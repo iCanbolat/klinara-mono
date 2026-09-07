@@ -1,7 +1,19 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowRight, BarChart3, FileText, Globe, LayoutPanelTop, type LucideIcon } from 'lucide-react';
+import {
+  ArrowRight,
+  BarChart3,
+  CalendarDays,
+  Clock,
+  FileText,
+  Globe,
+  LayoutPanelTop,
+  Scissors,
+  Users,
+  UsersRound,
+  type LucideIcon,
+} from 'lucide-react';
 import type { ReactNode } from 'react';
 import { visibleNav } from '@/lib/permissions';
 import { useSession } from '@/components/session/session-provider';
@@ -11,6 +23,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { t, type MessageKey } from '@/i18n/tr';
 
 const ICONS: Record<string, LucideIcon> = {
+  '/takvim': CalendarDays,
+  '/musteriler': Users,
+  '/katalog': Scissors,
+  '/personel': UsersRound,
+  '/calisma-saatleri': Clock,
   '/sayfa': LayoutPanelTop,
   '/icerik': FileText,
   '/alan-adlari': Globe,

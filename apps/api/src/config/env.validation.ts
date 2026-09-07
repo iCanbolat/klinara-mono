@@ -9,6 +9,7 @@ import {
   IsInt,
   IsNotEmpty,
   IsNumber,
+  IsISO8601,
   IsOptional,
   IsString,
   Matches,
@@ -71,6 +72,27 @@ export class EnvironmentVariables {
   @Min(1)
   BODY_LIMIT_BYTES: number = 1_048_576;
 
+  /**
+   * Gövdenin iç içe geçme derinliği sınırı (Batch 10.3).
+   *
+   * Bayt sınırı derinliği ölçmez: küçük ama binlerce seviye derin bir gövde,
+   * onu gezen her özyinelemeli kodu (doğrulama, dönüştürme, loglama)
+   * yıkabilir. 20, en derin gerçek DTO'muzun (şube bazlı istisnalar taşıyan
+   * hizmet gövdesi) kat kat üstünde.
+   */
+  @Expose()
+  @Type(() => Number)
+  @IsInt()
+  @Min(3)
+  BODY_MAX_DEPTH: number = 20;
+
+  /** Gövdedeki tek bir dizinin eleman sınırı. */
+  @Expose()
+  @Type(() => Number)
+  @IsInt()
+  @Min(10)
+  BODY_MAX_ARRAY_LENGTH: number = 1_000;
+
   @Expose()
   @Type(() => Number)
   @IsInt()
@@ -94,6 +116,66 @@ export class EnvironmentVariables {
   )
   @IsBoolean()
   RATE_LIMIT_ENABLED: boolean = true;
+
+  // --- Aşırı yük koruması (Batch 10.3; Faz 0'dan devreden madde) ---
+  /**
+   * Kapatılabilir olmasının tek sebebi TESTTİR: eşiği bilerek sıfıra çekip
+   * korumayı sınayan testin, diğer test dosyalarını etkilememesi gerekir.
+   */
+  @Expose()
+  @Transform(({ value }: { value: unknown }) =>
+    value === undefined ? undefined : value === 'true' || value === true,
+  )
+  @IsBoolean()
+  OVERLOAD_PROTECTION_ENABLED: boolean = true;
+
+  /**
+   * Event loop gecikmesi p99 eşiği (ms).
+   *
+   * 700 ms, "istekler henüz zaman aşımına uğramıyor ama süreç yetişemiyor"
+   * bandıdır: p95 hedefleri 120–200 ms olan bir API'de bu, kapasitenin
+   * dolduğunun erken ve net işaretidir.
+   */
+  @Expose()
+  @Type(() => Number)
+  @IsInt()
+  @Min(50)
+  OVERLOAD_MAX_EVENT_LOOP_DELAY_MS: number = 700;
+
+  /** Kullanılan heap / heap üst sınırı. Üstünde süreç GC'ye boğulur ve ölür. */
+  @Expose()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0.1)
+  @Max(1)
+  OVERLOAD_MAX_HEAP_USED_RATIO: number = 0.92;
+
+  /** Örnekleme aralığı (ms). Pencere her örneklemede sıfırlanır. */
+  @Expose()
+  @Type(() => Number)
+  @IsInt()
+  @Min(100)
+  OVERLOAD_SAMPLE_INTERVAL_MS: number = 1_000;
+
+  /** 503 yanıtındaki `Retry-After` (saniye). */
+  @Expose()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  OVERLOAD_RETRY_AFTER_SECONDS: number = 5;
+
+  /**
+   * Hız sınırı sayacının nerede durduğu (Batch 10.3).
+   *
+   * `memory` süreç-içidir ve YALNIZ tek instance'ta doğrudur: iki instance'ta
+   * her biri kendi sayacını tutar, sınır fiilen ikiye katlanır. `postgres`
+   * sayacı paylaşılan bir tabloya taşır. Üretimde `memory` REDDEDİLİR — yatay
+   * ölçeğe geçiş bir konfigürasyon değişikliği olmalı, sessiz bir güvenlik
+   * gerilemesi değil.
+   */
+  @Expose()
+  @IsIn(['postgres', 'memory'])
+  RATE_LIMIT_STORAGE: 'postgres' | 'memory' = 'postgres';
 
   /** Virgülle ayrılmış origin listesi. Boşsa tarayıcı kaynaklı çapraz istek kabul edilmez. */
   @Expose()
@@ -181,6 +263,20 @@ export class EnvironmentVariables {
   @IsOptional()
   @IsString()
   PLATFORM_ADMIN_TOKEN?: string;
+
+  /**
+   * Platform (destek) erişiminin SON KULLANMA tarihi — ISO 8601 (Batch 10.3).
+   *
+   * Kiracı-üstü bir anahtarın süresiz olması, bir kez sızdığında sonsuza dek
+   * geçerli olması demektir. Tarih geçtiğinde platform uçları 403 döner;
+   * uygulama AYAKTA KALIR — süre dolduğu için tüm API'yi düşürmek, destek
+   * erişimini kısıtlamaktan çok daha büyük bir hasar olurdu. Rotasyon
+   * prosedürü: Ek T.
+   */
+  @Expose()
+  @IsOptional()
+  @IsISO8601()
+  PLATFORM_ADMIN_TOKEN_NOT_AFTER?: string;
 
   // --- Kimlik (Faz 1) ---
   /**
@@ -678,6 +774,9 @@ export class EnvValidationError extends Error {
   }
 }
 
+/** Platform (destek) token'ının azami ömrü: 90 gün. */
+const MAX_PLATFORM_TOKEN_LIFETIME_MS = 90 * 24 * 60 * 60 * 1_000;
+
 /** Şema ile ifade edilemeyen, ortama bağlı kurallar. */
 function crossFieldIssues(env: EnvironmentVariables): string[] {
   const issues: string[] = [];
@@ -694,6 +793,11 @@ function crossFieldIssues(env: EnvironmentVariables): string[] {
   if (!env.RATE_LIMIT_ENABLED) {
     issues.push('RATE_LIMIT_ENABLED: üretimde kapatılamaz — hız sınırı zorunludur');
   }
+  if (env.RATE_LIMIT_STORAGE !== 'postgres') {
+    issues.push(
+      'RATE_LIMIT_STORAGE: üretimde postgres olmalı — süreç-içi sayaç iki instance’ta sınırı ikiye katlar',
+    );
+  }
   if (env.WEBAUTHN_ORIGINS.split(',').some((origin) => origin.trim().startsWith('http://'))) {
     issues.push(
       'WEBAUTHN_ORIGINS: üretimde http:// origin olamaz (passkey yalnız güvenli kaynakta çalışır)',
@@ -706,6 +810,25 @@ function crossFieldIssues(env: EnvironmentVariables): string[] {
   }
   if (env.PLATFORM_ADMIN_TOKEN !== undefined && env.PLATFORM_ADMIN_TOKEN.length < 32) {
     issues.push('PLATFORM_ADMIN_TOKEN: üretimde en az 32 karakter olmalı');
+  }
+  // Destek erişimi SÜRELİ olmalı (10.3 kabul kriteri).
+  if (env.PLATFORM_ADMIN_TOKEN !== undefined) {
+    if (env.PLATFORM_ADMIN_TOKEN_NOT_AFTER === undefined) {
+      issues.push(
+        'PLATFORM_ADMIN_TOKEN_NOT_AFTER: platform token tanımlıysa üretimde zorunlu — destek erişimi süreli olmalı',
+      );
+    } else {
+      const notAfter = Date.parse(env.PLATFORM_ADMIN_TOKEN_NOT_AFTER);
+      const maxAhead = Date.now() + MAX_PLATFORM_TOKEN_LIFETIME_MS;
+      // Süre GEÇMİŞSE burada hata VERİLMEZ: süresi dolmuş bir token yüzünden
+      // uygulamanın açılmaması, destek erişimini kısıtlamaktan çok daha büyük
+      // bir hasardır. Süre dolduğunda yalnız platform uçları kapanır.
+      if (notAfter > maxAhead) {
+        issues.push(
+          'PLATFORM_ADMIN_TOKEN_NOT_AFTER: en fazla 90 gün ileri olabilir — süresiz destek erişimi yasak',
+        );
+      }
+    }
   }
   if (env.EDGE_AUTH_TOKEN !== undefined && env.EDGE_AUTH_TOKEN.length < 32) {
     issues.push('EDGE_AUTH_TOKEN: üretimde en az 32 karakter olmalı');

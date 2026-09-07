@@ -18,6 +18,7 @@
  */
 
 import type { ContentBlockInput, SeoInput, ThemeInput } from './booking-content.js';
+import type { ServiceCategory as ClinicServiceCategory } from './clinic-api.js';
 
 // ---------------------------------------------------------------------------
 // Randevu sayfası — ayarlar
@@ -350,18 +351,20 @@ export interface Branch {
 /**
  * Hizmet kategorisi — `serviceList` bloğunun süzgeç seçenekleri.
  *
- * `Branch` gibi bu da katalog DTO'sunun DAR bir dilimi (`tenantId`, `createdAt`
- * yok): editörün ihtiyacı bir ad ve bir kimlik. Sözleşme testinin kapsamında
- * değil çünkü kaynağı `booking-page` modülü değil, katalog — orada bir alan
- * değişirse editörün seçim kutusu etkilenmez.
+ * `Branch` gibi bu da katalog DTO'sunun DAR bir dilimi (`tenantId`,
+ * `createdAt` yok): editörün ihtiyacı bir ad ve bir kimlik.
+ *
+ * Faz 12'ye kadar burada ELLE yazılı bir kopyaydı. Katalog yüzeyi
+ * `clinic-api.ts`e girince aynı adda iki tip oluştu; kopyayı bırakıp birini
+ * yeniden adlandırmak yerine dar olan tamdan TÜRETİLDİ. Böylece katalog
+ * DTO'sunda bir alan yeniden adlandırılırsa burası da kırılır — iki ayrı
+ * elle yazılmış tanımın sessizce ayrışması mümkün değil.
  */
-export interface ServiceCategory {
-  id: string;
-  slug: string;
-  name: string;
-  sortOrder: number;
-  isActive: boolean;
-}
+export type ServiceCategorySummary = Pick<
+  ClinicServiceCategory,
+  'id' | 'slug' | 'name' | 'sortOrder' | 'isActive'
+>;
+
 
 // ---------------------------------------------------------------------------
 // Oturum adımları — BFF'in TARAYICIYA döndüğü şekil

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
-import type { ServiceCategory } from '@klinara/shared';
+import type { ServiceCategorySummary } from '@klinara/shared';
 import { api } from '@/lib/api/client';
 import { t } from '@/i18n/tr';
 
@@ -42,13 +42,13 @@ export function CategoryPicker({
   error: string | undefined;
   onChange: (ids: string[] | undefined) => void;
 }): ReactNode {
-  const [categories, setCategories] = useState<ServiceCategory[]>([]);
+  const [categories, setCategories] = useState<ServiceCategorySummary[]>([]);
   const [state, setState] = useState<LoadState>('loading');
 
   useEffect(() => {
     void (async () => {
       try {
-        const response = await api.get<{ data: ServiceCategory[] }>('service-categories');
+        const response = await api.get<{ data: ServiceCategorySummary[] }>('service-categories');
         setCategories(response.data);
         setState('ready');
       } catch {

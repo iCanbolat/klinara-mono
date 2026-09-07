@@ -33,6 +33,15 @@ declare global {
       authError?: AppError;
 
       /**
+       * Platform (destek) token'ı DOĞRU ama süresi dolmuş.
+       *
+       * Middleware isteği burada düşürmez — `PlatformAdminGuard` "süre doldu"
+       * diyen ayrı bir 403 üretir. Sessizce "yetkin yok" demek, rotasyonu
+       * unutulmuş bir token ile çalınmış bir token'ı aynı cevaba indirirdi.
+       */
+      platformTokenExpired?: boolean;
+
+      /**
        * Çözümlenmiş randevu sayfası — `PublicSiteGuard` yazar.
        *
        * Yalnız public uçlarda dolu. Kiracı kimliği ayrıca istek bağlamına da

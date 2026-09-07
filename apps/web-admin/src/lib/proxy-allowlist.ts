@@ -24,11 +24,47 @@
  *   proxy'sinin sertifika sorusudur, `platform/*` kiracı-üstüdür.
  * - **`public/*`**: bu uygulamanın public yüzeyi okumak için hiçbir sebebi yok;
  *   taslak önizlemenin yetkili karşılığı `booking-page/preview`.
- * - **Klinik operasyonunun TAMAMI** (`appointments`, `calendar`, `customers`,
- *   `payments`, `charges`, `cash`, `packages`, `staff`, `services`, …): Faz 11
- *   kapsamı dışında (iOS'ta kalıyor). Dışarıda tutmak bedava ve "şuraya bir
- *   müşteri sayfası ekleyiverelim"i güvenlik açısından kritik bir dosyada
- *   GÖRÜNÜR BİR DIFF hâline getiriyor.
+ * - **Finans, paket, onam, bildirim, denetim** (`payments`, `charges`, `cash`,
+ *   `commission*`, `packages`, `customer-packages`, `consent*`, `messages`,
+ *   `audit*`): Faz 12 bunların HİÇBİRİNİ istemiyor. Kural aynı: uç buraya
+ *   yazılmadıkça geçmez.
+ *
+ * KLİNİK OPERASYONU — Faz 12'de AÇILDI, gerekçesi değişti
+ *
+ * Bu dosya Faz 11 boyunca "klinik operasyonunun TAMAMI dışarıda, çünkü
+ * dışarıda tutmak BEDAVA" diyordu. O gerekçe doğruydu ve artık geçersiz:
+ * panelde klinik ekranı yoktu, dolayısıyla kapalı tutmanın maliyeti sıfırdı.
+ * Faz 12 takvimi, müşteri kartını ve katalogu getirdiği anda maliyet sıfır
+ * olmaktan çıktı. Geçersizleşen bir gerekçeyi SİLMEK yerine neyin yerini
+ * aldığını yazmak gerekiyor:
+ *
+ * 1. **"Görünür diff" ilkesi korunuyor ve şimdi asıl işini yapıyor.** Eski
+ *    metnin değeri "şuraya bir müşteri sayfası ekleyiverelim"i güvenlik
+ *    açısından kritik bir dosyada görünür kılmasıydı. Aşağıdaki satırlar tam
+ *    olarak o diff'tir: ekran ekran, metot metot gerekçelendirilmiş.
+ * 2. **Okuma/yazma sınırı BATCH sınırıdır.** `GET services` ve `GET staff`
+ *    takvimle birlikte açıldı çünkü randevu formu onlarsız kurulamaz; yazma
+ *    metotları bir batch sonra, kendi ekranlarıyla geldi. `Rule` zaten metot
+ *    bazlı olduğu için bu ayrım bedava.
+ * 3. **`GET customers/search` ile `GET customers` arasındaki fark bilinçli.**
+ *    Arama ucu `q` için en az 2 karakter istiyor, çıplak dizi dönüyor ve
+ *    sayfalama taşımıyor — yani müşteri defterinin SIRAYLA TARANMASINA izin
+ *    vermiyor. Randevu formunun ihtiyacı tam olarak bu kadardı ve 12.2'de
+ *    yalnız o açıldı; defterin tamamı kendi ekranıyla (12.3) geldi.
+ * 4. **Önek jokeri YOK ve olmayacak.** `appointments/`, `customers/`,
+ *    `staff/` öneklerine joker vermek, yarın eklenecek bir alt ucu sessizce
+ *    açardı. Raporlar için yazılan aynı cümle burada daha da geçerli, çünkü
+ *    bu yollar YAZIYOR.
+ *
+ * ⚠️ BEYAZ LİSTE YALNIZ YOLU DENETLER. Sorgu dizgesi (`?branchId=`, `?q=`,
+ * `?cursor=`) `request.nextUrl.search` üzerinden yukarı akışa OLDUĞU GİBİ
+ * gider ve burada hiç görülmez. Denetimi API yapıyor: parametreler
+ * `class-validator` DTO'larından, kapsam ise `BranchAccessService`ten geçiyor.
+ * Bu kabul edilebilir ama yazılı olmalı — özellikle `?branchId` gibi KAPSAM
+ * BELİRLEYEN bir parametrenin doğrulandığı yerin burası olmadığı.
+ *
+ * Her kuralın `test/unit/proxy-allowlist.test.ts`te üç vakası var: izinli
+ * metot pozitifi, izinsiz metot negatifi, kardeş yol negatifi.
  *
  * RAPORLAR (10.1) — yukarıdaki kuralın İSTİSNASI DEĞİL, TANIMININ DIŞI
  *
@@ -122,6 +158,82 @@ const RULES: readonly Rule[] = [
   { methods: ['GET', 'POST'], pattern: /^booking-page\/domains$/ },
   { methods: ['DELETE'], pattern: new RegExp(`^booking-page/domains/${UUID}$`) },
   { methods: ['POST'], pattern: new RegExp(`^booking-page/domains/${UUID}/(verify|primary)$`) },
+
+  // --- Takvim ve randevu (12.2) ---
+  // Bu blok, klinik operasyonuna açılan İLK kapı. Yukarıdaki başlık yorumunun
+  // "KLİNİK OPERASYONU" bölümü neden ve hangi sınırlarla açıldığını anlatıyor.
+  { methods: ['GET', 'POST'], pattern: /^appointments$/ },
+  { methods: ['GET', 'PATCH'], pattern: new RegExp(`^appointments/${UUID}$`) },
+  { methods: ['GET'], pattern: new RegExp(`^appointments/${UUID}/history$`) },
+  // Üç eylem tek satırda: hepsi aynı kaydı, aynı izinle (`appointment:write`)
+  // değiştiriyor. `DELETE` YOK — randevu silinmez, iptal edilir.
+  {
+    methods: ['POST'],
+    pattern: new RegExp(`^appointments/${UUID}/(reschedule|cancel|status)$`),
+  },
+  { methods: ['GET'], pattern: /^availability$/ },
+  { methods: ['GET'], pattern: /^calendar\/(day|week|staff)$/ },
+
+  // Randevu formunun OKUMA yüzeyi. Yazma metotları 12.4'te, kendi
+  // ekranlarıyla birlikte açılıyor.
+  { methods: ['GET'], pattern: /^services$/ },
+  { methods: ['GET'], pattern: new RegExp(`^services/${UUID}$`) },
+  { methods: ['GET'], pattern: /^staff$/ },
+  { methods: ['GET'], pattern: new RegExp(`^staff/${UUID}$`) },
+
+  // Müşteri defterinin EN DAR kapısı: `q` en az 2 karakter, çıplak dizi,
+  // sayfalama yok — defter SIRAYLA TARANAMAZ.
+  { methods: ['GET'], pattern: /^customers\/search$/ },
+
+  // --- Müşteri kartı (12.3) ---
+  // Defterin tamamı burada açılıyor. 12.2 yalnız aramayı açmıştı; ayrım
+  // bilinçliydi ve kaydı burada duruyor (başlık yorumu, madde 3).
+  { methods: ['GET', 'POST'], pattern: /^customers$/ },
+  { methods: ['GET', 'PATCH', 'DELETE'], pattern: new RegExp(`^customers/${UUID}$`) },
+  { methods: ['PUT'], pattern: new RegExp(`^customers/${UUID}/tags$`) },
+  // Birleştirme YIKICI ve geri alınamaz; kendi izniyle (`customer:merge`)
+  // korunuyor ve arayüz yazarak onay istiyor.
+  { methods: ['POST'], pattern: new RegExp(`^customers/${UUID}/merge$`) },
+  { methods: ['GET', 'POST'], pattern: /^customer-tags$/ },
+  { methods: ['PATCH', 'DELETE'], pattern: new RegExp(`^customer-tags/${UUID}$`) },
+
+  { methods: ['GET', 'POST'], pattern: new RegExp(`^customers/${UUID}/notes$`) },
+  { methods: ['PATCH', 'DELETE'], pattern: new RegExp(`^notes/${UUID}$`) },
+  { methods: ['GET'], pattern: new RegExp(`^notes/${UUID}/revisions$`) },
+  { methods: ['GET'], pattern: new RegExp(`^customers/${UUID}/timeline$`) },
+
+  // Dosyalar. ⚠️ `download-url` HER ÇAĞRIDA KVKK erişim kaydı yazıyor;
+  // istemci onu liste render'ında değil, yalnız kullanıcı indirme/önizleme
+  // eylemini tetiklediğinde çekiyor.
+  { methods: ['POST'], pattern: /^uploads\/presign$/ },
+  { methods: ['GET', 'POST'], pattern: new RegExp(`^customers/${UUID}/files$`) },
+  { methods: ['GET', 'POST'], pattern: new RegExp(`^customers/${UUID}/file-groups$`) },
+  { methods: ['GET'], pattern: new RegExp(`^files/${UUID}/download-url$`) },
+  { methods: ['DELETE'], pattern: new RegExp(`^files/${UUID}$`) },
+
+  // --- Katalog YAZMA (12.4); okuma 12.2'de, `GET service-categories` yukarıda ---
+  { methods: ['POST'], pattern: /^services$/ },
+  { methods: ['PATCH', 'DELETE'], pattern: new RegExp(`^services/${UUID}$`) },
+  { methods: ['POST'], pattern: /^service-categories$/ },
+  { methods: ['PATCH', 'DELETE'], pattern: new RegExp(`^service-categories/${UUID}$`) },
+
+  // --- Personel YAZMA (12.4) ---
+  { methods: ['POST'], pattern: /^staff$/ },
+  { methods: ['PATCH'], pattern: new RegExp(`^staff/${UUID}$`) },
+  // Yetkinlik matrisi — TAM DEĞİŞTİRME.
+  { methods: ['PUT'], pattern: new RegExp(`^staff/${UUID}/services$`) },
+  // Personel oluşturma MEVCUT bir `userId` istiyor; kullanıcı listesi
+  // olmadan form kurulamaz. `PATCH users/:id` yalnız ad/dil/aktiflik
+  // değiştiriyor — ROL DEĞİŞTİREN bir uç yok (bkz. plan A6).
+  { methods: ['GET'], pattern: /^users$/ },
+  { methods: ['GET', 'PATCH'], pattern: new RegExp(`^users/${UUID}$`) },
+
+  // --- Çalışma planı (12.4) — hepsi `X-Branch-Id` istiyor ---
+  { methods: ['GET', 'PUT'], pattern: new RegExp(`^branches/${UUID}/hours$`) },
+  { methods: ['GET', 'PUT'], pattern: new RegExp(`^staff/${UUID}/schedule$`) },
+  { methods: ['GET', 'POST'], pattern: /^schedule-exceptions$/ },
+  // `PATCH` YOK ÇÜNKÜ UÇ YOK: düzenleme = kaldır + yeniden ekle.
+  { methods: ['DELETE'], pattern: new RegExp(`^schedule-exceptions/${UUID}$`) },
 ];
 
 /**

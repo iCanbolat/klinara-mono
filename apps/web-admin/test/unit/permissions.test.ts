@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PERMISSIONS } from '@klinara/shared';
+import { PERMISSIONS, ROLE_DEFINITIONS } from '@klinara/shared';
 import {
   bookingPageAccess,
   can,
@@ -82,6 +82,52 @@ describe('izne göre navigasyon', () => {
       expect(canOpenPath([REVENUE], '/raporlar/ciro')).toBe(true);
       expect(canOpenPath([], '/raporlar')).toBe(false);
       expect(canOpenPath([], '/raporlar/ciro')).toBe(false);
+    });
+  });
+
+  describe('klinik operasyonu menüsü (12.2)', () => {
+    // Roller `ROLE_DEFINITIONS`tan okunuyor, elle yazılmıyor: sunucuda bir
+    // rolün izni değişirse bu testler onunla birlikte değişmeli.
+    const roleOf = (key: string): string[] => {
+      const role = ROLE_DEFINITIONS.find((definition) => definition.key === key);
+      if (role === undefined) throw new Error(`rol yok: ${key}`);
+      return [...role.permissions];
+    };
+
+    it('MUHASEBECİ dört klinik ekranını da GÖRMÜYOR', () => {
+      // En önemli vaka: `accountant` `appointment:*`, `service:read`,
+      // `staff:read`, `schedule:read` izinlerinin HİÇBİRİNİ taşımıyor.
+      // Takvimi menüde göstermek ona boş bir ızgara açardı — yani
+      // "bugün randevu yok" demek olurdu. Yanlış bilgi.
+      const accountant = roleOf('accountant');
+      const paths = visibleNav(accountant).map((item) => item.path);
+
+      expect(paths).not.toContain('/takvim');
+      expect(paths).not.toContain('/katalog');
+      expect(paths).not.toContain('/personel');
+      expect(paths).not.toContain('/calisma-saatleri');
+      // Müşteri defteri `customer:read` ile açık.
+      expect(paths).toContain('/musteriler');
+    });
+
+    it('MUHASEBECİ takvimi doğrudan URL ile de açamıyor', () => {
+      expect(canOpenPath(roleOf('accountant'), '/takvim')).toBe(false);
+      expect(canOpenPath(roleOf('accountant'), '/katalog')).toBe(false);
+    });
+
+    it('UYGULAYICI takvimi görüyor — `read.own` yeterli', () => {
+      // `requires` ile yazılsaydı görmezdi: uygulayıcı `read.all` taşımıyor.
+      const practitioner = roleOf('practitioner');
+      expect(practitioner).not.toContain(PERMISSIONS.APPOINTMENT_READ_ALL);
+      expect(visibleNav(practitioner).map((item) => item.path)).toContain('/takvim');
+      expect(canOpenPath(practitioner, '/takvim')).toBe(true);
+    });
+
+    it('RESEPSİYON dört ekranı da görüyor', () => {
+      const paths = visibleNav(roleOf('receptionist')).map((item) => item.path);
+      for (const path of ['/takvim', '/musteriler', '/katalog', '/personel', '/calisma-saatleri']) {
+        expect(paths, path).toContain(path);
+      }
     });
   });
 

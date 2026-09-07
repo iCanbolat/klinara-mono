@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { MetricsService } from '../../observability/metrics.service';
 import type { AvailabilityResponseDto } from './dto/availability.dto';
 
 /**
@@ -27,17 +28,29 @@ interface CacheEntry {
 export class AvailabilityCacheService {
   private readonly cache = new Map<string, CacheEntry>();
 
+  constructor(private readonly metrics: MetricsService) {}
+
   static key(tenantId: string, parts: (string | number | undefined)[]): string {
     return `${tenantId}|${parts.map((part) => part ?? '').join('|')}`;
   }
 
   get(key: string): AvailabilityResponseDto | undefined {
     const entry = this.cache.get(key);
-    if (entry === undefined) return undefined;
-    if (entry.expiresAt <= Date.now()) {
-      this.cache.delete(key);
+    if (entry === undefined) {
+      this.metrics.cacheEvents.inc({ cache: 'availability', result: 'miss' });
       return undefined;
     }
+    if (entry.expiresAt <= Date.now()) {
+      this.cache.delete(key);
+      // Süresi dolmuş giriş ISKA'dır ama ayrı sayılıyor: yüksek `expired`
+      // oranı TTL'in kısa olduğunu söyler, yüksek `miss` ise anahtar
+      // çeşitliliğinin fazla olduğunu. İkisini tek sayaçta toplamak,
+      // 10.3'te dağıtık invalidasyona geçerken hangisinin değiştiğini
+      // görünmez kılardı.
+      this.metrics.cacheEvents.inc({ cache: 'availability', result: 'expired' });
+      return undefined;
+    }
+    this.metrics.cacheEvents.inc({ cache: 'availability', result: 'hit' });
     return entry.value;
   }
 

@@ -4,6 +4,7 @@ import { HttpMetricsInterceptor } from './http-metrics.interceptor';
 import { MetricsController } from './metrics.controller';
 import { MetricsTokenGuard } from './metrics-token.guard';
 import { MetricsService } from './metrics.service';
+import { PoolMetricsService } from './pool-metrics.service';
 
 /**
  * İş metrikleri her modülden erişilebilir olmalı (randevu, çakışma, bildirim
@@ -14,6 +15,7 @@ import { MetricsService } from './metrics.service';
   controllers: [MetricsController],
   providers: [
     MetricsService,
+    PoolMetricsService,
     MetricsTokenGuard,
     { provide: APP_INTERCEPTOR, useClass: HttpMetricsInterceptor },
   ],

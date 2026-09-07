@@ -132,9 +132,27 @@ export default tseslint.config(
     },
   },
   {
-    // Yapılandırma JS dosyaları tip bilgisiyle lint edilmez.
-    files: ['**/*.js'],
+    // Yapılandırma ve araç betikleri tip bilgisiyle lint edilmez: hiçbir
+    // uygulamanın tsconfig'ine ait değiller (`tools/brand`, `tools/k6`).
+    files: ['**/*.js', '**/*.mjs'],
     extends: [tseslint.configs.disableTypeChecked],
+  },
+  {
+    // Node betikleri: tip denetimi kapalı olduğu için `@types/node`
+    // globalleri de gelmiyor, elle tanımlanıyorlar.
+    files: ['tools/**/*.mjs'],
+    languageOptions: {
+      globals: { Buffer: 'readonly', console: 'readonly', process: 'readonly', URL: 'readonly' },
+    },
+  },
+  {
+    // k6 senaryoları k6'nın kendi çalışma zamanında koşar, Node'da değil:
+    // `__VU` (sanal kullanıcı no), `__ITER` (yineleme no) ve `__ENV` runtime
+    // tarafından enjekte edilir ve import edilemez.
+    files: ['tools/k6/**/*.js'],
+    languageOptions: {
+      globals: { __VU: 'readonly', __ITER: 'readonly', __ENV: 'readonly' },
+    },
   },
   {
     // env.ts, testler ve yapılandırma dosyaları process.env'i okumak zorunda.

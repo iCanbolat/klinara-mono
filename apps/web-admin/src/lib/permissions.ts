@@ -66,6 +66,29 @@ export interface NavItem {
  * bilinçli bir sürtünme.
  */
 export const NAV_ITEMS: readonly NavItem[] = [
+  // --- Klinik operasyonu (Faz 12) ---
+  // Takvim menünün BAŞINDA: resepsiyonun günlük işi bu, randevu sayfası
+  // editörü değil. Sıra kullanım sıklığına göre.
+  //
+  // `requiresAny` şart: uygulayıcı `appointment:read.all` TAŞIMAZ, yalnız
+  // `read.own` taşır. `requires` ile yazılsaydı takvimi hiç göremezdi.
+  // Muhasebeci ise ikisini de taşımıyor ve menüde takvim GÖRMÜYOR — boş bir
+  // ızgara göstermek, "bugün randevu yok" demek olurdu.
+  {
+    path: '/takvim',
+    labelKey: 'nav.calendar',
+    requires: [],
+    requiresAny: [PERMISSIONS.APPOINTMENT_READ_ALL, PERMISSIONS.APPOINTMENT_READ_OWN],
+  },
+  { path: '/musteriler', labelKey: 'nav.customers', requires: [PERMISSIONS.CUSTOMER_READ] },
+  { path: '/katalog', labelKey: 'nav.catalog', requires: [PERMISSIONS.SERVICE_READ] },
+  { path: '/personel', labelKey: 'nav.staff', requires: [PERMISSIONS.STAFF_READ] },
+  {
+    path: '/calisma-saatleri',
+    labelKey: 'nav.schedule',
+    requires: [PERMISSIONS.SCHEDULE_READ],
+  },
+
   { path: '/sayfa', labelKey: 'nav.page', requires: [PERMISSIONS.BOOKING_PAGE_READ] },
   { path: '/icerik', labelKey: 'nav.content', requires: [PERMISSIONS.BOOKING_PAGE_READ] },
   { path: '/alan-adlari', labelKey: 'nav.domains', requires: [PERMISSIONS.BOOKING_PAGE_READ] },

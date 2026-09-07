@@ -10,6 +10,7 @@ import type { Request, Response } from 'express';
 import { ERROR_CODES, type ErrorCode } from '@klinara/shared';
 import { AppError } from '../errors/app-error';
 import { requestIdOf } from '../request-context';
+import { sanitizeUrl } from '../../observability/redaction';
 
 const PROBLEM_CONTENT_TYPE = 'application/problem+json';
 const ERROR_BASE_URI = 'https://errors.klinara.app';
@@ -52,16 +53,60 @@ function codeForStatus(status: number): ErrorCode {
   return CODE_BY_STATUS[status] ?? ERROR_CODES.INTERNAL_ERROR;
 }
 
+/**
+ * Gövde ayrıştırıcısından (`body-parser`) gelen hatalar.
+ *
+ * Bunlar Nest'in `HttpException`ı DEĞİL, `http-errors` nesneleridir: gövde
+ * boyut sınırı aşıldığında `status: 413` taşıyan böyle bir hata fırlar. Ayrı
+ * ele alınmasaydı — ki Faz 0'dan 10.3'e kadar öyleydi — "gövde çok büyük"
+ * durumu istemciye 500 INTERNAL_ERROR olarak dönerdi: istemci düzeltebileceği
+ * bir hatayı sunucu arızası sanır, 5xx uyarı kuralı da sıradan bir yüklemede
+ * çalardı.
+ */
+interface HttpErrorLike {
+  status: number;
+  expose?: boolean;
+  type?: string;
+}
+
+function asHttpError(exception: unknown): HttpErrorLike | null {
+  if (exception === null || typeof exception !== 'object') return null;
+  const candidate = exception as { status?: unknown; expose?: unknown };
+  if (typeof candidate.status !== 'number') return null;
+  // `expose` yalnız istemciye gösterilebilir (4xx) hatalarda true'dur;
+  // sunucu tarafı ayrıntısı taşıyan hatalar 500 yolundan gitmeye devam eder.
+  if (candidate.expose !== true) return null;
+  return exception as HttpErrorLike;
+}
+
+/** Gövde ayrıştırma hatalarının insana yönelik başlıkları. */
+const PARSE_TITLES: Record<number, string> = {
+  400: 'İstek gövdesi okunamadı',
+  413: 'İstek gövdesi çok büyük',
+  415: 'Desteklenmeyen içerik türü',
+};
+
+/**
+ * Express'in rota bulunamadı mesajı isteğin URL'ini AYNEN geri yazar
+ * (`Cannot GET /uploads/local/get?sig=…`). Yansıtılan girdi hem sır sızdırır
+ * hem de istemciye hiçbir şey katmaz — istemci zaten ne istediğini bilir.
+ */
+const ROUTE_MISS = /^Cannot [A-Z]+ /;
+
 /** `HttpException` gövdesinden insana yönelik başlığı çıkarır. */
 function titleOf(exception: HttpException): string {
   const response: unknown = exception.getResponse();
-  if (typeof response === 'string') return response;
+  if (typeof response === 'string') {
+    return ROUTE_MISS.test(response) ? 'Kaynak bulunamadı' : response;
+  }
   if (response !== null && typeof response === 'object') {
     const message = (response as { message?: unknown }).message;
-    if (typeof message === 'string') return message;
+    if (typeof message === 'string') {
+      return ROUTE_MISS.test(message) ? 'Kaynak bulunamadı' : message;
+    }
     if (Array.isArray(message) && typeof message[0] === 'string') return message[0];
   }
-  return exception.message;
+  return ROUTE_MISS.test(exception.message) ? 'Kaynak bulunamadı' : exception.message;
 }
 
 /**
@@ -96,7 +141,9 @@ export class ProblemDetailsFilter implements ExceptionFilter {
       title,
       status,
       code,
-      instance: request.originalUrl,
+      // URL bir sır taşıyabilir (davet/randevu token'ı, imzalı yükleme URL'i)
+      // ve `instance` yalnız istemciye gitmez — problem belgesi LOGA da yazılır.
+      instance: sanitizeUrl(request.originalUrl),
       requestId: requestIdOf(request),
       ...extras,
     };
@@ -128,6 +175,20 @@ export class ProblemDetailsFilter implements ExceptionFilter {
       }
       this.logger.error({ err: exception }, 'Sunucu hatası');
     } else {
+      // 2b) Gövde ayrıştırıcısının hataları: Nest istisnası değiller ama
+      // istemci hatasıdırlar.
+      const httpError = asHttpError(exception);
+      if (httpError !== null && httpError.status >= 400 && httpError.status < 500) {
+        const problem = this.build(
+          request,
+          httpError.status,
+          codeForStatus(httpError.status),
+          PARSE_TITLES[httpError.status] ?? 'İstek işlenemedi',
+        );
+        this.logger.info({ problem }, 'İstemci hatası (gövde ayrıştırma)');
+        return problem;
+      }
+
       // 3) Beklenmeyen her şey → 500, ayrıntı SIZMAZ.
       this.logger.error({ err: exception }, 'Beklenmeyen hata');
     }

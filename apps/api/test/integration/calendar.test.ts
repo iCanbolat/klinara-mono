@@ -4,8 +4,7 @@ import { createTestApp } from '../helpers/app';
 import { startTestDatabase, type TestDatabase } from '../helpers/database';
 import { auth, http, inviteMember, PLATFORM_TOKEN } from '../helpers/identity';
 import { branchHeader, setupClinic, type ClinicFixture } from '../helpers/clinic';
-import pg from 'pg';
-import { PG_POOL } from '../../src/database/database.constants';
+import { countQueries } from '../helpers/query-count';
 
 interface Entry {
   id: string;
@@ -347,29 +346,7 @@ describe('takvim görünümleri (Batch 3.4)', () => {
   // -------------------------------------------------------------------------
   describe('N+1 koruması', () => {
     it('sorgu sayısı randevu sayısıyla BÜYÜMEZ', async () => {
-      const pool = app.get<pg.Pool>(PG_POOL);
-      const originalConnect = pool.connect.bind(pool);
-      let queries = 0;
-
-      // Havuzdan çıkan her istemcinin `query` çağrısını sayıyoruz. Drizzle
-      // transaction'ları `pool.connect()` üzerinden açtığı için tüm repository
-      // sorguları buradan geçer.
-      const COUNTED = Symbol.for('klinara.test.counted');
-      (pool as unknown as { connect: () => Promise<pg.PoolClient> }).connect = async () => {
-        const client = await originalConnect();
-        // İstemciler havuzdan TEKRAR TEKRAR çıkar; her seferinde sarmak
-        // sayacı katlanarak şişirirdi. Bir kez sarıp işaretliyoruz.
-        const marked = client as unknown as Record<symbol, boolean>;
-        if (marked[COUNTED] !== true) {
-          const original = client.query.bind(client) as (...args: unknown[]) => unknown;
-          (client as unknown as { query: unknown }).query = (...args: unknown[]) => {
-            queries += 1;
-            return original(...args);
-          };
-          marked[COUNTED] = true;
-        }
-        return client;
-      };
+      const counter = countQueries(app);
 
       try {
         const week = () =>
@@ -382,9 +359,9 @@ describe('takvim görünümleri (Batch 3.4)', () => {
         await book(at('09:00')).expect(201);
         await week(); // izin cache'ini ısıt
 
-        queries = 0;
+        counter.reset();
         await week();
-        const withOne = queries;
+        const withOne = counter.count;
 
         await http(app).post('/api/v1/customers').set(ownerAuth()).send({ fullName: 'Toplu' });
         await database.ownerPool.query(
@@ -401,16 +378,16 @@ describe('takvim görünümleri (Batch 3.4)', () => {
           [clinic.tenant.id, clinic.branch.id, clinic.customer.id],
         );
 
-        queries = 0;
+        counter.reset();
         const many = await week();
-        const withMany = queries;
+        const withMany = counter.count;
 
         expect((many.body as CalendarBody).appointments.length).toBeGreaterThan(100);
         // Sorgu sayısı AYNI kalmalı: kalemler json_agg ile aynı sorguda gelir.
         expect(withMany).toBe(withOne);
         expect(withMany).toBeLessThan(15);
       } finally {
-        (pool as unknown as { connect: unknown }).connect = originalConnect;
+        counter.restore();
       }
     });
   });

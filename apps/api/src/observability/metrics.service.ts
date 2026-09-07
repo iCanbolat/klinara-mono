@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Counter, Histogram, Registry, collectDefaultMetrics } from 'prom-client';
+import { Counter, Gauge, Histogram, Registry, collectDefaultMetrics } from 'prom-client';
 import type { EnvironmentVariables } from '../config/env.validation';
 
 /**
@@ -21,6 +21,53 @@ export class MetricsService {
   readonly slotConflicts: Counter<'resource_type'>;
   /** Gönderilen bildirim sayısı. */
   readonly notificationsSent: Counter<'channel' | 'status'>;
+
+  /**
+   * Süreç-içi cache isabet/ıska sayacı (Batch 10.2).
+   *
+   * Üç cache de tek instance varsayımıyla yazıldı (`AvailabilityCacheService`,
+   * `PrincipalService`, `BranchAccessService`) ve 10.3'te `LISTEN/NOTIFY` ile
+   * dağıtık invalidasyona bağlanacak. O işin ÖNCESİNDE isabet oranının
+   * ölçülmesi gerekiyor: invalidasyon yayını eklendiğinde isabet oranının
+   * düşüp düşmediği ancak bugünkü taban çizgisi bilinirse anlaşılır.
+   */
+  readonly cacheEvents: Counter<'cache' | 'result'>;
+
+  /**
+   * Veritabanı havuzu doygunluğu.
+   *
+   * `waiting > 0` havuzun tükendiği demektir ve bu, gecikmenin sorgu
+   * yavaşlığından DEĞİL bağlantı beklemesinden geldiği tek durumdur —
+   * `http_request_duration_seconds` ikisini ayırt edemez.
+   */
+  readonly dbPoolConnections: Gauge<'state'>;
+
+  /** pg-boss kuyruk derinliği (10.4 uyarı kuralının kaynağı). */
+  readonly queueDepth: Gauge<'queue' | 'state'>;
+
+  /**
+   * Aşırı yük ölçümü (Batch 10.3): event loop gecikmesi, heap doluluğu ve
+   * korumanın devrede olup olmadığı.
+   *
+   * 503 dönen bir API'de ilk soru "neden" olur; bu üç sayı olmadan cevap
+   * ancak süreçten dışarı sızan bir tahmindir.
+   */
+  readonly overload: Gauge<'signal'>;
+
+  /** `PoolMetricsService` tarafından takılır; bkz. `dbPoolConnections`. */
+  private poolSampler: ((gauge: Gauge<'state'>) => void) | undefined;
+
+  /** `OverloadMetricsService` tarafından takılır; bkz. `overload`. */
+  private overloadSampler: ((gauge: Gauge<'signal'>) => void) | undefined;
+
+  setOverloadSampler(sampler: (gauge: Gauge<'signal'>) => void): void {
+    this.overloadSampler = sampler;
+  }
+
+  /** Havuz örnekleyicisini takar. Tek çağıranı `PoolMetricsService`tir. */
+  setPoolSampler(sampler: (gauge: Gauge<'state'>) => void): void {
+    this.poolSampler = sampler;
+  }
 
   constructor(config: ConfigService<EnvironmentVariables, true>) {
     this.registry = new Registry();
@@ -55,6 +102,47 @@ export class MetricsService {
       help: 'Gönderilen bildirim sayısı',
       labelNames: ['channel', 'status'] as const,
       registers: [this.registry],
+    });
+
+    this.cacheEvents = new Counter({
+      name: 'klinara_cache_events_total',
+      help: 'Süreç-içi cache isabet/ıska sayısı',
+      labelNames: ['cache', 'result'] as const,
+      registers: [this.registry],
+    });
+
+    this.dbPoolConnections = new Gauge({
+      name: 'klinara_db_pool_connections',
+      help: 'Veritabanı havuzu bağlantı sayısı (total/idle/waiting)',
+      labelNames: ['state'] as const,
+      registers: [this.registry],
+      // Örnekleme SCRAPE ANINDA yapılır, zamanlayıcıyla değil: periyodik bir
+      // `setInterval` kimse bakmıyorken de çalışır ve iki scrape arasındaki
+      // tepe değerini kaçırır. Havuzun kendisi burada erişilebilir olmadığı
+      // için gerçek örnekleyiciyi `PoolMetricsService` takıyor; takılmadığı
+      // sürece (ör. havuzsuz birim testi) metrik boş kalır, patlamaz.
+      collect: (): void => {
+        this.poolSampler?.(this.dbPoolConnections);
+      },
+    });
+
+    this.queueDepth = new Gauge({
+      name: 'klinara_queue_depth',
+      help: 'Kuyruktaki iş sayısı',
+      labelNames: ['queue', 'state'] as const,
+      registers: [this.registry],
+    });
+
+    this.overload = new Gauge({
+      name: 'klinara_overload',
+      help: 'Aşırı yük sinyalleri: event_loop_delay_ms, heap_used_ratio, active',
+      labelNames: ['signal'] as const,
+      registers: [this.registry],
+      // Havuz metriğiyle aynı sebeple scrape anında: son örneklemenin
+      // sonucunu okur, yeni bir ölçüm başlatmaz.
+      collect: (): void => {
+        this.overloadSampler?.(this.overload);
+      },
     });
   }
 }

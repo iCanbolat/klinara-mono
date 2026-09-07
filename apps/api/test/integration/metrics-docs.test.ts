@@ -40,6 +40,19 @@ describe('metrikler ve doküman', () => {
     expect(res.text).toContain('process_cpu_user_seconds_total');
   });
 
+  it('havuz doygunluğu SCRAPE ANINDA örneklenir (Batch 10.2)', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/metrics')
+      .set('authorization', `Bearer ${METRICS_TOKEN}`);
+
+    // Metriğin TANIMLI olması yetmez — `PoolMetricsService` örnekleyiciyi
+    // takmadıysa gauge boş kalır ve `/metrics` yalnız HELP/TYPE satırlarını
+    // basar. Asıl iddia: gerçek etiketli satırların gelmesi.
+    expect(res.text).toContain('klinara_db_pool_connections{state="total"');
+    expect(res.text).toContain('klinara_db_pool_connections{state="idle"');
+    expect(res.text).toContain('klinara_db_pool_connections{state="waiting"');
+  });
+
   it('metrikler ham URL değil ROTA ŞABLONU ile etiketlenir', async () => {
     const res = await request(app.getHttpServer())
       .get('/metrics')

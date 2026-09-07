@@ -93,43 +93,202 @@ describe('yönetim proxy beyaz listesi', () => {
     }
   });
 
-  it('kategori listesi YALNIZ okunabiliyor — istisna dar', () => {
-    // `serviceList` bloğu kimlikleri bir ADLA eşleştirmek zorunda; istisnanın
-    // genişlemesi bu testin kırılmasıyla görünür olsun.
+  it('kategori yüzeyi 12.4te GENİŞLETİLDİ — ve bu görünür bir karar', () => {
+    // Bu test Faz 11'de "istisnanın genişlemesi kırılmasıyla görünür olsun"
+    // diye yazılmıştı ve İŞİNİ YAPTI: 12.4 katalog ekranını getirince kırıldı
+    // ve genişletme bilinçli olarak buraya kaydedildi.
+    //
+    // Faz 11'de `GET service-categories` TEK istisnaydı; editörün blok
+    // süzgeci kimlikleri bir adla eşleştirmek zorundaydı. 12.4 katalog
+    // yönetimini getirdi, dolayısıyla yazma da açıldı.
     expect(isAllowedProxyPath('service-categories', 'GET')).toBe(true);
-    expect(isAllowedProxyPath('service-categories', 'POST')).toBe(false);
-    expect(isAllowedProxyPath('service-categories', 'PATCH')).toBe(false);
-    expect(isAllowedProxyPath('service-categories', 'DELETE')).toBe(false);
+    expect(isAllowedProxyPath('service-categories', 'POST')).toBe(true);
+    expect(isAllowedProxyPath(`service-categories/${UUID}`, 'PATCH')).toBe(true);
+    expect(isAllowedProxyPath(`service-categories/${UUID}`, 'DELETE')).toBe(true);
+
+    // Sunucuda TEKİL kategori GET'i YOK; beyaz listede de yok.
     expect(isAllowedProxyPath(`service-categories/${UUID}`, 'GET')).toBe(false);
+    expect(isAllowedProxyPath('service-categories', 'PUT')).toBe(false);
   });
 
-  it('klinik operasyonu yüzeyinin TAMAMI kapsam dışı', () => {
-    // Kapsam kararı gereği; buraya bir kural eklemek bilinçli bir sürtünme.
+  it('PARA, PAKET, ONAM ve DENETİM yüzeyi hâlâ tamamen kapsam dışı', () => {
+    // Faz 12 klinik operasyonunu açtı ama bunları AÇMADI ve açmamalı:
+    // Faz 12'nin hiçbir ekranı bu uçları istemiyor. Kural aynı — uç buraya
+    // yazılmadıkça geçmez.
     //
-    // `reports/revenue` bu listeden 10.1'de ÇIKARILDI ve bu bilinçli bir
-    // karar: rapor uçları salt okunur ve toplu veri döndürüyor, müşteri kaydı
-    // ya da yazma yüzeyi açmıyorlar (gerekçe `proxy-allowlist.ts` başlığında,
-    // kapsamı da aşağıdaki "raporlar" bloğunda sınanıyor). Listenin geri
-    // kalanı olduğu gibi duruyor.
+    // `reports/*` bu listede DEĞİL çünkü 10.1'de bilinçli olarak çıkarıldı:
+    // salt okunur ve toplu veri döndürüyorlar (gerekçe `proxy-allowlist.ts`
+    // başlığında, kapsamı aşağıdaki "raporlar" bloğunda sınanıyor).
     for (const path of [
-      'appointments',
-      `appointments/${UUID}`,
-      'calendar/day',
-      'availability',
-      'customers',
-      `customers/${UUID}`,
       'payments',
+      `payments/${UUID}`,
       'charges',
-      'cash/sessions',
-      'packages',
-      'staff',
-      'services',
-      'schedules',
+      'cash-sessions',
+      'refunds',
+      'discounts',
+      'commission-rules',
+      'commission-periods',
+      'package-definitions',
+      'customer-packages',
+      `customer-packages/${UUID}/refund`,
+      'consent-templates',
+      'consent-records',
+      'messages',
+      'audit-log',
     ]) {
       for (const method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']) {
         expect(isAllowedProxyPath(path, method), `${method} ${path}`).toBe(false);
       }
     }
+  });
+
+  // -------------------------------------------------------------------------
+  describe('takvim ve randevu (12.2)', () => {
+    it('randevu yaşam döngüsü geçiyor', () => {
+      expect(isAllowedProxyPath('appointments', 'GET')).toBe(true);
+      expect(isAllowedProxyPath('appointments', 'POST')).toBe(true);
+      expect(isAllowedProxyPath(`appointments/${UUID}`, 'GET')).toBe(true);
+      expect(isAllowedProxyPath(`appointments/${UUID}`, 'PATCH')).toBe(true);
+      expect(isAllowedProxyPath(`appointments/${UUID}/history`, 'GET')).toBe(true);
+      expect(isAllowedProxyPath(`appointments/${UUID}/reschedule`, 'POST')).toBe(true);
+      expect(isAllowedProxyPath(`appointments/${UUID}/cancel`, 'POST')).toBe(true);
+      expect(isAllowedProxyPath(`appointments/${UUID}/status`, 'POST')).toBe(true);
+    });
+
+    it('randevu SİLİNEMEZ — iptal edilir', () => {
+      expect(isAllowedProxyPath(`appointments/${UUID}`, 'DELETE')).toBe(false);
+      expect(isAllowedProxyPath('appointments', 'DELETE')).toBe(false);
+      expect(isAllowedProxyPath('appointments', 'PUT')).toBe(false);
+    });
+
+    it('takvim ve uygunluk YALNIZ okunuyor', () => {
+      expect(isAllowedProxyPath('calendar/day', 'GET')).toBe(true);
+      expect(isAllowedProxyPath('calendar/week', 'GET')).toBe(true);
+      expect(isAllowedProxyPath('calendar/staff', 'GET')).toBe(true);
+      expect(isAllowedProxyPath('availability', 'GET')).toBe(true);
+
+      expect(isAllowedProxyPath('calendar/day', 'POST')).toBe(false);
+      expect(isAllowedProxyPath('availability', 'POST')).toBe(false);
+      // Uydurma alt yol geçmiyor.
+      expect(isAllowedProxyPath('calendar/month', 'GET')).toBe(false);
+      expect(isAllowedProxyPath('calendar', 'GET')).toBe(false);
+    });
+
+    it('katalog ve personel OKUMASI randevu formu için açık', () => {
+      // Okuma 12.2'de açıldı (randevu formu onlarsız kurulamaz); yazma
+      // 12.4'te kendi ekranlarıyla geldi. Ayrım `Rule`ün metot bazlı
+      // olmasıyla bedava.
+      expect(isAllowedProxyPath('services', 'GET')).toBe(true);
+      expect(isAllowedProxyPath(`services/${UUID}`, 'GET')).toBe(true);
+      expect(isAllowedProxyPath('staff', 'GET')).toBe(true);
+      expect(isAllowedProxyPath(`staff/${UUID}`, 'GET')).toBe(true);
+    });
+
+    it('UYDURMA alt yollar reddediliyor', () => {
+      expect(isAllowedProxyPath(`services/${UUID}/anything`, 'GET')).toBe(false);
+      expect(isAllowedProxyPath(`appointments/${UUID}/delete`, 'POST')).toBe(false);
+      expect(isAllowedProxyPath(`appointments/${UUID}/payments`, 'GET')).toBe(false);
+      expect(isAllowedProxyPath(`staff/${UUID}/payments`, 'GET')).toBe(false);
+    });
+
+    it('müşteri ARAMASI dar bir kapı olarak açık', () => {
+      // `q >= 2`, çıplak dizi, sayfalama yok: defter SIRAYLA TARANAMAZ.
+      expect(isAllowedProxyPath('customers/search', 'GET')).toBe(true);
+      expect(isAllowedProxyPath('customers/search', 'POST')).toBe(false);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe('müşteri kartı (12.3)', () => {
+    it('defter ve kart yüzeyi geçiyor', () => {
+      expect(isAllowedProxyPath('customers', 'GET')).toBe(true);
+      expect(isAllowedProxyPath('customers', 'POST')).toBe(true);
+      expect(isAllowedProxyPath(`customers/${UUID}`, 'GET')).toBe(true);
+      expect(isAllowedProxyPath(`customers/${UUID}`, 'PATCH')).toBe(true);
+      expect(isAllowedProxyPath(`customers/${UUID}`, 'DELETE')).toBe(true);
+      expect(isAllowedProxyPath(`customers/${UUID}/tags`, 'PUT')).toBe(true);
+      expect(isAllowedProxyPath(`customers/${UUID}/merge`, 'POST')).toBe(true);
+      expect(isAllowedProxyPath(`customers/${UUID}/timeline`, 'GET')).toBe(true);
+    });
+
+    it('not ve etiket yüzeyi geçiyor', () => {
+      expect(isAllowedProxyPath(`customers/${UUID}/notes`, 'GET')).toBe(true);
+      expect(isAllowedProxyPath(`customers/${UUID}/notes`, 'POST')).toBe(true);
+      expect(isAllowedProxyPath(`notes/${UUID}`, 'PATCH')).toBe(true);
+      expect(isAllowedProxyPath(`notes/${UUID}`, 'DELETE')).toBe(true);
+      expect(isAllowedProxyPath(`notes/${UUID}/revisions`, 'GET')).toBe(true);
+      expect(isAllowedProxyPath('customer-tags', 'GET')).toBe(true);
+      expect(isAllowedProxyPath('customer-tags', 'POST')).toBe(true);
+      expect(isAllowedProxyPath(`customer-tags/${UUID}`, 'PATCH')).toBe(true);
+    });
+
+    it('dosya yüzeyi geçiyor', () => {
+      expect(isAllowedProxyPath('uploads/presign', 'POST')).toBe(true);
+      expect(isAllowedProxyPath(`customers/${UUID}/files`, 'GET')).toBe(true);
+      expect(isAllowedProxyPath(`customers/${UUID}/files`, 'POST')).toBe(true);
+      expect(isAllowedProxyPath(`customers/${UUID}/file-groups`, 'GET')).toBe(true);
+      expect(isAllowedProxyPath(`files/${UUID}/download-url`, 'GET')).toBe(true);
+      expect(isAllowedProxyPath(`files/${UUID}`, 'DELETE')).toBe(true);
+    });
+
+    it('metot uyuşmazlıkları ve UYDURMA alt yollar reddediliyor (12.3)', () => {
+      expect(isAllowedProxyPath('customers', 'PUT')).toBe(false);
+      expect(isAllowedProxyPath(`customers/${UUID}/merge`, 'GET')).toBe(false);
+      expect(isAllowedProxyPath(`customers/${UUID}/tags`, 'POST')).toBe(false);
+      expect(isAllowedProxyPath(`notes/${UUID}`, 'GET')).toBe(false);
+      expect(isAllowedProxyPath(`files/${UUID}/download-url`, 'POST')).toBe(false);
+      // Kardeş yol: paket ve ödeme HÂLÂ kapalı.
+      expect(isAllowedProxyPath(`customers/${UUID}/packages`, 'GET')).toBe(false);
+      expect(isAllowedProxyPath(`customers/${UUID}/account`, 'GET')).toBe(false);
+      expect(isAllowedProxyPath(`customers/${UUID}/opt-out`, 'GET')).toBe(false);
+      expect(isAllowedProxyPath('uploads/local/put', 'PUT')).toBe(false);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe('katalog, personel ve plan (12.4)', () => {
+    it('katalog YAZMA açıldı', () => {
+      expect(isAllowedProxyPath('services', 'POST')).toBe(true);
+      expect(isAllowedProxyPath(`services/${UUID}`, 'PATCH')).toBe(true);
+      expect(isAllowedProxyPath(`services/${UUID}`, 'DELETE')).toBe(true);
+      expect(isAllowedProxyPath('service-categories', 'POST')).toBe(true);
+      expect(isAllowedProxyPath(`service-categories/${UUID}`, 'PATCH')).toBe(true);
+    });
+
+    it('personel YAZMA ve yetkinlik matrisi açıldı', () => {
+      expect(isAllowedProxyPath('staff', 'POST')).toBe(true);
+      expect(isAllowedProxyPath(`staff/${UUID}`, 'PATCH')).toBe(true);
+      expect(isAllowedProxyPath(`staff/${UUID}/services`, 'PUT')).toBe(true);
+      expect(isAllowedProxyPath('users', 'GET')).toBe(true);
+      expect(isAllowedProxyPath(`users/${UUID}`, 'PATCH')).toBe(true);
+    });
+
+    it('çalışma planı açıldı; istisnada PATCH YOK', () => {
+      expect(isAllowedProxyPath(`branches/${UUID}/hours`, 'GET')).toBe(true);
+      expect(isAllowedProxyPath(`branches/${UUID}/hours`, 'PUT')).toBe(true);
+      expect(isAllowedProxyPath(`staff/${UUID}/schedule`, 'GET')).toBe(true);
+      expect(isAllowedProxyPath(`staff/${UUID}/schedule`, 'PUT')).toBe(true);
+      expect(isAllowedProxyPath('schedule-exceptions', 'GET')).toBe(true);
+      expect(isAllowedProxyPath('schedule-exceptions', 'POST')).toBe(true);
+      expect(isAllowedProxyPath(`schedule-exceptions/${UUID}`, 'DELETE')).toBe(true);
+
+      // Sunucuda `PATCH /schedule-exceptions/:id` YOK; beyaz listede de yok.
+      expect(isAllowedProxyPath(`schedule-exceptions/${UUID}`, 'PATCH')).toBe(false);
+    });
+
+    it('KULLANICI SİLME ve rol yüzeyi açılmadı', () => {
+      // `PATCH users/:id` yalnız ad/dil/aktiflik değiştiriyor; rol
+      // değiştiren bir uç sunucuda YOK ve burada da açılmadı.
+      expect(isAllowedProxyPath(`users/${UUID}`, 'DELETE')).toBe(false);
+      expect(isAllowedProxyPath('users', 'POST')).toBe(false);
+      expect(isAllowedProxyPath(`users/${UUID}/memberships`, 'PUT')).toBe(false);
+      expect(isAllowedProxyPath('memberships', 'POST')).toBe(false);
+      // Personel SİLİNMİYOR, pasife alınıyor.
+      expect(isAllowedProxyPath(`staff/${UUID}`, 'DELETE')).toBe(false);
+      // Tatiller için uç YOK (plan A4).
+      expect(isAllowedProxyPath(`branches/${UUID}/holidays`, 'GET')).toBe(false);
+      expect(isAllowedProxyPath('holidays', 'GET')).toBe(false);
+    });
   });
 
   it('metot uyuşmazlığı reddediliyor', () => {
@@ -224,9 +383,8 @@ describe('yönetim proxy beyaz listesi', () => {
       expect(isAllowedProxyPath('reports%2F..%2Fme', 'GET')).toBe(false);
     });
 
-    it('klinik operasyonu HÂLÂ dışarıda', () => {
-      // Raporların eklenmesi o sınırı gevşetmedi.
-      for (const path of ['appointments', 'customers', 'payments', 'charges', 'packages']) {
+    it('raporların eklenmesi PARA yüzeyini açmadı', () => {
+      for (const path of ['payments', 'charges', 'packages', 'customer-packages']) {
         expect(isAllowedProxyPath(path, 'GET'), path).toBe(false);
       }
     });
