@@ -36,20 +36,62 @@ final class MockReportsService: ReportsService, @unchecked Sendable {
         ReportPeriod(from: KlinaraCoding.timestamp(from), to: KlinaraCoding.timestamp(to))
     }
 
+    /// Sunucudaki ``pageRows`` davranışının aynısı.
+    ///
+    /// Mock'un sayfalamayı taklit etmemesi, sayfa sınırındaki hataların yalnız
+    /// canlıda görünmesi demekti. Kural birebir aynı: `limit` yoksa tüm
+    /// satırlar döner (sayfalama opt-in), cursor hem sıra numarası hem çıpa
+    /// taşır ve toplamlar sayfadan ETKİLENMEZ.
+    private func paginate<Row>(
+        _ rows: [Row],
+        _ page: ReportPageQuery,
+        key: (Row) -> String
+    ) throws -> (data: [Row], pageInfo: PageInfo) {
+        guard page.limit != nil || page.cursor != nil else {
+            return (rows, PageInfo(nextCursor: nil, hasMore: false))
+        }
+        let limit = min(page.limit ?? 50, 200)
+
+        var start = 0
+        if let cursor = page.cursor {
+            guard let decoded = MockCursor.decodeKey(cursor) else {
+                throw MockErrors.validation("Geçersiz cursor", path: "cursor")
+            }
+            // Çıpa hâlâ listedeyse ondan SONRA devam; kaybolmuşsa sıra
+            // numarasına düşülür — sunucudaki kuralın aynısı.
+            let ordinal = Int(decoded.sortKey.timeIntervalSince1970)
+            start = rows.firstIndex { key($0) == decoded.id }.map { $0 + 1 } ?? max(ordinal, 0)
+        }
+
+        let data = Array(rows.dropFirst(start).prefix(limit))
+        let hasMore = start + data.count < rows.count
+        let next = hasMore && !data.isEmpty
+            ? MockCursor.encode(
+                sortKey: Date(timeIntervalSince1970: Double(start + data.count)),
+                id: key(data[data.count - 1])
+            )
+            : nil
+        return (data, PageInfo(nextCursor: next, hasMore: hasMore))
+    }
+
     func occupancy(
         from: Date,
         to: Date,
         branchId: String?,
         groupBy: OccupancyGrouping?,
-        compareToPrevious: Bool
+        compareToPrevious: Bool,
+        page: ReportPageQuery
     ) async throws -> OccupancyReport {
         let rows = MockReportsSeed.occupancyRows(groupBy: groupBy ?? .staff, ownOnly: scope == .own)
+        // Toplamlar SAYFADAN DEĞİL, satırların tamamından.
         let totals = MockReportsSeed.occupancyTotals(for: rows)
+        let slice = try paginate(rows, page) { $0.groupId ?? $0.groupLabel }
         return OccupancyReport(
             scope: scope,
             period: period(from: from, to: to),
             totals: totals,
-            data: rows,
+            data: slice.data,
+            pageInfo: slice.pageInfo,
             previous: compareToPrevious ? MockReportsSeed.occupancyPrevious : nil,
             delta: compareToPrevious ? ["occupancyRate": 12.5, "bookedMinutes": nil] : nil
         )
@@ -60,14 +102,17 @@ final class MockReportsService: ReportsService, @unchecked Sendable {
         to: Date,
         branchId: String?,
         groupBy: RevenueGrouping?,
-        compareToPrevious: Bool
+        compareToPrevious: Bool,
+        page: ReportPageQuery
     ) async throws -> RevenueReport {
         let rows = MockReportsSeed.revenueRows(groupBy: groupBy ?? .service)
+        let slice = try paginate(rows, page) { $0.groupId ?? $0.groupLabel }
         return RevenueReport(
             scope: scope,
             period: period(from: from, to: to),
             totals: MockReportsSeed.revenueTotals,
-            data: rows,
+            data: slice.data,
+            pageInfo: slice.pageInfo,
             previous: compareToPrevious ? MockReportsSeed.revenuePrevious : nil,
             delta: compareToPrevious ? ["collectedMinor": -8.4] : nil
         )
@@ -77,12 +122,16 @@ final class MockReportsService: ReportsService, @unchecked Sendable {
         from: Date,
         to: Date,
         branchId: String?,
-        compareToPrevious: Bool
+        compareToPrevious: Bool,
+        page: ReportPageQuery
     ) async throws -> StaffPerformanceReport {
-        StaffPerformanceReport(
+        let rows = MockReportsSeed.staffRows(ownOnly: scope == .own)
+        let slice = try paginate(rows, page) { $0.staffProfileId }
+        return StaffPerformanceReport(
             scope: scope,
             period: period(from: from, to: to),
-            data: MockReportsSeed.staffRows(ownOnly: scope == .own),
+            data: slice.data,
+            pageInfo: slice.pageInfo,
             currency: "TRY"
         )
     }
@@ -92,12 +141,15 @@ final class MockReportsService: ReportsService, @unchecked Sendable {
         to: Date,
         branchId: String?,
         groupBy: NoShowGrouping?,
-        compareToPrevious: Bool
+        compareToPrevious: Bool,
+        page: ReportPageQuery
     ) async throws -> NoShowReport {
-        NoShowReport(
+        let slice = try paginate(MockReportsSeed.noShowRows, page) { $0.groupId ?? $0.groupLabel }
+        return NoShowReport(
             period: period(from: from, to: to),
             totals: MockReportsSeed.noShowTotals,
-            data: MockReportsSeed.noShowRows,
+            data: slice.data,
+            pageInfo: slice.pageInfo,
             byOrigin: MockReportsSeed.noShowByOrigin,
             previous: compareToPrevious ? MockReportsSeed.noShowPrevious : nil,
             delta: compareToPrevious ? ["noShowRate": 3.2] : nil

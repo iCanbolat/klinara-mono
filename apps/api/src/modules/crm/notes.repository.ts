@@ -2,6 +2,7 @@ import { and, desc, eq, isNull, sql, type SQL } from 'drizzle-orm';
 import { customerNoteRevisions, customerNotes } from '../../database/schema';
 import type { Tx } from '../../database/tenant-tx';
 import { definedValues, hasUpdates, type Updatable } from '../../database/updates';
+import type { TimelineKind } from './dto/note.dto';
 
 export type CustomerNoteRow = typeof customerNotes.$inferSelect;
 export type CustomerNoteRevisionRow = typeof customerNoteRevisions.$inferSelect;
@@ -119,6 +120,12 @@ interface TimelineFilters {
   canReadMedical: boolean;
   cursorOccurredAt?: string | undefined;
   cursorId?: string | undefined;
+  /** Boş/verilmemişse tüm türler. */
+  kinds?: readonly TimelineKind[] | undefined;
+  /** Dahil. */
+  from?: string | undefined;
+  /** HARİÇ. */
+  to?: string | undefined;
 }
 
 /**
@@ -130,8 +137,24 @@ interface TimelineFilters {
  * `payload` döndürmesi. Faz 7'nin kolu (`consent`) aşağıda.
  */
 export async function listTimeline(tx: Tx, filters: TimelineFilters): Promise<TimelineRow[]> {
-  const result = await tx.execute<TimelineRow>(sql`
-    with events as (
+  // Tür filtresi kolu SQL'e HİÇ SOKMUYOR, sonradan elemiyor değil: `union all`
+  // her kolu tam tarayıp sonra atmak, "yalnız notları göster" diyen bir
+  // istemciye randevu tablosunun bedelini ödetmek olurdu.
+  const wants = (kind: TimelineKind): boolean =>
+    filters.kinds === undefined || filters.kinds.length === 0 || filters.kinds.includes(kind);
+
+  // Tarih koşulu her kolun KENDİ zaman sütununa iniyor: `occurred_at` ancak
+  // birleşimden sonra var ve orada filtrelemek indeksleri kullanılmaz kılardı.
+  const window = (column: SQL): SQL => sql`
+       and (${filters.from ?? null}::timestamptz is null
+            or ${column} >= ${filters.from ?? null}::timestamptz)
+       and (${filters.to ?? null}::timestamptz is null
+            or ${column} < ${filters.to ?? null}::timestamptz)`;
+
+  const branches: SQL[] = [];
+
+  if (wants('appointment')) {
+    branches.push(sql`
       select 'appointment'::text as kind,
              a.id,
              a.starts_at as occurred_at,
@@ -151,9 +174,11 @@ export async function listTimeline(tx: Tx, filters: TimelineFilters): Promise<Ti
         from appointments a
        where a.customer_id = ${filters.customerId}::uuid
          and a.deleted_at is null
+         ${window(sql`a.starts_at`)}`);
+  }
 
-      union all
-
+  if (wants('note')) {
+    branches.push(sql`
       select 'note'::text as kind,
              n.id,
              n.created_at as occurred_at,
@@ -167,13 +192,17 @@ export async function listTimeline(tx: Tx, filters: TimelineFilters): Promise<Ti
         from customer_notes n
        where n.customer_id = ${filters.customerId}::uuid
          and n.deleted_at is null
+         -- İzin daraltması kullanıcı tercihinden BAĞIMSIZ: tür filtresi
+         -- göremediği bir notu görünür kılamaz.
          and (${filters.canReadMedical} or n.kind = 'general')
+         ${window(sql`n.created_at`)}`);
+  }
 
-      union all
-
-      -- Onam kabulü (Faz 7). Metnin GÖVDESİ payload'a KONMUYOR: 20k'lık bir
-      -- aydınlatma metni her zaman çizelgesi sayfasına binerdi. Kanıtın tamamı
-      -- GET /consent-acceptances?customerId= ucundan çekiliyor.
+  if (wants('consent')) {
+    // Onam kabulü (Faz 7). Metnin GÖVDESİ payload'a KONMUYOR: 20k'lık bir
+    // aydınlatma metni her zaman çizelgesi sayfasına binerdi. Kanıtın tamamı
+    // GET /consent-acceptances?customerId= ucundan çekiliyor.
+    branches.push(sql`
       select 'consent'::text as kind,
              c.id,
              c.accepted_at as occurred_at,
@@ -185,6 +214,16 @@ export async function listTimeline(tx: Tx, filters: TimelineFilters): Promise<Ti
              ) as payload
         from booking_consent_acceptances c
        where c.customer_id = ${filters.customerId}::uuid
+         ${window(sql`c.accepted_at`)}`);
+  }
+
+  // Her tür elenmişse sorgu hiç atılmıyor: sıfır kollu bir `union all`
+  // geçersiz SQL, boş sonuç ise zaten bildiğimiz cevap.
+  if (branches.length === 0) return [];
+
+  const result = await tx.execute<TimelineRow>(sql`
+    with events as (
+      ${sql.join(branches, sql` union all `)}
     )
     select kind, id::text, occurred_at, payload
       from events

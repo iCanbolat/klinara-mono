@@ -13,9 +13,29 @@ struct PackageDefinitionListView: View {
     @State private var editing: PackageDefinitionEditorView.Target?
     @State private var pendingRetirement: PackageDefinition?
     @State private var error: APIError?
+    /// Yalnız seçili şubede satılabilenleri göster. Varsayılan **kapalı**:
+    /// tanım ekranı yönetim ekranı ve çoğu paket şube kısıtı taşımıyor.
+    @State private var scopedToBranch = false
 
     private var store: PackageDefinitionStore { session.packageDefinitionStore }
     private var canWrite: Bool { session.can(Permissions.packageWrite) }
+
+    /// Sunucuya gidecek kapsam. `nil` **tüm şubeler**.
+    private var scope: String? { scopedToBranch ? session.selectedBranchId : nil }
+
+    /// `.task(id:)` anahtarı: şube değişimi de kapsamı değiştiriyor.
+    private var scopeKey: String { scope ?? "*" }
+
+    /// Kapsam seçici. Tek şubeli kiracıda çizilmiyor: seçenek sunmayan bir
+    /// seçici, ekranda yer kaplayan bir yanıltmadır.
+    private var scopePicker: some View {
+        Picker("Kapsam", selection: $scopedToBranch) {
+            Text("Tüm şubeler").tag(false)
+            Text(session.selectedBranch?.name ?? "Seçili şube").tag(true)
+        }
+        .pickerStyle(.segmented)
+        .padding(.bottom, KlinaraMetrics.xs)
+    }
 
     var body: some View {
         KlinaraScreen(
@@ -30,6 +50,10 @@ struct PackageDefinitionListView: View {
         ) { definitions in
             if let error, !error.isFieldScoped {
                 ErrorBanner(error: error)
+            }
+
+            if session.canSwitchBranch {
+                scopePicker
             }
 
             let visible = filtered(definitions)
@@ -59,6 +83,10 @@ struct PackageDefinitionListView: View {
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $searchText, prompt: "Paket ara")
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                BranchMenu(session: session)
+            }
+
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Toggle("Pasifleri göster", isOn: $showsInactive)
@@ -75,7 +103,9 @@ struct PackageDefinitionListView: View {
                 .accessibilityLabel("Seçenekler")
             }
         }
-        .task { await store.load() }
+        // Kapsam ekranın kendi kararı: satış sayfası da kendi kapsamını
+        // istiyor ve iki ekran birbirinin filtresini miras almamalı.
+        .task(id: scopeKey) { await store.ensureScope(scope) }
         .refreshable { await store.reload() }
         .sheet(item: $editing) { target in
             PackageDefinitionEditorView(session: session, target: target)
@@ -99,6 +129,11 @@ struct PackageDefinitionListView: View {
             // belirliyor; kullanıcı "sildim" sanmasın.
             Text("Paket hiç satılmadıysa arşivlenir, satıldıysa yalnız pasife alınır. Satılmış paketler ve müşteri hakları etkilenmez.")
         }
+    }
+
+    /// Şube adı; oturumda bulunamazsa (başka şubenin paketi) genel ifade.
+    private func branchName(_ branchId: String) -> String {
+        session.branches.first { $0.id == branchId }?.name ?? "Şubeye özel"
     }
 
     // MARK: Satır
@@ -158,8 +193,11 @@ struct PackageDefinitionListView: View {
                     } else if !definition.isActive {
                         KlinaraBadge(text: "Pasif", tone: .muted)
                     }
-                    if definition.branchId != nil {
-                        KlinaraBadge(text: "Şubeye özel", tone: .neutral)
+                    // Rozet artık şubenin ADINI taşıyor: "şubeye özel"
+                    // hangi şube olduğunu söylemiyordu ve çok şubeli bir
+                    // kiracıda tek başına bir işe yaramıyordu.
+                    if let scope = definition.branchId {
+                        KlinaraBadge(text: branchName(scope), tone: .neutral)
                     }
                     if definition.isOnlineSellable {
                         KlinaraBadge(text: "Online", tone: .positive, icon: "globe")

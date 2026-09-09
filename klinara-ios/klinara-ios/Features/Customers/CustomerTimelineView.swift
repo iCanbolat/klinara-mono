@@ -13,8 +13,17 @@ struct CustomerTimelineView: View {
     var onEditNote: (String) -> Void
 
     private var clock: BranchClock { session.clock }
+    private var query: TimelineQuery { record.timelineQuery }
 
     var body: some View {
+        VStack(alignment: .leading, spacing: KlinaraMetrics.sm) {
+            filterBar
+            content
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
         switch record.timeline {
         case .loading:
             KlinaraCard(title: "Zaman çizelgesi") {
@@ -30,7 +39,13 @@ struct CustomerTimelineView: View {
         case .loaded(let entries):
             KlinaraCard(title: "Zaman çizelgesi", footnote: footnote) {
                 if entries.isEmpty {
-                    KlinaraRow(label: "Henüz kayıt yok")
+                    // "Kayıt yok" ile "bu filtreyle kayıt yok" farklı şeyler:
+                    // ilki kullanıcıyı bir şey eklemeye, ikincisi filtreyi
+                    // gevşetmeye yönlendirir.
+                    KlinaraRow(
+                        label: query.isFiltered ? "Bu filtreyle kayıt yok" : "Henüz kayıt yok",
+                        detail: query.isFiltered ? "Filtreyi temizleyip yeniden bakın." : nil
+                    )
                 } else {
                     ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
                         if index > 0 { KlinaraDivider() }
@@ -43,6 +58,95 @@ struct CustomerTimelineView: View {
                 loadMoreTrigger
             }
         }
+    }
+
+    // MARK: Filtre
+
+    /// Tür çipleri + tarih menüsü.
+    ///
+    /// Filtre **sunucuda** uygulanıyor: yüklenmiş sayfalar üzerinde süzmek,
+    /// "son 3 ay" diyen kullanıcıya elindeki ilk 50 kaydın içindeki son 3 ayı
+    /// göstermek olurdu — eksik bir cevabı tam bir cevap gibi sunmak.
+    private var filterBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: KlinaraMetrics.sm) {
+                rangeMenu
+
+                ForEach(TimelineKind.allCases) { kind in
+                    chip(title: kind.turkishName, isSelected: query.kinds.contains(kind)) {
+                        var updated = query
+                        // Çoklu seçim: çipler birbirini dışlamıyor, "randevu
+                        // VE onam" meşru bir soru.
+                        if updated.kinds.contains(kind) {
+                            updated.kinds.remove(kind)
+                        } else {
+                            updated.kinds.insert(kind)
+                        }
+                        Task { await record.applyTimelineFilter(updated) }
+                    }
+                }
+
+                if query.isFiltered {
+                    Button("Temizle") { Task { await record.clearTimelineFilter() } }
+                        .klinaraText(.button)
+                        .foregroundStyle(KlinaraColor.sageDeep)
+                        .frame(height: 34)
+                }
+            }
+            .padding(.horizontal, 1)
+        }
+    }
+
+    private var rangeMenu: some View {
+        Menu {
+            Button("Tümü") { apply(range: nil) }
+            Button("Son 3 ay") { apply(range: 3) }
+            Button("Son 1 yıl") { apply(range: 12) }
+        } label: {
+            chipLabel(title: rangeTitle, isSelected: query.from != nil || query.to != nil)
+        }
+        .accessibilityLabel("Tarih aralığı, \(rangeTitle)")
+    }
+
+    private var rangeTitle: String {
+        guard let from = query.from else { return "Tüm zamanlar" }
+        return "\(clock.formatDate(from))'ten beri"
+    }
+
+    /// Aralığın üst ucu **açık bırakılıyor**: "son 3 ay" bugünü de kapsıyor ve
+    /// bir üst sınır koymak, bugün eklenen kaydı listeden düşürürdü.
+    private func apply(range months: Int?) {
+        var updated = query
+        updated.from = months.map { clock.adding(months: -$0, to: Date()) }
+        updated.to = nil
+        Task { await record.applyTimelineFilter(updated) }
+    }
+
+    private func chip(
+        title: String,
+        isSelected: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) { chipLabel(title: title, isSelected: isSelected) }
+            .buttonStyle(.plain)
+            .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+    }
+
+    private func chipLabel(title: String, isSelected: Bool) -> some View {
+        Text(title)
+            .font(.system(size: 13, weight: .medium))
+            .foregroundStyle(isSelected ? KlinaraColor.surfaceRaised : KlinaraColor.charcoal)
+            .padding(.horizontal, KlinaraMetrics.md)
+            .frame(height: 34)
+            .background(isSelected ? KlinaraColor.sageDeep : KlinaraColor.surfaceRaised)
+            .overlay(
+                Capsule().stroke(
+                    isSelected ? KlinaraColor.sageDeep : KlinaraColor.border,
+                    lineWidth: KlinaraMetrics.borderWidth
+                )
+            )
+            .clipShape(.capsule)
+            .contentShape(.capsule)
     }
 
     /// Klinik notlar sunucudan hiç gelmiyorsa bunu söylemek gerekiyor:

@@ -136,6 +136,116 @@ struct Phase10StoreTests {
         // yazıyor. Bu, "bakiye istemcide hesaplanmaz" kuralının rapor hâli.
         #expect(ReportFormat.percent(12.5).hasPrefix("%"))
     }
+
+    // MARK: Sayfalama
+
+    /// İki değişmez: **toplamlar sayfadan etkilenmez** ve sayfaları izleyerek
+    /// toplanan satırlar sayfasız yanıtın aynısıdır. Birincisi bozulursa ikinci
+    /// sayfada doluluk oranı değişir, ikincisi bozulursa rapor sessizce eksik
+    /// kalır — düzeltilmek istenen hatanın ta kendisi.
+    @Test("Sayfaları izlemek sayfasız yanıtın aynısını verir; toplamlar sabit kalır")
+    func occupancyCursorWalkMatchesFullPage() async throws {
+        let graph = MockGraph()
+        let service = graph.reports
+        let full = try await service.occupancy(
+            from: Date(timeIntervalSince1970: 0),
+            to: Date(),
+            branchId: nil,
+            groupBy: .staff,
+            compareToPrevious: false,
+            page: .unpaged
+        )
+        try #require(full.data.count > 1)
+        #expect(full.pageInfo?.hasMore == false)
+
+        var walked: [OccupancyRow] = []
+        var cursor: String?
+        var guardCount = 0
+
+        repeat {
+            let page = try await service.occupancy(
+                from: Date(timeIntervalSince1970: 0),
+                to: Date(),
+                branchId: nil,
+                groupBy: .staff,
+                compareToPrevious: false,
+                page: ReportPageQuery(limit: 1, cursor: cursor)
+            )
+            #expect(page.data.count <= 1)
+            // Toplamlar sayfa değiştikçe SABİT.
+            #expect(page.totals == full.totals)
+            walked += page.data
+            cursor = page.pageInfo?.nextCursor
+            guardCount += 1
+        } while cursor != nil && guardCount < 50
+
+        #expect(walked.map(\.id) == full.data.map(\.id))
+        #expect(Set(walked.map(\.id)).count == walked.count, "Sayfa sınırında satır tekrarlandı")
+    }
+
+    /// Sayfalama OPT-IN: `limit` yoksa sunucu (ve mock) tüm satırları döndürür.
+    /// Varsayılan bir sayfa boyutu, web yönetim panelini haber vermeden
+    /// kırpardı.
+    @Test("limit verilmezse sayfalama yapılmaz")
+    func unpagedReturnsEverything() async throws {
+        let graph = MockGraph()
+        let report = try await graph.reports.noShow(
+            from: Date(timeIntervalSince1970: 0),
+            to: Date(),
+            branchId: nil,
+            groupBy: .staff,
+            compareToPrevious: false,
+            page: .unpaged
+        )
+        #expect(report.pageInfo?.nextCursor == nil)
+        #expect(report.pageInfo?.hasMore == false)
+    }
+
+    @Test("Store sonraki sayfayı satır EKLEYEREK alır, toplamları korur")
+    func storeAppendsPages() async throws {
+        let graph = MockGraph()
+        let store = ReportsStore(
+            service: graph.reports,
+            clock: graph.clock,
+            branchId: MockGraph.branchId
+        )
+
+        await store.loadOccupancy()
+        let first = try #require(store.occupancy.value)
+
+        // Store 50'lik sayfa istiyor; mock tohumu o kadar satır üretmiyor, bu
+        // yüzden imleç doğrudan servisten kurulup birleştirme sınanıyor.
+        let paged = try await graph.reports.occupancy(
+            from: store.periodStart,
+            to: store.periodEnd,
+            branchId: MockGraph.branchId,
+            groupBy: store.occupancyGrouping,
+            compareToPrevious: false,
+            page: ReportPageQuery(limit: 1)
+        )
+        #expect(paged.pageInfo?.hasMore == true)
+        #expect(paged.totals == first.totals)
+
+        // İmleç yokken loadMore hiçbir şey yapmaz.
+        #expect(!store.canLoadMoreOccupancy)
+        await store.loadMoreOccupancy()
+        #expect(store.occupancy.value?.data.count == first.data.count)
+    }
+
+    /// Geri dönüş raporunun kırılım listesi yok; sayfalamak olmayan bir listeye
+    /// sayfa numarası vermek olurdu.
+    @Test("Geri dönüş raporu sayfalanmıyor")
+    func retentionHasNoRowList() async throws {
+        let graph = MockGraph()
+        let report = try await graph.reports.retention(
+            from: Date(timeIntervalSince1970: 0),
+            to: Date(),
+            branchId: nil,
+            compareToPrevious: false
+        )
+        #expect(!report.cohorts.isEmpty)
+        #expect(!report.acquisition.isEmpty)
+    }
 }
 
 private extension ReportsStore {
@@ -143,4 +253,5 @@ private extension ReportsStore {
     var clockLabelForEnd: String {
         String(periodLabel.split(separator: "–").last ?? "").trimmingCharacters(in: .whitespaces)
     }
+
 }

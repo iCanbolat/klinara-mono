@@ -6,6 +6,49 @@ import Foundation
 /// sıralamada birleştiriyor; sözleşme her kolun `kind` + `payload` döndürmesi.
 /// Faz 5 (paket) ve Faz 6 (tahsilat) buraya kendi kolunu ekleyecek.
 
+/// Çizelgedeki bir olayın türü — sunucudaki `TIMELINE_KINDS` ile birebir.
+///
+/// ``TimelineEntry/unknown``ın karşılığı burada YOK ve olmamalı: bu tip
+/// kullanıcının **süzebildiği** türleri sayıyor; bilinmeyen bir türü filtre
+/// listesine koymak, adı olmayan bir kutucuk çizmek olurdu. Bilinmeyen olaylar
+/// filtresiz listede yine görünüyor.
+nonisolated enum TimelineKind: String, Sendable, CaseIterable, Identifiable {
+    case appointment
+    case note
+    case consent
+
+    var id: String { rawValue }
+
+    var turkishName: String {
+        switch self {
+        case .appointment: return "Randevu"
+        case .note: return "Not"
+        case .consent: return "Onam"
+        }
+    }
+}
+
+/// Çizelge sorgusu.
+///
+/// `kinds` boş küme "hiçbiri" DEĞİL, "süzme yok": sunucu da öyle yorumluyor ve
+/// filtreyi temizlemenin sonucu boş bir liste olamaz.
+nonisolated struct TimelineQuery: Sendable, Equatable {
+    var kinds: Set<TimelineKind> = []
+    /// Dahil.
+    var from: Date?
+    /// HARİÇ — takvim ve rapor uçlarındaki yarı açık aralık idiomu.
+    var to: Date?
+
+    var isFiltered: Bool { !kinds.isEmpty || from != nil || to != nil }
+
+    /// Kaç filtre etkin — başlıktaki sayaç rozeti için. Tarih aralığı, iki ucu
+    /// da dolu olsa **tek** filtre sayılıyor: kullanıcı onu tek bir seçim
+    /// olarak yaptı.
+    var activeCount: Int {
+        (kinds.isEmpty ? 0 : 1) + ((from != nil || to != nil) ? 1 : 0)
+    }
+}
+
 /// Tek bir olay.
 ///
 /// **Neden enum:** `payload` türe göre değişiyor. Optional-ağırlıklı tek bir

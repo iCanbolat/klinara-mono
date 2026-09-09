@@ -29,6 +29,18 @@ import {
 import { RevenueService } from './revenue.service';
 
 /**
+ * Dışa aktarım SAYFALANMAZ.
+ *
+ * CSV uçları rapor sorgusunun aynı DTO'sunu kullanıyor; `limit`/`cursor`
+ * gönderen bir çağıran eksik bir dosya indirir ve bunu **fark etmez** —
+ * dosyada "devamı var" diye bir alan yok. Dışa aktarımın var olma sebebi
+ * verinin tamamı; satır tavanı ayrı bir kural (`REPORT_EXPORT_MAX_ROWS`).
+ */
+function unpaged<T extends { limit?: number; cursor?: string }>(query: T): T {
+  return { ...query, limit: undefined, cursor: undefined };
+}
+
+/**
  * CSV dışa aktarım.
  *
  * `POST` — ama hiçbir şey YAZMIYOR. Gövde bir kayıt değil bir filtre; `GET`
@@ -61,7 +73,7 @@ export class ReportExportController {
     @Body() query: OccupancyQueryDto,
     @Res({ passthrough: true }) response: Response,
   ): Promise<string> {
-    const report = await this.occupancy.report(principal, query);
+    const report = await this.occupancy.report(principal, unpaged(query));
     return send(response, 'doluluk', query, occupancyCsv(report), report.data.length);
   }
 
@@ -75,7 +87,7 @@ export class ReportExportController {
     @Body() query: RevenueQueryDto,
     @Res({ passthrough: true }) response: Response,
   ): Promise<string> {
-    const report = await this.revenue.report(principal, query);
+    const report = await this.revenue.report(principal, unpaged(query));
     return send(response, 'ciro', query, revenueCsv(report), report.data.length);
   }
 
@@ -89,7 +101,7 @@ export class ReportExportController {
     @Body() query: StaffPerformanceQueryDto,
     @Res({ passthrough: true }) response: Response,
   ): Promise<string> {
-    const report = await this.performance.staffPerformance(principal, query);
+    const report = await this.performance.staffPerformance(principal, unpaged(query));
     return send(response, 'personel-performans', query, staffPerformanceCsv(report), report.data.length);
   }
 
@@ -103,7 +115,7 @@ export class ReportExportController {
     @Body() query: NoShowQueryDto,
     @Res({ passthrough: true }) response: Response,
   ): Promise<string> {
-    const report = await this.performance.noShow(principal, query);
+    const report = await this.performance.noShow(principal, unpaged(query));
     return send(response, 'gelmeme', query, noShowCsv(report), report.data.length);
   }
 
@@ -120,7 +132,7 @@ export class ReportExportController {
     @Body() query: RetentionQueryDto,
     @Res({ passthrough: true }) response: Response,
   ): Promise<string> {
-    const report = await this.performance.retention(principal, query);
+    const report = await this.performance.retention(principal, unpaged(query));
     return send(response, 'kazanim', query, retentionCsv(report), report.acquisition.length);
   }
 }

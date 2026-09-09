@@ -124,32 +124,154 @@ struct AppointmentBlockView: View {
     }
 }
 
+/// Yoğunluk ısı haritasının ortak renk ölçeği.
+///
+/// Tek yerde durması şart: gün şeridi ile hafta ızgarasının hücreleri aynı
+/// sayıyı farklı koyulukta gösterseydi, ikisi arasında geçen kullanıcı için
+/// renk bir ölçü olmaktan çıkardı.
+enum DensityScale {
+
+    /// Dolu bir saatin en açık tonu bile boş bir saatten ayırt edilebilmeli;
+    /// taban 0.25'ten başlıyor, 0'dan değil.
+    static func color(count: Int, peak: Int) -> Color {
+        guard count > 0 else { return KlinaraColor.border.opacity(0.35) }
+        let ratio = Double(count) / Double(max(peak, 1))
+        return KlinaraColor.sageDeep.opacity(0.25 + 0.75 * min(ratio, 1))
+    }
+}
+
 /// Yoğunluk şeridi — `density[]` verisinden saat başına doluluk.
 ///
-/// Isı haritasının en dar hâli: bir gün, saat başına bir kare. Hafta
-/// görünümünde bu satırlar üst üste yığılır.
+/// Isı haritasının en dar hâli: bir gün, saat başına bir kare.
 struct DensityStrip: View {
 
     /// Saat → randevu sayısı.
     let counts: [Int: Int]
     let hours: Range<Int>
+    /// Ortak tepe değeri. `nil` ise şerit kendi içinde ölçeklenir; birden çok
+    /// gün yan yana gösterilirken ortak bir tepe **verilmeli**, aksi hâlde
+    /// sakin bir gün ile dolu bir gün aynı koyulukta çıkar.
+    var peak: Int?
+    /// Erişilebilirlik etiketine giren gün adı; tek gün gösterilirken gereksiz.
+    var dayName: String?
 
-    private var peak: Int { max(counts.values.max() ?? 0, 1) }
+    private var resolvedPeak: Int { peak ?? max(counts.values.max() ?? 0, 1) }
 
     var body: some View {
         HStack(spacing: 2) {
             ForEach(hours, id: \.self) { hour in
                 let count = counts[hour] ?? 0
                 RoundedRectangle(cornerRadius: 3)
-                    .fill(
-                        count == 0
-                            ? KlinaraColor.border.opacity(0.35)
-                            : KlinaraColor.sageDeep.opacity(0.25 + 0.75 * Double(count) / Double(peak))
-                    )
+                    .fill(DensityScale.color(count: count, peak: resolvedPeak))
                     .frame(height: 22)
-                    .accessibilityLabel("\(hour) saatinde \(count) randevu")
+                    .accessibilityLabel(label(hour: hour, count: count))
             }
         }
+    }
+
+    private func label(hour: Int, count: Int) -> String {
+        let time = String(format: "%02d:00", hour)
+        guard let dayName else { return "\(time), \(count) randevu" }
+        return "\(dayName) \(time), \(count) randevu"
+    }
+}
+
+/// Isı haritası lejantı — "az" ile "çok"un neye benzediğini söyler.
+///
+/// Renk ölçeği göreli: en koyu kare **o aralığın** en yoğun saati demek,
+/// mutlak bir eşik değil. Lejant bunu tepe sayıyı yazarak açık ediyor.
+struct DensityLegend: View {
+
+    let peak: Int
+    /// Isı şube geneli mi, süzülmüş mü. Sunucu yoğunluğu personel filtresine
+    /// göre daraltmıyor ve bunu söylememek yanlış okumaya davet olurdu.
+    var note: String?
+
+    var body: some View {
+        HStack(spacing: KlinaraMetrics.xs) {
+            Text("az")
+                .font(.system(size: 10))
+                .foregroundStyle(KlinaraColor.charcoalMuted)
+
+            HStack(spacing: 2) {
+                ForEach(0..<4, id: \.self) { step in
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(DensityScale.color(count: step + 1, peak: 4))
+                        .frame(width: 12, height: 8)
+                }
+            }
+
+            Text(peak > 0 ? "çok (\(peak))" : "çok")
+                .font(.system(size: 10))
+                .foregroundStyle(KlinaraColor.charcoalMuted)
+
+            if let note {
+                Text("· \(note)")
+                    .font(.system(size: 10))
+                    .foregroundStyle(KlinaraColor.charcoalMuted)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            "Yoğunluk ölçeği, en yoğun saatte \(peak) randevu"
+                + (note.map { ". \($0)" } ?? "")
+        )
+    }
+}
+
+/// Hafta ızgarasındaki tek randevu bloğu.
+///
+/// ``AppointmentBlockView``den ayrı: yedi sütun ekrana sığdığında bir sütun
+/// ~45pt kalıyor ve o genişlikte ad, saat ve durum yan yana **okunmuyor**.
+/// Hafta görünümünün cevapladığı soru "bu hafta nerede boşluk var"; ayrıntı
+/// bloğa dokununca açılan detayda. Yine de her blok tam bilgisini
+/// erişilebilirlik etiketinde taşıyor — VoiceOver kullanıcısı için görsel
+/// daralma bir bilgi kaybı olmamalı.
+struct WeekBlockView: View {
+
+    let title: String
+    let timeRange: String
+    let colorHex: String?
+    let status: String
+    var isTerminal = false
+    let height: CGFloat
+
+    private var accent: Color {
+        colorHex.flatMap { Color(hex: $0) } ?? KlinaraColor.sage
+    }
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            RoundedRectangle(cornerRadius: 4)
+                .fill(accent.opacity(isTerminal ? 0.08 : 0.22))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 4)
+                        .stroke(accent.opacity(isTerminal ? 0.25 : 0.5), lineWidth: 1)
+                )
+
+            HStack(spacing: 2) {
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(accent)
+                    .frame(width: 2)
+
+                // 24pt'nin altında metin bir çizgiye dönüşüyor; boş bırakmak
+                // yanlış okunan bir harften iyi.
+                if height >= 24 {
+                    Text(title)
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(KlinaraColor.charcoal)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .padding(2)
+        }
+        .frame(height: height, alignment: .top)
+        .opacity(isTerminal ? 0.6 : 1)
+        .contentShape(.rect)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(title), \(timeRange), \(status)")
     }
 }
 
@@ -175,6 +297,17 @@ struct DensityStrip: View {
         )
 
         DensityStrip(counts: [9: 1, 10: 3, 11: 2, 14: 1], hours: 9..<19)
+
+        DensityLegend(peak: 3, note: "şube geneli")
+
+        WeekBlockView(
+            title: "Ayşe Yılmaz",
+            timeRange: "09:30 – 10:30",
+            colorHex: "#7F9A76",
+            status: "Planlandı",
+            height: CalendarGridMetrics.height(minutes: 60)
+        )
+        .frame(width: 46)
 
         TimeAxisRuler(hours: 9..<12)
     }

@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsUUID } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsIn, IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
 import {
   COMPARE_MODES,
   NO_SHOW_GROUPINGS,
@@ -35,6 +36,26 @@ export class ReportQueryDto extends DateRangeQueryDto {
   @IsOptional()
   @IsIn(COMPARE_MODES)
   compareTo?: CompareMode;
+
+  /**
+   * Kırılım satırlarının sayfa boyutu.
+   *
+   * `totals`, `previous` ve `delta` sayfalamadan ETKİLENMEZ: aralığın tamamı
+   * üzerinden hesaplanır. Sayfalanan yalnız `data[]` — ikinci sayfaya geçen
+   * kullanıcının toplamlarının değişmesi, raporu okunamaz kılardı.
+   */
+  @ApiPropertyOptional({ minimum: 1, maximum: 200, default: 50 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(200)
+  limit?: number;
+
+  @ApiPropertyOptional({ description: 'Önceki sayfanın `pageInfo.nextCursor` değeri' })
+  @IsOptional()
+  @IsString()
+  cursor?: string;
 }
 
 export class OccupancyQueryDto extends ReportQueryDto {
@@ -102,6 +123,11 @@ export class OccupancyReportDto {
   @ApiProperty({ type: ReportPeriodDto }) period: ReportPeriodDto;
   @ApiProperty({ type: OccupancyTotalsDto }) totals: OccupancyTotalsDto;
   @ApiProperty({ type: [OccupancyRowDto] }) data: OccupancyRowDto[];
+  @ApiProperty({
+    type: Object,
+    description: 'Kırılım satırlarının sayfası. Toplamlar sayfalamadan etkilenmez.',
+  })
+  pageInfo: { nextCursor: string | null; hasMore: boolean };
   @ApiPropertyOptional({ type: OccupancyTotalsDto }) previous?: OccupancyTotalsDto;
   @ApiPropertyOptional({
     type: Object,
@@ -131,6 +157,11 @@ export class RevenueReportDto {
   @ApiProperty({ type: ReportPeriodDto }) period: ReportPeriodDto;
   @ApiProperty({ type: RevenueTotalsDto }) totals: RevenueTotalsDto;
   @ApiProperty({ type: [RevenueRowDto] }) data: RevenueRowDto[];
+  @ApiProperty({
+    type: Object,
+    description: 'Kırılım satırlarının sayfası. Toplamlar sayfalamadan etkilenmez.',
+  })
+  pageInfo: { nextCursor: string | null; hasMore: boolean };
   @ApiPropertyOptional({ type: RevenueTotalsDto }) previous?: RevenueTotalsDto;
   @ApiPropertyOptional({ type: Object }) delta?: Record<string, number | null>;
 }
@@ -152,6 +183,11 @@ export class StaffPerformanceReportDto {
   @ApiProperty({ enum: ['all', 'own'] }) scope: 'all' | 'own';
   @ApiProperty({ type: ReportPeriodDto }) period: ReportPeriodDto;
   @ApiProperty({ type: [StaffPerformanceRowDto] }) data: StaffPerformanceRowDto[];
+  @ApiProperty({
+    type: Object,
+    description: 'Kırılım satırlarının sayfası. Toplamlar sayfalamadan etkilenmez.',
+  })
+  pageInfo: { nextCursor: string | null; hasMore: boolean };
   @ApiProperty() currency: string;
 }
 
@@ -177,6 +213,11 @@ export class NoShowReportDto {
   @ApiProperty({ type: ReportPeriodDto }) period: ReportPeriodDto;
   @ApiProperty({ type: NoShowTotalsDto }) totals: NoShowTotalsDto;
   @ApiProperty({ type: [NoShowRowDto] }) data: NoShowRowDto[];
+  @ApiProperty({
+    type: Object,
+    description: 'Kırılım satırlarının sayfası. Toplamlar sayfalamadan etkilenmez.',
+  })
+  pageInfo: { nextCursor: string | null; hasMore: boolean };
   @ApiProperty({
     type: [NoShowByOriginDto],
     description: 'Online randevunun no-show oranı ayrı izlenir (bkz. böl. 11, soru 8).',

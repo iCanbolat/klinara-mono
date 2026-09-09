@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import UniformTypeIdentifiers
 
 /// Bellekte yaşayan dosya servisi.
 ///
@@ -12,9 +13,20 @@ final class MockFilesService: FilesService, @unchecked Sendable {
     private let lock = NSLock()
     private var records: [CustomerFile] = []
     private var groupRecords: [CustomerFileGroup] = []
-    /// `storageKey → gövde`. Nesne depolamasının bellekteki karşılığı.
-    private var objects: [String: Data] = [:]
+    /// `storageKey → gövde + içerik tipi`. Nesne depolamasının bellekteki
+    /// karşılığı; tip de saklanıyor çünkü sunucu `confirm` anında MIME'ı
+    /// `HeadObject` ile **nesnenin kendisinden** okuyor.
+    private var objects: [String: StoredObject] = [:]
+    /// `fileId → nesne`. `confirm` anında anahtardan kayda geçen bağ;
+    /// ``downloadURL(fileId:variant:)`` gövdeyi buradan buluyor.
+    private var fileObjects: [String: StoredObject] = [:]
     private var canReadMedical: Bool
+
+    /// Nesne depolamasındaki bir kayıt: gövde ve `Content-Type` birlikte.
+    struct StoredObject {
+        let data: Data
+        let contentType: String
+    }
 
     init(canReadMedical: Bool = true) {
         self.canReadMedical = canReadMedical
@@ -26,6 +38,7 @@ final class MockFilesService: FilesService, @unchecked Sendable {
             records = []
             groupRecords = []
             objects = [:]
+            fileObjects = [:]
         }
     }
 
@@ -65,7 +78,7 @@ final class MockFilesService: FilesService, @unchecked Sendable {
         await latency(0.5)
         // `mock://uploads/<key>` — şemadan sonrası anahtar.
         let key = url.absoluteString.replacingOccurrences(of: "mock://uploads/", with: "")
-        withLock { objects[key] = data }
+        withLock { objects[key] = StoredObject(data: data, contentType: contentType) }
     }
 
     func confirm(customerId: String, _ input: ConfirmFileInput) async throws -> CustomerFile {
@@ -78,7 +91,7 @@ final class MockFilesService: FilesService, @unchecked Sendable {
             }
             // Nesne gerçekten var mı — sunucudaki `HeadObject` kontrolünün
             // karşılığı. Yükleme adımı atlanırsa burada takılır.
-            guard let data = objects[input.storageKey] else {
+            guard let object = objects[input.storageKey] else {
                 throw MockErrors.validation("Yüklenen dosya bulunamadı", path: "storageKey")
             }
             guard !records.contains(where: { $0.id == input.storageKey }) else {
@@ -91,9 +104,12 @@ final class MockFilesService: FilesService, @unchecked Sendable {
                 groupId: input.groupId,
                 kind: input.kind,
                 position: input.position ?? .other,
-                mimeType: input.kind == .photo ? "image/jpeg" : "application/pdf",
+                // Tip de boyut gibi NESNENİN KENDİSİNDEN. Burada `kind`e göre
+                // sabit bir MIME yazılıyordu ("belge ise PDF") ve istemcinin
+                // gerçek tipi taşıdığı düzeltmeyi mock modda görünmez kılıyordu.
+                mimeType: object.contentType,
                 // Boyut istemcinin beyanından değil NESNENİN KENDİSİNDEN.
-                sizeBytes: data.count,
+                sizeBytes: object.data.count,
                 sha256: input.sha256,
                 // Küçük görsel kuyruk işiyle üretiliyor: `confirm` anında
                 // HENÜZ hazır değil. Anında `true` dönmek, ızgaradaki yer
@@ -104,6 +120,7 @@ final class MockFilesService: FilesService, @unchecked Sendable {
                 createdAt: Date()
             )
             records.append(file)
+            fileObjects[file.id] = object
 
             if input.kind == .photo {
                 scheduleThumbnail(for: file.id)
@@ -196,8 +213,21 @@ final class MockFilesService: FilesService, @unchecked Sendable {
             if variant == .thumb, !file.hasThumbnail {
                 throw MockErrors.thumbnailNotReady
             }
+            // İmzalı adresin karşılığı GERÇEK bir adres olmalı: `mock://`
+            // şemasını `URLSession` çekemiyor ve indirme yolu (fotoğraf
+            // detayı, belge görüntüleyici) mock modda hiç çalışmıyordu —
+            // ekranların yalnız hata dalı deneniyordu.
+            guard let object = fileObjects[fileId] else { throw MockErrors.notFound }
+            let ext = UTType(mimeType: object.contentType)?.preferredFilenameExtension ?? "dat"
+            let target = FileManager.default.temporaryDirectory
+                .appendingPathComponent("mock-\(fileId)-\(variant.rawValue).\(ext)")
+            do {
+                try object.data.write(to: target, options: .atomic)
+            } catch {
+                throw MockErrors.notFound
+            }
             return DownloadURL(
-                url: "mock://files/\(fileId)/\(variant.rawValue)",
+                url: target.absoluteString,
                 expiresAt: Date().addingTimeInterval(300)
             )
         }

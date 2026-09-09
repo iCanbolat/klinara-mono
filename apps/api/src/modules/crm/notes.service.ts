@@ -9,6 +9,7 @@ import {
   toPage,
   type Page,
 } from '../../common/pagination';
+import { assertRange } from '../../common/dto/date-range.dto';
 import { TenantTxService } from '../../database/tenant-tx.service';
 import type { Tx } from '../../database/tenant-tx';
 import { hasPermission, type Principal } from '../identity/principal';
@@ -136,6 +137,9 @@ export class NotesService {
     const limit = Math.min(query.limit ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
     const cursor = decodeCursor(query.cursor);
     const medical = NotesService.canReadMedical(principal);
+    // İki uç da verilmişse aralık yarı açık ve `to > from` olmalı; rapor
+    // uçlarındaki kuralın aynısı.
+    if (query.from !== undefined && query.to !== undefined) assertRange(query.from, query.to);
 
     const rows = await this.tx.run(async (tx) => {
       await NotesService.assertCustomer(tx, customerId);
@@ -145,6 +149,9 @@ export class NotesService {
         canReadMedical: medical,
         cursorOccurredAt: cursor?.sortKey,
         cursorId: cursor?.id,
+        kinds: query.kinds,
+        from: query.from,
+        to: query.to,
       });
     });
 

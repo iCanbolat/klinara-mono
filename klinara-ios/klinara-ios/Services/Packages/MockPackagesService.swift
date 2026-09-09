@@ -696,12 +696,14 @@ final class MockPackagesService: PackagesService, @unchecked Sendable {
         limit: Int?
     ) async throws -> ExpiringReport {
         await latency(0.4)
-        return withLock {
+        let size = min(limit ?? 50, 200)
+
+        return try withLock {
             let names = Dictionary(
                 customers.snapshot.map { ($0.id, $0.fullName) },
                 uniquingKeysWith: { first, _ in first }
             )
-            let rows = packageRecords
+            var rows = packageRecords
                 .filter { $0.status == .active && $0.remainingSessions > 0 }
                 .filter { branchId == nil || $0.branchId == branchId }
                 // Aralık YARI AÇIK: `to` dahil değil.
@@ -719,10 +721,26 @@ final class MockPackagesService: PackagesService, @unchecked Sendable {
                         outstandingMinor: pkg.outstandingMinor
                     )
                 }
-                .sorted { $0.expiresAt < $1.expiresAt }
+                // Sunucudaki keyset sırası: `(expiresAt, id)` artan. Eşit
+                // tarihlerde `id` olmadan sıra belirsiz kalır ve sayfa
+                // sınırındaki kayıt ya iki kez çıkar ya hiç çıkmaz.
+                .sorted { ($0.expiresAt, $0.id) < ($1.expiresAt, $1.id) }
+
+            if let cursor {
+                guard let key = MockCursor.decodeKey(cursor) else {
+                    throw MockErrors.validation("Geçersiz cursor", path: "cursor")
+                }
+                rows = rows.filter { ($0.expiresAt, $0.id) > (key.sortKey, key.id) }
+            }
+
+            let page = Array(rows.prefix(size))
+            let hasMore = rows.count > size
+            let next = hasMore
+                ? page.last.map { MockCursor.encode(sortKey: $0.expiresAt, id: $0.id) }
+                : nil
             return ExpiringReport(
-                data: rows,
-                pageInfo: PageInfo(nextCursor: nil, hasMore: false)
+                data: page,
+                pageInfo: PageInfo(nextCursor: next, hasMore: hasMore)
             )
         }
     }

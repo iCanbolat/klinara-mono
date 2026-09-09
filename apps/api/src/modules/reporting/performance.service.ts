@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { sql, type SQL } from 'drizzle-orm';
+import { groupKey, pageRows } from './report-page';
 import { assertRange } from '../../common/dto/date-range.dto';
 import { TenantTxService } from '../../database/tenant-tx.service';
 import type { Principal } from '../identity/principal';
@@ -155,11 +156,7 @@ export class PerformanceService {
       `),
     );
 
-    return {
-      scope: scope.kind,
-      period: { from: query.from, to: query.to },
-      currency: 'TRY',
-      data: result.rows.map((row) => {
+    const rows = result.rows.map((row) => {
         const booked = Number(row.booked_minutes ?? 0);
         const available = Number(row.available_minutes ?? 0);
         return {
@@ -172,7 +169,18 @@ export class PerformanceService {
           availableMinutes: Math.round(available),
           occupancyRate: rate(booked, available),
         };
-      }),
+    });
+
+    // Satır sayısı personel sayısıyla sınırlı; yine de aynı sözleşme, çünkü
+    // istemci beş raporu tek bir sayfalama koduyla okuyor.
+    const page = pageRows(rows, query, (row) => row.staffProfileId);
+
+    return {
+      scope: scope.kind,
+      period: { from: query.from, to: query.to },
+      currency: 'TRY',
+      data: page.data,
+      pageInfo: page.pageInfo,
     };
   }
 
@@ -192,10 +200,19 @@ export class PerformanceService {
     ]);
     const totals = PerformanceService.sumNoShow(rows);
 
+    // `byOrigin` SAYFALANMIYOR: iki satır (iç/online) ve raporun okunması
+    // için ikisi de gerekli.
+    const page = pageRows(
+      rows.map(({ groupId, groupLabel, ...counts }) => ({ groupId, groupLabel, ...counts })),
+      query,
+      groupKey,
+    );
+
     const report: NoShowReportDto = {
       period: { from: query.from, to: query.to },
       totals,
-      data: rows.map(({ groupId, groupLabel, ...counts }) => ({ groupId, groupLabel, ...counts })),
+      data: page.data,
+      pageInfo: page.pageInfo,
       byOrigin,
     };
 

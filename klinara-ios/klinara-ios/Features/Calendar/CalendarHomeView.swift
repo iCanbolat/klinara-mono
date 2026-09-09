@@ -37,18 +37,29 @@ struct CalendarHomeView: View {
                             onSelect: { selected = $0 }
                         )
                     case .grid:
-                        DayGridView(
+                        dayGrid
+                    case .week:
+                        WeekGridView(
                             clock: clock,
-                            day: store.selectedDate,
+                            days: clock.weekDays(of: store.selectedDate),
+                            selectedDay: store.selectedDate,
                             entries: store.entries,
+                            density: store.densityByDay,
+                            densityPeak: store.densityPeak,
+                            densityNote: densityNote,
                             staffColor: staffColor,
-                            onSelect: { selected = $0 }
+                            onSelect: { selected = $0 },
+                            // Bir güne dokunmak o güne GEÇMİYOR, yalnız seçili
+                            // günü değiştiriyor: hafta görünümünden çıkmadan
+                            // gün seçmek, moda geri dönüldüğünde nereye
+                            // düşüleceğini belirliyor.
+                            onSelectDay: { store.select($0) }
                         )
                     }
                 }
             }
             .background(KlinaraColor.surface)
-            .navigationTitle(clock.formatDate(store.selectedDate))
+            .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { toolbar }
             .task(id: store.loadKey(clock: clock, branchId: session.selectedBranchId)) {
@@ -78,24 +89,66 @@ struct CalendarHomeView: View {
         .tint(KlinaraColor.sage)
     }
 
+    /// Gün ızgarası, üstünde o günün saatlik yoğunluk şeridiyle.
+    ///
+    /// Şerit ızgaranın kendisini tekrar etmiyor: bloklar **kimin** randevusu
+    /// olduğunu, şerit **kaç** randevu olduğunu söylüyor. Personel filtresi
+    /// açıkken ikisi ayrışıyor ve lejant bunu yazıyor.
+    private var dayGrid: some View {
+        VStack(alignment: .leading, spacing: KlinaraMetrics.sm) {
+            if store.densityPeak > 0 {
+                DensityStrip(
+                    counts: store.densityByDay[clock.localDateString(store.selectedDate)] ?? [:],
+                    hours: CalendarBlockLayout.hours(for: store.entries, clock: clock),
+                    peak: store.densityPeak
+                )
+                DensityLegend(peak: store.densityPeak, note: densityNote)
+            }
+
+            DayGridView(
+                clock: clock,
+                day: store.selectedDate,
+                entries: store.entries,
+                staffColor: staffColor,
+                onSelect: { selected = $0 }
+            )
+        }
+    }
+
+    /// Sunucu yoğunluğu personel filtresine göre daraltmıyor
+    /// (`calendar.repository.ts:loadDensity`). Filtre açıkken bloklarla ısının
+    /// ayrıştığını söylememek, kullanıcıyı "bu personel bu saatte dolu"
+    /// sonucuna götürürdü.
+    private var densityNote: String? {
+        store.staffFilter == nil ? nil : "şube geneli"
+    }
+
     // MARK: Başlık
 
     private var header: some View {
         VStack(spacing: KlinaraMetrics.md) {
-            CalendarDateStrip(
-                clock: clock,
-                selected: store.selectedDate,
-                counts: dayCounts,
-                onSelect: { store.select($0) }
-            )
+            // Hafta modunda şerit ızgaranın kendi gün başlığını tekrar ederdi;
+            // ekranın dikeyi zaten ızgaraya lazım.
+            if store.mode != .week {
+                CalendarDateStrip(
+                    clock: clock,
+                    selected: store.selectedDate,
+                    counts: dayCounts,
+                    onSelect: { store.select($0) }
+                )
+            }
 
-            HStack(spacing: KlinaraMetrics.md) {
+            HStack(spacing: KlinaraMetrics.sm) {
+                stepButton(-1, icon: "chevron.left", label: previousLabel)
+
                 KlinaraSegmentedPicker(
                     options: CalendarStore.Mode.allCases,
                     selection: Binding(get: { store.mode }, set: { store.mode = $0 }),
                     title: \.turkishName,
                     icon: \.icon
                 )
+
+                stepButton(1, icon: "chevron.right", label: nextLabel)
 
                 if !clock.isToday(store.selectedDate) {
                     Button("Bugün") { store.goToToday() }
@@ -113,6 +166,27 @@ struct CalendarHomeView: View {
         .padding(.bottom, KlinaraMetrics.md)
         .background(KlinaraColor.surface)
     }
+
+    /// İleri/geri. Şerit **daima** seçili günün haftasını çiziyor ve başka
+    /// bir haftaya geçmenin yolu yoktu; hafta ızgarası bunu görünür bir eksiğe
+    /// çevirdi — kaydırılamayan bir hafta görünümü planlamaya yaramaz.
+    ///
+    /// Adım modun kendi adımı: hafta görünümünde bir gün ilerlemek çoğu zaman
+    /// aynı haftada kalıp hiçbir şeyi değiştirmezdi.
+    private func stepButton(_ direction: Int, icon: String, label: String) -> some View {
+        Button { store.step(direction, clock: clock) } label: {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(KlinaraColor.sageDeep)
+                .frame(width: 32, height: 44)
+                .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+    }
+
+    private var previousLabel: String { store.mode == .week ? "Önceki hafta" : "Önceki gün" }
+    private var nextLabel: String { store.mode == .week ? "Sonraki hafta" : "Sonraki gün" }
 
     private var staffFilterRow: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -173,15 +247,29 @@ struct CalendarHomeView: View {
 
     // MARK: Yardımcılar
 
-    /// Şerit altındaki noktalar. Yalnız görüntülenen günün verisi elimizde
-    /// olduğu için diğer günler boş görünür — haftalık sayıyı çekmek için ayrı
-    /// bir istek atmak, şerit için fazla maliyet.
+    /// Şerit altındaki noktalar.
+    ///
+    /// Hafta modunda yanıt haftanın tamamının `density[]`ini taşıyor ve
+    /// noktalar ilk kez yedi gün için de doğru. Gün modunda elde yalnız o günün
+    /// verisi var; haftalık sayı için ikinci bir istek atmak, bir nokta uğruna
+    /// fazla maliyet.
     private var dayCounts: [String: Int] {
+        if store.mode == .week { return store.countsByDay }
         var counts: [String: Int] = [:]
         for entry in store.activeEntries {
             counts[clock.localDateString(entry.startsAt), default: 0] += 1
         }
         return counts
+    }
+
+    /// Hafta modunda tek bir gün yazmak yanıltıcı: ekranda yedi gün var.
+    private var title: String {
+        guard store.mode == .week else { return clock.formatDate(store.selectedDate) }
+        let days = clock.weekDays(of: store.selectedDate)
+        guard let first = days.first, let last = days.last else {
+            return clock.formatDate(store.selectedDate)
+        }
+        return "\(clock.dayNumber(first)) – \(clock.formatDate(last))"
     }
 
     private func staffColor(_ staffProfileId: String) -> String? {

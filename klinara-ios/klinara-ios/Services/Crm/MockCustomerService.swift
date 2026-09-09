@@ -69,10 +69,10 @@ final class MockCustomerService: CustomerService, @unchecked Sendable {
             if let source { visible = visible.filter { $0.source == source } }
 
             if let cursor {
-                guard let key = MockCursor.decode(cursor) else {
+                guard let key = MockCursor.decodeKey(cursor) else {
                     throw MockErrors.validation("Geçersiz cursor", path: "cursor")
                 }
-                visible = visible.filter { ($0.createdAt, $0.id) < (key.createdAt, key.id) }
+                visible = visible.filter { ($0.createdAt, $0.id) < (key.sortKey, key.id) }
             }
 
             let page = Array(visible.prefix(size))
@@ -387,12 +387,19 @@ final class MockCustomerService: CustomerService, @unchecked Sendable {
 /// da opak bir metin üretiliyor, ham tarih değil.
 enum MockCursor {
 
-    static func encode(_ customer: Customer) -> String {
-        let raw = "\(customer.createdAt.timeIntervalSince1970)|\(customer.id)"
+    /// Genel biçim: `sıralamaAnahtarı|id`. Sunucudaki keyset imleci de aynı
+    /// ikiliyi taşıyor; mock'un başka bir biçim kullanması, sayfa sınırındaki
+    /// hataların yalnız canlıda ortaya çıkması demekti.
+    static func encode(sortKey: Date, id: String) -> String {
+        let raw = "\(sortKey.timeIntervalSince1970)|\(id)"
         return Data(raw.utf8).base64EncodedString()
     }
 
-    static func decode(_ cursor: String) -> (createdAt: Date, id: String)? {
+    static func encode(_ customer: Customer) -> String {
+        encode(sortKey: customer.createdAt, id: customer.id)
+    }
+
+    static func decodeKey(_ cursor: String) -> (sortKey: Date, id: String)? {
         guard let data = Data(base64Encoded: cursor),
               let raw = String(data: data, encoding: .utf8)
         else { return nil }

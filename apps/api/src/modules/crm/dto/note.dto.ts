@@ -1,9 +1,10 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
   IsIn,
   IsInt,
+  IsISO8601,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -160,4 +161,40 @@ export class TimelineQueryDto {
   @IsOptional()
   @IsString()
   cursor?: string;
+
+  /**
+   * Gösterilecek olay türleri, virgülle ayrılmış (`kinds=note,consent`).
+   *
+   * Verilmezse hepsi döner. Boş bir liste "hiçbiri" DEĞİL, "belirtilmedi"
+   * sayılır: `?kinds=` yazan bir istemcinin boş sayfa alması, filtreyi
+   * temizlemenin sonucu boş liste olurdu.
+   */
+  @ApiPropertyOptional({
+    isArray: true,
+    enum: TIMELINE_KINDS,
+    description: 'Virgülle ayrılmış tür listesi; verilmezse tümü',
+  })
+  @IsOptional()
+  @Transform(({ value }) =>
+    typeof value === 'string'
+      ? value
+          .split(',')
+          .map((part) => part.trim())
+          .filter((part) => part.length > 0)
+      : value,
+  )
+  @IsIn(TIMELINE_KINDS, { each: true })
+  kinds?: TimelineKind[];
+
+  /** Dahil. Verilmezse geçmişin tamamı. */
+  @ApiPropertyOptional({ example: '2026-01-01T00:00:00+03:00' })
+  @IsOptional()
+  @IsISO8601({ strict: true })
+  from?: string;
+
+  /** HARİÇ — takvim ve rapor uçlarındaki yarı açık aralık idiomu. */
+  @ApiPropertyOptional({ example: '2026-10-01T00:00:00+03:00', description: 'HARİÇ' })
+  @IsOptional()
+  @IsISO8601({ strict: true })
+  to?: string;
 }

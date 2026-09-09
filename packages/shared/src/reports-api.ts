@@ -13,6 +13,8 @@
  * bundle'lıyor.
  */
 
+import type { PageInfo } from './clinic-api';
+
 /** Yarı açık aralık `[from, to)` — API sözleşmesi 5.5. */
 export interface ReportPeriod {
   from: string;
@@ -77,6 +79,15 @@ export interface OccupancyReport {
   period: ReportPeriod;
   totals: OccupancyTotals;
   data: OccupancyRow[];
+  /**
+   * Kırılım satırlarının sayfası.
+   *
+   * Sayfalama OPT-IN: istek `limit` taşımıyorsa satırların tamamı döner ve
+   * `hasMore` `false` olur. `totals` / `previous` / `delta` her koşulda
+   * aralığın TAMAMINDAN hesaplanır — sayfa değiştikçe toplamların oynaması
+   * raporu okunamaz kılardı.
+   */
+  pageInfo: PageInfo;
   previous?: OccupancyTotals;
   delta?: ReportDelta;
 }
@@ -112,6 +123,15 @@ export interface RevenueReport {
   period: ReportPeriod;
   totals: RevenueTotals;
   data: RevenueRow[];
+  /**
+   * Kırılım satırlarının sayfası.
+   *
+   * Sayfalama OPT-IN: istek `limit` taşımıyorsa satırların tamamı döner ve
+   * `hasMore` `false` olur. `totals` / `previous` / `delta` her koşulda
+   * aralığın TAMAMINDAN hesaplanır — sayfa değiştikçe toplamların oynaması
+   * raporu okunamaz kılardı.
+   */
+  pageInfo: PageInfo;
   previous?: RevenueTotals;
   delta?: ReportDelta;
 }
@@ -136,6 +156,15 @@ export interface StaffPerformanceReport {
   scope: ReportScopeKind;
   period: ReportPeriod;
   data: StaffPerformanceRow[];
+  /**
+   * Kırılım satırlarının sayfası.
+   *
+   * Sayfalama OPT-IN: istek `limit` taşımıyorsa satırların tamamı döner ve
+   * `hasMore` `false` olur. `totals` / `previous` / `delta` her koşulda
+   * aralığın TAMAMINDAN hesaplanır — sayfa değiştikçe toplamların oynaması
+   * raporu okunamaz kılardı.
+   */
+  pageInfo: PageInfo;
   currency: string;
 }
 
@@ -167,6 +196,15 @@ export interface NoShowReport {
   period: ReportPeriod;
   totals: NoShowTotals;
   data: NoShowRow[];
+  /**
+   * Kırılım satırlarının sayfası.
+   *
+   * Sayfalama OPT-IN: istek `limit` taşımıyorsa satırların tamamı döner ve
+   * `hasMore` `false` olur. `totals` / `previous` / `delta` her koşulda
+   * aralığın TAMAMINDAN hesaplanır — sayfa değiştikçe toplamların oynaması
+   * raporu okunamaz kılardı.
+   */
+  pageInfo: PageInfo;
   byOrigin: NoShowByOrigin[];
   previous?: NoShowTotals;
   delta?: ReportDelta;

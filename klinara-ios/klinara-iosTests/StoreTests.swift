@@ -158,9 +158,55 @@ struct CalendarStoreTests {
         let after = store.loadKey(clock: graph.clock, branchId: MockGraph.branchId)
 
         #expect(before != after)
-        #expect(after.day == graph.clock.localDateString(
+        #expect(after.scope == "d" + graph.clock.localDateString(
             graph.clock.adding(days: 1, to: graph.workingTuesday())
         ))
+    }
+
+    /// Hafta modunun kapsamı **haftanın ilk günü**: hafta içinde gün
+    /// değiştirmek aynı veriyi yeniden çekmemeli, hafta değiştirmek çekmeli.
+    @Test("Hafta modunda kapsam haftaya sabitlenir")
+    func weekScopeFollowsWeekNotDay() async {
+        let graph = MockGraph()
+        let store = await makeStore(graph)
+        store.mode = .week
+        let start = store.loadKey(clock: graph.clock, branchId: MockGraph.branchId)
+
+        // Aynı hafta içinde bir gün ileri.
+        store.shift(days: 1, clock: graph.clock)
+        #expect(store.loadKey(clock: graph.clock, branchId: MockGraph.branchId) == start)
+
+        store.step(1, clock: graph.clock)
+        #expect(store.loadKey(clock: graph.clock, branchId: MockGraph.branchId) != start)
+    }
+
+    /// Gün ve hafta AYRI uçlardan geliyor; mod değişimi yeniden çekmeli.
+    @Test("Mod değişimi yükleme anahtarını değiştirir")
+    func modeChangesLoadKey() async {
+        let graph = MockGraph()
+        let store = await makeStore(graph)
+        let day = store.loadKey(clock: graph.clock, branchId: MockGraph.branchId)
+
+        store.mode = .week
+        #expect(store.loadKey(clock: graph.clock, branchId: MockGraph.branchId) != day)
+    }
+
+    @Test("Hafta yanıtı yoğunluğu gün ve saat kırılımında verir")
+    func weekLoadFillsDensity() async {
+        let graph = MockGraph(scenario: .busyDay)
+        let store = await makeStore(graph)
+        store.mode = .week
+        await store.load(branchId: MockGraph.branchId, clock: graph.clock)
+
+        let density = store.densityByDay
+        try? #require(!density.isEmpty)
+        // Tepe, kovaların en büyüğü olmalı: sütunların ortak ölçeği bu.
+        let buckets = density.values.flatMap(\.values)
+        #expect(store.densityPeak == (buckets.max() ?? 0))
+        // Gün toplamı, o günün saat kovalarının toplamı.
+        for (day, hours) in density {
+            #expect(store.countsByDay[day] == hours.values.reduce(0, +))
+        }
     }
 }
 

@@ -16,13 +16,34 @@ import SwiftUI
 final class CalendarStore {
 
     /// Takvimin hangi biçimde çizildiği.
+    ///
+    /// Üçü aynı veriyi üç ayrı soruya cevap verecek biçimde çizer: "sırada ne
+    /// var", "bugün nerede boşluk var", "bu hafta nerede boşluk var".
     enum Mode: String, CaseIterable, Identifiable {
         case agenda
         case grid
+        case week
 
         var id: String { rawValue }
-        var turkishName: String { self == .agenda ? "Ajanda" : "Izgara" }
-        var icon: String { self == .agenda ? "list.bullet" : "square.grid.2x2" }
+
+        var turkishName: String {
+            switch self {
+            case .agenda: return "Ajanda"
+            case .grid: return "Gün"
+            case .week: return "Hafta"
+            }
+        }
+
+        var icon: String {
+            switch self {
+            case .agenda: return "list.bullet"
+            case .grid: return "square.grid.2x2"
+            case .week: return "calendar"
+            }
+        }
+
+        /// Bir "ileri/geri" adımının kaç gün olduğu.
+        var stride: Int { self == .week ? 7 : 1 }
     }
 
     private let service: any BookingService
@@ -44,19 +65,33 @@ final class CalendarStore {
         self.selectedDate = today
     }
 
-    /// `.task(id:)` anahtarı: bu üçlüden biri değişince veri yeniden çekilir.
+    /// `.task(id:)` anahtarı: bunlardan biri değişince veri yeniden çekilir.
+    ///
+    /// `mode` de anahtarın parçası: gün ve hafta **ayrı uçlardan** geliyor,
+    /// mod değişimi yeni bir istek gerektiriyor. Ajanda ile gün aynı veriyi
+    /// paylaşıyor ama ayırmamak, `scope`u modun belirlediği yerde iki modun
+    /// aynı anahtarla farklı aralık istemesi demekti.
     struct LoadKey: Hashable {
         let branchId: String?
-        let day: String
+        let scope: String
         let staffProfileId: String?
     }
 
     func loadKey(clock: BranchClock, branchId: String?) -> LoadKey {
         LoadKey(
             branchId: branchId,
-            day: clock.localDateString(selectedDate),
+            scope: scope(clock: clock),
             staffProfileId: staffFilter
         )
+    }
+
+    /// İstenen aralığın anahtarı — hafta modunda **haftanın ilk günü**, aksi
+    /// hâlde görüntülenen gün. Hafta içinde gün değiştirmek yeniden çekmemeli.
+    private func scope(clock: BranchClock) -> String {
+        switch mode {
+        case .week: return "w" + clock.localDateString(clock.startOfWeek(selectedDate))
+        case .agenda, .grid: return "d" + clock.localDateString(selectedDate)
+        }
     }
 
     // MARK: Gezinme
@@ -65,6 +100,12 @@ final class CalendarStore {
 
     func shift(days: Int, clock: BranchClock) {
         selectedDate = clock.adding(days: days, to: selectedDate)
+    }
+
+    /// Modun kendi adımıyla ileri/geri: hafta görünümünde bir gün atlamak,
+    /// çoğu zaman aynı haftada kalıp hiçbir şeyi değiştirmezdi.
+    func step(_ direction: Int, clock: BranchClock) {
+        shift(days: direction * mode.stride, clock: clock)
     }
 
     func goToToday() { selectedDate = Date() }
@@ -99,14 +140,56 @@ final class CalendarStore {
         }
         state = .loading
         do {
-            state = .loaded(try await service.calendarDay(CalendarDayQuery(
-                branchId: branchId,
-                date: clock.localDateString(selectedDate),
-                staffProfileId: staffFilter
-            )))
+            switch mode {
+            case .week:
+                state = .loaded(try await service.calendarWeek(CalendarWeekQuery(
+                    branchId: branchId,
+                    weekStart: clock.localDateString(clock.startOfWeek(selectedDate)),
+                    staffProfileId: staffFilter
+                )))
+            case .agenda, .grid:
+                state = .loaded(try await service.calendarDay(CalendarDayQuery(
+                    branchId: branchId,
+                    date: clock.localDateString(selectedDate),
+                    staffProfileId: staffFilter
+                )))
+            }
         } catch {
             state = .failed(error as? APIError ?? .network)
         }
+    }
+
+    // MARK: Yoğunluk
+
+    /// `density[]` → `yerelGün → saat → randevu sayısı`.
+    ///
+    /// Sunucu bunu **iptal ve gelmedi hariç** hesaplıyor; ısı haritası
+    /// "gerçekten dolu olan saat"i gösteriyor, "bir zamanlar doluydu"yu değil.
+    ///
+    /// UYARI: sunucu bu kovaları personel filtresine göre daraltmıyor
+    /// (`calendar.repository.ts:loadDensity`). Filtre açıkken bloklar
+    /// daralıyor ama ısı şube geneli kalıyor; ekran bunu yazıyla söylüyor.
+    var densityByDay: [String: [Int: Int]] {
+        var result: [String: [Int: Int]] = [:]
+        for bucket in state.value?.density ?? [] {
+            result[bucket.localDay, default: [:]][bucket.localHour] = bucket.appointmentCount
+        }
+        return result
+    }
+
+    /// Haftanın en yoğun saati. Günler ortak bir ölçekle boyanmazsa iki gün
+    /// aynı koyulukta görünüp farklı doluluğu anlatır.
+    var densityPeak: Int {
+        state.value?.density.map(\.appointmentCount).max() ?? 0
+    }
+
+    /// Gün başına toplam randevu — tarih şeridindeki noktalar için.
+    var countsByDay: [String: Int] {
+        var counts: [String: Int] = [:]
+        for bucket in state.value?.density ?? [] {
+            counts[bucket.localDay, default: 0] += bucket.appointmentCount
+        }
+        return counts
     }
 
     func history(id: String) async throws -> [AppointmentHistoryEntry] {

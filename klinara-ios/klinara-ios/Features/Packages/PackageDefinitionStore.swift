@@ -19,8 +19,29 @@ final class PackageDefinitionStore {
     private(set) var isLoadingMore = false
     private(set) var nextCursor: String?
 
+    /// Listenin sunucu tarafındaki şube kapsamı. `nil` **tüm şubeler**.
+    ///
+    /// Kapsam istemcide süzülmüyor: 200 tanımın olduğu bir kiracıda o şubenin
+    /// paketi üçüncü sayfada olabilir ve satış sayfası, listeyi kaydırmadan
+    /// "satılabilir paket yok" derdi. Sunucunun `branchId` filtresi paketi
+    /// dışlamıyor, kapsamı soruyor: şube kısıtı olmayan tanım her kapsama
+    /// giriyor (`package-definitions.repository.ts`).
+    private(set) var branchScope: String?
+
     init(service: any PackagesService) {
         self.service = service
+    }
+
+    /// Ekran ihtiyacı olan kapsamı bildirir; kapsam değiştiyse yeniden çeker.
+    ///
+    /// Store oturum ömürlü ve iki ekran paylaşıyor (yönetimdeki tanım listesi
+    /// ile satış sayfası). Kapsamı "en son kim ayarladıysa o" bırakmak, satış
+    /// sayfasının başka bir ekranın filtresini miras alması demekti; her ekran
+    /// göründüğünde kendi kapsamını söylüyor.
+    func ensureScope(_ branchId: String?) async {
+        guard branchScope != branchId || state.value == nil else { return }
+        branchScope = branchId
+        await load(force: true)
     }
 
     var definitions: [PackageDefinition] { state.value ?? [] }
@@ -50,7 +71,7 @@ final class PackageDefinitionStore {
             let page = try await service.definitions(
                 cursor: nil,
                 limit: nil,
-                branchId: nil,
+                branchId: branchScope,
                 serviceId: nil,
                 isActive: nil
             )
@@ -73,7 +94,7 @@ final class PackageDefinitionStore {
             let page = try await service.definitions(
                 cursor: cursor,
                 limit: nil,
-                branchId: nil,
+                branchId: branchScope,
                 serviceId: nil,
                 isActive: nil
             )

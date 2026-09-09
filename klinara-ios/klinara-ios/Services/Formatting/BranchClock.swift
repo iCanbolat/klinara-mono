@@ -106,6 +106,28 @@ struct BranchClock: Sendable {
             : "\(formatDateTime(start)) – \(formatDateTime(end))"
     }
 
+    /// Gün adının tek harfi: "P", "S", "Ç"…
+    ///
+    /// Tarih şeridi ve hafta ızgarası aynı harfi göstermek zorunda; her ekranın
+    /// kendi `DateFormatter`ını kurması, birinin bir gün `EEEEE` yerine `EEE`
+    /// yazması demekti.
+    func weekdayInitial(_ date: Date) -> String {
+        pattern("EEEEE").string(from: date)
+    }
+
+    /// Ayın günü, baştaki sıfır olmadan.
+    func dayNumber(_ date: Date) -> String {
+        pattern("d").string(from: date)
+    }
+
+    private func pattern(_ format: String) -> DateFormatter {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "tr_TR")
+        formatter.timeZone = timeZone
+        formatter.dateFormat = format
+        return formatter
+    }
+
     private func formatter(
         dateStyle: DateFormatter.Style,
         timeStyle: DateFormatter.Style

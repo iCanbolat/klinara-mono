@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import UIKit
+import UniformTypeIdentifiers
 @testable import klinara_ios
 
 /// Batch 4.1 davranışı — mock sadakati ve store.
@@ -249,6 +250,7 @@ struct CustomerRecordStoreTests {
 
         let first = try await graph.notes.timeline(
             customerId: MockCustomerSeed.ayse,
+            query: TimelineQuery(),
             cursor: nil,
             limit: 1
         )
@@ -257,11 +259,112 @@ struct CustomerRecordStoreTests {
 
         let second = try await graph.notes.timeline(
             customerId: MockCustomerSeed.ayse,
+            query: TimelineQuery(),
             cursor: cursor,
             limit: 1
         )
         #expect(second.data.first?.id != first.data.first?.id)
         #expect(second.data[0].occurredAt <= first.data[0].occurredAt)
+    }
+
+    /// Filtre SUNUCUDA (mock'ta da): yüklenmiş sayfalar üzerinde süzmek,
+    /// "son 3 ay" diyen kullanıcıya ilk sayfanın içindeki son 3 ayı
+    /// göstermek olurdu.
+    @Test("Tür filtresi yalnız istenen türü döndürür")
+    func timelineFiltersByKind() async throws {
+        let graph = MockGraph(scenario: .busyDay)
+
+        let all = try await graph.notes.timeline(
+            customerId: MockCustomerSeed.ayse,
+            query: TimelineQuery(),
+            cursor: nil,
+            limit: nil
+        )
+        let onlyNotes = try await graph.notes.timeline(
+            customerId: MockCustomerSeed.ayse,
+            query: TimelineQuery(kinds: [.note]),
+            cursor: nil,
+            limit: nil
+        )
+
+        #expect(!onlyNotes.data.isEmpty)
+        #expect(onlyNotes.data.count < all.data.count)
+        #expect(onlyNotes.data.allSatisfy { if case .note = $0 { return true } else { return false } })
+    }
+
+    @Test("Boş tür kümesi süzme YAPMAZ")
+    func emptyKindSetMeansNoFilter() async throws {
+        let graph = MockGraph(scenario: .busyDay)
+
+        let all = try await graph.notes.timeline(
+            customerId: MockCustomerSeed.ayse,
+            query: TimelineQuery(),
+            cursor: nil,
+            limit: nil
+        )
+        let explicitlyEmpty = try await graph.notes.timeline(
+            customerId: MockCustomerSeed.ayse,
+            query: TimelineQuery(kinds: []),
+            cursor: nil,
+            limit: nil
+        )
+
+        #expect(explicitlyEmpty.data.map(\.id) == all.data.map(\.id))
+    }
+
+    /// Aralık yarı açık: `from` DAHİL, `to` HARİÇ.
+    @Test("Tarih aralığının üst ucu hariç, alt ucu dahil")
+    func timelineRangeIsHalfOpen() async throws {
+        let graph = MockGraph(scenario: .busyDay)
+
+        let all = try await graph.notes.timeline(
+            customerId: MockCustomerSeed.ayse,
+            query: TimelineQuery(),
+            cursor: nil,
+            limit: nil
+        )
+        let newest = try #require(all.data.first)
+
+        let excluded = try await graph.notes.timeline(
+            customerId: MockCustomerSeed.ayse,
+            query: TimelineQuery(to: newest.occurredAt),
+            cursor: nil,
+            limit: nil
+        )
+        #expect(!excluded.data.contains { $0.id == newest.id })
+
+        let included = try await graph.notes.timeline(
+            customerId: MockCustomerSeed.ayse,
+            query: TimelineQuery(from: newest.occurredAt),
+            cursor: nil,
+            limit: nil
+        )
+        #expect(included.data.contains { $0.id == newest.id })
+    }
+
+    @Test("Filtre değişimi çizelgeyi baştan yükler")
+    func filterChangeResetsPages() async throws {
+        let graph = MockGraph(scenario: .busyDay)
+        let record = await CustomerRecordStore(
+            customerId: MockCustomerSeed.ayse,
+            notes: graph.notes,
+            files: graph.files,
+            canReadMedical: true,
+            canWriteMedical: true
+        )
+
+        await record.loadTimeline()
+        let before = await record.timelineEntries.count
+        #expect(before > 0)
+
+        await record.applyTimelineFilter(TimelineQuery(kinds: [.note]))
+        let filtered = await record.timelineEntries
+        // Eski sayfaların üstüne EKLENMİYOR: sayı düşmeli, hepsi not olmalı.
+        #expect(filtered.count < before)
+        #expect(filtered.allSatisfy { if case .note = $0 { return true } else { return false } })
+
+        await record.clearTimelineFilter()
+        #expect(await record.timelineEntries.count == before)
     }
 }
 
@@ -430,5 +533,90 @@ struct FileUploaderTests {
             kind: .document
         ))
         #expect(document.storageKey.isEmpty == false)
+    }
+}
+
+// MARK: - İçerik tipi tespiti
+
+/// Belge yükleme uzun süre tipi **varsaydı**: seçilen ne olursa olsun
+/// `application/pdf` yazılıyordu. Sonuç, JPEG'in PDF olarak kaydedilmesi ve
+/// gerçek bir PDF'in hiç seçilememesiydi.
+///
+/// Buradaki değişmez: tip baytlardan okunur, tanınmayan içerik **reddedilir**.
+/// Varsayılan bir tip, hatanın kendisiydi.
+@Suite("İçerik tipi tespiti")
+struct FileContentTypeTests {
+
+    /// Bir imzanın ardına gövde koymak gerekmiyor: tespit yalnız baş baytlara
+    /// bakıyor ve testin gerçek dosya taşıması sözleşmeye bir şey katmazdı.
+    private func bytes(_ values: [UInt8], padding: Int = 32) -> Data {
+        Data(values + Array(repeating: 0x00, count: padding))
+    }
+
+    @Test("PDF imzası application/pdf verir")
+    func detectsPDF() {
+        #expect(FileContentType.detect(data: bytes(Array("%PDF-1.7".utf8))) == "application/pdf")
+    }
+
+    @Test("JPEG imzası image/jpeg verir")
+    func detectsJPEG() {
+        #expect(FileContentType.detect(data: bytes([0xFF, 0xD8, 0xFF, 0xE0])) == "image/jpeg")
+    }
+
+    @Test("PNG imzası image/png verir")
+    func detectsPNG() {
+        let png: [UInt8] = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]
+        #expect(FileContentType.detect(data: bytes(png)) == "image/png")
+    }
+
+    @Test("WebP kapsayıcısı marka alanından tanınır")
+    func detectsWebP() {
+        // RIFF | 4 bayt uzunluk | WEBP
+        let webp = Array("RIFF".utf8) + [0x00, 0x00, 0x00, 0x00] + Array("WEBP".utf8)
+        #expect(FileContentType.detect(data: bytes(webp)) == "image/webp")
+    }
+
+    @Test("HEIC kapsayıcısı marka alanından tanınır")
+    func detectsHEIC() {
+        let heic = [0x00, 0x00, 0x00, 0x18] as [UInt8]
+            + Array("ftyp".utf8) + Array("heic".utf8)
+        #expect(FileContentType.detect(data: bytes(heic)) == "image/heic")
+    }
+
+    /// Uzantı bir İDDİA. `.pdf` uzantılı bir JPEG'e inanmak, `presign`
+    /// beyanı ile nesnenin gerçeğini ayırmak olurdu.
+    @Test("Uzantı yanlışsa baytlar kazanır")
+    func signatureBeatsExtension() {
+        let jpeg = bytes([0xFF, 0xD8, 0xFF, 0xE0])
+        #expect(FileContentType.detect(data: jpeg, filenameExtension: "pdf") == "image/jpeg")
+    }
+
+    @Test("İmza tanınmazsa uzantıya düşülür")
+    func fallsBackToExtension() {
+        let unknown = bytes([0x01, 0x02, 0x03, 0x04])
+        #expect(FileContentType.detect(data: unknown, filenameExtension: "pdf") == "application/pdf")
+    }
+
+    @Test("Desteklenmeyen içerik nil döner — varsayılan tip YOK")
+    func rejectsUnknown() {
+        let text = Data("merhaba dünya".utf8)
+        #expect(FileContentType.detect(data: text) == nil)
+        #expect(FileContentType.detect(data: text, filenameExtension: "txt") == nil)
+        #expect(FileContentType.detect(data: Data()) == nil)
+    }
+
+    @Test("Beyaz liste dışı bir uzantı kabul edilmez")
+    func rejectsDisallowedExtension() {
+        // SVG sunucuda bilinçli olarak dışarıda: çalıştırılabilir içerik taşır.
+        let svg = Data("<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>".utf8)
+        #expect(FileContentType.detect(data: svg, filenameExtension: "svg") == nil)
+    }
+
+    /// Seçici listesi ``FileContentType/allowed``den türetiliyor; ayrışırsa
+    /// kullanıcı sunucunun kabul ettiği bir dosyayı seçemez ya da tersi.
+    @Test("Seçici tip listesi sunucunun beyaz listesiyle örtüşür")
+    func pickerTypesMatchAllowList() {
+        let mimes = Set(FileContentType.allowedUTTypes.compactMap(\.preferredMIMEType))
+        #expect(mimes == Set(FileContentType.allowed))
     }
 }

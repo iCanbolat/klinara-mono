@@ -1,5 +1,6 @@
 import PhotosUI
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Fotoğraf / belge yükleme sayfası.
 ///
@@ -13,11 +14,23 @@ struct FileUploadSheet: View {
     let record: CustomerRecordStore
     let kind: FileKind
 
+    /// Öncesi/sonrası kartındaki boş yuvadan gelindiğinde dolu.
+    ///
+    /// Kullanıcı grubu ve konumu yuvaya dokunarak **zaten seçti**; aynı şeyi
+    /// bir de sayfada sormak, iki seçimin ayrışmasına ve fotoğrafın yanlış
+    /// yuvaya düşmesine açık kapı bırakırdı.
+    private let presetGroupId: String?
+    private let presetPosition: FilePosition?
+
     @Environment(\.dismiss) private var dismiss
 
     @State private var pickerItem: PhotosPickerItem?
     @State private var payload: FileUploader.Payload?
     @State private var preview: UIImage?
+    /// Seçilen dosyanın adı — yalnız belgede dolu. Fotoğrafta önizleme zaten
+    /// ne seçildiğini gösteriyor, belgede gösterecek başka bir şey yok.
+    @State private var pickedName: String?
+    @State private var showsFileImporter = false
     @State private var position: FilePosition = .other
     @State private var groupId: String?
     @State private var takenAt = Date()
@@ -26,8 +39,25 @@ struct FileUploadSheet: View {
     @State private var step: FileUploader.Step?
     @State private var error: APIError?
 
+    init(
+        session: AppSession,
+        record: CustomerRecordStore,
+        kind: FileKind,
+        presetGroupId: String? = nil,
+        presetPosition: FilePosition? = nil
+    ) {
+        self.session = session
+        self.record = record
+        self.kind = kind
+        self.presetGroupId = presetGroupId
+        self.presetPosition = presetPosition
+        _position = State(initialValue: presetPosition ?? .other)
+        _groupId = State(initialValue: presetGroupId)
+    }
+
     private var uploader: FileUploader { FileUploader(service: session.services.files) }
     private var isUploading: Bool { step != nil }
+    private var hasPreset: Bool { presetGroupId != nil || presetPosition != nil }
 
     var body: some View {
         KlinaraFormScaffold(
@@ -49,6 +79,12 @@ struct FileUploadSheet: View {
             }
         }
         .onChange(of: pickerItem) { _, item in Task { await load(item) } }
+        .fileImporter(
+            isPresented: $showsFileImporter,
+            allowedContentTypes: FileContentType.allowedUTTypes,
+            allowsMultipleSelection: false,
+            onCompletion: load
+        )
         .fullScreenCover(isPresented: $showsCamera) {
             CameraPicker { image in
                 apply(image)
@@ -61,11 +97,7 @@ struct FileUploadSheet: View {
 
     @ViewBuilder
     private var sourceSection: some View {
-        KlinaraFormSection(
-            title: "Kaynak",
-            footnote: "Fotoğraf uzun kenarı 2048 pikselе indirilir ve "
-                + "\(ByteSize.format(FileContentType.maxBytes)) sınırının altına küçültülür."
-        ) {
+        KlinaraFormSection(title: "Kaynak", footnote: sourceFootnote) {
             if let preview {
                 Image(uiImage: preview)
                     .resizable()
@@ -78,16 +110,28 @@ struct FileUploadSheet: View {
 
             if let payload {
                 KlinaraRow(
-                    label: "Seçilen dosya",
-                    value: ByteSize.format(payload.data.count)
+                    label: pickedName ?? "Seçilen dosya",
+                    value: ByteSize.format(payload.data.count),
+                    detail: FileContentType.turkishName(of: payload.contentType)
                 )
                 KlinaraDivider()
             }
 
-            PhotosPicker(
-                selection: $pickerItem,
-                matching: kind == .photo ? .images : .any(of: [.images])
-            ) {
+            // Belgede önce "Dosyalar": kimlik fotokopisi ve onam çıktısı
+            // galeride değil, iCloud Drive'da ya da e-posta ekinde duruyor.
+            if kind == .document {
+                Button { showsFileImporter = true } label: {
+                    KlinaraRow(label: "Dosyalardan seç") {
+                        Image(systemName: "folder")
+                            .foregroundStyle(KlinaraColor.sageDeep)
+                    }
+                }
+                .buttonStyle(.plain)
+                .disabled(isUploading)
+                KlinaraDivider()
+            }
+
+            PhotosPicker(selection: $pickerItem, matching: .images) {
                 KlinaraRow(label: "Galeriden seç") {
                     Image(systemName: "photo.on.rectangle")
                         .foregroundStyle(KlinaraColor.sageDeep)
@@ -109,35 +153,55 @@ struct FileUploadSheet: View {
         }
     }
 
+    /// Belge yeniden kodlanmıyor, fotoğraf küçültülüyor: iki farklı vaat.
+    private var sourceFootnote: String {
+        switch kind {
+        case .photo:
+            return "Fotoğraf uzun kenarı 2048 piksele indirilir ve "
+                + "\(ByteSize.format(FileContentType.maxBytes)) sınırının altına küçültülür."
+        case .document:
+            return "PDF ya da görsel (JPEG, PNG, WebP, HEIC), en çok "
+                + "\(ByteSize.format(FileContentType.maxBytes)). Belge olduğu gibi yüklenir."
+        }
+    }
+
     // MARK: Fotoğraf ayrıntıları
 
     private var photoDetailsSection: some View {
         KlinaraFormSection(
             title: "Eşleme",
-            footnote: "Öncesi/sonrası karşılaştırması için fotoğrafı bir gruba bağlayın."
+            footnote: hasPreset
+                ? "Fotoğraf bu grubun \(position.turkishName.lowercased()) yuvasına yüklenir."
+                : "Öncesi/sonrası karşılaştırması için fotoğrafı bir gruba bağlayın."
         ) {
-            Picker("Konum", selection: $position) {
-                ForEach(FilePosition.allCases) { value in
-                    Text(value.turkishName).tag(value)
+            if hasPreset {
+                KlinaraRow(label: "Grup", value: presetGroupTitle)
+                KlinaraDivider()
+                KlinaraRow(label: "Konum", value: position.turkishName)
+            } else {
+                Picker("Konum", selection: $position) {
+                    ForEach(FilePosition.allCases) { value in
+                        Text(value.turkishName).tag(value)
+                    }
                 }
-            }
-            .pickerStyle(.segmented)
-            .padding(KlinaraMetrics.md)
-            .disabled(isUploading)
+                .pickerStyle(.segmented)
+                .padding(KlinaraMetrics.md)
+                .disabled(isUploading)
 
-            KlinaraDivider()
+                KlinaraDivider()
 
-            Picker("Grup", selection: $groupId) {
-                Text("Grupsuz").tag(String?.none)
-                ForEach(record.groups.value ?? []) { group in
-                    Text(group.title).tag(String?.some(group.id))
+                Picker("Grup", selection: $groupId) {
+                    Text("Grupsuz").tag(String?.none)
+                    ForEach(record.groups.value ?? []) { group in
+                        Text(group.title).tag(String?.some(group.id))
+                    }
                 }
+                .pickerStyle(.menu)
+                .tint(KlinaraColor.sageDeep)
+                .klinaraText(.bodyM)
+                .padding(KlinaraMetrics.md)
+                .disabled(isUploading)
             }
-            .pickerStyle(.menu)
-            .tint(KlinaraColor.sageDeep)
-            .klinaraText(.bodyM)
-            .padding(KlinaraMetrics.md)
-            .disabled(isUploading)
 
             KlinaraDivider()
 
@@ -157,6 +221,13 @@ struct FileUploadSheet: View {
                     .disabled(isUploading)
             }
         }
+    }
+
+    private var presetGroupTitle: String {
+        guard let presetGroupId,
+              let group = record.groups.value?.first(where: { $0.id == presetGroupId })
+        else { return "Grupsuz" }
+        return group.title
     }
 
     private func progressSection(_ step: FileUploader.Step) -> some View {
@@ -192,15 +263,65 @@ struct FileUploadSheet: View {
         if kind == .photo, let image = UIImage(data: data) {
             apply(image)
         } else {
-            payload = FileUploader.prepare(documentData: data, contentType: "application/pdf")
-            if payload == nil {
-                error = .problem(ProblemDetails(
-                    code: .validationFailed,
-                    title: "Bu dosya yüklenemez",
-                    detail: "Tip desteklenmiyor ya da boyut sınırı aşılıyor.",
-                    status: 400
-                ))
-            }
+            // Galeriden gelen bir belge de PDF DEĞİL: tipi baytlardan okuyoruz.
+            pickedName = nil
+            apply(documentData: data, filenameExtension: nil)
+        }
+    }
+
+    /// `fileImporter` sonucu. Seçilen dosya uygulamanın kum havuzunun dışında;
+    /// güvenlik kapsamı açılmadan `Data(contentsOf:)` izin hatası verir.
+    private func load(_ result: Result<[URL], Error>) {
+        error = nil
+        guard case .success(let urls) = result else {
+            error = .malformedResponse("Dosya seçilemedi")
+            return
+        }
+        guard let url = urls.first else { return }
+
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+
+        guard let data = try? Data(contentsOf: url) else {
+            error = .malformedResponse("Seçilen dosya okunamadı")
+            return
+        }
+        pickedName = url.lastPathComponent
+        apply(documentData: data, filenameExtension: url.pathExtension)
+    }
+
+    /// Belge gövdesini yüklenebilir hâle getirir.
+    ///
+    /// Tip ve boyut hataları AYRI: "desteklenmiyor" ile "çok büyük" kullanıcıya
+    /// bambaşka şeyler yaptırır — birinde dosyayı değiştirir, diğerinde küçültür.
+    private func apply(documentData data: Data, filenameExtension: String?) {
+        guard let contentType = FileContentType.detect(
+            data: data,
+            filenameExtension: filenameExtension
+        ) else {
+            payload = nil
+            preview = nil
+            error = .problem(ProblemDetails(
+                code: .validationFailed,
+                title: "Bu dosya türü desteklenmiyor",
+                detail: "PDF ya da JPEG, PNG, WebP, HEIC görsel yükleyebilirsiniz.",
+                status: 400
+            ))
+            return
+        }
+
+        payload = FileUploader.prepare(documentData: data, contentType: contentType)
+        // Görsel bir belgede önizleme, yanlış dosyayı yüklemenin önündeki
+        // en ucuz engel.
+        preview = UIImage(data: data)
+
+        if payload == nil {
+            error = .problem(ProblemDetails(
+                code: .validationFailed,
+                title: "Dosya çok büyük",
+                detail: "En çok \(ByteSize.format(FileContentType.maxBytes)) yükleyebilirsiniz.",
+                status: 400
+            ))
         }
     }
 

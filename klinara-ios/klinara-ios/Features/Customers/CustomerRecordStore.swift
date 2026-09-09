@@ -19,6 +19,11 @@ final class CustomerRecordStore {
     private(set) var timelineCursor: String?
     private(set) var isLoadingMore = false
 
+    /// Çizelge filtresi. Değişince liste **baştan** yükleniyor: filtre
+    /// değişimini eldeki sayfaların üstüne eklemek, eski filtrenin kayıtlarıyla
+    /// yenilerini karıştırmak olurdu.
+    private(set) var timelineQuery = TimelineQuery()
+
     private(set) var notes: LoadState<[CustomerNote]> = .loading
     private(set) var files: LoadState<[CustomerFile]> = .loading
     private(set) var groups: LoadState<[CustomerFileGroup]> = .loading
@@ -49,12 +54,24 @@ final class CustomerRecordStore {
 
     // MARK: Zaman çizelgesi
 
+    /// Filtreyi değiştirir ve çizelgeyi sıfırdan çeker.
+    func applyTimelineFilter(_ query: TimelineQuery) async {
+        guard query != timelineQuery else { return }
+        timelineQuery = query
+        await loadTimeline()
+    }
+
+    func clearTimelineFilter() async {
+        await applyTimelineFilter(TimelineQuery())
+    }
+
     func loadTimeline() async {
         timeline = .loading
         timelineCursor = nil
         do {
             let page = try await notesService.timeline(
                 customerId: customerId,
+                query: timelineQuery,
                 cursor: nil,
                 limit: nil
             )
@@ -72,6 +89,7 @@ final class CustomerRecordStore {
         do {
             let page = try await notesService.timeline(
                 customerId: customerId,
+                query: timelineQuery,
                 cursor: cursor,
                 limit: nil
             )

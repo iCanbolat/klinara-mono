@@ -74,6 +74,12 @@ nonisolated struct OccupancyReport: Decodable, Sendable, Equatable {
     let period: ReportPeriod
     let totals: OccupancyTotals
     let data: [OccupancyRow]
+    /// Kırılım satırlarının sayfası. **Opsiyonel**: sayfalamayı tanımayan bir
+    /// sunucu sürümüne karşı çözümleme kırılmasın.
+    ///
+    /// `totals`, `previous` ve `delta` sayfalamadan ETKİLENMEZ — aralığın
+    /// tamamından hesaplanır.
+    let pageInfo: PageInfo?
     let previous: OccupancyTotals?
     let delta: ReportDelta?
 }
@@ -129,6 +135,12 @@ nonisolated struct RevenueReport: Decodable, Sendable, Equatable {
     let period: ReportPeriod
     let totals: RevenueTotals
     let data: [RevenueRow]
+    /// Kırılım satırlarının sayfası. **Opsiyonel**: sayfalamayı tanımayan bir
+    /// sunucu sürümüne karşı çözümleme kırılmasın.
+    ///
+    /// `totals`, `previous` ve `delta` sayfalamadan ETKİLENMEZ — aralığın
+    /// tamamından hesaplanır.
+    let pageInfo: PageInfo?
     let previous: RevenueTotals?
     let delta: ReportDelta?
 }
@@ -153,6 +165,12 @@ nonisolated struct StaffPerformanceReport: Decodable, Sendable, Equatable {
     let scope: ReportScopeKind
     let period: ReportPeriod
     let data: [StaffPerformanceRow]
+    /// Kırılım satırlarının sayfası. **Opsiyonel**: sayfalamayı tanımayan bir
+    /// sunucu sürümüne karşı çözümleme kırılmasın.
+    ///
+    /// `totals`, `previous` ve `delta` sayfalamadan ETKİLENMEZ — aralığın
+    /// tamamından hesaplanır.
+    let pageInfo: PageInfo?
     let currency: String
 }
 
@@ -216,6 +234,12 @@ nonisolated struct NoShowReport: Decodable, Sendable, Equatable {
     let period: ReportPeriod
     let totals: NoShowTotals
     let data: [NoShowRow]
+    /// Kırılım satırlarının sayfası. **Opsiyonel**: sayfalamayı tanımayan bir
+    /// sunucu sürümüne karşı çözümleme kırılmasın.
+    ///
+    /// `totals`, `previous` ve `delta` sayfalamadan ETKİLENMEZ — aralığın
+    /// tamamından hesaplanır.
+    let pageInfo: PageInfo?
     let byOrigin: [NoShowByOrigin]
     let previous: NoShowTotals?
     let delta: ReportDelta?
@@ -252,6 +276,20 @@ nonisolated struct CohortReturn: Decodable, Sendable, Identifiable, Equatable {
 /// ⚠️ `cohorts` oranları dönem bugüne yakınsa yapısal olarak düşük çıkar:
 /// müşterilerin 90 günü henüz dolmamıştır. Sunucu bunu "düzeltmiyor" (kohortu
 /// kırpmak sayının anlamını gizlerdi); ekran uyarıyı gösteriyor.
+/// Kırılım satırlarının sayfa isteği.
+///
+/// Sayfalama **opt-in**: `limit` yoksa sunucu satırların tamamını döndürüyor.
+/// Bu uçlar bugüne kadar hep tam listeyi verdi ve web yönetim paneli öyle
+/// çiziyor; sunucuya varsayılan bir sayfa boyutu koymak o ekranları haber
+/// vermeden kırpmak olurdu.
+nonisolated struct ReportPageQuery: Sendable, Equatable {
+    var limit: Int?
+    var cursor: String?
+
+    /// Tüm satırlar, tek yanıt.
+    static let unpaged = ReportPageQuery()
+}
+
 nonisolated struct RetentionReport: Decodable, Sendable, Equatable {
     let period: ReportPeriod
     let totals: RetentionTotals

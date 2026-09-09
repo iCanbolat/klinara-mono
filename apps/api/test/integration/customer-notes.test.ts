@@ -252,6 +252,95 @@ describe('müşteri notları ve zaman çizelgesi (Batch 4.2)', () => {
       expect(page.data.map((e) => e.kind)).toEqual(['appointment']);
     });
 
+    it('tür filtresi yalnız istenen kolları döndürür', async () => {
+      await createAppointment('10:00').expect(201);
+      await addNote({ body: 'Not 1' }).expect(201);
+
+      const res = await http(app)
+        .get(`/api/v1/customers/${customer()}/timeline`)
+        .query({ kinds: 'note' })
+        .set(ownerAuth())
+        .expect(200);
+      const page = res.body as TimelinePage;
+
+      expect(page.data).toHaveLength(1);
+      expect(page.data[0]?.kind).toBe('note');
+    });
+
+    it('birden çok tür virgülle verilir', async () => {
+      await createAppointment('10:00').expect(201);
+      await addNote({ body: 'Not 1' }).expect(201);
+
+      const res = await http(app)
+        .get(`/api/v1/customers/${customer()}/timeline`)
+        .query({ kinds: 'note,appointment' })
+        .set(ownerAuth())
+        .expect(200);
+      const page = res.body as TimelinePage;
+      expect(page.data).toHaveLength(2);
+    });
+
+    it('bilinmeyen tür 400', async () => {
+      await http(app)
+        .get(`/api/v1/customers/${customer()}/timeline`)
+        .query({ kinds: 'note,uydurma' })
+        .set(ownerAuth())
+        .expect(400);
+    });
+
+    /// Aralık yarı açık: `to` HARİÇ.
+    it('tarih aralığı çizelgeyi daraltır ve üst sınır hariçtir', async () => {
+      await createAppointment('10:00').expect(201);
+      await addNote({ body: 'Not 1' }).expect(201);
+
+      const all = await http(app)
+        .get(`/api/v1/customers/${customer()}/timeline`)
+        .set(ownerAuth())
+        .expect(200);
+      const entries = (all.body as TimelinePage).data;
+      expect(entries.length).toBeGreaterThan(0);
+
+      const newest = entries[0]!;
+      // Üst sınır tam olayın anı: HARİÇ olduğu için olay düşmeli.
+      const excluded = await http(app)
+        .get(`/api/v1/customers/${customer()}/timeline`)
+        .query({ to: newest.occurredAt })
+        .set(ownerAuth())
+        .expect(200);
+      expect((excluded.body as TimelinePage).data.map((e) => e.id)).not.toContain(newest.id);
+
+      // Alt sınır DAHİL: aynı an verilince olay listede kalmalı.
+      const included = await http(app)
+        .get(`/api/v1/customers/${customer()}/timeline`)
+        .query({ from: newest.occurredAt })
+        .set(ownerAuth())
+        .expect(200);
+      expect((included.body as TimelinePage).data.map((e) => e.id)).toContain(newest.id);
+    });
+
+    it('ters aralık 400', async () => {
+      await http(app)
+        .get(`/api/v1/customers/${customer()}/timeline`)
+        .query({ from: '2026-10-01T00:00:00+03:00', to: '2026-09-01T00:00:00+03:00' })
+        .set(ownerAuth())
+        .expect(400);
+    });
+
+    /// İzin daraltması kullanıcı tercihinin ÜSTÜNDE: `kinds=note` diyen bir
+    /// resepsiyonist klinik notunu yine göremez.
+    it('tür filtresi izin daraltmasını gevşetmez', async () => {
+      await addNote({ body: 'İç not', kind: 'internal' }).expect(201);
+      await addNote({ body: 'Serbest not' }).expect(201);
+
+      const res = await http(app)
+        .get(`/api/v1/customers/${customer()}/timeline`)
+        .query({ kinds: 'note' })
+        .set(deskAuth())
+        .expect(200);
+      const page = res.body as TimelinePage;
+      expect(page.data).toHaveLength(1);
+    });
+
     it('BAŞKA kiracının müşterisinin çizelgesi 404', async () => {
       const other = await setupClinic(app, { slug: 'klinik-b' });
       const res = await http(app)

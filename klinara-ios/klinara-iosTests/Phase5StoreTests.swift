@@ -99,6 +99,38 @@ struct Phase5StoreTests {
         #expect(store.definition(id: target.id)?.name == target.name)
     }
 
+    /// Kapsam sunucu tarafında: istemcide süzmek, o şubenin paketi ikinci
+    /// sayfadaysa satış sayfasının "paket yok" demesi demekti.
+    @Test("Kapsam değişimi listeyi sunucudan yeniden çeker")
+    func scopeRefetchesFromServer() async {
+        let mock = graph()
+        let store = PackageDefinitionStore(service: mock.packages)
+
+        await store.ensureScope(nil)
+        let all = store.definitions.count
+        #expect(store.branchScope == nil)
+
+        await store.ensureScope(MockGraph.branchId)
+        #expect(store.branchScope == MockGraph.branchId)
+        // Kapsam DIŞLAMIYOR, soruyor: şube kısıtı olmayan tanımlar da geliyor.
+        #expect(store.definitions.allSatisfy {
+            $0.branchId == nil || $0.branchId == MockGraph.branchId
+        })
+        #expect(store.definitions.count <= all)
+    }
+
+    @Test("Aynı kapsam yeniden çekmez")
+    func sameScopeIsNoop() async {
+        let mock = graph()
+        let store = PackageDefinitionStore(service: mock.packages)
+
+        await store.ensureScope(MockGraph.branchId)
+        let before = store.definitions
+        await store.ensureScope(MockGraph.branchId)
+
+        #expect(store.definitions == before)
+    }
+
     @Test("Satılabilir liste pasif ve başka şubenin paketlerini eler")
     func sellableFiltersScope() async throws {
         let mock = graph()
@@ -333,5 +365,91 @@ struct Phase5StoreTests {
             reason: "yeterince uzun gerekce"
         )
         #expect(valid.isValid)
+    }
+}
+
+// MARK: - Süre dolumu raporunun sayfalaması
+
+/// `GET /reports/packages/expiring` istemci tarafındaki tek sayfalanan rapor.
+///
+/// Ekran uzun süre `pageInfo`yu **hiç okumadı**: sunucunun ilk sayfası (50
+/// satır) listenin tamamı sanıldı ve fazlası sessizce düştü. Buradaki
+/// değişmez, "sayfaları izleyerek toplananın sayfasız yanıtla aynı olması" —
+/// eksik satır da, iki kez sayılan satır da bunu bozar.
+@MainActor
+@Suite("Süre dolumu sayfalaması")
+struct ExpiringPaginationTests {
+
+    private func window(_ clock: BranchClock) -> (from: Date, to: Date) {
+        // Mock tohumundaki paketlerin tamamını kapsayacak kadar geniş.
+        let from = clock.adding(months: -24, to: clock.startOfMonth(Date()))
+        return (from, clock.adding(months: 48, to: from))
+    }
+
+    @Test("Sayfaları izlemek sayfasız yanıtın aynısını verir")
+    func cursorWalkMatchesFullPage() async throws {
+        let mock = MockGraph()
+        let range = window(mock.clock)
+
+        let all = try await mock.packages.expiringReport(
+            from: range.from,
+            to: range.to,
+            branchId: nil,
+            cursor: nil,
+            limit: nil
+        )
+        try #require(!all.data.isEmpty, "Tohumda süre dolumu satırı yok; test bir şey sınamıyor")
+
+        var walked: [ExpiringRow] = []
+        var cursor: String?
+        // Sayfa başına tek satır: sayfa sınırı her satırda sınanıyor.
+        repeat {
+            let page = try await mock.packages.expiringReport(
+                from: range.from,
+                to: range.to,
+                branchId: nil,
+                cursor: cursor,
+                limit: 1
+            )
+            #expect(page.data.count <= 1)
+            walked += page.data
+            cursor = page.pageInfo.nextCursor
+        } while cursor != nil
+
+        #expect(walked.map(\.id) == all.data.map(\.id))
+        #expect(Set(walked.map(\.id)).count == walked.count, "Sayfa sınırında satır tekrarlandı")
+    }
+
+    @Test("Son sayfada imleç yok")
+    func lastPageHasNoCursor() async throws {
+        let mock = MockGraph()
+        let range = window(mock.clock)
+
+        let all = try await mock.packages.expiringReport(
+            from: range.from,
+            to: range.to,
+            branchId: nil,
+            cursor: nil,
+            limit: nil
+        )
+        #expect(all.pageInfo.nextCursor == nil)
+        #expect(!all.pageInfo.hasMore)
+    }
+
+    @Test("İmleç yokken loadMore hiçbir şey yapmaz")
+    func loadMoreIsNoopWithoutCursor() async throws {
+        let mock = MockGraph()
+        let store = PackageReportsStore(
+            service: mock.packages,
+            clock: mock.clock,
+            branchId: MockGraph.branchId
+        )
+        store.months = 48
+        await store.loadExpiring()
+        let before = store.expiring.value?.data.count
+
+        #expect(!store.canLoadMoreExpiring)
+        await store.loadMoreExpiring()
+        #expect(store.expiring.value?.data.count == before)
     }
 }

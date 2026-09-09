@@ -76,10 +76,31 @@ struct OccupancyReportView: View {
                     KlinaraRow(label: "Müsait", value: ReportFormat.minutes(row.availableMinutes))
                 }
             }
+
+            if store.canLoadMoreOccupancy {
+                loadMoreTrigger
+            }
         }
         .navigationTitle("Doluluk")
         .navigationBarTitleDisplayMode(.inline)
         .task { await store.loadOccupancy() }
+    }
+
+    /// Listenin sonuna gelindiğinde sonraki sayfayı ister.
+    ///
+    /// Sunucu tarafında sayfalama opt-in; mobil istemci onu açıyor ve
+    /// `groupBy=day` ile 12 aylık bir rapor artık 365 satırı tek yanıtta
+    /// indirmiyor. Toplamlar sayfa eklendikçe DEĞİŞMİYOR — aralığın
+    /// tamamından geliyorlar.
+    private var loadMoreTrigger: some View {
+        HStack {
+            Spacer()
+            ProgressView()
+                .tint(KlinaraColor.sage)
+            Spacer()
+        }
+        .padding(.vertical, KlinaraMetrics.md)
+        .onAppear { Task { await store.loadMoreOccupancy() } }
     }
 }
 

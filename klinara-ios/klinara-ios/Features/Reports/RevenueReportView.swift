@@ -89,6 +89,10 @@ struct RevenueReportView: View {
                 }
             }
 
+            if store.canLoadMoreRevenue {
+                loadMoreTrigger
+            }
+
             // Kırılım toplamının genel toplamdan küçük olabilmesi raporun en
             // sık "hata" sanılan davranışı; not her zaman görünür.
             Text(
@@ -103,5 +107,22 @@ struct RevenueReportView: View {
         .navigationTitle("Ciro")
         .navigationBarTitleDisplayMode(.inline)
         .task { await store.loadRevenue() }
+    }
+
+    /// Listenin sonuna gelindiğinde sonraki sayfayı ister.
+    ///
+    /// Sunucu tarafında sayfalama opt-in; mobil istemci onu açıyor ve
+    /// `groupBy=day` ile 12 aylık bir rapor artık 365 satırı tek yanıtta
+    /// indirmiyor. Toplamlar sayfa eklendikçe DEĞİŞMİYOR — aralığın
+    /// tamamından geliyorlar.
+    private var loadMoreTrigger: some View {
+        HStack {
+            Spacer()
+            ProgressView()
+                .tint(KlinaraColor.sage)
+            Spacer()
+        }
+        .padding(.vertical, KlinaraMetrics.md)
+        .onAppear { Task { await store.loadMoreRevenue() } }
     }
 }

@@ -30,6 +30,16 @@ struct SellPackageSheet: View {
         options.first { $0.id == selectedId }
     }
 
+    private var emptyMessage: String {
+        guard let name = session.selectedBranch?.name else {
+            return "Satışa açık paket tanımı bulunmuyor."
+        }
+        return "\(name) şubesinde satışa açık paket tanımı bulunmuyor."
+            + (session.canSwitchBranch
+                ? " Başka bir şubede satış yapmak için önce şubeyi değiştirin."
+                : "")
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -53,7 +63,11 @@ struct SellPackageSheet: View {
                             EmptyStateView(
                                 icon: "shippingbox",
                                 title: "Satılabilir paket yok",
-                                message: "Bu şubede satışa açık paket tanımı bulunmuyor."
+                                // Şubenin ADI yazılıyor: çok şubeli bir
+                                // kiracıda "bu şubede" hangi şube olduğunu
+                                // söylemiyor ve kullanıcı yanlış şubede
+                                // olduğunu fark edemiyordu.
+                                message: emptyMessage
                             )
                         } else {
                             picker
@@ -76,7 +90,10 @@ struct SellPackageSheet: View {
                         .foregroundStyle(KlinaraColor.charcoalMuted)
                 }
             }
-            .task { await definitionStore.load() }
+            // Satış SEÇİLİ ŞUBEDE yapılıyor; liste de o kapsamdan gelmeli.
+            // Kapsamsız çekilen listede o şubenin paketi ikinci sayfada
+            // kalabilir ve sayfa "satılabilir paket yok" derdi.
+            .task { await definitionStore.ensureScope(session.selectedBranchId) }
             .overlay {
                 if store.isSaving { AuthLoadingOverlay(message: "Satış kaydediliyor…") }
             }

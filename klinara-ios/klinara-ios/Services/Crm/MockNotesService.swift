@@ -149,12 +149,15 @@ final class MockNotesService: NotesService, @unchecked Sendable {
 
     func timeline(
         customerId: String,
+        query: TimelineQuery,
         cursor: String?,
         limit: Int?
     ) async throws -> Page<TimelineEntry> {
         await latency(0.4)
         let size = min(limit ?? 50, 200)
-        let appointments = booking.appointmentSnapshot(customerId: customerId)
+        let appointments = query.kinds.isEmpty || query.kinds.contains(.appointment)
+            ? booking.appointmentSnapshot(customerId: customerId)
+            : []
 
         return try withLock {
             var events: [TimelineEntry] = appointments.map { appointment in
@@ -170,7 +173,7 @@ final class MockNotesService: NotesService, @unchecked Sendable {
                 )
             }
 
-            events += visible(records)
+            events += (query.kinds.isEmpty || query.kinds.contains(.note) ? visible(records) : [])
                 .filter { $0.customerId == customerId }
                 .map { note in
                     .note(
@@ -184,6 +187,12 @@ final class MockNotesService: NotesService, @unchecked Sendable {
                         )
                     )
                 }
+
+            // Aralık yarı açık: `from` DAHİL, `to` HARİÇ — sunucudaki kural.
+            // Mock'un filtreyi uygulamaması, filtre hatalarının yalnız canlıda
+            // görünmesi demekti.
+            if let from = query.from { events = events.filter { $0.occurredAt >= from } }
+            if let to = query.to { events = events.filter { $0.occurredAt < to } }
 
             // Sunucudaki `order by occurred_at desc, id desc` — cursor bu ikili
             // anahtar üzerinde ilerliyor.

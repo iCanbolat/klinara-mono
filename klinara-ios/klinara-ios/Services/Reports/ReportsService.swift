@@ -13,7 +13,8 @@ protocol ReportsService: Sendable {
         to: Date,
         branchId: String?,
         groupBy: OccupancyGrouping?,
-        compareToPrevious: Bool
+        compareToPrevious: Bool,
+        page: ReportPageQuery
     ) async throws -> OccupancyReport
 
     /// `GET /reports/revenue` — `report.revenue:read` ister.
@@ -22,7 +23,8 @@ protocol ReportsService: Sendable {
         to: Date,
         branchId: String?,
         groupBy: RevenueGrouping?,
-        compareToPrevious: Bool
+        compareToPrevious: Bool,
+        page: ReportPageQuery
     ) async throws -> RevenueReport
 
     /// `GET /reports/staff-performance`
@@ -34,7 +36,8 @@ protocol ReportsService: Sendable {
         from: Date,
         to: Date,
         branchId: String?,
-        compareToPrevious: Bool
+        compareToPrevious: Bool,
+        page: ReportPageQuery
     ) async throws -> StaffPerformanceReport
 
     /// `GET /reports/no-show`
@@ -43,7 +46,8 @@ protocol ReportsService: Sendable {
         to: Date,
         branchId: String?,
         groupBy: NoShowGrouping?,
-        compareToPrevious: Bool
+        compareToPrevious: Bool,
+        page: ReportPageQuery
     ) async throws -> NoShowReport
 
     /// `GET /reports/retention`
@@ -68,7 +72,8 @@ nonisolated struct LiveReportsService: ReportsService {
         from: Date,
         to: Date,
         branchId: String?,
-        compareToPrevious: Bool
+        compareToPrevious: Bool,
+        page: ReportPageQuery = .unpaged
     ) -> [URLQueryItem] {
         var query = [
             URLQueryItem(name: "from", value: KlinaraCoding.timestamp(from)),
@@ -76,6 +81,9 @@ nonisolated struct LiveReportsService: ReportsService {
         ]
         if let branchId { query.append(URLQueryItem(name: "branchId", value: branchId)) }
         if compareToPrevious { query.append(URLQueryItem(name: "compareTo", value: "previous")) }
+        // `limit` YOKSA sunucu tüm satırları döndürüyor; sayfalama opt-in.
+        if let limit = page.limit { query.append(URLQueryItem(name: "limit", value: String(limit))) }
+        if let cursor = page.cursor { query.append(URLQueryItem(name: "cursor", value: cursor)) }
         return query
     }
 
@@ -84,9 +92,16 @@ nonisolated struct LiveReportsService: ReportsService {
         to: Date,
         branchId: String?,
         groupBy: OccupancyGrouping?,
-        compareToPrevious: Bool
+        compareToPrevious: Bool,
+        page: ReportPageQuery
     ) async throws -> OccupancyReport {
-        var query = baseQuery(from: from, to: to, branchId: branchId, compareToPrevious: compareToPrevious)
+        var query = baseQuery(
+            from: from,
+            to: to,
+            branchId: branchId,
+            compareToPrevious: compareToPrevious,
+            page: page
+        )
         if let groupBy { query.append(URLQueryItem(name: "groupBy", value: groupBy.rawValue)) }
         return try await client.send(APIRequest.get("reports/occupancy", query: query))
     }
@@ -96,9 +111,16 @@ nonisolated struct LiveReportsService: ReportsService {
         to: Date,
         branchId: String?,
         groupBy: RevenueGrouping?,
-        compareToPrevious: Bool
+        compareToPrevious: Bool,
+        page: ReportPageQuery
     ) async throws -> RevenueReport {
-        var query = baseQuery(from: from, to: to, branchId: branchId, compareToPrevious: compareToPrevious)
+        var query = baseQuery(
+            from: from,
+            to: to,
+            branchId: branchId,
+            compareToPrevious: compareToPrevious,
+            page: page
+        )
         if let groupBy { query.append(URLQueryItem(name: "groupBy", value: groupBy.rawValue)) }
         return try await client.send(APIRequest.get("reports/revenue", query: query))
     }
@@ -107,9 +129,16 @@ nonisolated struct LiveReportsService: ReportsService {
         from: Date,
         to: Date,
         branchId: String?,
-        compareToPrevious: Bool
+        compareToPrevious: Bool,
+        page: ReportPageQuery
     ) async throws -> StaffPerformanceReport {
-        let query = baseQuery(from: from, to: to, branchId: branchId, compareToPrevious: compareToPrevious)
+        let query = baseQuery(
+            from: from,
+            to: to,
+            branchId: branchId,
+            compareToPrevious: compareToPrevious,
+            page: page
+        )
         return try await client.send(APIRequest.get("reports/staff-performance", query: query))
     }
 
@@ -118,9 +147,16 @@ nonisolated struct LiveReportsService: ReportsService {
         to: Date,
         branchId: String?,
         groupBy: NoShowGrouping?,
-        compareToPrevious: Bool
+        compareToPrevious: Bool,
+        page: ReportPageQuery
     ) async throws -> NoShowReport {
-        var query = baseQuery(from: from, to: to, branchId: branchId, compareToPrevious: compareToPrevious)
+        var query = baseQuery(
+            from: from,
+            to: to,
+            branchId: branchId,
+            compareToPrevious: compareToPrevious,
+            page: page
+        )
         if let groupBy { query.append(URLQueryItem(name: "groupBy", value: groupBy.rawValue)) }
         return try await client.send(APIRequest.get("reports/no-show", query: query))
     }

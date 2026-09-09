@@ -21,6 +21,7 @@ interface OccupancyReport {
     availableMinutes: number;
     occupancyRate: number;
   }[];
+  pageInfo: { nextCursor: string | null; hasMore: boolean };
   previous?: { bookedMinutes: number; availableMinutes: number; occupancyRate: number };
   delta?: Record<string, number | null>;
 }
@@ -35,6 +36,9 @@ const range = (from: string, to: string) =>
 const MONDAY = '2026-09-07';
 const DAY_FROM = `${MONDAY}T00:00:00+03:00`;
 const DAY_TO = '2026-09-08T00:00:00+03:00';
+// Sayfalama testleri için birden çok gün satırı gereken aralık.
+const WEEK_FROM = DAY_FROM;
+const WEEK_TO = '2026-09-14T00:00:00+03:00';
 
 describe('doluluk raporu (Batch 10.1)', () => {
   let database: TestDatabase;
@@ -263,6 +267,69 @@ describe('doluluk raporu (Batch 10.1)', () => {
       const res = await occupancy(range(DAY_TO, DAY_FROM));
       expect(res.status).toBe(400);
       expect((res.body as { code: string }).code).toBe('VALIDATION_FAILED');
+    });
+  });
+
+  /**
+   * Sayfalama OPT-IN ve TOPLAMLARI ETKİLEMİYOR.
+   *
+   * İkisi de gerçek risk: varsayılan bir sayfa boyutu web yönetim panelini
+   * haber vermeden 50 satıra kırpardı; sayfaya göre hesaplanan bir toplam ise
+   * ikinci sayfada doluluk oranını değiştirirdi.
+   */
+  describe('sayfalama', () => {
+    beforeEach(async () => {
+      await database.truncateAll();
+      await setupStandard();
+      await book(`${MONDAY}T10:00:00+03:00`);
+    });
+
+    it('`limit` verilmezse tüm satırlar döner ve `hasMore` false', async () => {
+      const res = await occupancy(`${range(DAY_FROM, DAY_TO)}&groupBy=day`);
+      expect(res.status).toBe(200);
+      const body = res.body as OccupancyReport;
+      expect(body.pageInfo.hasMore).toBe(false);
+      expect(body.pageInfo.nextCursor).toBeNull();
+    });
+
+    it('cursor izlenince toplanan satırlar sayfasız yanıtla aynı', async () => {
+      const full = await occupancy(`${range(WEEK_FROM, WEEK_TO)}&groupBy=day`);
+      expect(full.status).toBe(200);
+      const all = (full.body as OccupancyReport).data;
+      expect(all.length).toBeGreaterThan(1);
+
+      const walked: typeof all = [];
+      let cursor: string | null = null;
+      let pages = 0;
+
+      do {
+        const query =
+          `${range(WEEK_FROM, WEEK_TO)}&groupBy=day&limit=1` +
+          (cursor === null ? '' : `&cursor=${encodeURIComponent(cursor)}`);
+        const res = await occupancy(query);
+        expect(res.status).toBe(200);
+        const body = res.body as OccupancyReport;
+
+        expect(body.data.length).toBeLessThanOrEqual(1);
+        walked.push(...body.data);
+        // Toplamlar sayfa değiştikçe SABİT kalmalı.
+        expect(body.totals).toEqual((full.body as OccupancyReport).totals);
+
+        cursor = body.pageInfo.nextCursor;
+        pages += 1;
+      } while (cursor !== null && pages < 60);
+
+      expect(walked.map((row) => row.groupLabel)).toEqual(all.map((row) => row.groupLabel));
+    });
+
+    it('geçersiz cursor 400', async () => {
+      const res = await occupancy(`${range(DAY_FROM, DAY_TO)}&limit=1&cursor=bozuk!!`);
+      expect(res.status).toBe(400);
+    });
+
+    it('sınır dışı `limit` 400', async () => {
+      expect((await occupancy(`${range(DAY_FROM, DAY_TO)}&limit=0`)).status).toBe(400);
+      expect((await occupancy(`${range(DAY_FROM, DAY_TO)}&limit=201`)).status).toBe(400);
     });
   });
 });

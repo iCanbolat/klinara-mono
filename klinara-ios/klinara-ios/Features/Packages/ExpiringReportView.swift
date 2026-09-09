@@ -32,12 +32,33 @@ struct ExpiringReportView: View {
                     if index > 0 { KlinaraDivider() }
                     self.row(row)
                 }
+
+                if store.canLoadMoreExpiring {
+                    KlinaraDivider()
+                    loadMoreTrigger
+                }
             }
         }
         .navigationTitle("Süre dolumu")
         .navigationBarTitleDisplayMode(.inline)
         .task { await store.loadExpiring() }
         .refreshable { await store.loadExpiring() }
+    }
+
+    /// Listenin sonuna gelindiğinde sonraki sayfayı ister.
+    ///
+    /// Bu olmadan rapor sunucunun ilk sayfasında (50 satır) sessizce kesiliyor
+    /// ve kullanıcı listenin bittiğini sanıyordu; yanıt `pageInfo` döndürdüğü
+    /// hâlde okunmuyordu.
+    private var loadMoreTrigger: some View {
+        HStack {
+            Spacer()
+            ProgressView()
+                .tint(KlinaraColor.sage)
+            Spacer()
+        }
+        .padding(.vertical, KlinaraMetrics.md)
+        .onAppear { Task { await store.loadMoreExpiring() } }
     }
 
     private func row(_ item: ExpiringRow) -> some View {

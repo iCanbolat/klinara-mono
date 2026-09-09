@@ -33,14 +33,14 @@ struct CalendarDateStrip: View {
             onSelect(day)
         } label: {
             VStack(spacing: 2) {
-                Text(weekdayLabel(day))
+                Text(clock.weekdayInitial(day))
                     .font(.system(size: 10, weight: .semibold))
                     .textCase(.uppercase)
                     .foregroundStyle(
                         isSelected ? KlinaraColor.surfaceRaised : KlinaraColor.charcoalMuted
                     )
 
-                Text(dayNumber(day))
+                Text(clock.dayNumber(day))
                     .font(.system(size: 16, weight: isToday ? .bold : .medium))
                     .monospacedDigit()
                     .foregroundStyle(
@@ -72,21 +72,5 @@ struct CalendarDateStrip: View {
     private func dotColor(count: Int, isSelected: Bool) -> Color {
         guard count > 0 else { return .clear }
         return isSelected ? KlinaraColor.surfaceRaised.opacity(0.8) : KlinaraColor.sage
-    }
-
-    private func weekdayLabel(_ day: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "tr_TR")
-        formatter.timeZone = clock.timeZone
-        formatter.dateFormat = "EEEEE"
-        return formatter.string(from: day)
-    }
-
-    private func dayNumber(_ day: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "tr_TR")
-        formatter.timeZone = clock.timeZone
-        formatter.dateFormat = "d"
-        return formatter.string(from: day)
     }
 }

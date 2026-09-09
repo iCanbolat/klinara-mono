@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
+import { groupKey, pageRows } from './report-page';
 import { assertRange } from '../../common/dto/date-range.dto';
 import { TenantTxService } from '../../database/tenant-tx.service';
 import type { Tx } from '../../database/tenant-tx';
@@ -64,13 +65,17 @@ export class OccupancyService {
     const groupBy = query.groupBy ?? 'staff';
 
     const rows = OccupancyService.group(await this.daily(scope, period), groupBy);
+    // Toplamlar SAYFADAN DEĞİL, satırların tamamından: ikinci sayfaya geçen
+    // kullanıcının doluluk oranının değişmesi raporu okunamaz kılardı.
     const totals = OccupancyService.sum(rows);
+    const page = pageRows(rows, query, groupKey);
 
     const report: OccupancyReportDto = {
       scope: scope.kind,
       period: { from: query.from, to: query.to },
       totals,
-      data: rows,
+      data: page.data,
+      pageInfo: page.pageInfo,
     };
 
     if (query.compareTo === 'previous') {

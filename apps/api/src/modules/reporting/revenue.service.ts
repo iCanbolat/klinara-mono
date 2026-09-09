@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { sql, type SQL } from 'drizzle-orm';
+import { groupKey, pageRows } from './report-page';
 import { assertRange } from '../../common/dto/date-range.dto';
 import { TenantTxService } from '../../database/tenant-tx.service';
 import type { Tx } from '../../database/tenant-tx';
@@ -45,11 +46,16 @@ export class RevenueService {
       this.rows(scope, period, groupBy),
     ]);
 
+    // `totals` zaten satırlardan bağımsız hesaplanıyor (ayrı sorgu) ve
+    // sayfalamadan etkilenmiyor.
+    const page = pageRows(rows, query, groupKey);
+
     const report: RevenueReportDto = {
       scope: scope.kind,
       period: { from: query.from, to: query.to },
       totals,
-      data: rows,
+      data: page.data,
+      pageInfo: page.pageInfo,
     };
 
     if (query.compareTo === 'previous') {

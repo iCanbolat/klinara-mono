@@ -27,8 +27,15 @@ protocol NotesService: Sendable {
     func revisions(noteId: String) async throws -> [CustomerNoteRevision]
 
     /// `GET /customers/:id/timeline` — randevu + not, tek akış, cursor'lu.
-    func timeline(customerId: String, cursor: String?, limit: Int?) async throws
-        -> Page<TimelineEntry>
+    ///
+    /// Filtre **sunucuda**: yüklenmiş sayfalar üzerinde süzmek, "son 3 ay"
+    /// diyen kullanıcıya elindeki ilk 50 kaydın içindeki son 3 ayı gösterirdi.
+    func timeline(
+        customerId: String,
+        query: TimelineQuery,
+        cursor: String?,
+        limit: Int?
+    ) async throws -> Page<TimelineEntry>
 }
 
 struct LiveNotesService: NotesService {
@@ -67,14 +74,33 @@ struct LiveNotesService: NotesService {
 
     func timeline(
         customerId: String,
+        query: TimelineQuery,
         cursor: String?,
         limit: Int?
     ) async throws -> Page<TimelineEntry> {
-        var query: [URLQueryItem] = []
-        if let cursor { query.append(URLQueryItem(name: "cursor", value: cursor)) }
-        if let limit { query.append(URLQueryItem(name: "limit", value: String(limit))) }
+        var items: [URLQueryItem] = []
+        if let cursor { items.append(URLQueryItem(name: "cursor", value: cursor)) }
+        if let limit { items.append(URLQueryItem(name: "limit", value: String(limit))) }
+        if !query.kinds.isEmpty {
+            // Sunucu virgülle ayrılmış tek değer bekliyor; sırayı sabitlemek
+            // isteği önbelleklenebilir ve loglarda okunabilir kılıyor.
+            let kinds = TimelineKind.allCases
+                .filter(query.kinds.contains)
+                .map(\.rawValue)
+                .joined(separator: ",")
+            items.append(URLQueryItem(name: "kinds", value: kinds))
+        }
+        // Sınırlar UTC yazılıyor: `Date` zaten mutlak bir an ve sunucu
+        // offset'li her ISO 8601 değerini kabul ediyor. Şube saatine çevirmek
+        // yalnız yazma uçlarında anlamlı (denetim kaydı okunabilirliği).
+        if let from = query.from {
+            items.append(URLQueryItem(name: "from", value: KlinaraCoding.timestamp(from)))
+        }
+        if let to = query.to {
+            items.append(URLQueryItem(name: "to", value: KlinaraCoding.timestamp(to)))
+        }
         return try await client.send(
-            APIRequest.get("customers/\(customerId)/timeline", query: query)
+            APIRequest.get("customers/\(customerId)/timeline", query: items)
         )
     }
 }

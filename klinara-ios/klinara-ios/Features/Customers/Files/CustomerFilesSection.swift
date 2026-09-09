@@ -19,12 +19,35 @@ struct CustomerFilesSection: View {
 
     @State private var uploading: FileKind?
     @State private var opened: CustomerFile?
+    @State private var openedDocument: CustomerFile?
 
     private var clock: BranchClock { session.clock }
     private var canWrite: Bool { session.can(Permissions.customerWrite) }
     private var canWritePhotos: Bool { session.can(Permissions.customerMedicalWrite) }
 
+    /// Sayfalar kartların DIŞINDA: yükleme sayfası fotoğraf kartına bağlıyken,
+    /// klinik veri izni olmayan bir kullanıcıda o kart hiç çizilmiyor ve
+    /// "Belge ekle" düğmesi sessizce hiçbir şey yapmıyordu.
     var body: some View {
+        content
+            .sheet(item: $uploading) { kind in
+                FileUploadSheet(session: session, record: record, kind: kind)
+            }
+            .sheet(item: $opened) { file in
+                PhotoDetailView(
+                    session: session,
+                    record: record,
+                    thumbnails: thumbnails,
+                    file: file
+                )
+            }
+            .sheet(item: $openedDocument) { file in
+                DocumentPreviewView(session: session, file: file)
+            }
+    }
+
+    @ViewBuilder
+    private var content: some View {
         switch record.files {
         case .loading:
             KlinaraCard(title: "Fotoğraflar ve belgeler") {
@@ -72,17 +95,6 @@ struct CustomerFilesSection: View {
                 .padding(KlinaraMetrics.md)
             }
         }
-        .sheet(item: $uploading) { kind in
-            FileUploadSheet(session: session, record: record, kind: kind)
-        }
-        .sheet(item: $opened) { file in
-            PhotoDetailView(
-                session: session,
-                record: record,
-                thumbnails: thumbnails,
-                file: file
-            )
-        }
     }
 
     // MARK: Belgeler
@@ -94,15 +106,18 @@ struct CustomerFilesSection: View {
             } else {
                 ForEach(Array(documents.enumerated()), id: \.element.id) { index, file in
                     if index > 0 { KlinaraDivider() }
-                    KlinaraRow(
-                        label: file.mimeType == "application/pdf" ? "PDF belge" : "Belge",
-                        detail: "\(ByteSize.format(file.sizeBytes)) · "
-                            + clock.formatDate(file.createdAt)
-                    ) {
-                        Image(systemName: "doc")
-                            .font(.system(size: 13))
-                            .foregroundStyle(KlinaraColor.charcoalMuted)
+                    Button { openedDocument = file } label: {
+                        KlinaraRow(
+                            label: FileContentType.turkishName(of: file.mimeType),
+                            detail: "\(ByteSize.format(file.sizeBytes)) · "
+                                + clock.formatDate(file.createdAt)
+                        ) {
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(KlinaraColor.charcoalMuted)
+                        }
                     }
+                    .buttonStyle(.plain)
                 }
             }
 

@@ -13,6 +13,16 @@ struct PhotoGroupsView: View {
 
     @State private var creating = false
     @State private var opened: CustomerFile?
+    @State private var filling: SlotTarget?
+
+    /// Doldurulmak istenen yuva. Grup ve konum birlikte taşınıyor: yükleme
+    /// sayfası ikisini de önseçili açıyor.
+    private struct SlotTarget: Identifiable {
+        let groupId: String
+        let position: FilePosition
+
+        var id: String { "\(groupId)-\(position.rawValue)" }
+    }
 
     private var clock: BranchClock { session.clock }
     private var canWrite: Bool { session.can(Permissions.customerMedicalWrite) }
@@ -58,6 +68,15 @@ struct PhotoGroupsView: View {
                 file: file
             )
         }
+        .sheet(item: $filling) { target in
+            FileUploadSheet(
+                session: session,
+                record: record,
+                kind: .photo,
+                presetGroupId: target.groupId,
+                presetPosition: target.position
+            )
+        }
     }
 
     private func groupCard(_ group: CustomerFileGroup) -> some View {
@@ -68,37 +87,60 @@ struct PhotoGroupsView: View {
                 .joined(separator: " · ")
         ) {
             HStack(spacing: KlinaraMetrics.sm) {
-                slot(group.file(at: .before), label: "Öncesi")
-                slot(group.file(at: .after), label: "Sonrası")
+                slot(group.file(at: .before), in: group, at: .before)
+                slot(group.file(at: .after), in: group, at: .after)
             }
             .padding(KlinaraMetrics.md)
         }
     }
 
+    /// Boş yuva **dokunulabilir**: ikonu artı işareti taşıdığı hâlde eylemsizdi
+    /// ve fotoğrafı gruba koymanın tek yolu ekrandan çıkıp müşteri kartındaki
+    /// genel yükleme sayfasında grubu ve konumu elle seçmekti.
+    ///
+    /// Yazma izni yoksa yuva eskisi gibi pasif kalıyor — dokunup yetki hatası
+    /// almak, en baştan dokunamamaktan kötü.
     @ViewBuilder
-    private func slot(_ file: CustomerFile?, label: String) -> some View {
+    private func slot(
+        _ file: CustomerFile?,
+        in group: CustomerFileGroup,
+        at position: FilePosition
+    ) -> some View {
         VStack(spacing: KlinaraMetrics.xs) {
             if let file {
                 Button { opened = file } label: {
                     PhotoThumbnail(file: file, thumbnails: thumbnails)
                 }
                 .buttonStyle(.plain)
-            } else {
-                ZStack {
-                    KlinaraColor.border.opacity(0.35)
-                    Image(systemName: "plus.viewfinder")
-                        .font(.system(size: 18, weight: .light))
-                        .foregroundStyle(KlinaraColor.charcoalMuted)
+            } else if canWrite {
+                Button {
+                    filling = SlotTarget(groupId: group.id, position: position)
+                } label: {
+                    emptySlot
                 }
-                .frame(height: 92)
-                .clipShape(.rect(cornerRadius: KlinaraMetrics.controlRadius))
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(position.turkishName) fotoğrafı ekle")
+            } else {
+                emptySlot
             }
 
-            Text(label)
+            Text(position.turkishName)
                 .klinaraText(.label)
                 .foregroundStyle(KlinaraColor.charcoalMuted)
         }
         .frame(maxWidth: .infinity)
+    }
+
+    private var emptySlot: some View {
+        ZStack {
+            KlinaraColor.border.opacity(0.35)
+            Image(systemName: "plus.viewfinder")
+                .font(.system(size: 18, weight: .light))
+                .foregroundStyle(KlinaraColor.charcoalMuted)
+        }
+        .frame(height: 92)
+        .clipShape(.rect(cornerRadius: KlinaraMetrics.controlRadius))
+        .contentShape(.rect)
     }
 }
 

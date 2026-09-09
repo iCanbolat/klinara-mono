@@ -56,6 +56,7 @@ struct PackageDefinitionEditorView: View {
             basicsSection
             itemsSection
             pricingSection
+            scopeSection
             rulesSection
         }
         .sheet(isPresented: $isPickingService) {
@@ -185,6 +186,37 @@ struct PackageDefinitionEditorView: View {
         let list = "Kalemlerin katalog toplamı: \(Money.format(minor: form.listPriceMinor))"
         guard let discount = form.discountMinor else { return list }
         return "\(list) · İndirim: \(Money.format(minor: discount))"
+    }
+
+    /// Paketin nerede satılabileceği.
+    ///
+    /// ``PackageDefinitionForm/branchId`` alanı vardı ama hiçbir kontrole
+    /// bağlı değildi: bir paketin şube kapsamı iOS'tan **hiç** ayarlanamıyor,
+    /// yalnız listede "şubeye özel" rozetiyle görülüyordu.
+    ///
+    /// Tek şubeli kiracıda gizli: sunulacak tek bir seçenek var ve o zaten
+    /// varsayılan.
+    @ViewBuilder
+    private var scopeSection: some View {
+        if session.canSwitchBranch {
+            KlinaraFormSection(
+                title: "Kapsam",
+                footnote: "Şube seçilirse paket yalnız o şubede satılabilir. "
+                    + "Boş bırakılırsa tüm şubelerde satışa açıktır."
+            ) {
+                Picker("Şube", selection: $form.branchId) {
+                    Text("Tüm şubeler").tag(String?.none)
+                    ForEach(session.branches) { branch in
+                        Text(branch.name).tag(String?.some(branch.id))
+                    }
+                }
+                .pickerStyle(.menu)
+                .tint(KlinaraColor.sageDeep)
+                .klinaraText(.bodyM)
+                .padding(KlinaraMetrics.md)
+                .disabled(isReadOnly)
+            }
+        }
     }
 
     private var rulesSection: some View {
