@@ -192,7 +192,11 @@ struct CustomerRecordStoreTests {
         #expect(note.version == 1)
         #expect(note.wasEdited == false)
 
-        try await store.updateNote(id: note.id, UpdateNoteInput(body: "Düzeltilmiş metin"))
+        try await store.updateNote(
+            id: note.id,
+            version: note.version,
+            UpdateNoteInput(body: "Düzeltilmiş metin")
+        )
 
         let updated = try #require(store.note(id: note.id))
         #expect(updated.version == 2)
@@ -211,11 +215,43 @@ struct CustomerRecordStoreTests {
         await store.loadNotes()
 
         let note = try #require(store.notes.value?.first { $0.kind == .general })
-        try await store.updateNote(id: note.id, UpdateNoteInput(customerVisible: true))
+        try await store.updateNote(
+            id: note.id,
+            version: note.version,
+            UpdateNoteInput(customerVisible: true)
+        )
 
         let updated = try #require(store.note(id: note.id))
         #expect(updated.version == 1)
         #expect(try await store.revisions(noteId: note.id).isEmpty)
+    }
+
+    /// Sunucu `PATCH /notes/:id` üzerinde `If-Match` ZORUNLU tutuyor: bayat bir
+    /// sürümle kaydetmek 409 alır. Faz 4'te bu uçta kilit yoktu ve istemci
+    /// yalnız uyarı basıyordu; uyarı, iki kişi aynı anda yazdığında birinin
+    /// cümlesinin kaybolmasını engellemiyordu.
+    @Test("Bayat sürümle kaydetme VERSION_CONFLICT alır")
+    func staleVersionIsRejected() async throws {
+        let graph = MockGraph(scenario: .busyDay)
+        let store = makeStore(graph)
+        await store.loadNotes()
+
+        let note = try #require(store.notes.value?.first { $0.kind == .general })
+        try await store.updateNote(
+            id: note.id,
+            version: note.version,
+            UpdateNoteInput(body: "Birinci düzenleme")
+        )
+
+        // İkinci düzenleyici hâlâ açılıştaki sürümü tutuyor.
+        await #expect(throws: APIError.self) {
+            try await store.updateNote(
+                id: note.id,
+                version: note.version,
+                UpdateNoteInput(body: "İkinci düzenleme")
+            )
+        }
+        #expect(store.note(id: note.id)?.body == "Birinci düzenleme")
     }
 
     /// Görünürlük SQL'de daralıyor, uygulamada değil: klinik notlar sorgudan

@@ -1,0 +1,20 @@
+.gradle/
+build/
+local.properties
+.kotlin/
+.cxx/
+captures/
+*.iml
+.idea/
+
+# İmza materyali — asla commit edilmez (P2)
+*.jks
+*.keystore
+
+# Çıktılar
+*.apk
+*.aab
+release/
+lint-results*.html
+lint-results*.xml
+lint-results*.txt

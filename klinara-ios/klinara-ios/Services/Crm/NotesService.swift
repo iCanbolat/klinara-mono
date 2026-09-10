@@ -16,9 +16,13 @@ protocol NotesService: Sendable {
 
     /// `PATCH /notes/:id` — metin değişirse eski sürüm trigger'la saklanır.
     ///
-    /// **`If-Match` yok**: eşzamanlı düzenlemede son yazan kazanıyor. Revizyon
-    /// geçmişi veri kaybını engelliyor ama bir kilit değil (Ek G devreden madde).
-    func update(noteId: String, _ input: UpdateNoteInput) async throws -> CustomerNote
+    /// `version` **zorunlu**: sunucu `If-Match` istiyor. Başlıksız istek `428`,
+    /// bayat sürüm `409 VERSION_CONFLICT` alır. Değer notun okunduğu andaki
+    /// sürümdür — yanıt başlığını okumaya gerek yok, gövdedeki `version` yeter.
+    ///
+    /// ⚠️ Sürümü YALNIZ METİN değişimi artırır; tür ya da görünürlük değişimi
+    /// sürümü olduğu yerde bırakır ve elde tutulan değer geçerli kalır.
+    func update(noteId: String, version: Int, _ input: UpdateNoteInput) async throws -> CustomerNote
 
     /// `DELETE /notes/:id` — arşivler (soft delete).
     func delete(noteId: String) async throws
@@ -57,8 +61,10 @@ struct LiveNotesService: NotesService {
         try await client.send(APIRequest.post("customers/\(customerId)/notes", body: input))
     }
 
-    func update(noteId: String, _ input: UpdateNoteInput) async throws -> CustomerNote {
-        try await client.send(APIRequest.patch("notes/\(noteId)", body: input))
+    func update(noteId: String, version: Int, _ input: UpdateNoteInput) async throws -> CustomerNote {
+        try await client.send(
+            APIRequest.patch("notes/\(noteId)", body: input, ifMatch: weakETag(version))
+        )
     }
 
     func delete(noteId: String) async throws {

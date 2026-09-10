@@ -18,6 +18,8 @@
     "format": "prettier --write .",
     "typecheck": "pnpm --filter @klinara/shared build && pnpm -r typecheck",
     "test": "pnpm --filter @klinara/shared build && pnpm --filter @klinara/api test && pnpm --filter @klinara/web-booking test && pnpm --filter @klinara/web-admin test",
+    "gen:contracts": "pnpm --filter @klinara/shared build && node tools/gen-client-contracts.mjs",
+    "gen:contracts:check": "pnpm --filter @klinara/shared build && node tools/gen-client-contracts.mjs --check",
     "audit": "pnpm audit --audit-level high",
     "db:generate": "pnpm --filter @klinara/api db:generate",
     "db:migrate": "pnpm --filter @klinara/api db:migrate",

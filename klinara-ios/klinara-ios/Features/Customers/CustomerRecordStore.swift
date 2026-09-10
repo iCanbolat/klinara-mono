@@ -121,9 +121,12 @@ final class CustomerRecordStore {
         }
     }
 
-    func updateNote(id: String, _ input: UpdateNoteInput) async throws {
+    /// `version`: notun düzenlemeye AÇILDIĞI andaki sürüm — `If-Match` değeri.
+    /// Store'un elindeki güncel sürümü göndermek kilidi etkisiz kılardı:
+    /// başkasının yazdığı sürüm sessizce kabul edilir, çakışma hiç görünmezdi.
+    func updateNote(id: String, version: Int, _ input: UpdateNoteInput) async throws {
         try await mutating {
-            _ = try await notesService.update(noteId: id, input)
+            _ = try await notesService.update(noteId: id, version: version, input)
             await refreshNotesAndTimeline()
         }
     }

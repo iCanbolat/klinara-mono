@@ -1,0 +1,4 @@
+{
+  "secret": "JBSWY3DPEHPK3PXP",
+  "otpauthUri": "otpauth://totp/Klinara:ayse%40klinik.com?secret=JBSWY3DPEHPK3PXP&issuer=Klinara"
+}

@@ -30,6 +30,10 @@ import {
   type CustomerNoteRevision,
   type CustomerTag,
   type DensityBucket,
+  type Holiday,
+  type HolidayInput,
+  type Membership,
+  type MembershipInput,
   type RescheduleAppointmentInput,
   type ScheduleException,
   type Service,
@@ -40,6 +44,7 @@ import {
   type StaffServiceLink,
   type TimelineEntry,
   type UpdateAppointmentInput,
+  type UpdateHolidayInput,
 } from '@klinara/shared';
 import {
   APPOINTMENT_STATUSES as DTO_APPOINTMENT_STATUSES,
@@ -87,10 +92,17 @@ import {
 import {
   BranchHourResponseDto,
   BranchHoursResponseDto,
+  HolidayInputDto,
+  HolidayResponseDto,
   ScheduleExceptionResponseDto,
   StaffScheduleByBranchResponseDto,
   StaffScheduleResponseDto,
+  UpdateHolidayDto,
 } from '../../src/modules/scheduling/dto/scheduling.dto';
+import {
+  MembershipInputDto,
+  MembershipResponseDto,
+} from '../../src/modules/identity/dto/user.dto';
 
 /**
  * Klinik operasyonu API'si iki yerde temsil ediliyor: `apps/api/.../dto/*`
@@ -163,6 +175,11 @@ const _keysStaffScheduleByBranch: SameKeys<
   StaffScheduleByBranch
 > = true;
 const _keysException: SameKeys<ScheduleExceptionResponseDto, ScheduleException> = true;
+const _keysHoliday: SameKeys<HolidayResponseDto, Holiday> = true;
+const _keysHolidayInput: SameKeys<HolidayInputDto, HolidayInput> = true;
+const _keysHolidayUpdate: SameKeys<UpdateHolidayDto, UpdateHolidayInput> = true;
+const _keysMembership: SameKeys<MembershipResponseDto, Membership> = true;
+const _keysMembershipInput: SameKeys<MembershipInputDto, MembershipInput> = true;
 
 /** Değer düzeyinde atanabilirlik — alan TİPLERİ de uyuşmalı, yalnız adlar değil. */
 const _appointmentToShared: Appointment = new AppointmentResponseDto();
@@ -175,6 +192,18 @@ const _serviceToShared: Service = new ServiceResponseDto();
 const _staffToShared: StaffProfile = new StaffProfileResponseDto();
 const _branchHoursToShared: BranchHours = new BranchHoursResponseDto();
 const _exceptionToShared: ScheduleException = new ScheduleExceptionResponseDto();
+const _holidayToShared: Holiday = new HolidayResponseDto();
+const _membershipToShared: Membership = new MembershipResponseDto();
+
+/** shared → DTO: istemcinin gönderdiği şekli sunucu kabul etmeli. */
+const _holidayToDto: HolidayInputDto = {
+  holidayDate: '2026-04-23',
+  name: 'Ulusal Egemenlik ve Çocuk Bayramı',
+} satisfies HolidayInput;
+const _membershipToDto: MembershipInputDto = {
+  roleKey: 'receptionist',
+  branchId: '00000000-0000-4000-8000-000000000005',
+} satisfies MembershipInput;
 
 /** shared tipi → DTO sınıfı. İstemcinin gönderdiği şekli sunucu kabul etmeli. */
 const _createToDto: CreateAppointmentDto = {
@@ -226,6 +255,11 @@ void [
   _keysStaffSchedule,
   _keysStaffScheduleByBranch,
   _keysException,
+  _keysHoliday,
+  _keysHolidayInput,
+  _keysHolidayUpdate,
+  _keysMembership,
+  _keysMembershipInput,
   _appointmentToShared,
   _historyToShared,
   _calendarToShared,
@@ -236,6 +270,10 @@ void [
   _staffToShared,
   _branchHoursToShared,
   _exceptionToShared,
+  _holidayToShared,
+  _membershipToShared,
+  _holidayToDto,
+  _membershipToDto,
   _createToDto,
   _updateToDto,
   _rescheduleToDto,
@@ -360,6 +398,49 @@ describe('klinik API sözleşmesi — shared ile DTO arasında sapma yok', () =>
     const paths = flattenPaths(errors);
     expect(paths).toContain('services.0.serviceId');
     expect(paths).toContain('services.0.staffProfileId');
+  });
+
+  it('tatil gövdesi GERÇEK doğrulama boru hattını geçiyor', () => {
+    const closed: HolidayInput = { holidayDate: '2026-04-23', name: '23 Nisan' };
+    expect(validateSync(plainToInstance(HolidayInputDto, closed))).toHaveLength(0);
+
+    const halfDay: HolidayInput = {
+      branchId: '11111111-1111-4111-8111-111111111111',
+      holidayDate: '2026-12-31',
+      name: 'Yılbaşı arifesi',
+      isClosed: false,
+      openTime: '10:00',
+      closeTime: '14:00',
+    };
+    expect(validateSync(plainToInstance(HolidayInputDto, halfDay))).toHaveLength(0);
+
+    // Tatil bir GÜN. `IsISO8601` bir zaman damgasını da kabul ederdi ve
+    // `holiday_date` kolonu onu sessizce güne kırpardı — "1 Ocak 23:00"
+    // gönderen bir istemci hangi günü kapattığını bilemezdi.
+    const withTime = plainToInstance(HolidayInputDto, {
+      holidayDate: '2026-04-23T00:00:00+03:00',
+      name: '23 Nisan',
+    });
+    expect(validateSync(withTime).length).toBeGreaterThan(0);
+  });
+
+  it('üyelik gövdesi GERÇEK doğrulama boru hattını geçiyor', () => {
+    const branchScoped: MembershipInput = {
+      roleKey: 'receptionist',
+      branchId: '11111111-1111-4111-8111-111111111111',
+    };
+    expect(validateSync(plainToInstance(MembershipInputDto, branchScoped))).toHaveLength(0);
+
+    const tenantScoped: MembershipInput = { roleKey: 'owner' };
+    expect(validateSync(plainToInstance(MembershipInputDto, tenantScoped))).toHaveLength(0);
+  });
+
+  it('zaman çizelgesi türleri paket kollarını da içeriyor', () => {
+    // İstemcinin `unknown` kolu bilinmeyen bir türü yutmuyor, "bu sürümde
+    // gösterilemeyen kayıt" olarak çiziyor. Sabit burada tutuluyor ki yeni bir
+    // kol eklendiğinde iki temsil birlikte güncellensin.
+    expect(TIMELINE_KINDS).toContain('package_sale');
+    expect(TIMELINE_KINDS).toContain('package_ledger');
   });
 
   it('geçersiz durum değeri REDDEDİLİYOR', () => {

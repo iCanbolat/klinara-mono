@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Yalnız sistem splash'i, launcher ikonu ve A0.1 iskele ekranı için.
+         Uygulama içi renkler KlinaraColors.kt'de (A0.2) — ham hex hiçbir ekranda görünmez. -->
+    <color name="klinara_surface">#FAF8F5</color>
+</resources>

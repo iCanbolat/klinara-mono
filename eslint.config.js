@@ -10,6 +10,7 @@ export default tseslint.config(
       '**/dist/**',
       '**/node_modules/**',
       'klinara-ios/**',
+      'klinara-android/**',
       '**/coverage/**',
       '**/.next/**',
       '**/next-env.d.ts',

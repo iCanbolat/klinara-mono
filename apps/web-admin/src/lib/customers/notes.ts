@@ -63,13 +63,13 @@ export function canWriteNote(permissions: readonly string[], kind: CustomerNoteK
 /**
  * Not, biz açtıktan sonra değişmiş mi.
  *
- * ⚠️ `PATCH /notes/:id` `If-Match` İSTEMİYOR: son yazan kazanır (bilinen
- * borç, planda A7). Kilit koyamıyoruz ama SESSİZ KALMAK zorunda da değiliz:
- * kart, notu açarken okunan sürümle sunucudan dönen sürümü karşılaştırıp
- * uyarı basıyor.
+ * `PATCH /notes/:id` artık `If-Match` ZORUNLU tutuyor: bayat bir sürümle
+ * kaydetmek `409 VERSION_CONFLICT` alır ve kimsenin cümlesi sessizce
+ * kaybolmaz. Bu yüzden buradaki karşılaştırma bir TELAFİ değil, ÖN HABER:
+ * kullanıcı kaydete basmadan önce "bu not değişti" diyor.
  *
- * Bu bir UYARIDIR, kilit değil — kullanıcı yine de üzerine yazabilir. Asıl
- * çözüm sunucuda.
+ * ⚠️ Sürümü yalnız METİN değişimi artırır (`customer_notes_revision`
+ * trigger'ı); tür ya da görünürlük değişimi sürümü olduğu yerde bırakır.
  */
 export function isStale(openedVersion: number, current: CustomerNote): boolean {
   return current.version > openedVersion;

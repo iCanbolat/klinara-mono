@@ -299,18 +299,28 @@ describe('yönetim proxy beyaz listesi', () => {
       expect(isAllowedProxyPath(`schedule-exceptions/${UUID}`, 'PATCH')).toBe(false);
     });
 
-    it('KULLANICI SİLME ve rol yüzeyi açılmadı', () => {
-      // `PATCH users/:id` yalnız ad/dil/aktiflik değiştiriyor; rol
-      // değiştiren bir uç sunucuda YOK ve burada da açılmadı.
+    it('rol ve tatil yüzeyi açıldı; KULLANICI SİLME hâlâ kapalı', () => {
+      // Rol değiştirme ucu (`PUT users/:id/memberships`) ve tatil uçları
+      // sunucuda artık VAR; ikisi de Faz 1/Faz 3'ten devreden maddelerdi.
+      expect(isAllowedProxyPath(`users/${UUID}/memberships`, 'GET')).toBe(true);
+      expect(isAllowedProxyPath(`users/${UUID}/memberships`, 'PUT')).toBe(true);
+      expect(isAllowedProxyPath('holidays', 'GET')).toBe(true);
+      expect(isAllowedProxyPath('holidays', 'POST')).toBe(true);
+      expect(isAllowedProxyPath(`holidays/${UUID}`, 'PATCH')).toBe(true);
+      expect(isAllowedProxyPath(`holidays/${UUID}`, 'DELETE')).toBe(true);
+
+      // Kullanıcı SİLİNMİYOR (pasife alınıyor) ve panel kullanıcı YARATMIYOR:
+      // yeni personel davetle geliyor.
       expect(isAllowedProxyPath(`users/${UUID}`, 'DELETE')).toBe(false);
       expect(isAllowedProxyPath('users', 'POST')).toBe(false);
-      expect(isAllowedProxyPath(`users/${UUID}/memberships`, 'PUT')).toBe(false);
+      // Üyelik ayrı bir kaynak DEĞİL: yalnız kullanıcının altında yönetiliyor.
       expect(isAllowedProxyPath('memberships', 'POST')).toBe(false);
+      expect(isAllowedProxyPath(`users/${UUID}/memberships`, 'DELETE')).toBe(false);
+      // Tatil kaydının tarihi ve şubesi değişmez; şubeye gömülü bir yol YOK.
+      expect(isAllowedProxyPath(`branches/${UUID}/holidays`, 'GET')).toBe(false);
+      expect(isAllowedProxyPath('holidays', 'PUT')).toBe(false);
       // Personel SİLİNMİYOR, pasife alınıyor.
       expect(isAllowedProxyPath(`staff/${UUID}`, 'DELETE')).toBe(false);
-      // Tatiller için uç YOK (plan A4).
-      expect(isAllowedProxyPath(`branches/${UUID}/holidays`, 'GET')).toBe(false);
-      expect(isAllowedProxyPath('holidays', 'GET')).toBe(false);
     });
   });
 

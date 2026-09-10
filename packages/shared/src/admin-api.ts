@@ -274,11 +274,40 @@ export const DOMAIN_LIMITS = { host: 253 } as const;
 // Kimlik — `web-admin`'in BFF katmanının okuduğu şekiller
 // ---------------------------------------------------------------------------
 
+/**
+ * Bir kullanıcının bir klinikteki tek bir rolü.
+ *
+ * `PUT /users/:id/memberships` TAM DEĞİŞTİRİR: listede olmayan üyelik pasife
+ * alınır ve boş liste "kullanıcıyı klinikten çıkar" demektir (geri alınması
+ * yeni bir davet gerektirir). Rol Faz 1'de yalnız davetle atanıyordu; bu uç
+ * ikinci atama yolu.
+ *
+ * Sunucunun zorladığı ve arayüzün ÖNCEDEN bilmesi gereken dört kural:
+ *
+ *   1. Kendinden geniş yetkili bir rol ATANAMAZ ve KALDIRILAMAZ
+ *      (`403 ROLE_ESCALATION`) — ikincisi olmasaydı şube yöneticisi işletme
+ *      sahibini klinikten atabilirdi.
+ *   2. Kimse KENDİ rollerine dokunamaz (`403 FORBIDDEN`).
+ *   3. Şube kapsamlı rol (`manager`, `receptionist`, `practitioner`) için
+ *      `branchId` ZORUNLU; kiracı kapsamlı rol (`owner`, `accountant`) için
+ *      gönderilmemeli (`400 VALIDATION_FAILED`).
+ *   4. Kliniğin son `owner` üyeliği kaldırılamaz (`409 CONFLICT`).
+ *
+ * Değişim ANINDA etkilidir: izinler access token'da taşınmaz.
+ */
 export interface Membership {
   id: string;
+  /** `null` = kiracı kapsamlı rol (tüm şubeler). */
   branchId: string | null;
   roleKey: string;
+  /** Rolün insan okunur adı — `ROLE_BY_KEY`ten çözülür. */
   roleName: string;
+}
+
+export interface MembershipInput {
+  roleKey: string;
+  /** Şube kapsamlı roller için ZORUNLU, kiracı kapsamlı roller için gönderilmemeli. */
+  branchId?: string;
 }
 
 export interface MeUser {

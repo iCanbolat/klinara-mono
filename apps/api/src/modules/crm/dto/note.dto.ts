@@ -17,8 +17,23 @@ import type { CustomerNoteKind } from '../../../database/schema/crm';
 
 export const CUSTOMER_NOTE_KINDS = ['general', 'treatment', 'internal'] as const;
 
-/** Zaman çizelgesindeki bir olayın türü. Faz 5/6/7 kendi kolunu ekleyecek. */
-export const TIMELINE_KINDS = ['appointment', 'note', 'consent'] as const;
+/**
+ * Zaman çizelgesindeki bir olayın türü.
+ *
+ * Paket İKİ kola bölünüyor. `package_sale` paketin kendisinden (bir satış = bir
+ * olay), `package_ledger` ise append-only defterden gelir ve tüketim/iade/devir
+ * gibi SONRAKİ hareketleri taşır. Tek bir `package` türü olsaydı üç hizmetli
+ * bir satış, üç ayrı defter satırı olarak zaman çizelgesine düşerdi.
+ *
+ * Faz 6 (tahsilat) hâlâ kendi kolunu eklemedi.
+ */
+export const TIMELINE_KINDS = [
+  'appointment',
+  'note',
+  'consent',
+  'package_sale',
+  'package_ledger',
+] as const;
 export type TimelineKind = (typeof TIMELINE_KINDS)[number];
 
 export class CustomerNoteResponseDto {
@@ -135,7 +150,8 @@ export class TimelineEntryDto {
   @ApiProperty({
     type: 'object',
     additionalProperties: true,
-    description: 'Türe göre değişen yük: randevu özeti veya not gövdesi.',
+    description:
+      'Türe göre değişen yük: randevu özeti, not gövdesi, onam kanıtı, paket satışı veya defter hareketi.',
   })
   payload: Record<string, unknown>;
 }
@@ -175,7 +191,10 @@ export class TimelineQueryDto {
     description: 'Virgülle ayrılmış tür listesi; verilmezse tümü',
   })
   @IsOptional()
-  @Transform(({ value }) =>
+  // `value` `class-transformer` tarafından `any` olarak veriliyor; tipi burada
+  // daraltmak lint'in `no-unsafe-return` uyarısını susturmaktan öte, dizinin
+  // gerçekten `string[]` olduğunu çağrı yerinde belgeliyor.
+  @Transform(({ value }: { value: unknown }): unknown =>
     typeof value === 'string'
       ? value
           .split(',')

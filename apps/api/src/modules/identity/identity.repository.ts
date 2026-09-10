@@ -207,6 +207,44 @@ export async function listMembershipsInTenant(
     );
 }
 
+/**
+ * Kiracıdaki TÜM aktif üyelikler — rol değişiminde "son sahip" kontrolü için.
+ *
+ * Sayı değil satır dönüyor: kontrol "kaç sahip var" değil, "İLGİLİ KULLANICI
+ * DIŞINDA sahip var mı" sorusudur ve sayı bunu cevaplayamaz.
+ */
+export async function listMembershipsByRole(
+  tx: Tx,
+  tenantId: string,
+  roleKey: string,
+): Promise<MembershipRow[]> {
+  return tx
+    .select()
+    .from(memberships)
+    .where(
+      and(
+        eq(memberships.tenantId, tenantId),
+        eq(memberships.roleKey, roleKey),
+        eq(memberships.isActive, true),
+        isNull(memberships.deletedAt),
+      ),
+    );
+}
+
+/**
+ * Üyeliği pasife alır. Satır SİLİNMEZ: denetim kaydı ve `insertMembership`in
+ * upsert'ü (aynı rol yeniden verilirse satır canlanır) ikisi de satırın
+ * kalmasına dayanıyor.
+ */
+export async function deactivateMembership(tx: Tx, id: string): Promise<boolean> {
+  const rows = await tx
+    .update(memberships)
+    .set({ isActive: false, deletedAt: new Date() })
+    .where(and(eq(memberships.id, id), isNull(memberships.deletedAt)))
+    .returning({ id: memberships.id });
+  return rows.length > 0;
+}
+
 export async function insertMembership(
   tx: Tx,
   values: { tenantId: string; userId: string; branchId?: string | null; roleKey: string },

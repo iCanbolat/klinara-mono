@@ -33,11 +33,13 @@ const KIND_LABEL: Record<CustomerNoteKind, MessageKey> = {
  * "göremiyorum" ile "yok" arasındaki fark açıkça söyleniyor.
  *
  * ---------------------------------------------------------------------------
- * SON YAZAN KAZANIR — VE BU SÖYLENİYOR
+ * SÜRÜM DEĞİŞTİYSE ÖNCEDEN SÖYLENİYOR
  * ---------------------------------------------------------------------------
- * `PATCH /notes/:id` `If-Match` İSTEMİYOR (planda A7). Kilit koyamıyoruz ama
- * sessiz de kalmıyoruz: not açılırken okunan sürüm saklanıyor ve sunucudan
- * dönen sürüm daha yüksekse uyarı basılıyor. Uyarı, kilit değil.
+ * `PATCH /notes/:id` artık `If-Match` ZORUNLU tutuyor: bayat sürümle kaydetme
+ * `409` alır. Not açılırken okunan sürüm saklanıyor ve sunucudan dönen sürüm
+ * daha yüksekse uyarı basılıyor — kaydetme reddedileceği için bu bir telafi
+ * değil, ön haber. (Bu panelde düzenleme arayüzü henüz yok; sürüm izleme
+ * düzenleme geldiğinde hazır olsun diye duruyor.)
  */
 export function NotesPanel({ customerId }: { customerId: string }): ReactNode {
   const { permissions } = useSession();

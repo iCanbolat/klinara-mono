@@ -1,0 +1,27 @@
+{
+  "user": {
+    "id": "u1000000-0000-4000-8000-000000000001",
+    "email": "ayse.yilmaz@klinik.com",
+    "fullName": "Ayşe Yılmaz",
+    "locale": "tr-TR",
+    "isActive": true,
+    "phone": "+905321234567",
+    "phoneVerified": true,
+    "hasPassword": true,
+    "lastLoginAt": "2026-08-26T08:14:00.000Z",
+    "createdAt": "2026-05-02T09:30:00.000Z",
+    "memberships": [
+      {
+        "id": "m1",
+        "branchId": "b1000000-0000-4000-8000-000000000001",
+        "roleKey": "manager",
+        "roleName": "Şube Yöneticisi"
+      }
+    ]
+  },
+  "tenantId": "7f3d1a20-0000-4000-8000-000000000001",
+  "roles": ["manager"],
+  "permissions": [],
+  "branchIds": ["b1000000-0000-4000-8000-000000000001"],
+  "tenantWide": false
+}

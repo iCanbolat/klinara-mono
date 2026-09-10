@@ -1,0 +1,10 @@
+{
+  "status": "authenticated",
+  "tokens": {
+    "accessToken": "mock.access.token",
+    "refreshToken": "mock-opaque-refresh-token",
+    "tokenType": "Bearer",
+    "expiresIn": 900
+  },
+  "tenant": { "id": "7f3d1a20-0000-4000-8000-000000000001" }
+}

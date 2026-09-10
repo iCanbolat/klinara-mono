@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ERROR_CODES, ROLE_BY_KEY, ROLES, isRoleKey, type RoleKey } from '@klinara/shared';
+import { ERROR_CODES, ROLE_BY_KEY, ROLES, isRoleKey } from '@klinara/shared';
 import { AppError } from '../../common/errors/app-error';
 import { generateOpaqueToken, sha256 } from '../../common/crypto/tokens';
 import { PasswordService } from '../../common/crypto/password.service';
@@ -9,6 +9,7 @@ import { setTenantContext, type Tx } from '../../database/tenant-tx';
 import { TenantTxService } from '../../database/tenant-tx.service';
 import type { EnvironmentVariables } from '../../config/env.validation';
 import { MAIL_SENDER, type MailSender } from '../../lib/mail/mail.types';
+import { assertAssignableRole, assertNoEscalation, assertRoleScope } from './role-rules';
 import * as identityRepo from './identity.repository';
 import * as invitationsRepo from './invitations.repository';
 import { AuthService, type RequestMeta } from './auth.service';
@@ -47,27 +48,17 @@ export class InvitationsService {
   /**
    * Personel daveti.
    *
-   * İki kural DB'ye bırakılamaz ve burada zorlanır:
+   * İki kural DB'ye bırakılamaz ve `role-rules.ts`te zorlanır:
    *   1. Kimse KENDİNDEN geniş yetkili bir rolü davet edemez (yetki yükseltme),
    *   2. Şube kapsamlı rol için şube zorunlu ve o şube bu kiracıya ait olmalı.
+   *
+   * Aynı kurallar `PUT /users/:id/memberships` ucunda da geçerli — iki atama
+   * yolu tek bir modülden besleniyor.
    */
   async create(input: CreateInvitationDto, principal: Principal): Promise<InvitationResponseDto> {
-    const roleKey = InvitationsService.assertRole(input.roleKey);
-    this.assertNoEscalation(roleKey, principal);
-
-    const role = ROLE_BY_KEY[roleKey];
-    if (role.scope === 'branch' && input.branchId === undefined) {
-      throw new AppError(400, ERROR_CODES.VALIDATION_FAILED, 'Bu rol için şube seçilmeli', {
-        extra: { errors: [{ path: 'branchId', message: 'Şube kapsamlı rol için zorunlu' }] },
-      });
-    }
-    if (role.scope === 'tenant' && input.branchId !== undefined) {
-      throw new AppError(400, ERROR_CODES.VALIDATION_FAILED, 'Bu rol şubeye bağlanamaz', {
-        extra: {
-          errors: [{ path: 'branchId', message: 'Kiracı kapsamlı rol için gönderilmemeli' }],
-        },
-      });
-    }
+    const roleKey = assertAssignableRole(input.roleKey);
+    assertNoEscalation(roleKey, principal);
+    assertRoleScope(roleKey, input.branchId);
 
     const email = input.email.trim().toLowerCase();
     const token = generateOpaqueToken();
@@ -295,31 +286,6 @@ export class InvitationsService {
       meta,
     });
     return { status: 'authenticated', tokens, tenant: { id: outcome.tenantId } };
-  }
-
-  private assertNoEscalation(roleKey: RoleKey, principal: Principal): void {
-    const target = ROLE_BY_KEY[roleKey].rank;
-    const highestOwn = Math.max(
-      ...principal.roles.map((role) => (isRoleKey(role) ? ROLE_BY_KEY[role].rank : 0)),
-      0,
-    );
-    if (target > highestOwn) {
-      throw new AppError(
-        403,
-        ERROR_CODES.ROLE_ESCALATION,
-        'Kendinizden geniş yetkili bir rol atayamazsınız',
-        { detail: `Atamak istediğiniz rol: ${ROLE_BY_KEY[roleKey].name}` },
-      );
-    }
-  }
-
-  private static assertRole(roleKey: string): RoleKey {
-    if (!isRoleKey(roleKey) || ROLE_BY_KEY[roleKey].scope === 'platform') {
-      throw new AppError(400, ERROR_CODES.VALIDATION_FAILED, 'Geçersiz rol', {
-        extra: { errors: [{ path: 'roleKey', message: 'Tanımlı bir kiracı rolü olmalı' }] },
-      });
-    }
-    return roleKey;
   }
 
   private static assertUsable(invitation: invitationsRepo.InvitationRow): void {

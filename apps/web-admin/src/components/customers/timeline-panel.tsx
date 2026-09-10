@@ -11,14 +11,15 @@ import { Button } from '@/components/ui/button';
 /**
  * Müşteri zaman tüneli.
  *
- * ⚠️ Akış YALNIZ randevu ve not içeriyor. Paket satışı/tüketimi ve tahsilat
- * defterde duruyor ama bu sorguya hiç eklenmedi (Faz 5'ten devreden açık
- * madde; `notes.repository.ts:132` `listTimeline` yalnız iki koldan `union`
- * yapıyor).
+ * Akış randevu, not, onam ve PAKET olaylarını içeriyor. Paket iki koldan
+ * geliyor: `package_sale` satışın kendisi (bir satış = bir satır),
+ * `package_ledger` ise satış sonrası defter hareketleri (tüketim, iade,
+ * devir, süre dolumu, düzeltme).
  *
- * Bu boşluk ekranda AÇIKÇA SÖYLENİYOR. Sessizce gizlemek, kullanıcının
- * "bu müşteriye hiç paket satılmamış" diye düşünmesine yol açardı — oysa
- * satılmış olabilir ve bu akış onu göstermiyor.
+ * ⚠️ TAHSİLAT hâlâ yok: defterde duruyor ama bu sorguya eklenmedi (Faz 6'dan
+ * devreden madde). Boşluk ekranda AÇIKÇA SÖYLENİYOR — sessizce gizlemek,
+ * kullanıcının "bu müşteriden hiç tahsilat yapılmamış" diye düşünmesine yol
+ * açardı.
  */
 /** `payload` gevşek tipli (`Record<string, unknown>`); sürüm sayı ya da yok. */
 function consentVersion(payload: Record<string, unknown>): string {
@@ -26,11 +27,30 @@ function consentVersion(payload: Record<string, unknown>): string {
   return typeof version === 'number' ? String(version) : '—';
 }
 
+/** `payload` gevşek tipli; paket satırlarının okunabilir özeti. */
+function packageSummary(kind: string, payload: Record<string, unknown>): string | null {
+  const name = payload['definitionName'];
+  if (typeof name !== 'string') return null;
+
+  if (kind === 'package_sale') return name;
+
+  // Defter hareketinde işaret AÇIKÇA yazılıyor: "1 seans" tek başına hakkın
+  // düştüğünü mü eklendiğini mi söylediğini belirsiz bırakırdı.
+  const delta = payload['delta'];
+  const service = payload['serviceName'];
+  const parts = [name];
+  if (typeof service === 'string') parts.push(service);
+  if (typeof delta === 'number') parts.push(delta > 0 ? `+${delta} seans` : `${delta} seans`);
+  return parts.join(' · ');
+}
+
 /** Ham `kind` değerleri ekranda görünmemeli; sözleşme İngilizce, arayüz Türkçe. */
 const KIND_LABELS: Record<string, string> = {
   appointment: t('customers.timeline.kind.appointment'),
   note: t('customers.timeline.kind.note'),
   consent: t('customers.timeline.kind.consent'),
+  package_sale: t('customers.timeline.kind.packageSale'),
+  package_ledger: t('customers.timeline.kind.packageLedger'),
 };
 
 export function TimelinePanel({ customerId }: { customerId: string }): ReactNode {
@@ -108,6 +128,11 @@ export function TimelinePanel({ customerId }: { customerId: string }): ReactNode
             {entry.kind === 'consent' ? (
               <span className="ml-2 text-xs text-muted-foreground">
                 {t('customers.timeline.consentVersion')} {consentVersion(entry.payload)}
+              </span>
+            ) : null}
+            {entry.kind === 'package_sale' || entry.kind === 'package_ledger' ? (
+              <span className="ml-2 text-xs text-muted-foreground">
+                {packageSummary(entry.kind, entry.payload)}
               </span>
             ) : null}
           </li>

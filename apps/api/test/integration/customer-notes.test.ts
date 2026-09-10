@@ -4,6 +4,7 @@ import { createTestApp } from '../helpers/app';
 import { startTestDatabase, type TestDatabase } from '../helpers/database';
 import { auth, http, inviteMember, PLATFORM_TOKEN, type Tokens } from '../helpers/identity';
 import { branchHeader, setupClinic, type ClinicFixture } from '../helpers/clinic';
+import { createPackageDefinition, sellPackage } from '../helpers/packages';
 
 interface Problem {
   code: string;
@@ -111,6 +112,7 @@ describe('müşteri notları ve zaman çizelgesi (Batch 4.2)', () => {
       const res = await http(app)
         .patch(`/api/v1/notes/${(internal.body as NoteBody).id}`)
         .set(deskAuth())
+        .set('If-Match', 'W/"1"')
         .send({ body: 'Değiştirildi' });
       expect(res.status).toBe(404);
     });
@@ -126,9 +128,11 @@ describe('müşteri notları ve zaman çizelgesi (Batch 4.2)', () => {
       const updated = await http(app)
         .patch(`/api/v1/notes/${id}`)
         .set(ownerAuth())
+        .set('If-Match', 'W/"1"')
         .send({ body: 'İkinci hâli' })
         .expect(200);
       expect((updated.body as NoteBody).version).toBe(2);
+      expect(updated.headers.etag).toBe('W/"2"');
 
       const revisions = await http(app)
         .get(`/api/v1/notes/${id}/revisions`)
@@ -147,8 +151,11 @@ describe('müşteri notları ve zaman çizelgesi (Batch 4.2)', () => {
       const updated = await http(app)
         .patch(`/api/v1/notes/${id}`)
         .set(ownerAuth())
+        .set('If-Match', 'W/"1"')
         .send({ customerVisible: true })
         .expect(200);
+      // Sürüm ARTMIYOR: trigger yalnız metin değişiminde artırır. İstemcinin
+      // elindeki ETag geçerli kalıyor, ikinci bir düzenleme 409 yemiyor.
       expect((updated.body as NoteBody).version).toBe(1);
       expect((updated.body as NoteBody).customerVisible).toBe(true);
 
@@ -157,6 +164,44 @@ describe('müşteri notları ve zaman çizelgesi (Batch 4.2)', () => {
         .set(ownerAuth())
         .expect(200);
       expect((revisions.body as { data: unknown[] }).data).toHaveLength(0);
+    });
+
+    it('If-Match GÖNDERİLMEZSE 428, BAYAT sürümle 409 döner', async () => {
+      const created = await addNote({ body: 'İlk hâli' }).expect(201);
+      const id = (created.body as NoteBody).id;
+      expect(created.headers.etag).toBe('W/"1"');
+
+      // Başlığın hiç gönderilmemesi ile bayat gönderilmesi AYRI iki cevap:
+      // biri istemci hatası, diğeri gerçek bir yarış (sözleşme 5.7).
+      const missing = await http(app)
+        .patch(`/api/v1/notes/${id}`)
+        .set(ownerAuth())
+        .send({ body: 'Başlıksız' });
+      expect(missing.status).toBe(428);
+
+      await http(app)
+        .patch(`/api/v1/notes/${id}`)
+        .set(ownerAuth())
+        .set('If-Match', 'W/"1"')
+        .send({ body: 'İlk düzenleme' })
+        .expect(200);
+
+      // İkinci düzenleyici hâlâ 1'i tutuyor: birincinin cümlesi üzerine
+      // yazılmıyor, gürültülü bir 409 alıyor.
+      const stale = await http(app)
+        .patch(`/api/v1/notes/${id}`)
+        .set(ownerAuth())
+        .set('If-Match', 'W/"1"')
+        .send({ body: 'İkinci düzenleme' });
+      expect(stale.status).toBe(409);
+      expect((stale.body as Problem).code).toBe('VERSION_CONFLICT');
+
+      const current = await http(app)
+        .get(`/api/v1/customers/${customer()}/notes`)
+        .set(ownerAuth())
+        .expect(200);
+      const note = (current.body as { data: NoteBody[] }).data.find((row) => row.id === id);
+      expect(note?.body).toBe('İlk düzenleme');
     });
 
     it('arşivlenen not listeden çıkar', async () => {
@@ -339,6 +384,93 @@ describe('müşteri notları ve zaman çizelgesi (Batch 4.2)', () => {
         .expect(200);
       const page = res.body as TimelinePage;
       expect(page.data).toHaveLength(1);
+    });
+
+    it('paket satışı BİR olay, defter hareketleri AYRI olaylardır', async () => {
+      // Üç hizmetli bir paket: defterde üç `purchase` satırı doğuyor. Tek bir
+      // `package` türü olsaydı satış çizelgeye üç muhasebe kaydı olarak
+      // düşerdi; `package_sale` paketin KENDİSİNDEN okunuyor.
+      const definition = await createPackageDefinition(app, clinic.owner.tokens, {
+        slug: 'lazer-paketi',
+        totalPriceMinor: 300000,
+        items: [
+          { serviceId: clinic.service.id, quantity: 5 },
+          { serviceId: clinic.quickService.id, quantity: 5 },
+        ],
+      });
+      const sold = await sellPackage(app, clinic.owner.tokens, clinic.branch.id, {
+        customerId: customer(),
+        definitionId: definition.id,
+      });
+
+      const afterSale = await http(app)
+        .get(`/api/v1/customers/${customer()}/timeline`)
+        .set(ownerAuth())
+        .expect(200);
+      const saleEvents = (afterSale.body as TimelinePage).data.filter(
+        (entry) => entry.kind === 'package_sale',
+      );
+      expect(saleEvents).toHaveLength(1);
+      expect(saleEvents[0]?.payload).toMatchObject({
+        definitionName: 'lazer-paketi',
+        totalPriceMinor: 300000,
+        branchId: clinic.branch.id,
+      });
+      // Satın alma defter satırları çizelgeye GİRMİYOR: satış kolunda zaten
+      // temsil ediliyorlar.
+      expect((afterSale.body as TimelinePage).data.filter((e) => e.kind === 'package_ledger'))
+        .toHaveLength(0);
+
+      // Elle düzeltme `manual_adjustment` olarak deftere düşüyor ve çizelgede
+      // görünmesi gereken tam olarak bu.
+      await http(app)
+        .post(`/api/v1/customer-packages/${sold.id}/adjust`)
+        .set(ownerAuth())
+        .set(branchHeader(clinic.branch.id))
+        .set('If-Match', `W/"${sold.version}"`)
+        .send({
+          items: [{ customerPackageItemId: sold.items[0]?.id, delta: -1 }],
+          reason: 'Seans dışarıda kullanıldı',
+        })
+        .expect(200);
+
+      const afterAdjust = await http(app)
+        .get(`/api/v1/customers/${customer()}/timeline`)
+        .set(ownerAuth())
+        .expect(200);
+      const ledger = (afterAdjust.body as TimelinePage).data.filter(
+        (entry) => entry.kind === 'package_ledger',
+      );
+      expect(ledger).toHaveLength(1);
+      expect(ledger[0]?.payload).toMatchObject({
+        entryType: 'manual_adjustment',
+        delta: -1,
+        reason: 'Seans dışarıda kullanıldı',
+        customerPackageId: sold.id,
+      });
+    });
+
+    it('paket olayları tür süzgeciyle tek başına istenebilir', async () => {
+      const definition = await createPackageDefinition(app, clinic.owner.tokens, {
+        slug: 'tekil-paket',
+        totalPriceMinor: 100000,
+        items: [{ serviceId: clinic.quickService.id, quantity: 3 }],
+      });
+      await sellPackage(app, clinic.owner.tokens, clinic.branch.id, {
+        customerId: customer(),
+        definitionId: definition.id,
+      });
+      await createAppointment('10:00').expect(201);
+      await addNote({ body: 'Not' }).expect(201);
+
+      const res = await http(app)
+        .get(`/api/v1/customers/${customer()}/timeline`)
+        .query({ kinds: 'package_sale' })
+        .set(ownerAuth())
+        .expect(200);
+      const page = res.body as TimelinePage;
+      expect(page.data).toHaveLength(1);
+      expect(page.data[0]?.kind).toBe('package_sale');
     });
 
     it('BAŞKA kiracının müşterisinin çizelgesi 404', async () => {

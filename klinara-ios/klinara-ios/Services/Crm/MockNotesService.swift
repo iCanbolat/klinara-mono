@@ -90,7 +90,7 @@ final class MockNotesService: NotesService, @unchecked Sendable {
         }
     }
 
-    func update(noteId: String, _ input: UpdateNoteInput) async throws -> CustomerNote {
+    func update(noteId: String, version: Int, _ input: UpdateNoteInput) async throws -> CustomerNote {
         await latency(0.4)
         return try withLock {
             guard let index = records.firstIndex(where: { $0.id == noteId }),
@@ -98,6 +98,9 @@ final class MockNotesService: NotesService, @unchecked Sendable {
             else { throw MockErrors.notFound }
 
             let old = records[index]
+            // Sunucunun iyimser kilidi: bayat sürüm 409. Mock bunu taklit
+            // etmeseydi çakışma yolu YALNIZ canlı sunucuda görülürdü.
+            guard old.version == version else { throw MockErrors.versionConflict }
             // Göremediği notu düzenleyemez de.
             try assertCanWrite(old.kind)
             if let kind = input.kind { try assertCanWrite(kind) }

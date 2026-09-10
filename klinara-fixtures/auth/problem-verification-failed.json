@@ -1,0 +1,7 @@
+{
+  "code": "VERIFICATION_FAILED",
+  "title": "Kod doğrulanamadı",
+  "detail": "Kod hatalı ya da süresi dolmuş.",
+  "status": 400,
+  "requestId": "req_mock_verification_failed"
+}

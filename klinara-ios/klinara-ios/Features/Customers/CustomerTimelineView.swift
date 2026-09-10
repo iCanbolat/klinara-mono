@@ -207,9 +207,36 @@ struct CustomerTimelineView: View {
                     .foregroundStyle(KlinaraColor.charcoalMuted)
             }
 
+        case .packageSale(_, let payload):
+            KlinaraRow(
+                label: payload.definitionName,
+                detail: "Paket satışı · "
+                    + Money.format(minor: payload.totalPriceMinor)
+                    + " · \(clock.formatDateTime(entry.occurredAt))"
+            ) {
+                Image(systemName: "shippingbox")
+                    .font(.system(size: 13))
+                    .foregroundStyle(KlinaraColor.charcoalMuted)
+            }
+
+        case .packageLedger(_, let payload):
+            // `delta` işaretli geliyor; `+`/`-` ekranda AÇIKÇA yazılıyor:
+            // "1 seans" tek başına hakkın düştüğünü mü eklendiğini mi
+            // söylediğini belirsiz bırakırdı.
+            KlinaraRow(
+                label: payload.entryType.turkishName,
+                detail: "\(payload.serviceName) · "
+                    + (payload.delta > 0 ? "+\(payload.delta)" : "\(payload.delta)")
+                    + " seans · \(clock.formatDateTime(entry.occurredAt))"
+            ) {
+                Image(systemName: payload.delta > 0 ? "arrow.up.circle" : "arrow.down.circle")
+                    .font(.system(size: 13))
+                    .foregroundStyle(KlinaraColor.charcoalMuted)
+            }
+
         case .unknown(_, let kind):
             // Bilinmeyen olay YUTULMUYOR: sunucu yeni bir kol eklediğinde
-            // (paket, tahsilat) eski istemci geçmişi eksik göstermemeli.
+            // (tahsilat) eski istemci geçmişi eksik göstermemeli.
             KlinaraRow(
                 label: "Bu sürümde gösterilemeyen kayıt",
                 detail: "\(kind) · \(clock.formatDateTime(entry.occurredAt))"

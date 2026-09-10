@@ -401,7 +401,7 @@ export const MESSAGES = {
 
   'customers.timeline.empty': 'Geçmiş kaydı yok.',
   'customers.timeline.partial':
-    'Bu akış yalnız randevu ve notları gösteriyor; paket ve tahsilat olayları henüz eklenmedi.',
+    'Bu akış randevu, not, onam ve paket olaylarını gösteriyor; tahsilat olayları henüz eklenmedi.',
 
   'customers.files.empty': 'Dosya yok.',
   'customers.files.upload': 'Dosya yükle',
@@ -524,6 +524,8 @@ export const MESSAGES = {
   'customers.timeline.kind.appointment': 'Randevu',
   'customers.timeline.kind.note': 'Not',
   'customers.timeline.kind.consent': 'Onam',
+  'customers.timeline.kind.packageSale': 'Paket satışı',
+  'customers.timeline.kind.packageLedger': 'Paket hareketi',
   'customers.timeline.consentVersion': 'sürüm',
 
   'consent.title': 'KVKK aydınlatma ve açık rıza metni',

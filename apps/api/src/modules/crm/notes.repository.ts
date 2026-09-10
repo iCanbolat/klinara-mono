@@ -70,18 +70,39 @@ export async function insertNote(
   return row;
 }
 
-export async function updateNote(
+/**
+ * İyimser kilit (API sözleşmesi 5.7) — `expectedVersion` tutmazsa 0 satır döner.
+ *
+ * DİKKAT, `version`ı YALNIZ METİN DEĞİŞİMİ artırır: `customer_notes_revision`
+ * trigger'ı sürümü `new.body is distinct from old.body` koşuluyla artırıyor.
+ * Yani `kind` ya da `customerVisible` değiştiren bir düzenleme sürümü olduğu
+ * yerde bırakır. Bu kasıtlı: kilidin koruduğu şey notun METNİ ve onun revizyon
+ * geçmişidir; bayrak değişimi kaybolan bir cümle üretmez.
+ */
+export async function updateNoteWithVersion(
   tx: Tx,
   id: string,
+  expectedVersion: number,
   values: Updatable<Pick<CustomerNoteRow, 'body' | 'kind' | 'customerVisible'>>,
 ): Promise<CustomerNoteRow | undefined> {
   const patch = definedValues(values);
-  if (!hasUpdates(patch)) return findNoteById(tx, id, true);
+  // Boş yama da sürümü DOĞRULAR: "hiçbir şey değiştirme" isteği bile bayat bir
+  // sürümle geldiyse istemcinin elindeki kopya yanlıştır ve 409 hak eder.
+  if (!hasUpdates(patch)) {
+    const current = await findNoteById(tx, id, true);
+    return current?.version === expectedVersion ? current : undefined;
+  }
 
   const [row] = await tx
     .update(customerNotes)
     .set(patch)
-    .where(and(eq(customerNotes.id, id), isNull(customerNotes.deletedAt)))
+    .where(
+      and(
+        eq(customerNotes.id, id),
+        eq(customerNotes.version, expectedVersion),
+        isNull(customerNotes.deletedAt),
+      ),
+    )
     .returning();
   return row;
 }
@@ -118,6 +139,8 @@ interface TimelineFilters {
   customerId: string;
   limit: number;
   canReadMedical: boolean;
+  /** `package:read` — paket kolları bu izne bağlı (bkz. `wants`). */
+  canReadPackages: boolean;
   cursorOccurredAt?: string | undefined;
   cursorId?: string | undefined;
   /** Boş/verilmemişse tüm türler. */
@@ -129,19 +152,24 @@ interface TimelineFilters {
 }
 
 /**
- * Randevu ve notları TEK sorguda, tek sıralamada birleştirir.
+ * Randevu, not, onam ve paket olaylarını TEK sorguda, tek sıralamada birleştirir.
  *
  * `union all` kolları ayrı ayrı sayfalanamaz — ortak `(occurred_at, id)`
- * anahtarı üzerinde sıralanıp tek cursor'la ilerliyor. Faz 5 (paket) ve Faz 6
- * (tahsilat) buraya kendi kolunu ekleyecek; sözleşme her kolun `kind` +
- * `payload` döndürmesi. Faz 7'nin kolu (`consent`) aşağıda.
+ * anahtarı üzerinde sıralanıp tek cursor'la ilerliyor. Sözleşme her kolun
+ * `kind` + `payload` döndürmesi. Faz 6 (tahsilat) hâlâ kendi kolunu eklemedi.
  */
 export async function listTimeline(tx: Tx, filters: TimelineFilters): Promise<TimelineRow[]> {
   // Tür filtresi kolu SQL'e HİÇ SOKMUYOR, sonradan elemiyor değil: `union all`
   // her kolu tam tarayıp sonra atmak, "yalnız notları göster" diyen bir
   // istemciye randevu tablosunun bedelini ödetmek olurdu.
-  const wants = (kind: TimelineKind): boolean =>
-    filters.kinds === undefined || filters.kinds.length === 0 || filters.kinds.includes(kind);
+  const wants = (kind: TimelineKind): boolean => {
+    // İzin daraltması kullanıcı tercihinden BAĞIMSIZ ve önce geliyor: tür
+    // filtresi göremeyeceği bir olayı görünür kılamaz (notlardaki kuralın aynısı).
+    if (!filters.canReadPackages && (kind === 'package_sale' || kind === 'package_ledger')) {
+      return false;
+    }
+    return filters.kinds === undefined || filters.kinds.length === 0 || filters.kinds.includes(kind);
+  };
 
   // Tarih koşulu her kolun KENDİ zaman sütununa iniyor: `occurred_at` ancak
   // birleşimden sonra var ve orada filtrelemek indeksleri kullanılmaz kılardı.
@@ -215,6 +243,62 @@ export async function listTimeline(tx: Tx, filters: TimelineFilters): Promise<Ti
         from booking_consent_acceptances c
        where c.customer_id = ${filters.customerId}::uuid
          ${window(sql`c.accepted_at`)}`);
+  }
+
+  if (wants('package_sale')) {
+    // Satış PAKETTEN okunuyor, defterden değil. Defterdeki `purchase` satırları
+    // KALEM başınadır: üç hizmetli bir paket satışı zaman çizelgesine üç olay
+    // olarak düşerdi ve "bugün ne oldu" sorusunun cevabı bir satış yerine üç
+    // muhasebe kaydı olurdu.
+    branches.push(sql`
+      select 'package_sale'::text as kind,
+             p.id,
+             p.sold_at as occurred_at,
+             jsonb_build_object(
+               'definitionName',    p.definition_name,
+               'branchId',          p.branch_id,
+               'totalPriceMinor',   p.total_price_minor,
+               'currency',          p.currency,
+               'status',            p.status,
+               'expiresAt',         p.expires_at,
+               'remainingSessions', p.remaining_sessions
+             ) as payload
+        from customer_packages p
+       where p.customer_id = ${filters.customerId}::uuid
+         and p.deleted_at is null
+         ${window(sql`p.sold_at`)}`);
+  }
+
+  if (wants('package_ledger')) {
+    // Satın alma DIŞINDAKİ defter hareketleri: tüketim, iade, devir, süre
+    // dolumu, elle düzeltme. `purchase` yukarıdaki kolda temsil edildiği için
+    // burada elenmese olay iki kez görünürdü.
+    //
+    // Defterde `customer_id` YOK; müşteriye paketten geçiliyor. Sıra önemli:
+    // `customer_packages_customer_idx` müşterinin paketlerini,
+    // `package_ledger_package_idx` her paketin hareketlerini veriyor.
+    branches.push(sql`
+      select 'package_ledger'::text as kind,
+             e.id,
+             e.created_at as occurred_at,
+             jsonb_build_object(
+               'entryType',         e.entry_type,
+               'delta',             e.delta,
+               'customerPackageId', e.customer_package_id,
+               'definitionName',    p.definition_name,
+               'serviceId',         i.service_id,
+               'serviceName',       i.service_name,
+               'appointmentId',     e.appointment_id,
+               'actorUserId',       e.actor_user_id,
+               'reason',            e.reason
+             ) as payload
+        from package_ledger_entries e
+        join customer_packages p on p.id = e.customer_package_id
+        join customer_package_items i on i.id = e.customer_package_item_id
+       where p.customer_id = ${filters.customerId}::uuid
+         and p.deleted_at is null
+         and e.entry_type <> 'purchase'
+         ${window(sql`e.created_at`)}`);
   }
 
   // Her tür elenmişse sorgu hiç atılmıyor: sıfır kollu bir `union all`

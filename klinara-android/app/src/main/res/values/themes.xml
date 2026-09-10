@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Sistem splash teması. core-splashscreen `Theme.SplashScreen`'den türemeyi şart
+      koşuyor; gerçek tema Compose tarafında (KlinaraTheme, A0.2).
+
+      Zemin `KlinaraColors.surface` ile aynı olmalı, yoksa splash'ten Compose'a geçişte
+      renk sıçraması olur.
+    -->
+    <style name="Theme.Klinara.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/klinara_surface</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/klinara_logo_mark</item>
+        <item name="postSplashScreenTheme">@style/Theme.Klinara</item>
+    </style>
+
+    <style name="Theme.Klinara" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/klinara_surface</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+</resources>

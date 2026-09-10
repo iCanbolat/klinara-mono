@@ -13,3 +13,8 @@ coverage/
 .next/
 next-env.d.ts
 .turbo/
+
+# Android (Faz A0)
+.idea/
+.kotlin/
+klinara-android/local.properties

@@ -1,0 +1,7 @@
+{
+  "code": "RATE_LIMITED",
+  "title": "Çok fazla istek",
+  "detail": "Biraz sonra tekrar deneyin.",
+  "status": 429,
+  "requestId": "req_mock_rate_limited"
+}

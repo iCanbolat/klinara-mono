@@ -1,5 +1,5 @@
-import { and, eq, gte, isNull, lte } from 'drizzle-orm';
-import { branchHours, scheduleExceptions, staffSchedules } from '../../database/schema';
+import { and, eq, gte, isNull, lte, or } from 'drizzle-orm';
+import { branchHours, holidays, scheduleExceptions, staffSchedules } from '../../database/schema';
 import type { Tx } from '../../database/tenant-tx';
 import type {
   BranchHourInputDto,
@@ -160,4 +160,110 @@ export async function deactivateScheduleException(
     .where(eq(scheduleExceptions.id, id))
     .returning();
   return row;
+}
+
+// ---------------------------------------------------------------------------
+// Tatiller
+// ---------------------------------------------------------------------------
+
+export type HolidayRow = typeof holidays.$inferSelect;
+
+/**
+ * Şube süzgeci verildiğinde kiracı geneli satırlar da döner.
+ *
+ * Uygunluk motoru (`availability.repository.ts`) o günü hesaplarken ikisine
+ * birden bakıyor ve şube satırını tercih ediyor; liste yalnız şube satırlarını
+ * döndürseydi ekran, takvimi fiilen kapatan bir kaydı hiç göstermezdi.
+ */
+export async function listHolidays(
+  tx: Tx,
+  filters: { branchId?: string | undefined; from?: string | undefined; to?: string | undefined },
+): Promise<HolidayRow[]> {
+  return tx
+    .select()
+    .from(holidays)
+    .where(
+      and(
+        isNull(holidays.deletedAt),
+        filters.branchId !== undefined
+          ? or(eq(holidays.branchId, filters.branchId), isNull(holidays.branchId))
+          : undefined,
+        filters.from !== undefined ? gte(holidays.holidayDate, filters.from) : undefined,
+        filters.to !== undefined ? lte(holidays.holidayDate, filters.to) : undefined,
+      ),
+    )
+    .orderBy(holidays.holidayDate, holidays.branchId);
+}
+
+export async function findHolidayById(tx: Tx, id: string): Promise<HolidayRow | undefined> {
+  const [row] = await tx
+    .select()
+    .from(holidays)
+    .where(and(eq(holidays.id, id), isNull(holidays.deletedAt)))
+    .limit(1);
+  return row;
+}
+
+export async function insertHoliday(
+  tx: Tx,
+  tenantId: string,
+  input: {
+    branchId?: string | undefined;
+    holidayDate: string;
+    name: string;
+    isClosed: boolean;
+    openTime?: string | undefined;
+    closeTime?: string | undefined;
+  },
+): Promise<HolidayRow> {
+  const [row] = await tx
+    .insert(holidays)
+    .values({
+      tenantId,
+      branchId: input.branchId ?? null,
+      holidayDate: input.holidayDate,
+      name: input.name.trim(),
+      isClosed: input.isClosed,
+      openTime: input.openTime,
+      closeTime: input.closeTime,
+    })
+    .returning();
+
+  if (row === undefined) throw new Error('Tatil kaydı oluşturulamadı');
+  return row;
+}
+
+/**
+ * `openTime`/`closeTime` HER ZAMAN yazılır, `definedValues` ile süzülmez.
+ *
+ * "Yarım günü tam kapalıya çevir" isteği `isClosed: true` ile gelir ve saatler
+ * gövdede olmaz; süzülselerdi eski saatler satırda kalır ve `holidays_time_window`
+ * check constraint'i isteği anlamsız bir 500 ile reddederdi. Servis iki alanı
+ * birlikte çözüp buraya tam hâlini veriyor.
+ */
+export async function updateHoliday(
+  tx: Tx,
+  id: string,
+  values: { name?: string | undefined; isClosed: boolean; openTime: string | null; closeTime: string | null },
+): Promise<HolidayRow | undefined> {
+  const [row] = await tx
+    .update(holidays)
+    .set({
+      ...(values.name !== undefined ? { name: values.name } : {}),
+      isClosed: values.isClosed,
+      openTime: values.openTime,
+      closeTime: values.closeTime,
+    })
+    .where(and(eq(holidays.id, id), isNull(holidays.deletedAt)))
+    .returning();
+  return row;
+}
+
+export async function softDeleteHoliday(tx: Tx, id: string): Promise<boolean> {
+  const rows = await tx
+    .update(holidays)
+    .set({ deletedAt: new Date() })
+    .where(and(eq(holidays.id, id), isNull(holidays.deletedAt)))
+    .returning({ id: holidays.id });
+  return rows.length > 0;
 }

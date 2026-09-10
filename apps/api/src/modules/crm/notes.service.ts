@@ -10,6 +10,7 @@ import {
   type Page,
 } from '../../common/pagination';
 import { assertRange } from '../../common/dto/date-range.dto';
+import { versionConflict } from '../../common/http/etag';
 import { TenantTxService } from '../../database/tenant-tx.service';
 import type { Tx } from '../../database/tenant-tx';
 import { hasPermission, type Principal } from '../identity/principal';
@@ -70,34 +71,46 @@ export class NotesService {
   /**
    * Not düzenleme. Metin değişirse eski sürüm TRIGGER tarafından saklanır ve
    * `version` artar — servis bunu yazmaz, yazamaz.
+   *
+   * `If-Match` ZORUNLU (API sözleşmesi 5.7). Faz 4'te bilerek atlanmıştı —
+   * revizyon geçmişi veri KAYBINI engelliyordu — ama kaybolmayan bir metnin
+   * üzerine yazılmış olması onu geri getirmiyor: iki kişi aynı notu açtığında
+   * ikincisi birincinin cümlesini sessizce siliyordu. İstemciler bu boşluğu
+   * "sürüm değişmiş" uyarısıyla kapatmaya çalışıyordu; uyarı kilit değildir.
    */
   async update(
     principal: Principal,
     id: string,
+    expectedVersion: number,
     input: UpdateCustomerNoteDto,
   ): Promise<CustomerNoteResponseDto> {
     const medical = NotesService.canReadMedical(principal);
     if (input.kind !== undefined) NotesService.assertCanWriteKind(principal, input.kind);
 
-    const row = await this.tx
+    const payload = await this.tx
       .run(async (tx) => {
         const current = await repo.findNoteById(tx, id, medical);
         if (current === undefined) return undefined;
         // Klinik notu göremeyen biri onu düzenleyemez de.
         NotesService.assertCanWriteKind(principal, current.kind);
 
-        return repo.updateNote(tx, id, {
+        const row = await repo.updateNoteWithVersion(tx, id, expectedVersion, {
           body: input.body?.trim(),
           kind: input.kind,
           customerVisible: input.customerVisible,
         });
+        // Satır görünüyor ama güncellenmiyorsa tek açıklama bayat sürümdür;
+        // 404 ile 409 istemci için tamamen farklı iki cevap (biri "not yok",
+        // diğeri "yeniden oku ve tekrar dene").
+        return row === undefined ? { conflict: true as const } : { row };
       })
       .catch((error: unknown) => {
         throw NotesService.translate(error);
       });
 
-    if (row === undefined) throw AppError.notFound('Not bulunamadı');
-    return NotesService.toResponse(row);
+    if (payload === undefined) throw AppError.notFound('Not bulunamadı');
+    if ('conflict' in payload) throw versionConflict();
+    return NotesService.toResponse(payload.row);
   }
 
   async remove(principal: Principal, id: string): Promise<void> {
@@ -147,6 +160,7 @@ export class NotesService {
         customerId,
         limit: limit + 1,
         canReadMedical: medical,
+        canReadPackages: hasPermission(principal, PERMISSIONS.PACKAGE_READ),
         cursorOccurredAt: cursor?.sortKey,
         cursorId: cursor?.id,
         kinds: query.kinds,

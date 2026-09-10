@@ -11,6 +11,9 @@ import type {
   BranchHourInputDto,
   BranchHourResponseDto,
   BranchHoursResponseDto,
+  HolidayInputDto,
+  HolidayResponseDto,
+  ListHolidaysQueryDto,
   ListScheduleExceptionsQueryDto,
   PutBranchHoursDto,
   PutStaffScheduleDto,
@@ -19,6 +22,7 @@ import type {
   StaffScheduleByBranchResponseDto,
   StaffScheduleInputDto,
   StaffScheduleResponseDto,
+  UpdateHolidayDto,
 } from './dto/scheduling.dto';
 
 @Injectable()
@@ -199,6 +203,200 @@ export class SchedulingService {
     this.invalidateAvailability();
   }
 
+  // -------------------------------------------------------------------------
+  // Tatiller
+  // -------------------------------------------------------------------------
+
+  async listHolidays(
+    principal: Principal,
+    query: ListHolidaysQueryDto,
+  ): Promise<HolidayResponseDto[]> {
+    if (query.branchId !== undefined) await this.branchAccess.assertInput(principal, query.branchId);
+    if (query.from !== undefined && query.to !== undefined && query.to < query.from) {
+      throw new AppError(400, ERROR_CODES.VALIDATION_FAILED, 'to, from tarihinden önce olamaz');
+    }
+
+    const rows = await this.tx.run((tx) =>
+      repo.listHolidays(tx, { branchId: query.branchId, from: query.from, to: query.to }),
+    );
+    return rows.map((row) => SchedulingService.toHolidayResponse(row));
+  }
+
+  async createHoliday(
+    principal: Principal,
+    input: HolidayInputDto,
+  ): Promise<HolidayResponseDto> {
+    await this.assertHolidayScope(principal, input.branchId ?? null);
+    const hours = SchedulingService.resolveHolidayHours(input.isClosed ?? true, input.openTime, input.closeTime);
+
+    const row = await this.tx
+      .run((tx) => repo.insertHoliday(tx, this.tx.tenantId, { ...input, ...hours }))
+      .catch((error: unknown) => {
+        throw SchedulingService.translateHoliday(error);
+      });
+
+    this.invalidateAvailability();
+    return SchedulingService.toHolidayResponse(row);
+  }
+
+  async updateHoliday(
+    principal: Principal,
+    id: string,
+    input: UpdateHolidayDto,
+  ): Promise<HolidayResponseDto> {
+    const row = await this.tx
+      .run(async (tx) => {
+        const current = await repo.findHolidayById(tx, id);
+        if (current === undefined) return undefined;
+        // Kapsam SATIRDAN okunuyor: RLS satırın bu kiracıya ait olduğunu zaten
+        // kanıtladı, geriye yalnız "bu kullanıcı bu şubeye dokunabilir mi"
+        // sorusu kalıyor.
+        SchedulingService.assertHolidayRowScope(principal, current.branchId);
+
+        // Saatler ÜÇ kaynaktan çözülüyor: gövde, mevcut satır ve `isClosed`.
+        //
+        // Kapalıya çevirme (`isClosed: true`) kayıtlı saatleri TEMİZLER, hata
+        // vermez: gövdede saat yok, çelişki de yok. Çelişki yalnız İSTEMCİNİN
+        // AÇIKÇA saat gönderdiği durumdadır ve orası 400'dür. Kayıtlı saatleri
+        // çelişki saymak, "yarım günü tam kapalıya çevir" isteğini imkânsız
+        // kılardı.
+        const isClosed = input.isClosed ?? current.isClosed;
+        const hours = isClosed
+          ? SchedulingService.resolveHolidayHours(true, input.openTime, input.closeTime)
+          : SchedulingService.resolveHolidayHours(
+              false,
+              input.openTime ?? current.openTime ?? undefined,
+              input.closeTime ?? current.closeTime ?? undefined,
+            );
+
+        return repo.updateHoliday(tx, id, {
+          name: input.name?.trim(),
+          isClosed,
+          openTime: hours.openTime ?? null,
+          closeTime: hours.closeTime ?? null,
+        });
+      })
+      .catch((error: unknown) => {
+        throw SchedulingService.translateHoliday(error);
+      });
+
+    if (row === undefined) throw AppError.notFound('Tatil kaydı bulunamadı');
+
+    this.invalidateAvailability();
+    return SchedulingService.toHolidayResponse(row);
+  }
+
+  async deleteHoliday(principal: Principal, id: string): Promise<void> {
+    await this.tx.run(async (tx) => {
+      const current = await repo.findHolidayById(tx, id);
+      if (current === undefined) throw AppError.notFound('Tatil kaydı bulunamadı');
+      SchedulingService.assertHolidayRowScope(principal, current.branchId);
+
+      const deleted = await repo.softDeleteHoliday(tx, id);
+      if (!deleted) throw AppError.notFound('Tatil kaydı bulunamadı');
+    });
+
+    this.invalidateAvailability();
+  }
+
+  /**
+   * Kiracı GENELİ tatil yazmak kiracı kapsamlı bir rol ister.
+   *
+   * Şube yöneticisinin `schedule:write` izni vardır ama kapsamı kendi
+   * şubesidir; `branchId: null` bir kayıt TÜM şubelerin takvimini kapatır.
+   * İzin kontrolü bu farkı göremez (izin listesi tek bir anahtar), kapsam
+   * kontrolü görebilir — ayrım `BranchAccessService`in üyelik/aidiyet
+   * ayrımıyla aynı gerekçeye dayanıyor.
+   */
+  private async assertHolidayScope(principal: Principal, branchId: string | null): Promise<void> {
+    if (branchId === null) {
+      if (!principal.tenantWide) {
+        throw new AppError(
+          403,
+          ERROR_CODES.BRANCH_FORBIDDEN,
+          'Kiracı geneli tatil için tüm şubeleri kapsayan bir rol gerekir',
+          { detail: 'Şube yöneticisi yalnız kendi şubesine tatil tanımlayabilir.' },
+        );
+      }
+      return;
+    }
+    await this.branchAccess.assertInput(principal, branchId);
+  }
+
+  private static assertHolidayRowScope(principal: Principal, branchId: string | null): void {
+    if (branchId === null) {
+      if (!principal.tenantWide) {
+        throw new AppError(
+          403,
+          ERROR_CODES.BRANCH_FORBIDDEN,
+          'Kiracı geneli tatil için tüm şubeleri kapsayan bir rol gerekir',
+        );
+      }
+      return;
+    }
+    BranchAccessService.assertMembership(principal, branchId);
+  }
+
+  /**
+   * `isClosed` ile saat aralığı arasındaki bağ — `holidays_time_window` check
+   * constraint'inin uygulama tarafındaki karşılığı. DB'ye bırakılsaydı hata
+   * 500 olurdu; kullanıcının gördüğü mesaj neyi yanlış yaptığını söylemeli.
+   */
+  private static resolveHolidayHours(
+    isClosed: boolean,
+    openTime: string | undefined,
+    closeTime: string | undefined,
+  ): { isClosed: boolean; openTime?: string | undefined; closeTime?: string | undefined } {
+    if (isClosed) {
+      // Tam kapalı günde saat TAŞINMAZ; gövdede geldiyse istek çelişkilidir.
+      if (openTime !== undefined || closeTime !== undefined) {
+        throw new AppError(
+          400,
+          ERROR_CODES.VALIDATION_FAILED,
+          'Kapalı tatil gününe saat aralığı yazılamaz',
+          { detail: 'Yarım gün açılış için isClosed: false gönderin.' },
+        );
+      }
+      return { isClosed: true };
+    }
+
+    if (openTime === undefined || closeTime === undefined) {
+      throw new AppError(
+        400,
+        ERROR_CODES.VALIDATION_FAILED,
+        'Yarım gün açılışta openTime ve closeTime zorunludur',
+      );
+    }
+    if (openTime >= closeTime) {
+      throw new AppError(
+        400,
+        ERROR_CODES.VALIDATION_FAILED,
+        'openTime, closeTime değerinden önce olmalıdır',
+      );
+    }
+    return { isClosed: false, openTime, closeTime };
+  }
+
+  private static translateHoliday(error: unknown): unknown {
+    if (isPgError(error, PG_ERROR.UNIQUE_VIOLATION)) {
+      return AppError.conflict(
+        ERROR_CODES.CONFLICT,
+        'Bu tarih için zaten bir tatil kaydı var',
+        { detail: 'Aynı şube (veya kiracı geneli) ve tarih için tek kayıt tutulur.' },
+      );
+    }
+    if (isPgError(error, PG_ERROR.FOREIGN_KEY_VIOLATION)) {
+      return AppError.notFound('Şube bulunamadı');
+    }
+    // Kapsam trigger'ı ve `holidays_time_window` aynı SQLSTATE'i kullanıyor;
+    // saat çelişkisi yukarıda zaten elendiği için buraya kalan tek olasılık
+    // şubenin başka kiracıya ait olmasıdır.
+    if (isPgError(error, PG_ERROR.CHECK_VIOLATION)) {
+      return AppError.conflict(ERROR_CODES.CONFLICT, 'Şube bu kiracıya ait olmalı');
+    }
+    return error;
+  }
+
   private static assertBranchHourEntries(entries: BranchHourInputDto[]): void {
     SchedulingService.assertWeeklyUniqueDays(
       entries.map((entry) => entry.dayOfWeek),
@@ -360,6 +558,20 @@ export class SchedulingService {
       isOff: row.isOff,
       startTime: row.startTime,
       endTime: row.endTime,
+      createdAt: row.createdAt.toISOString(),
+    };
+  }
+
+  private static toHolidayResponse(row: repo.HolidayRow): HolidayResponseDto {
+    return {
+      id: row.id,
+      tenantId: row.tenantId,
+      branchId: row.branchId,
+      holidayDate: row.holidayDate,
+      name: row.name,
+      isClosed: row.isClosed,
+      openTime: row.openTime,
+      closeTime: row.closeTime,
       createdAt: row.createdAt.toISOString(),
     };
   }

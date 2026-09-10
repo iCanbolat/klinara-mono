@@ -1,0 +1,7 @@
+{
+  "code": "MFA_INVALID",
+  "title": "Doğrulama başarısız",
+  "detail": "Girdiğiniz kod hatalı.",
+  "status": 401,
+  "requestId": "req_mock_mfa_invalid"
+}

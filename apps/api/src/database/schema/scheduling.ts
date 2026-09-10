@@ -110,5 +110,10 @@ export const holidays = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
   },
+  // ⚠️ Gerçek index `nulls not distinct` VE `where deleted_at is null` taşır
+  // (0044); Drizzle ikisini de ifade etmiyor ve şema burada yalnız TARİF eder,
+  // kaynağı migration'dır. `nulls not distinct` olmadan kiracı geneli kayıtta
+  // `branch_id` NULL olduğu için aynı güne sınırsız "tüm şubeler" tatili
+  // yazılabilirdi — `memberships_unique` ile aynı gerekçe.
   (table) => [uniqueIndex('holidays_tenant_branch_date_key').on(table.tenantId, table.branchId, table.holidayDate)],
 );

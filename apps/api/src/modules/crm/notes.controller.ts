@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   HttpCode,
   HttpStatus,
   Param,
@@ -10,17 +11,21 @@ import {
   Patch,
   Post,
   Query,
+  Res,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
+  ApiHeader,
   ApiNoContentResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { PERMISSIONS } from '@klinara/shared';
 import { RequirePermission } from '../../common/decorators/auth.decorators';
+import { requireIfMatch, weakETag } from '../../common/http/etag';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { Principal } from '../identity/principal';
 import { NotesService } from './notes.service';
@@ -60,12 +65,15 @@ export class NotesController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Müşteriye not ekle' })
   @ApiCreatedResponse({ type: CustomerNoteResponseDto })
-  create(
+  async create(
     @CurrentUser() principal: Principal,
     @Param('id', new ParseUUIDPipe()) id: string,
     @Body() body: CreateCustomerNoteDto,
+    @Res({ passthrough: true }) response: Response,
   ): Promise<CustomerNoteResponseDto> {
-    return this.notes.create(principal, id, body);
+    const note = await this.notes.create(principal, id, body);
+    response.setHeader('ETag', weakETag(note.version));
+    return note;
   }
 
   @Get('customers/:id/timeline')
@@ -85,14 +93,23 @@ export class NotesController {
 
   @Patch('notes/:id')
   @RequirePermission(PERMISSIONS.CUSTOMER_WRITE)
-  @ApiOperation({ summary: 'Notu düzenle (eski sürüm saklanır)' })
+  @ApiOperation({
+    summary: 'Notu düzenle (eski sürüm saklanır)',
+    description:
+      '`If-Match` ZORUNLU: başlıksız istek `428`, bayat sürüm `409 VERSION_CONFLICT` alır. Sürümü yalnız METİN değişimi artırır.',
+  })
+  @ApiHeader({ name: 'If-Match', required: true, example: 'W/"1"' })
   @ApiOkResponse({ type: CustomerNoteResponseDto })
-  update(
+  async update(
     @CurrentUser() principal: Principal,
     @Param('id', new ParseUUIDPipe()) id: string,
+    @Headers('if-match') ifMatch: string | undefined,
     @Body() body: UpdateCustomerNoteDto,
+    @Res({ passthrough: true }) response: Response,
   ): Promise<CustomerNoteResponseDto> {
-    return this.notes.update(principal, id, body);
+    const note = await this.notes.update(principal, id, requireIfMatch(ifMatch), body);
+    response.setHeader('ETag', weakETag(note.version));
+    return note;
   }
 
   @Delete('notes/:id')

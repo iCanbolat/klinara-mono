@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- KlinaraColors.surface (dark). Sistem splash'i ile Compose zemini arasında
+         renk sıçraması olmasın diye. -->
+    <color name="klinara_surface">#161917</color>
+</resources>

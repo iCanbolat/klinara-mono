@@ -7,6 +7,7 @@ import {
   HttpStatus,
   Param,
   ParseUUIDPipe,
+  Patch,
   Put,
   Query,
   Post,
@@ -29,6 +30,10 @@ import type { Principal } from '../identity/principal';
 import { SchedulingService } from './scheduling.service';
 import {
   BranchHoursResponseDto,
+  HolidayInputDto,
+  HolidayListResponseDto,
+  HolidayResponseDto,
+  ListHolidaysQueryDto,
   ListScheduleExceptionsQueryDto,
   PutBranchHoursDto,
   PutStaffScheduleDto,
@@ -36,6 +41,7 @@ import {
   ScheduleExceptionListResponseDto,
   ScheduleExceptionResponseDto,
   StaffScheduleByBranchResponseDto,
+  UpdateHolidayDto,
 } from './dto/scheduling.dto';
 
 @ApiTags('scheduling')
@@ -131,5 +137,72 @@ export class SchedulingController {
     @Param('id', new ParseUUIDPipe()) id: string,
   ): Promise<void> {
     await this.scheduling.deleteScheduleException(principal, id);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Tatiller
+  // ---------------------------------------------------------------------------
+  //
+  // `@RequireBranchScope()` bilerek YOK: tatil kiracı geneli de olabilir ve
+  // `X-Branch-Id` zorunluluğu, "tüm şubeler" kaydını okumak için anlamsız bir
+  // şube seçmeye zorlardı. Kapsam denetimi servistedir (`assertHolidayScope`)
+  // ve kiracı geneli yazımı `tenantWide` role bağlar.
+
+  @Get('holidays')
+  @RequirePermission(PERMISSIONS.SCHEDULE_READ)
+  @ApiOperation({
+    summary: 'Tatil ve özel gün kayıtları',
+    description:
+      '`branchId` verilirse o şubenin kayıtlarıyla BİRLİKTE kiracı geneli kayıtlar döner — takvimi etkileyen kümenin tamamı budur.',
+  })
+  @ApiOkResponse({ type: HolidayListResponseDto })
+  async listHolidays(
+    @CurrentUser() principal: Principal,
+    @Query() query: ListHolidaysQueryDto,
+  ): Promise<HolidayListResponseDto> {
+    return { data: await this.scheduling.listHolidays(principal, query) };
+  }
+
+  @Post('holidays')
+  @RequirePermission(PERMISSIONS.SCHEDULE_WRITE)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Tatil kaydı oluştur',
+    description:
+      '`branchId` verilmezse kiracı geneli olur ve tüm şubelerin takvimini etkiler; bu yüzden kiracı kapsamlı bir rol gerektirir.',
+  })
+  @ApiCreatedResponse({ type: HolidayResponseDto })
+  createHoliday(
+    @CurrentUser() principal: Principal,
+    @Body() body: HolidayInputDto,
+  ): Promise<HolidayResponseDto> {
+    return this.scheduling.createHoliday(principal, body);
+  }
+
+  @Patch('holidays/:id')
+  @RequirePermission(PERMISSIONS.SCHEDULE_WRITE)
+  @ApiOperation({
+    summary: 'Tatil kaydını güncelle',
+    description: 'Tarih ve şube DEĞİŞTİRİLEMEZ — başka bir gün, başka bir kayıttır.',
+  })
+  @ApiOkResponse({ type: HolidayResponseDto })
+  updateHoliday(
+    @CurrentUser() principal: Principal,
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() body: UpdateHolidayDto,
+  ): Promise<HolidayResponseDto> {
+    return this.scheduling.updateHoliday(principal, id, body);
+  }
+
+  @Delete('holidays/:id')
+  @RequirePermission(PERMISSIONS.SCHEDULE_WRITE)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Tatil kaydını kaldır (soft delete)' })
+  @ApiNoContentResponse()
+  async deleteHoliday(
+    @CurrentUser() principal: Principal,
+    @Param('id', new ParseUUIDPipe()) id: string,
+  ): Promise<void> {
+    await this.scheduling.deleteHoliday(principal, id);
   }
 }

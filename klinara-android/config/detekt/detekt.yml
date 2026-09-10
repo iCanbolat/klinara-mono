@@ -1,0 +1,65 @@
+# Varsayılanın üzerine kurulur (buildUponDefaultConfig = true); yalnız farklar burada.
+
+complexity:
+  CyclomaticComplexMethod:
+    # Govdesi TEK bir `when` olan metotlar haric: bunlar dispatch tablosudur,
+    # denetim akisi degil. `AuthFlowViewModel.onEvent` her olayi bir gecise
+    # esliyor; ic ice blok yok, kosul yok. Kurali bolmek "tek durum makinesi"
+    # ozelligini yok ederdi.
+    ignoreSingleWhenExpression: true
+  LongParameterList:
+    # @Composable fonksiyonlar doğaları gereği çok parametrelidir.
+    functionThreshold: 8
+    constructorThreshold: 10
+    ignoreAnnotated: ['Composable']
+  LongMethod:
+    threshold: 80
+    ignoreAnnotated: ['Composable']
+  TooManyFunctions:
+    thresholdInFiles: 30
+    thresholdInClasses: 40
+    # Servis arayuzleri sunucu ucu kumesinin AYNASIDIR; AuthService 15 uc tasiyor.
+    # Bolmek "cok is yapan sinif" sorununu cozmez, sozlesmeyi ikiye boler.
+    thresholdInInterfaces: 25
+
+style:
+  UnusedPrivateMember:
+    # @Preview composable'lari Android Studio arac zinciri cagirir, kod cagirmaz.
+    ignoreAnnotated: ['Preview', 'KlinaraPreviews']
+  ReturnCount:
+    # Guard clause'lar ic ice yuvalamadan okunakli. Ag katmaninda "yoksa cik"
+    # zinciri (token yok / tag yok / zaten denenmis / ...) dogal olarak 4-5 return.
+    max: 5
+    excludeGuardClauses: true
+  MagicNumber:
+    # Tasarım sistemi token dosyaları ZATEN sayıdır; orada kural anlamsız.
+    excludes: ['**/designsystem/**', '**/test/**', '**/androidTest/**']
+  ForbiddenComment:
+    # TODO bir batch numarası taşımalı: "TODO(A3.1): ..."
+    comments:
+      - reason: 'TODO bir batch numarasi tasimali, ornek: TODO(A3.1)'
+        value: 'TODO:'
+      - reason: 'FIXME yerine batch numarali TODO kullanin'
+        value: 'FIXME'
+  ForbiddenMethodCall:
+    active: true
+    methods:
+      - reason: 'PII/token loglara dusmemeli (ANDROID_DEVELOPMENT.md §7.9). Gerekiyorsa Log.w/e ve yalniz sinif adi.'
+        value: 'android.util.Log.d'
+      - reason: 'PII/token loglara dusmemeli (ANDROID_DEVELOPMENT.md §7.9).'
+        value: 'android.util.Log.v'
+      - reason: 'println release derlemede de calisir; logcat yerine kullanilmamali.'
+        value: 'kotlin.io.println'
+  MaxLineLength:
+    maxLineLength: 120
+
+naming:
+  MatchingDeclarationName:
+    # Bir @Composable ile kendi secenek enum'u (KlinaraButton + KlinaraButtonKind)
+    # ayni dosyada durmali. Kural Java'nin "bir dosya bir sinif" varsayimini tasiyor.
+    active: false
+  FunctionNaming:
+    # @Composable PascalCase.
+    ignoreAnnotated: ['Composable']
+  TopLevelPropertyNaming:
+    constantPattern: '[A-Za-z][_A-Za-z0-9]*'

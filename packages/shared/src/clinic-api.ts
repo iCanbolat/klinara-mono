@@ -302,9 +302,13 @@ export interface CustomerNote {
   customerVisible: boolean;
   authorUserId: string | null;
   /**
-   * ⚠️ `version` dönüyor ama `PATCH /notes/:id` `If-Match` İSTEMİYOR:
-   * son yazan kazanır. İstemci sürümü karşılaştırıp uyarabilir; bu bir
-   * uyarıdır, kilit değil. Asıl çözüm sunucuda (bkz. plan, A7).
+   * İyimser kilit token'ı. `PATCH /notes/:id` `If-Match: W/"<version>"`
+   * ZORUNLU tutar: başlıksız istek `428`, bayat sürüm `409 VERSION_CONFLICT`.
+   *
+   * ⚠️ Sürümü YALNIZ METİN değişimi artırır (`customer_notes_revision`
+   * trigger'ı). `kind` ya da `customerVisible` değiştiren bir düzenleme
+   * sürümü olduğu yerde bırakır; istemci ETag'i tazelemek için yanıttaki
+   * `version`'ı kullanmalı.
    */
   version: number;
   createdAt: string;
@@ -319,17 +323,39 @@ export interface CustomerNoteRevision {
   editedAt: string;
 }
 
-export const TIMELINE_KINDS = ['appointment', 'note', 'consent'] as const;
+export const TIMELINE_KINDS = [
+  'appointment',
+  'note',
+  'consent',
+  'package_sale',
+  'package_ledger',
+] as const;
 export type TimelineKind = (typeof TIMELINE_KINDS)[number];
 
 /**
- * ⚠️ Zaman tüneli randevu, not ve onam kabulü içeriyor. Paket satışı/tüketimi
- * ve tahsilat defterde duruyor ama bu sorguya eklenmedi (Faz 5'ten devreden
- * açık madde). Ekran bu boşluğu dipnotla belirtmeli, sessizce gizlememeli.
+ * Zaman tüneli randevu, not, onam kabulü ve paket olaylarını içerir. TAHSİLAT
+ * hâlâ YOK — defterde duruyor ama bu sorguya eklenmedi (Faz 6'dan devreden
+ * madde). Ekran bu boşluğu dipnotla belirtmeli, sessizce gizlememeli.
  *
  * `consent` kolunun payload'ında metnin GÖVDESİ yoktur (`consentKind`,
  * `version`, `locale`, `textSha256`): 20k'lık bir aydınlatma metni her zaman
  * çizelgesi sayfasına binerdi. Tam kanıt `GET /consent-acceptances`ten gelir.
+ *
+ * Paket İKİ kola bölünür ve bu bir tercih değil, zorunluluk:
+ *
+ *   `package_sale`   — `customer_packages` satırı. Bir satış = BİR olay.
+ *                      Payload: `definitionName`, `branchId`, `totalPriceMinor`,
+ *                      `currency`, `status`, `expiresAt`, `remainingSessions`.
+ *   `package_ledger` — append-only defterin `purchase` DIŞINDAKİ satırları
+ *                      (tüketim, iade, devir, süre dolumu, elle düzeltme).
+ *                      Payload: `entryType`, `delta`, `customerPackageId`,
+ *                      `definitionName`, `serviceId`, `serviceName`,
+ *                      `appointmentId`, `actorUserId`, `reason`.
+ *
+ * Defterdeki `purchase` satırları KALEM başınadır; tek bir `package` türü
+ * olsaydı üç hizmetli bir satış zaman çizelgesine üç muhasebe kaydı olarak
+ * düşerdi. Her iki kol da `package:read` iznine bağlıdır ve izin yoksa
+ * sorgudan hiç çıkmaz — `kinds` filtresi bunu geri açamaz.
  */
 export interface TimelineEntry {
   kind: TimelineKind;
@@ -500,4 +526,52 @@ export interface ScheduleException {
   recurrenceWeekdays: number[];
   isActive: boolean;
   createdAt: string;
+}
+
+/**
+ * Tatil / özel gün.
+ *
+ * `branchId: null` KİRACI GENELİ demektir ve tüm şubelerin takvimini etkiler.
+ * Uygunluk motoru aynı güne hem şube hem kiracı geneli kayıt bulursa ŞUBE
+ * kaydını uygular (`order by branch_id nulls last`): kiracı 1 Ocak'ı kapatır,
+ * tek bir şube isterse aynı güne kendi yarım gün kaydını yazar.
+ *
+ * `GET /holidays?branchId=` bu yüzden şube kayıtlarıyla BİRLİKTE kiracı geneli
+ * kayıtları da döndürür — takvimi etkileyen kümenin tamamı budur.
+ *
+ * ⚠️ Kiracı geneli kayıt YAZMAK kiracı kapsamlı bir rol ister (`owner`,
+ * `accountant`); şube yöneticisinin `schedule:write` izni vardır ama kapsamı
+ * kendi şubesidir ve `403 BRANCH_FORBIDDEN` alır.
+ *
+ * ⚠️ `PATCH` tarihi ve şubeyi DEĞİŞTİRMEZ: başka bir gün, başka bir kayıttır.
+ */
+export interface Holiday {
+  id: string;
+  tenantId: string;
+  /** `null` = kiracı geneli (tüm şubeler). */
+  branchId: string | null;
+  /** `YYYY-MM-DD` — gün, an değil. */
+  holidayDate: string;
+  name: string;
+  /** `false` ise `openTime`/`closeTime` dolu: yarım gün açılış. */
+  isClosed: boolean;
+  openTime: string | null;
+  closeTime: string | null;
+  createdAt: string;
+}
+
+export interface HolidayInput {
+  branchId?: string;
+  holidayDate: string;
+  name: string;
+  isClosed?: boolean;
+  openTime?: string;
+  closeTime?: string;
+}
+
+export interface UpdateHolidayInput {
+  name?: string;
+  isClosed?: boolean;
+  openTime?: string;
+  closeTime?: string;
 }

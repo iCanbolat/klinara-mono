@@ -61,9 +61,9 @@ struct NoteEditorView: View {
 
     /// Not, düzenlemeye girildiğinden beri başkası tarafından değiştirildi mi.
     ///
-    /// Bu bir **kilit değil, uyarı**: sunucuda bu uçta `If-Match` yok ve son
-    /// yazan kazanıyor. Revizyon geçmişi veri kaybını engelliyor, çakışmayı
-    /// değil — kullanıcıya böyle söyleniyor.
+    /// Artık bir uyarı DEĞİL, önceden haber: sunucu `If-Match` istiyor ve bu
+    /// durumda kaydetme `409` ile duracak. Banner kullanıcıya kaydete basmadan
+    /// önce söylüyor ki yazdığı metni boşuna yazmasın.
     private var wasChangedElsewhere: Bool {
         guard let openedVersion, let current = existing.map(\.version) else { return false }
         return current > openedVersion
@@ -81,9 +81,9 @@ struct NoteEditorView: View {
         ) {
             if wasChangedElsewhere {
                 ErrorBanner(error: .problem(ProblemDetails(
-                    code: .conflict,
+                    code: .versionConflict,
                     title: "Bu not siz açtıktan sonra değiştirildi",
-                    detail: "Kaydederseniz son hâli sizinki olur; eski metin geçmişte kalır.",
+                    detail: "Kaydetme reddedilecek. Sayfayı kapatıp notu yeniden açın.",
                     status: 409
                 )))
             }
@@ -190,11 +190,17 @@ struct NoteEditorView: View {
         error = nil
         do {
             if let existing {
-                try await record.updateNote(id: existing.id, UpdateNoteInput(
-                    body: trimmed,
-                    kind: kind,
-                    customerVisible: customerVisible
-                ))
+                // Sürüm, notun AÇILDIĞI andaki değer (`openedVersion`) —
+                // aradaki bir değişiklik kaydı sessizce ezmesin.
+                try await record.updateNote(
+                    id: existing.id,
+                    version: openedVersion ?? existing.version,
+                    UpdateNoteInput(
+                        body: trimmed,
+                        kind: kind,
+                        customerVisible: customerVisible
+                    )
+                )
             } else {
                 try await record.createNote(CreateNoteInput(
                     body: trimmed,

@@ -1,0 +1,7 @@
+{
+  "code": "ACCOUNT_LOCKED",
+  "title": "Hesap kilitli",
+  "detail": "Çok fazla hatalı deneme yapıldı.",
+  "status": 423,
+  "requestId": "req_mock_account_locked"
+}

@@ -1,0 +1,18 @@
+{
+  "data": [
+    {
+      "id": "b1000000-0000-4000-8000-000000000001",
+      "name": "Nişantaşı",
+      "timezone": "Europe/Istanbul",
+      "address": "Teşvikiye Cad. No: 12, Şişli",
+      "isActive": true
+    },
+    {
+      "id": "b1000000-0000-4000-8000-000000000002",
+      "name": "Bodrum",
+      "timezone": "Europe/Istanbul",
+      "address": "Neyzen Tevfik Cad. No: 44, Bodrum",
+      "isActive": true
+    }
+  ]
+}

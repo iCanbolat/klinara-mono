@@ -2,9 +2,9 @@ import Foundation
 
 /// Müşteri zaman çizelgesi — `GET /customers/:id/timeline`.
 ///
-/// Sunucu randevu, not ve onam kabullerini `union all` ile TEK sorguda, tek
-/// sıralamada birleştiriyor; sözleşme her kolun `kind` + `payload` döndürmesi.
-/// Faz 5 (paket) ve Faz 6 (tahsilat) buraya kendi kolunu ekleyecek.
+/// Sunucu randevu, not, onam kabulü ve paket olaylarını `union all` ile TEK
+/// sorguda, tek sıralamada birleştiriyor; sözleşme her kolun `kind` + `payload`
+/// döndürmesi. Faz 6 (tahsilat) hâlâ kendi kolunu eklemedi.
 
 /// Çizelgedeki bir olayın türü — sunucudaki `TIMELINE_KINDS` ile birebir.
 ///
@@ -16,6 +16,13 @@ nonisolated enum TimelineKind: String, Sendable, CaseIterable, Identifiable {
     case appointment
     case note
     case consent
+    /// Paketin SATIŞI — `customer_packages` satırı, bir satış bir olay.
+    case packageSale = "package_sale"
+    /// Satış SONRASI defter hareketleri: tüketim, iade, devir, süre dolumu,
+    /// elle düzeltme. Ayrı bir tür çünkü satın alma defter satırları kalem
+    /// başınadır ve satışla birleştirilseydi üç hizmetli bir paket satışı
+    /// çizelgeye üç muhasebe kaydı olarak düşerdi.
+    case packageLedger = "package_ledger"
 
     var id: String { rawValue }
 
@@ -24,6 +31,40 @@ nonisolated enum TimelineKind: String, Sendable, CaseIterable, Identifiable {
         case .appointment: return "Randevu"
         case .note: return "Not"
         case .consent: return "Onam"
+        case .packageSale: return "Paket satışı"
+        case .packageLedger: return "Paket hareketi"
+        }
+    }
+}
+
+/// Defter hareketinin türü — sunucudaki `LedgerEntryType` ile birebir.
+///
+/// `purchase` BİLEREK yok: satın alma satırları çizelgeye ``TimelineKind/packageSale``
+/// kolundan giriyor ve sunucu bu koldan onları eliyor.
+nonisolated enum PackageLedgerEntryType: String, Decodable, Sendable, Equatable {
+    case consume
+    case refund
+    case transferIn = "transfer_in"
+    case transferOut = "transfer_out"
+    case expire
+    case manualAdjustment = "manual_adjustment"
+    /// Sunucu yeni bir tür eklerse çözümleme patlamasın.
+    case unknown
+
+    init(from decoder: any Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = PackageLedgerEntryType(rawValue: raw) ?? .unknown
+    }
+
+    var turkishName: String {
+        switch self {
+        case .consume: return "Seans kullanıldı"
+        case .refund: return "İade"
+        case .transferIn: return "Devir (gelen)"
+        case .transferOut: return "Devir (giden)"
+        case .expire: return "Süre doldu"
+        case .manualAdjustment: return "Manuel düzeltme"
+        case .unknown: return "Paket hareketi"
         }
     }
 }
@@ -63,11 +104,14 @@ nonisolated enum TimelineEntry: Decodable, Sendable, Identifiable, Equatable {
     case appointment(TimelineHeader, AppointmentTimelinePayload)
     case note(TimelineHeader, NoteTimelinePayload)
     case consent(TimelineHeader, ConsentTimelinePayload)
+    case packageSale(TimelineHeader, PackageSaleTimelinePayload)
+    case packageLedger(TimelineHeader, PackageLedgerTimelinePayload)
     case unknown(TimelineHeader, kind: String)
 
     var header: TimelineHeader {
         switch self {
         case .appointment(let header, _), .note(let header, _), .consent(let header, _),
+            .packageSale(let header, _), .packageLedger(let header, _),
             .unknown(let header, _):
             return header
         }
@@ -102,6 +146,16 @@ nonisolated enum TimelineEntry: Decodable, Sendable, Identifiable, Equatable {
             self = .consent(
                 header,
                 try container.decode(ConsentTimelinePayload.self, forKey: .payload)
+            )
+        case "package_sale":
+            self = .packageSale(
+                header,
+                try container.decode(PackageSaleTimelinePayload.self, forKey: .payload)
+            )
+        case "package_ledger":
+            self = .packageLedger(
+                header,
+                try container.decode(PackageLedgerTimelinePayload.self, forKey: .payload)
             )
         default:
             self = .unknown(header, kind: kind)
@@ -144,6 +198,38 @@ nonisolated struct ConsentTimelinePayload: Decodable, Sendable, Equatable {
     let version: Int?
     let locale: String?
     let textSha256: String
+}
+
+/// Paket satışı.
+///
+/// Tutar SATIŞ ANINDAKİ snapshot'tır (`customer_packages.total_price_minor`):
+/// tanımın sonradan zamlanması geçmiş bir satışı değiştirmez.
+nonisolated struct PackageSaleTimelinePayload: Decodable, Sendable, Equatable {
+    let definitionName: String
+    let branchId: String
+    let totalPriceMinor: Int
+    let currency: String
+    let status: String
+    /// Süresiz pakette `nil`.
+    let expiresAt: Date?
+    let remainingSessions: Int
+}
+
+/// Append-only defterden bir hareket.
+///
+/// `delta` işaretli: negatif = hak düştü (tüketim), pozitif = hak eklendi
+/// (iade, düzeltme). Hangi hizmetin hakkı olduğu `serviceName`de — satış
+/// anındaki SNAPSHOT ad, katalogdaki güncel ad değil.
+nonisolated struct PackageLedgerTimelinePayload: Decodable, Sendable, Equatable {
+    let entryType: PackageLedgerEntryType
+    let delta: Int
+    let customerPackageId: String
+    let definitionName: String
+    let serviceId: String
+    let serviceName: String
+    let appointmentId: String?
+    let actorUserId: String?
+    let reason: String?
 }
 
 nonisolated struct NoteTimelinePayload: Decodable, Sendable, Equatable {

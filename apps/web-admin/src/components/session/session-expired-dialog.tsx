@@ -38,6 +38,12 @@ export function SessionExpiredDialog({
   email: string;
   onRecovered: (expiresIn: number) => void;
 }): ReactNode {
+  // `email` boş gelebilir: sayfa yenilendiğinde `/api/session/me` doğrudan
+  // 401 dönerse `SessionProvider` kullanıcıyı hiç öğrenemeden diyaloğu açar.
+  // O durumda alan salt-okunur KALAMAZ — boş ve düzenlenemez bir e-posta
+  // kullanıcıyı içeri girmenin hiçbir yolu olmadan kilitler.
+  const emailKnown = email !== '';
+  const [emailValue, setEmailValue] = useState(email);
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -47,7 +53,7 @@ export function SessionExpiredDialog({
     setBusy(true);
     setError(null);
     try {
-      const step = await sessionCall<SessionStep>('login', { email, password });
+      const step = await sessionCall<SessionStep>('login', { email: emailValue, password });
       if (step.step === 'authenticated') {
         onRecovered(step.expiresIn);
         return;
@@ -88,9 +94,12 @@ export function SessionExpiredDialog({
           <Field
             label={t('auth.login.email')}
             type="email"
-            value={email}
-            readOnly
+            value={emailValue}
+            onChange={emailKnown ? undefined : (event) => setEmailValue(event.target.value)}
+            readOnly={emailKnown}
             autoComplete="username"
+            autoFocus={!emailKnown}
+            required
           />
           <Field
             label={t('auth.login.password')}
@@ -98,7 +107,7 @@ export function SessionExpiredDialog({
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             autoComplete="current-password"
-            autoFocus
+            autoFocus={emailKnown}
             required
           />
           {error !== null ? <Alert tone="danger">{error}</Alert> : null}

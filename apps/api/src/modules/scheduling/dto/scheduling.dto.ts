@@ -6,16 +6,20 @@ import {
   IsIn,
   IsInt,
   IsISO8601,
+  IsNotEmpty,
   IsOptional,
   IsString,
   IsUUID,
   Matches,
   Max,
+  MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+/** `YYYY-MM-DD`. Tatil bir GÜNDÜR; `IsISO8601` saat de kabul ederdi. */
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const RECURRENCE_TYPES = ['none', 'weekly'] as const;
 
 type RecurrenceType = (typeof RECURRENCE_TYPES)[number];
@@ -299,5 +303,150 @@ export class ListScheduleExceptionsQueryDto {
   @ApiPropertyOptional({ format: 'date-time' })
   @IsOptional()
   @IsISO8601()
+  to?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Tatiller
+// ---------------------------------------------------------------------------
+
+/**
+ * Tatil kaydı — şubeye BAĞLI ya da kiracı GENELİ.
+ *
+ * `branchId: null` "tüm şubeler" demektir ve uygunluk motoru şube kaydını
+ * kiracı geneline TERCİH eder (`order by h.branch_id nulls last`): kiracı
+ * geneli 1 Ocak'ı kapatır, tek bir şube isterse aynı güne kendi kaydını yazıp
+ * yarım gün açılır. Sıralama motorda zaten böyleydi; uç onu görünür kılıyor.
+ */
+export class HolidayInputDto {
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'Verilmezse kiracı geneli (tüm şubeler)',
+  })
+  @IsOptional()
+  @IsUUID()
+  branchId?: string;
+
+  @ApiProperty({ format: 'date', example: '2026-04-23' })
+  @IsString()
+  @Matches(DATE_PATTERN, { message: 'holidayDate YYYY-MM-DD biçiminde olmalı' })
+  holidayDate: string;
+
+  @ApiProperty({ example: 'Ulusal Egemenlik ve Çocuk Bayramı' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(200)
+  name: string;
+
+  @ApiPropertyOptional({
+    default: true,
+    description: 'false ise openTime/closeTime zorunlu (yarım gün açılış)',
+  })
+  @IsOptional()
+  @IsBoolean()
+  isClosed?: boolean;
+
+  @ApiPropertyOptional({ example: '10:00' })
+  @IsOptional()
+  @IsString()
+  @Matches(TIME_PATTERN)
+  openTime?: string;
+
+  @ApiPropertyOptional({ example: '14:00' })
+  @IsOptional()
+  @IsString()
+  @Matches(TIME_PATTERN)
+  closeTime?: string;
+}
+
+export class UpdateHolidayDto {
+  @ApiPropertyOptional({ example: 'Ulusal Egemenlik ve Çocuk Bayramı' })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(200)
+  name?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  isClosed?: boolean;
+
+  @ApiPropertyOptional({ example: '10:00' })
+  @IsOptional()
+  @IsString()
+  @Matches(TIME_PATTERN)
+  openTime?: string;
+
+  @ApiPropertyOptional({ example: '14:00' })
+  @IsOptional()
+  @IsString()
+  @Matches(TIME_PATTERN)
+  closeTime?: string;
+}
+
+export class HolidayResponseDto {
+  @ApiProperty({ format: 'uuid' })
+  id: string;
+
+  @ApiProperty({ format: 'uuid' })
+  tenantId: string;
+
+  @ApiProperty({
+    format: 'uuid',
+    nullable: true,
+    type: String,
+    description: 'null = kiracı geneli',
+  })
+  branchId: string | null;
+
+  @ApiProperty({ format: 'date', example: '2026-04-23' })
+  holidayDate: string;
+
+  @ApiProperty()
+  name: string;
+
+  @ApiProperty()
+  isClosed: boolean;
+
+  @ApiProperty({ nullable: true, type: String, example: '10:00:00' })
+  openTime: string | null;
+
+  @ApiProperty({ nullable: true, type: String, example: '14:00:00' })
+  closeTime: string | null;
+
+  @ApiProperty({ format: 'date-time' })
+  createdAt: string;
+}
+
+export class HolidayListResponseDto {
+  @ApiProperty({ type: [HolidayResponseDto] })
+  data: HolidayResponseDto[];
+}
+
+export class ListHolidaysQueryDto {
+  /**
+   * Verilirse o şubenin kayıtları VE kiracı geneli kayıtlar döner: takvimi
+   * etkileyen kümenin tamamı budur. Yalnız şube satırlarını döndürmek,
+   * "bu şubede tatil yok" diyen bir listeyle kapalı bir günü aynı ekranda
+   * göstermek olurdu.
+   */
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  branchId?: string;
+
+  /** Dahil. */
+  @ApiPropertyOptional({ format: 'date', example: '2026-01-01' })
+  @IsOptional()
+  @IsString()
+  @Matches(DATE_PATTERN)
+  from?: string;
+
+  /** Dahil — tatiller gün bazlıdır, yarı açık aralık burada okunaksız olurdu. */
+  @ApiPropertyOptional({ format: 'date', example: '2026-12-31' })
+  @IsOptional()
+  @IsString()
+  @Matches(DATE_PATTERN)
   to?: string;
 }

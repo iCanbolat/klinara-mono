@@ -1,0 +1,8 @@
+{
+  "status": "mfa_required",
+  "challengeToken": "mock.mfa.token",
+  "mfa": {
+    "configured": true,
+    "methods": ["totp", "backup_code"]
+  }
+}

@@ -234,9 +234,13 @@ const RULES: readonly Rule[] = [
   { methods: ['PUT'], pattern: new RegExp(`^staff/${UUID}/services$`) },
   // Personel oluşturma MEVCUT bir `userId` istiyor; kullanıcı listesi
   // olmadan form kurulamaz. `PATCH users/:id` yalnız ad/dil/aktiflik
-  // değiştiriyor — ROL DEĞİŞTİREN bir uç yok (bkz. plan A6).
+  // değiştiriyor.
   { methods: ['GET'], pattern: /^users$/ },
   { methods: ['GET', 'PATCH'], pattern: new RegExp(`^users/${UUID}$`) },
+  // Rol değiştirme (Faz 1'den devreden madde kapandı). `PUT` TAM DEĞİŞTİRİR
+  // ve boş liste kullanıcıyı klinikten çıkarır; sunucu yetki yükseltmeyi,
+  // kendi rolüne dokunmayı ve son sahibi kaldırmayı ayrıca reddediyor.
+  { methods: ['GET', 'PUT'], pattern: new RegExp(`^users/${UUID}/memberships$`) },
 
   // --- Çalışma planı (12.4) — hepsi `X-Branch-Id` istiyor ---
   { methods: ['GET', 'PUT'], pattern: new RegExp(`^branches/${UUID}/hours$`) },
@@ -244,6 +248,12 @@ const RULES: readonly Rule[] = [
   { methods: ['GET', 'POST'], pattern: /^schedule-exceptions$/ },
   // `PATCH` YOK ÇÜNKÜ UÇ YOK: düzenleme = kaldır + yeniden ekle.
   { methods: ['DELETE'], pattern: new RegExp(`^schedule-exceptions/${UUID}$`) },
+
+  // Tatiller (Faz 3'ten devreden madde kapandı). İstisnaların aksine burada
+  // `PATCH` VAR: tatilin adı ve saatleri değişebilir, tarihi ve şubesi
+  // değişemez — başka bir gün, başka bir kayıttır.
+  { methods: ['GET', 'POST'], pattern: /^holidays$/ },
+  { methods: ['PATCH', 'DELETE'], pattern: new RegExp(`^holidays/${UUID}$`) },
 ];
 
 /**

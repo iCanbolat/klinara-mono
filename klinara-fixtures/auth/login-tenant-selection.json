@@ -1,0 +1,18 @@
+{
+  "status": "tenant_selection_required",
+  "challengeToken": "mock.tenant-select.token",
+  "tenants": [
+    {
+      "id": "7f3d1a20-0000-4000-8000-000000000001",
+      "slug": "nisantasi-estetik",
+      "name": "Nişantaşı Estetik",
+      "roles": ["practitioner"]
+    },
+    {
+      "id": "7f3d1a20-0000-4000-8000-000000000002",
+      "slug": "bodrum-medikal",
+      "name": "Bodrum Medikal Güzellik",
+      "roles": ["manager", "practitioner"]
+    }
+  ]
+}
