@@ -1,0 +1,6 @@
+{
+  "storageKey": "7f3d1a20-0000-4000-8000-000000000001/9a1e5c40-1f6b-4d2e-9c31-5f0a7b2d8e11/4c8e1b07-2a95-4f30-b6d8-0e73a1c95f42",
+  "uploadUrl": "https://minio.klinara.test/klinara-files/7f3d1a20-0000-4000-8000-000000000001/9a1e5c40-1f6b-4d2e-9c31-5f0a7b2d8e11/4c8e1b07-2a95-4f30-b6d8-0e73a1c95f42?X-Amz-Signature=abc123",
+  "contentType": "image/jpeg",
+  "expiresAt": "2026-09-08T09:05:00.000Z"
+}

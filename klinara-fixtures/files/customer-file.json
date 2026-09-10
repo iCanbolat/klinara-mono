@@ -1,0 +1,14 @@
+{
+  "id": "4c8e1b07-2a95-4f30-b6d8-0e73a1c95f42",
+  "customerId": "9a1e5c40-1f6b-4d2e-9c31-5f0a7b2d8e11",
+  "groupId": null,
+  "kind": "photo",
+  "position": "before",
+  "mimeType": "image/jpeg",
+  "sizeBytes": 1843200,
+  "sha256": "9f2b7c1e4a08d365b9e07c4f1a2d8b630e5c9a71f4d02b86c3e17a95d0428fbc",
+  "hasThumbnail": false,
+  "takenAt": "2026-09-08T08:55:00.000Z",
+  "uploadedBy": "3f0c8d21-5b74-4e19-9a62-8c1d0e7f4b35",
+  "createdAt": "2026-09-08T09:00:00.000Z"
+}

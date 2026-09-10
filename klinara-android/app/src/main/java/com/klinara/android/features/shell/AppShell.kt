@@ -2,6 +2,7 @@ package com.klinara.android.features.shell
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -35,11 +36,25 @@ import com.klinara.android.designsystem.KlinaraTheme
 import com.klinara.android.designsystem.KlinaraType
 import com.klinara.android.designsystem.components.EmptyStateView
 import com.klinara.android.designsystem.components.KlinaraScreen
+import com.klinara.android.designsystem.components.KlinaraCard
+import com.klinara.android.designsystem.components.KlinaraNavigationRow
 import com.klinara.android.features.auth.AppSession
 import com.klinara.android.features.auth.AuthEvent
 import com.klinara.android.features.calendar.AppointmentDetailScreen
 import com.klinara.android.features.calendar.AppointmentHistoryScreen
 import com.klinara.android.features.calendar.CalendarHomeScreen
+import com.klinara.android.features.customers.CustomerDetailScreen
+import com.klinara.android.features.customers.CustomerEditorScreen
+import com.klinara.android.features.customers.CustomerListScreen
+import com.klinara.android.features.customers.CustomerMergeScreen
+import com.klinara.android.features.customers.CustomerTagListScreen
+import com.klinara.android.features.customers.NoteEditorHost
+import com.klinara.android.features.customers.NoteRevisionsHost
+import com.klinara.android.features.customers.files.DocumentPreviewHost
+import com.klinara.android.features.customers.files.FileUploadHost
+import com.klinara.android.features.customers.files.PhotoDetailHost
+import com.klinara.android.features.customers.files.PhotoGroupsHost
+import com.klinara.android.services.files.FilePosition
 import com.klinara.android.features.calendar.booking.BookingFlowHost
 import com.klinara.android.features.profile.ProfileScreen
 import com.klinara.android.services.ServiceContainer
@@ -109,8 +124,8 @@ fun AppShell(
 
             when (selected) {
                 ShellTab.Today -> TodayTab(todayNav, session, container, branchGeneration, branchMenu)
-                ShellTab.Customers -> CustomersTab(customersNav, branchMenu)
-                ShellTab.Management -> ManagementTab(managementNav, branchMenu)
+                ShellTab.Customers -> CustomersTab(customersNav, session, container, branchMenu)
+                ShellTab.Management -> ManagementTab(managementNav, session, container, branchMenu)
                 ShellTab.Profile ->
                     ProfileTab(
                         navController = profileNav,
@@ -208,16 +223,158 @@ private fun TodayTab(
 @Composable
 private fun CustomersTab(
     navController: NavHostController,
+    session: AppSession,
+    container: ServiceContainer,
     trailing: @Composable RowScope.() -> Unit,
 ) {
     NavHost(navController = navController, startDestination = ShellRoutes.CustomerList) {
         composable<ShellRoutes.CustomerList> {
-            ComingSoonScreen(
-                title = "Müşteriler",
-                headline = "Müşteri kartı hazırlanıyor",
-                message = "Liste, arama, notlar ve fotoğraflar Faz A4 ile geliyor.",
-                icon = Icons.Filled.Person,
+            CustomerListScreen(
+                session = session,
+                container = container,
+                onSelectCustomer = { navController.navigate(ShellRoutes.CustomerDetail(it)) },
+                onCreateCustomer =
+                    if (session.can(Permissions.CUSTOMER_WRITE)) {
+                        { navController.navigate(ShellRoutes.CustomerEditor()) }
+                    } else {
+                        null
+                    },
                 trailing = trailing,
+            )
+        }
+
+        composable<ShellRoutes.CustomerDetail> { entry ->
+            val route = entry.toRoute<ShellRoutes.CustomerDetail>()
+            CustomerDetailScreen(
+                session = session,
+                container = container,
+                customerId = route.customerId,
+                onBack = { navController.popBackStack() },
+                onEdit = { navController.navigate(ShellRoutes.CustomerEditor(it)) },
+                onMerge = { navController.navigate(ShellRoutes.CustomerMerge(it)) },
+                onOpenNote = { customer, note ->
+                    navController.navigate(ShellRoutes.NoteEditor(customer, note))
+                },
+                onOpenPhoto = { customer, fileId ->
+                    navController.navigate(ShellRoutes.PhotoDetail(customer, fileId))
+                },
+                onOpenDocument = { customer, fileId ->
+                    navController.navigate(ShellRoutes.DocumentPreview(customer, fileId))
+                },
+                onOpenGroups = { navController.navigate(ShellRoutes.PhotoGroups(it)) },
+                onUploadFile = { customer, isPhoto ->
+                    navController.navigate(ShellRoutes.FileUpload(customer, isPhoto))
+                },
+            )
+        }
+
+        composable<ShellRoutes.FileUpload> { entry ->
+            val route = entry.toRoute<ShellRoutes.FileUpload>()
+            FileUploadHost(
+                container = container,
+                customerId = route.customerId,
+                isPhoto = route.isPhoto,
+                groupId = route.groupId,
+                position = route.position?.let(FilePosition::from),
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable<ShellRoutes.PhotoGroups> { entry ->
+            val route = entry.toRoute<ShellRoutes.PhotoGroups>()
+            PhotoGroupsHost(
+                session = session,
+                container = container,
+                customerId = route.customerId,
+                onOpenPhoto = { navController.navigate(ShellRoutes.PhotoDetail(route.customerId, it)) },
+                onAddToSlot = { groupId, position ->
+                    // Grup ve konum önceden seçili gidiyor: yükleme ekranı bir daha sormaz.
+                    navController.navigate(
+                        ShellRoutes.FileUpload(
+                            customerId = route.customerId,
+                            isPhoto = true,
+                            groupId = groupId,
+                            position = position.wire,
+                        ),
+                    )
+                },
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable<ShellRoutes.PhotoDetail> { entry ->
+            val route = entry.toRoute<ShellRoutes.PhotoDetail>()
+            PhotoDetailHost(
+                session = session,
+                container = container,
+                customerId = route.customerId,
+                fileId = route.fileId,
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable<ShellRoutes.DocumentPreview> { entry ->
+            val route = entry.toRoute<ShellRoutes.DocumentPreview>()
+            DocumentPreviewHost(
+                container = container,
+                customerId = route.customerId,
+                fileId = route.fileId,
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable<ShellRoutes.NoteEditor> { entry ->
+            val route = entry.toRoute<ShellRoutes.NoteEditor>()
+            NoteEditorHost(
+                session = session,
+                container = container,
+                customerId = route.customerId,
+                noteId = route.noteId,
+                onBack = { navController.popBackStack() },
+                onOpenRevisions = { customer, note ->
+                    navController.navigate(ShellRoutes.NoteRevisions(customer, note))
+                },
+            )
+        }
+
+        composable<ShellRoutes.NoteRevisions> { entry ->
+            val route = entry.toRoute<ShellRoutes.NoteRevisions>()
+            NoteRevisionsHost(
+                session = session,
+                container = container,
+                customerId = route.customerId,
+                noteId = route.noteId,
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable<ShellRoutes.CustomerEditor> { entry ->
+            val route = entry.toRoute<ShellRoutes.CustomerEditor>()
+            CustomerEditorScreen(
+                container = container,
+                customerId = route.customerId,
+                onBack = { navController.popBackStack() },
+                onSaved = { saved ->
+                    // Yeni kayıt kartına GİDER, düzenleme geri döner. Yeni müşteriyi
+                    // kaydedip listeye düşmek, kullanıcıyı az önce yarattığı kaydı
+                    // aramaya zorlardı.
+                    if (route.customerId == null) {
+                        navController.navigate(ShellRoutes.CustomerDetail(saved.id)) {
+                            popUpTo(ShellRoutes.CustomerList)
+                        }
+                    } else {
+                        navController.popBackStack()
+                    }
+                },
+            )
+        }
+
+        composable<ShellRoutes.CustomerMerge> { entry ->
+            val route = entry.toRoute<ShellRoutes.CustomerMerge>()
+            CustomerMergeScreen(
+                container = container,
+                targetCustomerId = route.customerId,
+                onBack = { navController.popBackStack() },
             )
         }
     }
@@ -226,18 +383,60 @@ private fun CustomersTab(
 @Composable
 private fun ManagementTab(
     navController: NavHostController,
+    session: AppSession,
+    container: ServiceContainer,
     trailing: @Composable RowScope.() -> Unit,
 ) {
     NavHost(navController = navController, startDestination = ShellRoutes.ManagementHome) {
         composable<ShellRoutes.ManagementHome> {
-            // Gerçek hub (katalog, personel, çalışma saatleri, kasa, prim) Faz A7'de.
-            ComingSoonScreen(
-                title = "Yönetim",
-                headline = "Kurulum ekranları hazırlanıyor",
-                message =
-                    "Hizmetler, ekip ve çalışma saatleri Faz A7 ile; kasa ve prim Faz A6 ile geliyor.",
-                icon = Icons.Filled.Settings,
+            ManagementHomeScreen(
+                session = session,
+                onOpenCustomerTags = { navController.navigate(ShellRoutes.CustomerTagList) },
                 trailing = trailing,
+            )
+        }
+
+        composable<ShellRoutes.CustomerTagList> {
+            CustomerTagListScreen(
+                session = session,
+                container = container,
+                onBack = { navController.popBackStack() },
+            )
+        }
+    }
+}
+
+/**
+ * Yönetim kökü.
+ *
+ * Gerçek hub (katalog, personel, çalışma saatleri, kasa, prim) A7'de; bugün yalnız
+ * A4.2'nin getirdiği tek bölüm gerçek. Kalanı için **sahte satır çizilmiyor** — açılmayan
+ * bir menü, kullanıcıya var olmayan bir özellik vaat eder.
+ */
+@Composable
+private fun ManagementHomeScreen(
+    session: AppSession,
+    onOpenCustomerTags: () -> Unit,
+    trailing: @Composable RowScope.() -> Unit,
+) {
+    KlinaraScreen(title = "Yönetim", trailing = trailing) {
+        if (session.can(Permissions.CUSTOMER_READ)) {
+            KlinaraCard(title = "Müşteriler") {
+                KlinaraNavigationRow(
+                    label = "Müşteri etiketleri",
+                    value = "Kiracı genelinde tanımlı etiketler",
+                    onClick = onOpenCustomerTags,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+
+        KlinaraCard(title = "Yakında") {
+            Text(
+                text =
+                    "Hizmetler, ekip ve çalışma saatleri Faz A7 ile; kasa ve prim Faz A6 ile geliyor.",
+                style = KlinaraType.bodyM,
+                color = KlinaraTheme.colors.charcoalMuted,
             )
         }
     }

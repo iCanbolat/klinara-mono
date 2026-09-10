@@ -1,0 +1,46 @@
+{
+  "data": [
+    {
+      "kind": "appointment",
+      "id": "d17e9c34-6b08-4f52-a930-1c7d4e2b8f60",
+      "occurredAt": "2026-09-07T06:00:00+00:00",
+      "payload": {
+        "status": "completed",
+        "startsAt": "2026-09-07T06:00:00+00:00",
+        "endsAt": "2026-09-07T07:00:00+00:00",
+        "branchId": "b1000000-0000-4000-8000-000000000001",
+        "totalMinor": 90000,
+        "serviceName": "Cilt bakımı"
+      }
+    },
+    {
+      "kind": "note",
+      "id": "7b2e4f10-9c33-4a51-8e07-2d6b1f9a3c48",
+      "occurredAt": "2026-09-06T12:40:00+00:00",
+      "payload": { "kind": "treatment", "body": "Cilt reaksiyonu gözlenmedi." }
+    },
+    {
+      "kind": "consent",
+      "id": "e83b1a76-2f95-4d08-b647-9a0e5c3f7d21",
+      "occurredAt": "2026-09-03T08:00:00+00:00",
+      "payload": {
+        "consentKind": "kvkk_aydinlatma",
+        "version": "3",
+        "locale": "tr",
+        "textSha256": "9f2b7c1e4a08d365b9e07c4f1a2d8b630e5c9a71f4d02b86c3e17a95d0428fbc"
+      }
+    },
+    {
+      "kind": "package_ledger",
+      "id": "a05f2c89-4e13-4b70-8d26-6f9a1c035e74",
+      "occurredAt": "2026-09-02T10:30:00+00:00",
+      "payload": {
+        "entryType": "consumption",
+        "delta": -1,
+        "definitionName": "10 Seans Lazer",
+        "serviceName": "Lazer epilasyon"
+      }
+    }
+  ],
+  "pageInfo": { "nextCursor": "NA", "hasMore": true }
+}

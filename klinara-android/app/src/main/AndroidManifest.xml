@@ -4,6 +4,17 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!--
+      Klinik fotoğrafı çoğu kez O AN çekiliyor (A4.4). Galeri için izin YOK ve
+      olmayacak: Photo Picker (`PickVisualMedia`) kullanıcının seçtiği dosyayı
+      veriyor, uygulama galeriye hiç erişmiyor.
+
+      `required="false"`: kamerası olmayan bir cihazda uygulama yine kurulabilmeli —
+      fotoğraf çekmek bir yol, tek yol değil.
+    -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
     <application
         android:name=".KlinaraApplication"
         android:allowBackup="false"

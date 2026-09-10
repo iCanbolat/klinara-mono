@@ -176,6 +176,12 @@ dependencies {
     // Kabuk içi gezinme (A2.1). Giriş akışı kullanmaz — o bir durum makinesi (§5.3).
     implementation(libs.androidx.navigation.compose)
 
+    // Klinik fotoğrafı o an çekiliyor (A4.4).
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 
     testImplementation(libs.junit.jupiter)

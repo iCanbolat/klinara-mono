@@ -1,0 +1,27 @@
+{
+  "data": [
+    {
+      "id": "8d1a3f60-7c24-4b98-a051-2e6f9d4c8107",
+      "title": "Sağ kol — 3. seans",
+      "bodyArea": "sağ kol",
+      "serviceId": "5e111ce0-0000-4000-8000-000000000002",
+      "files": [
+        {
+          "id": "4c8e1b07-2a95-4f30-b6d8-0e73a1c95f42",
+          "customerId": "9a1e5c40-1f6b-4d2e-9c31-5f0a7b2d8e11",
+          "groupId": "8d1a3f60-7c24-4b98-a051-2e6f9d4c8107",
+          "kind": "photo",
+          "position": "before",
+          "mimeType": "image/jpeg",
+          "sizeBytes": 1843200,
+          "sha256": null,
+          "hasThumbnail": true,
+          "takenAt": null,
+          "uploadedBy": null,
+          "createdAt": "2026-09-08T09:00:00.000Z"
+        }
+      ],
+      "createdAt": "2026-09-08T08:50:00.000Z"
+    }
+  ]
+}

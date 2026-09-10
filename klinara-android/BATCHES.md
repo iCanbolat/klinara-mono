@@ -1133,3 +1133,479 @@ düzeltilmeseydi "dolu olan" kartı boş çizilirdi ve sebebi görünmezdi.
 - **"Yeni müşteri ekle"** — `customer:write` ve bir müşteri formu ister; A4.2'nin işi.
 - **Boş slota dokunup oluşturma** (takvimde) — iOS'ta da yok; `startingAt` bağlandı ama
   çağıran yok. Eklemek parite değil, yeni davranış olurdu.
+
+---
+
+## A4.1 — Liste, arama, detay ✅
+
+**Durum:** `./gradlew check` yeşil. **254 test** (A3.4 sonunda 231'di), 37 suite, 0
+başarısız. Emülatörde mock senaryosuyla uçtan uca sürüldü: liste, Türkçe arama, kart,
+sistem geri tuşu, koyu tema.
+
+Müşteriler sekmesi `ComingSoon`'dan çıktı. `CustomerService` A3'ten iki metotla
+geliyordu (`get`, `search`); A4.1 `list`i ekledi ve kartın tamamını modelledi.
+
+### Model bilerek kırpıktı, artık değil
+
+A3.3 `Customer`ı dört alanla bırakmıştı ve gerekçesi doğruydu: randevu detayının
+ihtiyacı ad ve telefondu, bugün okunmayan alanları modellemek kullanılmamış bir
+sözleşmeyi bakım yüküne çevirmek olurdu. A4.1 kart ekranını yazdığı için o alanların
+hepsinin gerçek bir çağıranı doğdu ve model açıldı.
+
+**`birthDate` çıplak bir `"YYYY-MM-DD"` STRING olarak duruyor**, `Instant` değil.
+Doğum günü bir takvim günüdür; `Instant`'a çevirmek cihazın diliminde gece yarısını
+kaydırıp doğum gününü bir gün öteler. Emülatörde `12.05.1990` doğru çizildi.
+
+### Kaynak ve cinsiyet enum'larında `Unknown` kolu
+
+`AppointmentStatus`'taki kararın aynısı: sunucuya yarın eklenecek bir kaynak
+(`tiktok`) ya da cinsiyet değeri, **on bin kayıtlık listeyi** çözümleme hatasıyla
+düşürmemeli. `customer-forward-compatible.json` bunu çiviliyor — tanımadığımız iki
+enum değeri ve fazladan bir alan taşıyor, istemci üçünde de çökmüyor.
+
+`selectable` ayrı bir liste: `Unknown` bir seçenek değildir, bir kurtarma dalıdır.
+
+### Plandan bilinçli iki sapma
+
+**1. Debounce eklendi — A3.4'teki kararın tersine.**
+`BookingFlowViewModel.searchCustomers` bunu bilerek eklememişti ("ölçülmeden eklenen
+bir kısaltma 'yazdım ama liste gelmedi' hissi üretir") ve o gerekçe **orada hâlâ
+geçerli**: randevu seçicisinde aranan küme küçük, seçim anlık. Burada durum farklı —
+kabul ölçütü "10k müşteride arama gecikmesi hissedilmiyor" ve her tuş vuruşunda ağa
+çıkmak sunucuya saniyede beş sorgu bindirir. 250 ms + `Job` iptali eklendi;
+`debounceCollapsesKeystrokes` testi üç tuşun tek istek ürettiğini sabitliyor.
+
+İptal ayrıca bir borcu kapatıyor: `BookingFlowViewModel`de uçuştaki istek iptal
+edilmiyor ve yanıtlar sırasız dönebiliyor — kullanıcı "Ay" yazarken "A"nın sonucunu
+görebilir. **A3.4'ün seçicisine dokunulmadı**; orası ayrı bir iş.
+
+**2. Mock artık gerçekten sayfalıyor.**
+`MockBookingService.appointments` bilerek tek sayfa döndürüyor ("sahte bir imleç,
+imleç MANTIĞINI değil KURGUSUNU test etmek olurdu"). A4.1 **ilk gerçek cursor
+tüketicisi**: `loadMore` mock sayfalamazsa hiç sürülemez. `MockCursor` sunucunun
+keyset kuralını taklit ediyor — `(createdAt, id)` azalan, base64 `"<epoch>|<id>"`.
+
+Biçim **opak**: ekran onu ayrıştırmıyor. Sunucununkiyle aynı olması da gerekmiyor,
+çünkü taklit edilen şey biçim değil DAVRANIŞ — bir sayfanın bir kaydı iki kez
+göstermemesi. `cursorDoesNotRepeatOrSkip` on kaydı üçerli sayfalarla geziyor ve hem
+tekrar hem eksik olmadığını iddia ediyor.
+
+Bu yüzden `MockCustomers` satırlarına `createdAt` eklendi ve **azalan** üretiliyor:
+hepsine aynı anı vermek keyset sayfalamasını ayırt edilemez kılardı.
+
+### `searchState` nullable — ve bu bir tembellik değil
+
+`Loadable<List<Customer>>?` içinde `null` **"arama yapmıyoruz"** demek, "sonuç yok"
+değil. İkisini tek tiple temsil etmek, boş bir arama sonucuyla hiç aranmamış bir
+listeyi karıştırırdı: ekran "eşleşme yok" mu yazacak yoksa listeyi mi çizecek
+bilemezdi. Ekranda iki ayrı boş durum metni var ve hangisinin çıkacağını bu alan
+belirliyor.
+
+`searchMasksTheListWithoutDestroyingIt` testi aramanın listeyi **gizlediğini ama
+silmediğini** sabitliyor: temizlendiğinde liste yeniden çekilmiyor.
+
+### Sayfa hatası listeyi düşürmüyor
+
+`loadMore` başarısız olursa imleç yerinde kalıyor ve yüklenmiş kayıtlar duruyor.
+Yüklenmiş 200 kaydı bir sayfa hatası yüzünden silmek, kullanıcıyı en başa döndürmek
+olurdu. `failedPageKeepsTheList` bunu doğruluyor.
+
+Bu, A3'ün "okuma hatası bölümü düşürür" kuralının bir istisnası değil, ince ayarı:
+düşen şey **bir sayfa**, bölüm değil.
+
+### Liste `branchGeneration` dinlemiyor — kasıtlı
+
+Takvim şube değişiminde yeniden yükleniyor; müşteri listesi **yüklenmiyor**. Müşteri
+KİRACI kapsamlıdır (`X-Branch-Id` bu uçlarda anlamsız) ve şube değişimi listeyi
+bayatlatmaz. `branchGeneration` dinlemek, her şube değişiminde on bin kayıtlık bir
+listeyi sebepsiz yeniden çekmek olurdu.
+
+### `MockErrors` doğdu
+
+Mock servislerin paylaştığı hata fabrikası (`notFound`, `forbidden`, `conflict`,
+`versionConflict`, `validation`). Her mock kendi `ProblemDetails`ini kurarsa aynı hata
+iki serviste iki farklı `code` ile çıkar ve ekran biri için doğru, diğeri için yanlış
+mesaj gösterir — `MockIds`in gerekçesi neyse bunun gerekçesi de o. A4.3 ve A4.4
+üzerine binecek.
+
+### `CustomerTagChip` — `KlinaraBadge` neden kullanılmadı
+
+`KlinaraBadge` **sabit bir ton kümesi** taşıyor (Neutral, Positive, Warning…) ve
+etiketin rengi kiracının seçtiği serbest bir hex. Ton enum'una "AnyColor" eklemek,
+tasarım sisteminin sözünü bozardı. Bozuk ya da eksik renk **nötr tona düşüyor**,
+çökmüyor: bir etiket rengi bir ekranı düşürecek kadar önemli değil.
+
+### Sözleşme tuzağı çivilendi: arama çıplak dizi döndürür
+
+`GET customers/search` `{ data: [...] }` zarfı taşımıyor ve bu iOS'ta gerçek bir
+hataydı (arama HER çağrıda sessizce kırılıyordu). `searchIsABareArray` testi yalnız
+doğru çözümlemeyi değil, **zarf denemesinin hata vermesini** de sabitliyor — biri
+"tutarlı olsun" diye zarfa sardığında test gürültüyle kırılsın diye.
+
+Sözleşmede bunun bir eşi daha var: `GET customers/:id/opt-out` (A4.2'nin işi).
+
+### Yeni bağımlılık: YOK
+
+### Kapsam dışı bırakılanlar
+
+- **"Yeni müşteri ekle"** — `customer:write` ve bir form ister; A4.2.
+- **Etiket/kaynak filtresi arayüzü** — `CustomerListQuery` taşıyor ve mock uyguluyor
+  (`tagFilterNarrows`), ekranda kontrolü yok. Çağıranı A4.2'de doğacak; bugün eklemek
+  filtrelenecek bir etiket kümesi olmadan bir menü çizmek olurdu.
+- **Kartın notlar/zaman çizelgesi/fotoğraf bölümleri** — A4.3, A4.4. Kartta sahte veri
+  YOK; ne geleceğini söyleyen bir satır var.
+- **Aşağı çekip yenileme** — `reload()` hazır, jest bağlanmadı.
+
+---
+
+## A4.2 — Düzenleme, etiket, birleştirme, iletişim tercihi ✅
+
+**Durum:** `./gradlew check` yeşil. **308 test** (A4.1 sonunda 254'tü), 43 suite, 0
+başarısız. Emülatörde uçtan uca sürüldü: yeni müşteri → mükerrer telefon 409 → serbest
+numarayla kayıt → VIP etiketi → kart → opt-out → birleştirme → etiket yönetimi.
+
+### Üç durumlu `PATCH` — bu batch'in asıl işi
+
+`Patch<T>` (`Unchanged` / `Set` / `Clear`) sözleşmenin en sinsi tuzağını kapatıyor.
+`KlinaraJson` `explicitNulls = false` ile kurulu, yani bir `String?` alanındaki `null`
+gövdeden **atılır** — dolayısıyla `String?` ile bir alanı temizlemek **imkânsızdır** ve
+sessizce "dokunma"ya döner. Kullanıcı adresi siler, kaydeder, adres yerinde durur; bunu
+ancak müşteri şikâyet edince fark ederiz.
+
+`LiveBookingService.updateNotes` aynı sorunu tek alan için elle çözmüştü
+(`buildJsonObject { put("notes", JsonNull) }`); `Patch` onu genelleştiriyor.
+`CustomerPatchTest` üç durumun **üç ayrı gövde** ürettiğini çiviliyor.
+
+⚠️ `fullName` ve `gender` bilerek `Patch` DEĞİL: sunucu kolonları nullable değil ve
+temizlenemezler. Onlara `Patch` vermek, çalışma anında 400 alacak bir niyeti derleme
+zamanında ifade edilebilir kılmak olurdu.
+
+### Sözleşmedeki İKİNCİ çıplak dizi
+
+A4.1 `customers/search`in zarfsız olduğunu çivilemişti. `GET customers/:id/opt-out` de
+zarfsız — **iki istisna var, bir değil**. `GET customer-tags` ise zarfLI. Üç uç, üç
+biçim; birini diğerine benzetmek sessiz bir çözümleme hatası.
+
+### `notifications` servisinin dar dilimi öne alındı
+
+Doküman bu servisi A8.1'e koyuyor; **üç metodu** (`optOuts`, `createOptOut`,
+`revokeOptOut`) A4.2'ye alındı çünkü kartın iletişim tercihi bölümü onlarsız çizilemez.
+A3'ün `booking`/`staff`/`catalog` desenini izliyor: gerçek metot, gerçek çağıran, kendi
+mock'u. Gelen kutusu, şablonlar ve tercihler A8'de bu arayüzün üstüne biner —
+**bugün çağıranı olmayan on metot yazılmadı** (§A0.5).
+
+### İzin şaşırtması: opt-out `customer:*` değil
+
+Bölüm müşteri kartında duruyor ama uçlar `notification:read` / `notification:manage`
+istiyor — kayıt bir müşteri alanı değil, bir **iletişim kaydı**. Resepsiyon bu ayrımın
+canlı örneği ve `CustomerPermissionTest` onu sabitliyor: müşteriyi **yazabilir**, ileti
+tercihini **görebilir**, ama **değiştiremez**.
+
+İkisini karıştırmak, yazma izni olan herkese ileti tercihini açmak olurdu.
+
+### Kayıt İKİ istektir ve sıra sunucunun kuralı
+
+Etiket ucu (`PUT customers/:id/tags`) var olan bir kimlik ister, dolayısıyla yeni
+müşteride önce kayıt doğmalı. İkinci istek **yalnız etiketler değiştiyse** atılır;
+`CustomerEditorViewModelTest` dört ayrı kombinasyonu sayıyor (etiketsiz oluşturma → 1
+istek, etiketli → 2, dokunulmamış düzenleme → 0 PATCH, yalnız etiket → 0 PATCH + 1
+etiket isteği).
+
+Boş bir `PATCH` atılmıyor: sunucuya gereksiz bir yazma ve kayda gereksiz bir
+`updatedAt` demek.
+
+### `ColorSwatchPicker` A7.1'den öne alındı
+
+A0.3 bunu "çağıranı yok" diye A7.1'e ertelemişti ve kural buydu — bir bileşenin şekli
+ancak gerçek bir çağıran karşısında kararlaştırılır. Çağıran etiket editöründe doğdu.
+
+**Serbest bir renk çarkı değil, sabit palet.** Sunucu `#RRGGBB` doğruluyor ama asıl
+mesele o değil: sınırsız renk, arka planla aynı tonda okunmaz bir etiket ve birbirinden
+ayırt edilemeyen altı "yeşil" üretir. Hex'ler `KlinaraColors`'tan **kopyalanmadı**,
+ayrıca yazıldı: bunlar veri, tema değil — sunucuya yazılıp web-admin'de de aynı
+görünmeleri gerekiyor, temaya göre değişmemeleri gerekiyor.
+
+### Mock artık yazıyor — ve `MockCustomers` tohuma dönüştü
+
+Yazma gelince salt okunur bir listeden okumak mümkün değildi: oluşturulan müşteri
+listede görünmeli, arşivlenen kaybolmalı. `MockCustomers.ALL` artık **tohum**;
+`MockCustomerService` kendi değiştirilebilir tablosunu ondan kuruyor.
+
+Taklit edilen sunucu kuralları (`MockCustomerWriteTest`, 14 test):
+- Telefon E.164'e **normalize** ediliyor, tekillik ihlali `409`
+- **Arşivleme silme değil**: kaydı döndürüyor, numarayı serbest bırakıyor, ikincisi `404`
+- `PUT tags` **tam değiştirme**: boş liste "hepsini kaldır" demek
+- Etiket tekilliği **katlanmış ada** göre (`VIP` ≡ `vıp`)
+- Etiket adı değişince **kartlardaki rozetler de** değişiyor — eski adı taşıyan bir
+  kopya bırakmak aynı etiketi iki isimle göstermeye giderdi
+- Birleştirme **veri kazandırıyor**: hedefin dolu alanı kalıyor, boşu kaynaktan doluyor,
+  etiketler birleşiyor, kendine birleştirme `400`
+
+### `MockErrors` ikinci tüketicisini buldu
+
+A4.1'de doğmuştu; `MockNotificationsService` ve etiket/telefon çakışmaları da onu
+kullanıyor. Her mock'un kendi `ProblemDetails`ini kurması, aynı hatanın iki serviste
+iki farklı `code` ile çıkması demekti.
+
+### Yönetim sekmesi `ComingSoon`'dan **kısmen** çıktı
+
+Etiket yönetimi kiracı kapsamlı bir kavram ve iOS'ta da Yönetim'de yaşıyor — kartın
+altına gömmek, her karttan biraz farklı yazılmış üç "VIP" üretirdi. Ama ekranın bir
+çağıranı olmalıydı (§A0.3: çağıranı olmayan kod yazılmaz), o yüzden `ManagementHome`
+gerçek bir hub'a dönüştü: **tek gerçek satır** + "yakında" notu.
+
+**Sahte satır çizilmedi.** Açılmayan bir menü, kullanıcıya var olmayan bir özellik
+vaat eder. Gerçek hub A7'de.
+
+### `SelectableChip` — `CustomerTagChip`ten neden ayrı
+
+Biri **gösterim** rozeti (tıklanmaz, seçili hâli yok), diğeri bir **kontrol**. Tek
+bileşende toplamak, salt okunur bir rozete tıklama semantiği ve TalkBack'e yanlış bir
+rol vermek olurdu.
+
+### `KlinaraButtonKind.Destructive` EKLENMEDİ
+
+Opt-out kapatma yıkıcı görünüyor ama değil: "İzni geri ver" ile dönülebiliyor. Kırmızı
+bir düğme, geri alınabilir bir tercihi kalıcı bir kayıp gibi gösterirdi. Arşivleme ve
+birleştirme için `Tertiary` yeterli geldi ve onay diyalogları asıl uyarıyı zaten
+taşıyor — yeni bir ton eklemek için gerçek bir ihtiyaç doğmadı.
+
+### Yeni bağımlılık: YOK
+
+### Kapsam dışı bırakılanlar
+
+- **Kanal bazlı opt-out** — model ve uç taşıyor, ekran yalnız "tümü" kapsamını sürüyor.
+  Kanal seçici A8.2'nin işi; bugün eklemek, tek kanalı kapatmanın ne anlama geldiğini
+  gösterecek bir mesaj günlüğü olmadan yarım kalırdı.
+- **Etiket/kaynak filtresi arayüzü** — `CustomerListQuery` taşıyor, mock uyguluyor
+  (`tagFilterNarrows`), ekranda kontrol yok. A4.1'den devreden madde.
+- **Etiketi yeniden adlandırmanın listeyi tazelemesi** — kart açılınca doğru geliyor;
+  açık duran bir listede rozet eski adla kalabilir. Gerçek bir sorun ölçülürse eklenir.
+- **Doğum tarihi seçici** — alan `YYYY-MM-DD` metin girişi. `DatePicker` şube saat
+  dilimine sabitlenmeli (gece yarısı kayması) ve bu ayrı bir iş; biçim ekranda yazıyor.
+
+---
+
+## A4.3 — Notlar ve zaman çizelgesi ✅
+
+**Durum:** `./gradlew check` yeşil. **326 test** (A4.2 sonunda 308'di). Emülatörde
+sürüldü: klinik/genel not rozetleri, sürüm bilgisi, filtre çipleri, karma çizelge ve
+**bilinmeyen türün görünür çizilmesi**.
+
+### `If-Match` AÇILIŞ sürümüyle gidiyor
+
+Sözleşmenin en ince maddesi bu. `PATCH notes/:id` `If-Match` zorunlu tutuyor ve
+gönderilen sürüm notun **açıldığı andaki** sürüm olmalı. Store'un güncel sürümünü
+göndermek kilidi **etkisiz kılardı**: başkasının bu arada yazdığı metnin üstüne
+sessizce yazardık ve iyimser kilit hiçbir şeyi korumamış olurdu.
+
+`NoteEditorScreen` `openedVersion`ı `remember(note?.id)` ile bir kez yakalıyor ve ekran
+boyunca değiştirmiyor.
+
+Sürüm bu arada arttıysa **ön haber** veriliyor ("başkası değiştirdi, kaydederseniz
+çakışma alacaksınız"). Bu bir kilit değil ve kullanıcıya öyle de denmiyor — amaç
+kullanıcının boşuna paragraf yazmasını önlemek.
+
+### Sürümü YALNIZ metin değişimi artırıyor
+
+`customer_notes_revision` trigger'ının koşulu `new.body is distinct from old.body`.
+Mock her düzenlemede artırsaydı, `kind` ya da `customerVisible` değiştiren bir kaydetme
+elde tutulan ETag'i gereksiz yere geçersiz kılar ve ekran **hiç yaşanmayacak** bir
+çakışma uyarısı gösterirdi. `flagChangeLeavesTheVersionAlone` bunu çiviliyor.
+
+### Klinik not kapısı bir DÜRÜSTLÜK kapısı
+
+`treatment` ve `internal` notlar `customer.medical:read` olmayana **sorgudan hiç
+çıkmıyor** ve yanıtta "gizlendi" bayrağı YOK. Kısalmış bir liste göstermek,
+resepsiyona *"bu müşterinin tedavi notu yok"* demektir — kliniğin en hassas verisi
+hakkında yanlış bilgi.
+
+Ekran bu sessizliği **açık bir satırla** kırıyor: "Klinik notları görme yetkiniz yok;
+bu listede yalnız genel notlar var. Müşterinin klinik notu OLABİLİR."
+
+Aynı daraltma **zaman çizelgesinde de** uygulanıyor (`timelineRespectsMedicalNarrowing`):
+izni bir kapıda uygulayıp diğerinde unutmak, gizlenen metnin başka bir kapıdan
+sızması olurdu.
+
+Sunucu izinsiz kullanıcıya `404` veriyor, `403` değil — `403` "var ama göremezsin"
+derdi ve notun **varlığını** sızdırırdı. Mock bunu da taklit ediyor.
+
+### Zaman çizelgesinde `unknown` kolu — bir konfor değil, hayatta kalma şartı
+
+Faz 5, 6 ve 7 bu akışa kendi kolunu ekleyecek. Bilinmeyen bir `kind` çözümlemeyi
+patlatsaydı **eski istemci yeni sunucuda müşteri kartını HİÇ açamazdı**: tek bir yeni
+olay türü tüm kartı kilitlerdi.
+
+Olay yutulmuyor da — "Bu sürümde gösterilemeyen kayıt" olarak, **uyarı tonlu bir
+rozetle** çiziliyor. Eksik bir geçmiş, tam bir geçmiş gibi görünmemeli.
+Mock tohumu bilerek bir `loyalty_award` taşıyor ki bu yol elle de sürülebilsin.
+
+### İki dürüstlük dipnotu
+
+1. **Tahsilat bu akışta yok** (sunucudan gelmiyor, Faz 6'dan devreden). Sessizce
+   gizlemek "bu müşteriden hiç tahsilat yapılmamış" izlenimi verirdi.
+2. **Klinik notlar izinsiz kullanıcıda listeye dâhil değil** — çizelgenin dipnotu da
+   bunu söylüyor.
+
+### `occurredAt` UTC geliyor, takvim şube offset'i
+
+`+00:00` ve `+03:00` **aynı anı** gösteriyor ve `InstantSerializer` ikisini de
+çözüyor. iOS'ta bu bir varsayım hatasıydı ve "saatler 3 saat kaymış" olarak
+keşfedilecekti; test iki biçimin aynı ana çözüldüğünü sabitliyor.
+
+### `payload` bilerek çözümlenmemiş
+
+Türe göre beş farklı şekil taşıyor. Hepsini sealed bir hiyerarşiye açmak, bugün
+okunmayan alanları modellemek olurdu (A3.3'ün `Customer`ı kırpık bırakma gerekçesi).
+Ekranın ihtiyacı olan üç-dört alan `string()`/`long()` ile okunuyor ve eksik anahtar
+`null` dönüyor — Faz 5/6 buraya dokunmadan alan ekleyebilir.
+
+### Bir not hem nottur hem çizelge olayı
+
+Yazma sonrası **ikisi birden** tazeleniyor. Yalnız birini tazelemek iki tutarsız liste
+bırakırdı. Filtre değişince çizelge **baştan** yükleniyor: yeni filtre altında eskiyi
+biriktirmek, iki farklı sorgunun sonucunu tek listede karıştırmak olurdu.
+
+### `KlinaraTextEditor` A0.3'ten geldi
+
+Çağıranı not editöründe doğdu. `KlinaraTextField`ten farkı yalnız `maxLines` değil:
+**`ImeAction.Default`** taşıyor (Enter satır atlar, formu göndermez) ve minimum
+yüksekliği var — klinik bir not çoğunlukla birkaç cümledir.
+
+### Yeni bağımlılık: YOK
+
+### Kapsam dışı
+
+- **Randevuya bağlı not** (`appointmentId`) — model ve uç taşıyor, arayüzü yok;
+  çağıranı randevu detayında doğacak.
+- **Tarih aralığı filtresi** — `kinds` bağlandı, `from`/`to` bağlanmadı (iOS'ta var).
+- **Revizyondan geri alma** — sürümler görüntüleniyor, "bu sürüme dön" yok; sunucuda
+  da böyle bir uç yok.
+
+---
+
+## A4.4 — Fotoğraf ve dosyalar ✅
+
+**Durum:** `./gradlew check` yeşil. **345 test** (A4.3 sonunda 326'ydı), 47 suite.
+Emülatörde sürüldü: fotoğraf/belge kartlarının ayrı izin kapıları, öncesi/sonrası
+ekranı, boş durum metinleri.
+
+### Üç adımlı zincir ve onu koruyan mock
+
+`presign` → imzalı **PUT** → `confirm`. Mock üç sunucu kuralını zorluyor:
+
+- **`presign` DB'ye hiçbir şey yazmıyor** — yarıda kalan yükleme asılı "pending" satır
+  bırakmasın (`presignWritesNothing`).
+- **Yükleme atlanırsa `confirm` reddediliyor** — `presign` bir söz değil, bir izindir
+  (`confirmWithoutUploadIsRejected`).
+- **Anahtar öneki doğrulanıyor** — başka müşterinin yoluna yazma denemesi `403`
+  (`crossCustomerKeyIsForbidden`).
+
+Ayrıca **boyut ve MIME nesnenin KENDİSİNDEN** okunuyor, istemci beyanından değil:
+test istemciye bilerek yalan söyletiyor (10 bayt diyor) ve gerçek boyutun kaydedildiğini
+doğruluyor.
+
+### Küçültme PİKSEL cinsinden — iOS'un hata #2'si
+
+iOS'ta `UIImage.size` **nokta** olduğu için 3x ölçekli bir görselde nokta hesabı
+hedefin üç katını üretiyordu: "2048'e indirildi" denen fotoğraf 6144 piksel kalıyordu.
+Android'de `Bitmap.width` zaten piksel; `ImageResize` bu gerçeği **açıkça** yazıyor ki
+biri "dp ile hesaplayalım" demesin.
+
+Sığmazsa **null dönüyor** — sunucunun reddedeceği bir nesneyi yüklemeye çalışmak,
+kullanıcıyı anlamsız bir hatayla karşılamak olurdu.
+
+### Tip SİHİRLİ BAYTTAN tespit ediliyor
+
+Uzantı ikinci sırada. `.jpg` diye adlandırılmış bir PDF, PDF'tir. Bilinmeyen içerik
+`null` dönüyor ve **varsayılan tip ATANMIYOR**: tanımadığımız bir dosyayı JPEG sanmak,
+sunucunun beyaz listesini istemcide sessizce delmek olurdu.
+
+`image/svg+xml` beyaz listede **yok** — SVG çalıştırılabilir içerik taşır.
+
+### Hazır olmayan `thumb` 409 veriyor ve TAM BOYUTA DÜŞMÜYOR
+
+Sessiz düşüş, 30 fotoğraflı bir ızgaranın farkında olmadan 25 MB'lık nesneler indirmesi
+demekti. `409` bir hata değil **"henüz değil"**: yer tutucu çiziliyor ve **bir kez**
+gecikmeli tazeleniyor — **sonsuz yoklama yok**.
+
+### Erişim kaydı: `view` ile `download` ayrı
+
+`download-url` HER çağrıda `customer_record_access_log`'a yazıyor. Adres liste
+render'ında çekilseydi bir kaydırma onlarca sahte "görüntüledi" üretir ve "kim hangi
+kaydı gördü" sorusu **cevaplanamaz** hâle gelirdi.
+
+Bu yüzden `ThumbnailCache` **adresi değil GÖRÜNTÜYÜ** önbelleklıyor (imzalı adres 5
+dakikalık; onu saklamak ölü bağlantı önbelleği tutmak olurdu) ve **tam boyut asla
+önbelleğe alınmıyor** — her açılış bir `download` kaydı düşürmeli.
+
+Önbellek **yalnız bellekte** (`LruCache`, 200 girdi): bir klinik fotoğrafın küçük hâli
+de klinik fotoğraftır ve diskte artakalmamalı (§7.9).
+
+### iOS'un düzeltilmiş hatası tekrarlanmadı — ve emülatörde doğrulandı
+
+iOS'ta yükleme sayfaları fotoğraf kartına asılıydı ve `customer.medical:*` izni
+olmayan kullanıcıda **"Belge ekle" düğmesi ölüydü**. Burada fotoğraf ve belge **ayrı
+kartlar, ayrı izinler**.
+
+`manager` rolü bunun canlı örneği: `customer.medical:read` var, `:write` YOK.
+Emülatörde fotoğraf kartı çiziliyor, **"Fotoğraf ekle" görünmüyor**, "Belge ekle"
+çalışıyor. Tek kartta olsalardı belge yükleme de ölürdü.
+
+### `FLAG_SECURE` klinik fotoğraf ekranlarında
+
+Bir hasta fotoğrafının son kullanılanlar ekranında küçük resim olarak durması, kliniğin
+kontrolü dışına çıkan bir sağlık verisidir. Bayrak ekrandan **çıkarken kaldırılıyor**:
+uygulamanın geri kalanında ekran görüntüsü meşru bir ihtiyaç.
+
+**Paylaş düğmesi YOK** (§9, kalıcı karar).
+
+### Boş slot izinsiz kullanıcıda ATIL
+
+Öncesi/sonrası slotu yalnız `customer.medical:write` varken tıklanabilir. Tıklanabilir
+gösterip izin hatası vermek, hiç dokunamamaktan kötüdür (§7.4). Emülatörde `manager`da
+"Yeni grup" düğmesi de çizilmiyor.
+
+Gruba yüklerken grup ve konum **önceden seçili gidiyor ve tekrar sorulmuyor** — iki kez
+sormak, iki seçimin ayrışmasına izin vermekti.
+
+### PDF: platform `PdfRenderer`, üçüncü parti YOK
+
+Bir PDF kütüphanesi sağlık verisi dosyasını okuyacaktı; bağımlılık yüzeyi bilinçle
+sıfır (§3). Geçici dosya `onDispose`'da **siliniyor** — silinmiş bir belge sandbox'ta
+yaşamaya devam etmemeli. En fazla 20 sayfa render ediliyor: bir onam metni 200 sayfa
+olabilir ve tamamını belleğe açmak gerekmiyor.
+
+### ⚠️ Plandan sapma: Coil EKLENMEDİ
+
+Plan Coil 3'ü öngörüyordu ve katalog girdisi de yazılmıştı. **Kaldırıldı: çağıranı
+doğmadı.**
+
+`ThumbnailCache` elle yazıldı (OkHttp + `BitmapFactory` + `LruCache`) ve bu tesadüf
+değil, daha doğru çıktı: Coil'in disk önbelleğini **kapatmayı unutmak** sağlık
+verisini diske yazmak olurdu ve "kapattığımızı" ancak bir denetimde fark ederdik. Elle
+yazılan önbellekte disk yolu **hiç yok** — yapısal olarak imkânsız.
+
+Fotoğraf sayısı da bunu destekliyor: bir müşteri kartında onlarca fotoğraf var, binlerce
+değil; Coil'in getirdiği ağ katmanı, disk katmanı ve dönüşüm hattı bu ölçekte
+kullanılmayan yüzeydi. **"§3 öngörüyor" bir gerekçe değil**, bir tahmindi.
+
+### Yeni bağımlılık: CameraX (4 modül)
+
+`camera-core`, `camera-camera2`, `camera-lifecycle`, `camera-view`. Gerekçe: klinik
+fotoğrafı çoğu kez **o an** çekiliyor ve Photo Picker yalnız galeriyi okuyor.
+`CAMERA` izni manifest'e eklendi, `uses-feature required="false"` ile — kamerası
+olmayan bir cihazda uygulama yine kurulabilmeli.
+
+**Photo Picker izin GEREKTİRMİYOR** ve bu bilinçli bir tercih: `READ_MEDIA_IMAGES`
+istemek, kullanıcının tüm galerisine erişmek demekti; `PickVisualMedia` yalnız
+seçilen dosyayı veriyor.
+
+### Kapsam dışı
+
+- **CameraX ile canlı çekim ekranı** — bağımlılık ve izin hazır, önizleme/çekim
+  arayüzü bağlanmadı. Photo Picker yolu uçtan uca çalışıyor; kamera yüzeyi kendi
+  başına bir ekran ve ayrı bir doğrulama turu istiyor.
+- **`takenAt` seçimi** — model ve kablo taşıyor, arayüzü yok.
+- **Grup düzenleme/silme** — oluşturma var, düzenleme yok (sunucuda da uç yok).
+- **`customer_record_access_log` okuma** — rapor ucu Batch 7.4'te.

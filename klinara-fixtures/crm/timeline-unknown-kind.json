@@ -1,0 +1,17 @@
+{
+  "data": [
+    {
+      "kind": "loyalty_award",
+      "id": "f6c04a92-8b37-4e15-9d80-3a2e7c1f5b46",
+      "occurredAt": "2026-09-08T11:00:00+00:00",
+      "payload": { "tier": "gold", "points": 250 }
+    },
+    {
+      "kind": "note",
+      "id": "7b2e4f10-9c33-4a51-8e07-2d6b1f9a3c48",
+      "occurredAt": "2026-09-06T12:40:00+00:00",
+      "payload": { "kind": "general", "body": "Telefonla teyit edildi." }
+    }
+  ],
+  "pageInfo": { "nextCursor": null, "hasMore": false }
+}

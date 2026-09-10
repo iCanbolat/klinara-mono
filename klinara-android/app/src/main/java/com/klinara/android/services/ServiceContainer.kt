@@ -18,7 +18,18 @@ import com.klinara.android.services.catalog.LiveCatalogService
 import com.klinara.android.services.catalog.MockCatalogService
 import com.klinara.android.services.crm.CustomerService
 import com.klinara.android.services.crm.LiveCustomerService
+import com.klinara.android.services.crm.LiveNotesService
 import com.klinara.android.services.crm.MockCustomerService
+import com.klinara.android.services.crm.MockNotesService
+import com.klinara.android.services.crm.NotesService
+import com.klinara.android.services.files.FilesService
+import com.klinara.android.services.files.LiveFilesService
+import com.klinara.android.services.files.MockFilesService
+import com.klinara.android.services.files.ThumbnailCache
+import okhttp3.OkHttpClient
+import com.klinara.android.services.notifications.LiveNotificationsService
+import com.klinara.android.services.notifications.MockNotificationsService
+import com.klinara.android.services.notifications.NotificationsService
 import com.klinara.android.services.formatting.BranchClock
 import com.klinara.android.services.mock.MockDataScenario
 import com.klinara.android.services.mock.MockScenario
@@ -49,7 +60,7 @@ import kotlinx.coroutines.flow.SharedFlow
  * DEĞİL (boş arayüzler okunmamış uçlar için imza tahmini kodlar ve her batch'te
  * "refactor" edilir; ilerleme gibi görünen çalkantı):
  *
- *     customers A3.4 · notes A4.3 · files A4.4 · packages A5.1
+ *     customers A3.4 · notifications(opt-out) A4.2 · notes A4.3 ✓ · files A4.4 ✓ · files A4.4 · packages A5.1
  *     finance A6.1 · commissions A6.4 · scheduling A7.3
  *     notifications A8.1 · messages A8.1 · whatsapp A8.3 · reports A9
  *
@@ -74,6 +85,10 @@ class ServiceContainer private constructor(
     val booking: BookingService,
     val staff: StaffService,
     val customers: CustomerService,
+    val notifications: NotificationsService,
+    val notes: NotesService,
+    val files: FilesService,
+    val thumbnails: ThumbnailCache,
     val catalog: CatalogService,
     val tokens: TokenStore,
     val sessionExpired: SharedFlow<Unit>,
@@ -108,6 +123,7 @@ class ServiceContainer private constructor(
                 )
 
             val client = ApiClient(clients.api, ApiEnvironment.baseUrl)
+            val liveFiles = LiveFilesService(client)
 
             // Şube saat dilimi oturum açılana kadar bilinmiyor; `BranchClock`'un
             // varsayılanı zaten Europe/Istanbul ve burada YALNIZ `/appointments`
@@ -118,6 +134,12 @@ class ServiceContainer private constructor(
                 booking = LiveBookingService(client, BranchClock(null)),
                 staff = LiveStaffService(client),
                 customers = LiveCustomerService(client),
+                notifications = LiveNotificationsService(client),
+                notes = LiveNotesService(client),
+                files = liveFiles,
+                // Küçük görsel indirmesi imzalı URL'ye gidiyor: `bare` istemci, yani
+                // `Authorization` ve `X-Branch-Id` GÖNDERİLMİYOR (§5.4).
+                thumbnails = ThumbnailCache(liveFiles, clients.bare),
                 catalog = LiveCatalogService(client),
                 tokens = tokens,
                 sessionExpired = client.sessionExpired,
@@ -152,6 +174,9 @@ class ServiceContainer private constructor(
             val mockBooking = MockBookingService(data).apply { this.failing = failing }
             val mockStaff = MockStaffService().apply { this.failing = failing }
             val mockCustomers = MockCustomerService().apply { this.failing = failing }
+            val mockNotifications = MockNotificationsService().apply { this.failing = failing }
+            val mockNotes = MockNotesService().apply { this.failing = failing }
+            val mockFiles = MockFilesService().apply { this.failing = failing }
             val mockCatalog = MockCatalogService().apply { this.failing = failing }
 
             return ServiceContainer(
@@ -159,6 +184,10 @@ class ServiceContainer private constructor(
                 booking = mockBooking,
                 staff = mockStaff,
                 customers = mockCustomers,
+                notifications = mockNotifications,
+                notes = mockNotes,
+                files = mockFiles,
+                thumbnails = ThumbnailCache(mockFiles, OkHttpClient()),
                 catalog = mockCatalog,
                 tokens = tokens,
                 sessionExpired = MutableSharedFlow(extraBufferCapacity = 1),
@@ -183,12 +212,19 @@ class ServiceContainer private constructor(
             booking: BookingService = MockBookingService(latencyEnabled = false),
             staff: StaffService = MockStaffService(latencyEnabled = false),
             customers: CustomerService = MockCustomerService(latencyEnabled = false),
+        notifications: NotificationsService = MockNotificationsService(latencyEnabled = false),
+        notes: NotesService = MockNotesService(latencyEnabled = false),
+        files: FilesService = MockFilesService(latencyEnabled = false, thumbnailDelayMillis = 0),
             catalog: CatalogService = MockCatalogService(latencyEnabled = false),
         ) = ServiceContainer(
             auth = auth,
             booking = booking,
             staff = staff,
             customers = customers,
+            notifications = notifications,
+            notes = notes,
+            files = files,
+            thumbnails = ThumbnailCache(files, OkHttpClient()),
             catalog = catalog,
             tokens = tokens,
             sessionExpired = sessionExpired,

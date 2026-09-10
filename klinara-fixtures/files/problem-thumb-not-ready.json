@@ -1,0 +1,8 @@
+{
+  "type": "https://klinara.app/errors/conflict",
+  "title": "Küçük görsel hazır değil",
+  "status": 409,
+  "detail": "Küçük görsel üretimi henüz tamamlanmadı; birazdan tekrar deneyin.",
+  "code": "CONFLICT",
+  "requestId": "req_9f3c1a70"
+}

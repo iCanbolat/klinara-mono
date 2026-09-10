@@ -1,0 +1,21 @@
+{
+  "id": "9a1e5c40-1f6b-4d2e-9c31-5f0a7b2d8e11",
+  "tenantId": "7f3d1a20-0000-4000-8000-000000000001",
+  "fullName": "Ayşe Yılmaz",
+  "phone": "+905321234567",
+  "email": "ayse.yilmaz@ornek.com",
+  "birthDate": "1990-05-12",
+  "gender": "female",
+  "notes": "Alerjisi yok.",
+  "addressLine": "Bağdat Cad. 12",
+  "district": "Kadıköy",
+  "city": "İstanbul",
+  "postalCode": "34710",
+  "source": "instagram",
+  "mergedIntoCustomerId": null,
+  "tags": [
+    { "id": "3c9d2a10-0000-4000-8000-000000000001", "name": "VIP", "color": "#7F9A76" },
+    { "id": "3c9d2a10-0000-4000-8000-000000000002", "name": "Hassas cilt", "color": null }
+  ],
+  "createdAt": "2026-08-14T11:23:45.000Z"
+}

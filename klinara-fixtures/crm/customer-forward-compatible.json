@@ -1,0 +1,19 @@
+{
+  "id": "5d3b8e71-2c04-4f19-a6b8-3e7d1c9f0a22",
+  "tenantId": "7f3d1a20-0000-4000-8000-000000000001",
+  "fullName": "Deniz Yıldız",
+  "phone": null,
+  "email": null,
+  "birthDate": null,
+  "gender": "non_binary",
+  "notes": null,
+  "addressLine": null,
+  "district": null,
+  "city": null,
+  "postalCode": null,
+  "source": "tiktok",
+  "mergedIntoCustomerId": "9a1e5c40-1f6b-4d2e-9c31-5f0a7b2d8e11",
+  "tags": [],
+  "createdAt": "2026-08-10T06:30:00.000Z",
+  "loyaltyTier": "gold"
+}

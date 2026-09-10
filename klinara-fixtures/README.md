@@ -30,6 +30,23 @@ gizlerdi.
 `packages/shared/src/permissions.ts`'ten üretiyor ve mock servis çalışma anında
 yerleştiriyor. Elle tutulan bir izin listesi iOS'ta bir kez saptı.
 
+## `crm/` (A4.1)
+
+`customer-with-tags.json` kartın tam alan kümesini, `customer-page.json` imleçli
+sayfayı, `customer-search.json` ise **çıplak diziyi** (zarf YOK) çiviliyor — sözleşmenin
+tek istisnası odur ve iOS'ta bir kez ezberden zarf beklenip arama kırılmıştı.
+
+`customer-forward-compatible.json` bilerek **ileri sürümlü**: tanımadığımız bir `source`
+ve `gender` değeri ve fazladan bir alan taşıyor. İstemci üçünde de çökmemeli — yoksa
+sunucuya eklenen tek bir yeni geliş kaynağı, on bin kayıtlık listeyi düşürürdü.
+
+## `files/` (A4.4)
+
+`presign-upload.json` üç adımlı akışın ilk adımını, `customer-file.json` yeni yüklenmiş
+bir dosyayı (**`hasThumbnail: false`** — kuyruk işi henüz bitmedi) ve
+`problem-thumb-not-ready.json` hazır olmayan küçük görselin `409`'unu çiviliyor. O `409`
+bir hata değil "henüz değil" demek ve istemci **tam boyuta düşmemeli**.
+
 ## Tohum ≠ fixture (A3.1)
 
 `booking/` altındaki dosyalar **çözümleme sözleşmesini** çiviliyor: sabit tarihlidirler

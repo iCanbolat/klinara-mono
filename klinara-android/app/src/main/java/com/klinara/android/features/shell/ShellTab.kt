@@ -115,8 +115,81 @@ object ShellRoutes {
     @Serializable
     data object CustomerList
 
+    /**
+     * Müşteri kartı — sheet DEĞİL, gerçek bir hedef (randevu detayıyla aynı gerekçe).
+     *
+     * Argümanda **yalnız kimlik** taşınıyor; kaydın kendisini taşımak bir ekranın
+     * gerçeğini başka bir ekranın hafızasına bağlar ve bayatlamaya davetiye çıkarır.
+     */
+    @Serializable
+    data class CustomerDetail(
+        val customerId: String,
+    )
+
+    /**
+     * Müşteri oluşturma / düzenleme. [customerId] null ise YENİ kayıt.
+     *
+     * İki ayrı hedef yerine tek hedef: form aynı, değişen yalnız başlangıç değerleri ve
+     * düğme metni. `BookingFlow`un oluşturma/erteleme kararının aynısı.
+     */
+    @Serializable
+    data class CustomerEditor(
+        val customerId: String? = null,
+    )
+
+    @Serializable
+    data class CustomerMerge(
+        val customerId: String,
+    )
+
+    /** Not editörü — [noteId] null ise YENİ not. */
+    @Serializable
+    data class NoteEditor(
+        val customerId: String,
+        val noteId: String? = null,
+    )
+
+    @Serializable
+    data class NoteRevisions(
+        val customerId: String,
+        val noteId: String,
+    )
+
+    /**
+     * Dosya yükleme. [groupId] ve [position] doluysa öncesi/sonrası slotundan
+     * geliniyor demektir ve ekran ikisini bir daha SORMAZ.
+     */
+    @Serializable
+    data class FileUpload(
+        val customerId: String,
+        val isPhoto: Boolean,
+        val groupId: String? = null,
+        val position: String? = null,
+    )
+
+    @Serializable
+    data class PhotoGroups(
+        val customerId: String,
+    )
+
+    @Serializable
+    data class PhotoDetail(
+        val customerId: String,
+        val fileId: String,
+    )
+
+    @Serializable
+    data class DocumentPreview(
+        val customerId: String,
+        val fileId: String,
+    )
+
     @Serializable
     data object ManagementHome
+
+    /** Etiketler KİRACI kapsamlı: Yönetim sekmesinde yaşar, müşteri kartında değil. */
+    @Serializable
+    data object CustomerTagList
 
     @Serializable
     data object ProfileHome
