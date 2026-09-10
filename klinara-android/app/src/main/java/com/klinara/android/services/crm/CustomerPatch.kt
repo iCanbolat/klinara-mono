@@ -1,5 +1,6 @@
 package com.klinara.android.services.crm
 
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonObjectBuilder
@@ -63,6 +64,25 @@ internal fun <T> JsonObjectBuilder.putPatch(
     key: String,
     patch: Patch<T>,
     encode: (T) -> String,
+) {
+    when (patch) {
+        Patch.Unchanged -> Unit
+        Patch.Clear -> put(key, JsonNull)
+        is Patch.Set -> put(key, encode(patch.value))
+    }
+}
+
+/**
+ * [putPatch]'in sayı ve boolean gibi metin OLMAYAN alanlar için hâli.
+ *
+ * `putPatch` değeri daima metne çeviriyor; paket tanımının `validityDays`'i gibi bir
+ * sayıyı `"365"` olarak göndermek sunucuda 400 alırdı. İmzayı değiştirmek yerine ayrı bir
+ * fonksiyon: var olan onlarca çağıran `{ it }` yazmaya devam ediyor.
+ */
+internal fun <T> JsonObjectBuilder.putPatchElement(
+    key: String,
+    patch: Patch<T>,
+    encode: (T) -> JsonElement,
 ) {
     when (patch) {
         Patch.Unchanged -> Unit

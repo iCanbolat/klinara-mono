@@ -35,6 +35,10 @@ fun ComponentGalleryScreen(modifier: Modifier = Modifier) {
     var password by remember { mutableStateOf("gizli-parola") }
     var phone by remember { mutableStateOf("") }
     var otp by remember { mutableStateOf("") }
+    var sessions by remember { mutableStateOf(3) }
+    var priceMinor by remember { mutableStateOf<Long?>(1_250_000L) }
+    var transferable by remember { mutableStateOf(true) }
+    var picked by remember { mutableStateOf("Lazer epilasyon") }
 
     AuthScaffold(
         modifier = modifier.fillMaxSize(),
@@ -102,6 +106,45 @@ fun ComponentGalleryScreen(modifier: Modifier = Modifier) {
             KlinaraRow(label = "Hizmet", value = "Cilt bakımı", detail = "45 dk")
             KlinaraDivider()
             KlinaraNavigationRow(label = "Geçmişi gör", onClick = {}, value = "3 kayıt")
+        }
+
+        // A5.1 — paket formlarıyla doğanlar.
+        SectionLabel("Adımlayıcı, tutar, anahtar")
+        KlinaraCard {
+            KlinaraStepperRow(
+                label = "Lazer epilasyon",
+                value = sessions,
+                onValueChange = { sessions = it },
+                range = 1..10,
+                detail = "Alt ve üst sınırda düğme pasifleşir",
+                format = { "$it seans" },
+            )
+            KlinaraDivider()
+            KlinaraMoneyField(
+                label = "Satış fiyatı",
+                valueMinor = priceMinor,
+                onValueChange = { priceMinor = it },
+                parse = com.klinara.android.services.formatting.Money::parse,
+                format = com.klinara.android.services.formatting.Money::formatPlain,
+            )
+            KlinaraToggleRow(
+                label = "Devredilebilir",
+                detail = "Kalan hak başka müşteriye aktarılabilir",
+                isOn = transferable,
+                onToggle = { transferable = it },
+            )
+        }
+
+        SectionLabel("Seçim listesi")
+        KlinaraCard {
+            KlinaraSearchablePicker(
+                options = listOf("Cilt bakımı", "Lazer epilasyon", "Dolgu", "Kontrol", "Maske", "Peeling"),
+                key = { it },
+                label = { it },
+                isSelected = { it == picked },
+                onSelect = { picked = it },
+                searchLabel = "Hizmet ara",
+            )
         }
     }
 }

@@ -56,6 +56,8 @@ import com.klinara.android.features.customers.files.PhotoDetailHost
 import com.klinara.android.features.customers.files.PhotoGroupsHost
 import com.klinara.android.services.files.FilePosition
 import com.klinara.android.features.calendar.booking.BookingFlowHost
+import com.klinara.android.features.packages.PackageDefinitionEditorScreen
+import com.klinara.android.features.packages.PackageDefinitionListScreen
 import com.klinara.android.features.profile.ProfileScreen
 import com.klinara.android.services.ServiceContainer
 import com.klinara.android.services.contracts.Permissions
@@ -392,7 +394,29 @@ private fun ManagementTab(
             ManagementHomeScreen(
                 session = session,
                 onOpenCustomerTags = { navController.navigate(ShellRoutes.CustomerTagList) },
+                onOpenPackageDefinitions = { navController.navigate(ShellRoutes.PackageDefinitionList) },
                 trailing = trailing,
+            )
+        }
+
+        composable<ShellRoutes.PackageDefinitionList> {
+            PackageDefinitionListScreen(
+                session = session,
+                container = container,
+                onBack = { navController.popBackStack() },
+                onOpen = { id -> navController.navigate(ShellRoutes.PackageDefinitionEditor(id)) },
+            )
+        }
+
+        composable<ShellRoutes.PackageDefinitionEditor> { entry ->
+            val route = entry.toRoute<ShellRoutes.PackageDefinitionEditor>()
+            PackageDefinitionEditorScreen(
+                session = session,
+                container = container,
+                definitionId = route.definitionId,
+                onBack = { navController.popBackStack() },
+                // Liste dönüşte kendini sessizce tazeliyor; kaydı geri taşımaya gerek yok.
+                onSaved = { navController.popBackStack() },
             )
         }
 
@@ -410,13 +434,14 @@ private fun ManagementTab(
  * Yönetim kökü.
  *
  * Gerçek hub (katalog, personel, çalışma saatleri, kasa, prim) A7'de; bugün yalnız
- * A4.2'nin getirdiği tek bölüm gerçek. Kalanı için **sahte satır çizilmiyor** — açılmayan
- * bir menü, kullanıcıya var olmayan bir özellik vaat eder.
+ * A4.2'nin etiketleri ve A5'in paketleri gerçek. Kalanı için **sahte satır çizilmiyor** —
+ * açılmayan bir menü, kullanıcıya var olmayan bir özellik vaat eder.
  */
 @Composable
 private fun ManagementHomeScreen(
     session: AppSession,
     onOpenCustomerTags: () -> Unit,
+    onOpenPackageDefinitions: () -> Unit,
     trailing: @Composable RowScope.() -> Unit,
 ) {
     KlinaraScreen(title = "Yönetim", trailing = trailing) {
@@ -426,6 +451,17 @@ private fun ManagementHomeScreen(
                     label = "Müşteri etiketleri",
                     value = "Kiracı genelinde tanımlı etiketler",
                     onClick = onOpenCustomerTags,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+
+        if (session.can(Permissions.PACKAGE_READ)) {
+            KlinaraCard(title = "Paketler") {
+                KlinaraNavigationRow(
+                    label = "Paket tanımları",
+                    value = "Satılabilir seans paketleri ve fiyatları",
+                    onClick = onOpenPackageDefinitions,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }

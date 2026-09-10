@@ -56,3 +56,10 @@ bir JSON yarın boş bir gün gibi görünürdü.
 
 `calendar-day-unknown-status.json` bilerek bozuk değil, bilerek **ileri sürümlü**:
 tanımadığımız bir `status` ve fazladan bir alan taşıyor. İstemci ikisinde de çökmemeli.
+
+## `packages/` (A5)
+
+`package-definition.json` çok kalemli ve indirimli tanımı çiviliyor: `revision` ile
+`version` bilerek FARKLI — ikisi iki ayrı sayaç ve eşit olsalardı karıştırıldıkları hiç
+görünmezdi. `package-definition-page.json` imleçli sayfayı, **`validityDays: null`**
+(süresiz — `0` değil) ve ileri sürümlü bir alanı taşıyor.

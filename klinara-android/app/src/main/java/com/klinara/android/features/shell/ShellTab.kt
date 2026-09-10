@@ -48,6 +48,11 @@ enum class ShellTab(
          * rolünde `service:read`, `staff:read`, `schedule:read` yok; eski koşulla
          * muhasebe sekmeyi hiç göremiyor, dolayısıyla kendisi için yazılmış Kasa ve
          * Prim ekranlarına da hiç ulaşamıyordu.
+         *
+         * **`package:read` A5.1'de eklendi**, aynı sınıftan bir hatayı önlemek için:
+         * paket tanımları ve raporları Yönetim'de yaşıyor. Bugün her paket izni olan rol
+         * sekmeyi zaten başka bir izinle görüyor, ama koşul "şans eseri doğru" olmamalı —
+         * paket ekranına götüren izin sekmeyi de açmalı.
          */
         val MANAGEMENT_PERMISSIONS =
             setOf(
@@ -58,6 +63,7 @@ enum class ShellTab(
                 Permissions.FINANCE_COMMISSION_READ,
                 Permissions.NOTIFICATION_READ,
                 Permissions.NOTIFICATION_MANAGE,
+                Permissions.PACKAGE_READ,
             )
 
         fun visibleFor(session: AppSession): List<ShellTab> = entries.filter { it.isVisible(session) }
@@ -190,6 +196,16 @@ object ShellRoutes {
     /** Etiketler KİRACI kapsamlı: Yönetim sekmesinde yaşar, müşteri kartında değil. */
     @Serializable
     data object CustomerTagList
+
+    /** Paket tanımları (A5.1) — kiracı kapsamlı şablonlar, Yönetim sekmesinde yaşar. */
+    @Serializable
+    data object PackageDefinitionList
+
+    /** Tanım oluşturma / düzenleme. [definitionId] null ise YENİ tanım. */
+    @Serializable
+    data class PackageDefinitionEditor(
+        val definitionId: String? = null,
+    )
 
     @Serializable
     data object ProfileHome

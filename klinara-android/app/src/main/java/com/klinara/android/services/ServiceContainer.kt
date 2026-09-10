@@ -30,6 +30,9 @@ import okhttp3.OkHttpClient
 import com.klinara.android.services.notifications.LiveNotificationsService
 import com.klinara.android.services.notifications.MockNotificationsService
 import com.klinara.android.services.notifications.NotificationsService
+import com.klinara.android.services.packages.LivePackagesService
+import com.klinara.android.services.packages.MockPackagesService
+import com.klinara.android.services.packages.PackagesService
 import com.klinara.android.services.formatting.BranchClock
 import com.klinara.android.services.mock.MockDataScenario
 import com.klinara.android.services.mock.MockScenario
@@ -60,7 +63,7 @@ import kotlinx.coroutines.flow.SharedFlow
  * DEĞİL (boş arayüzler okunmamış uçlar için imza tahmini kodlar ve her batch'te
  * "refactor" edilir; ilerleme gibi görünen çalkantı):
  *
- *     customers A3.4 · notifications(opt-out) A4.2 · notes A4.3 ✓ · files A4.4 ✓ · files A4.4 · packages A5.1
+ *     customers A3.4 · notifications(opt-out) A4.2 · notes A4.3 ✓ · files A4.4 ✓ · packages A5.1 ✓
  *     finance A6.1 · commissions A6.4 · scheduling A7.3
  *     notifications A8.1 · messages A8.1 · whatsapp A8.3 · reports A9
  *
@@ -90,6 +93,7 @@ class ServiceContainer private constructor(
     val files: FilesService,
     val thumbnails: ThumbnailCache,
     val catalog: CatalogService,
+    val packages: PackagesService,
     val tokens: TokenStore,
     val sessionExpired: SharedFlow<Unit>,
     /** Yalnız mock modda dolu — geliştirici senaryo menüsü bunu kullanır. */
@@ -141,6 +145,7 @@ class ServiceContainer private constructor(
                 // `Authorization` ve `X-Branch-Id` GÖNDERİLMİYOR (§5.4).
                 thumbnails = ThumbnailCache(liveFiles, clients.bare),
                 catalog = LiveCatalogService(client),
+                packages = LivePackagesService(client),
                 tokens = tokens,
                 sessionExpired = client.sessionExpired,
                 mockAuth = null,
@@ -178,6 +183,9 @@ class ServiceContainer private constructor(
             val mockNotes = MockNotesService().apply { this.failing = failing }
             val mockFiles = MockFilesService().apply { this.failing = failing }
             val mockCatalog = MockCatalogService().apply { this.failing = failing }
+            // Paket kalemleri katalogdan fiyat ve ad alıyor — ayrı bir katalog kopyası,
+            // pakete eklenen hizmetin rezervasyon formunda bulunamaması demek olurdu.
+            val mockPackages = MockPackagesService(catalog = mockCatalog).apply { this.failing = failing }
 
             return ServiceContainer(
                 auth = mockAuth,
@@ -189,6 +197,7 @@ class ServiceContainer private constructor(
                 files = mockFiles,
                 thumbnails = ThumbnailCache(mockFiles, OkHttpClient()),
                 catalog = mockCatalog,
+                packages = mockPackages,
                 tokens = tokens,
                 sessionExpired = MutableSharedFlow(extraBufferCapacity = 1),
                 mockAuth = mockAuth,
@@ -216,6 +225,7 @@ class ServiceContainer private constructor(
         notes: NotesService = MockNotesService(latencyEnabled = false),
         files: FilesService = MockFilesService(latencyEnabled = false, thumbnailDelayMillis = 0),
             catalog: CatalogService = MockCatalogService(latencyEnabled = false),
+            packages: PackagesService = MockPackagesService(latencyEnabled = false),
         ) = ServiceContainer(
             auth = auth,
             booking = booking,
@@ -226,6 +236,7 @@ class ServiceContainer private constructor(
             files = files,
             thumbnails = ThumbnailCache(files, OkHttpClient()),
             catalog = catalog,
+            packages = packages,
             tokens = tokens,
             sessionExpired = sessionExpired,
             mockAuth = mockAuth,

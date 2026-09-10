@@ -1,0 +1,35 @@
+{
+  "data": [
+    {
+      "id": "f1000000-0000-4000-8000-000000000002",
+      "branchId": "b1000000-0000-4000-8000-000000000001",
+      "slug": "cilt-bakimi-5",
+      "name": "5 Seans Cilt Bakımı",
+      "description": null,
+      "totalPriceMinor": 400000,
+      "listPriceMinor": 450000,
+      "currency": "TRY",
+      "validityDays": null,
+      "isTransferable": false,
+      "isOnlineSellable": false,
+      "isActive": true,
+      "revision": 2,
+      "version": 3,
+      "items": [
+        {
+          "id": "f4000000-0000-4000-8000-000000000003",
+          "serviceId": "5e111ce0-0000-4000-8000-000000000001",
+          "serviceName": "Cilt bakımı",
+          "quantity": 5,
+          "unitListPriceMinor": 90000,
+          "sortOrder": 0
+        }
+      ],
+      "createdAt": "2026-09-07T09:00:00.000Z",
+      "updatedAt": "2026-09-07T09:00:00.000Z",
+      "deletedAt": null,
+      "futureField": { "ignored": true }
+    }
+  ],
+  "pageInfo": { "nextCursor": "eyJjIjoiMjAyNi0wOS0wNyJ9", "hasMore": true }
+}

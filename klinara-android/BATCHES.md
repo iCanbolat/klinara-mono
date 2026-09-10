@@ -1609,3 +1609,91 @@ seçilen dosyayı veriyor.
 - **`takenAt` seçimi** — model ve kablo taşıyor, arayüzü yok.
 - **Grup düzenleme/silme** — oluşturma var, düzenleme yok (sunucuda da uç yok).
 - **`customer_record_access_log` okuma** — rapor ucu Batch 7.4'te.
+
+---
+
+## A5.1 — Paket tanımları ✅
+
+**Durum:** `./gradlew check` yeşil. **369 test** (A4.4 sonunda 345'ti), 51 suite.
+Emülatörde `Çok şubeli` senaryosuyla sürüldü: Yönetim → Paketler listesi (indirim
+rozeti, üstü çizili liste fiyatı, şube ADI rozeti, "Süresiz"), yeni tanım (ad yazdıkça
+slug türüyor, kalem adımlayıcısı, canlı indirim önizlemesi 14.400 − 12.000 = 2.400 ₺),
+kaydedince listeye dönüş ve yeni tanımın görünmesi; **satılmış** lazer paketini emekliye
+ayırmak onu arşivlemedi, "Pasif" rozetiyle listede bıraktı.
+
+### `PackagesService` tek arayüz, ama metotları batch batch geliyor
+
+iOS'un dört bölümlü tek protokolü aynen alındı (tanım / satış-defter / operasyon /
+rapor): sunucuda dört controller var ama istemcide hepsi aynı ekran ailesini besliyor.
+A5.1'de arayüzde **yalnız tanım metotları** var — satış, defter ve raporlar kendi
+batch'lerinde, kendi çağıranlarıyla ekleniyor (§5.1 boş arayüz yasağı).
+
+### `revision` ile `version` iki ayrı sayaç ve mock ikisini ayrı sürüyor
+
+`revision` satışı etkileyen alan değişince artar ve satılan paket onu snapshot olarak
+taşır; `version` her yazmada artar ve `If-Match`'e gider. Seed'deki ikinci tanım
+bilerek `revision = 2, version = 3` — eşit olsalardı karıştırıldıkları hiç görünmezdi.
+`revisionBumpsOnlyOnSaleAffectingChanges` ad değişiminin revizyonu artırmadığını,
+fiyat değişiminin artırdığını çiviliyor.
+
+### "Süresiz" `null`'dır, `0` değil — ve gövdede AÇIK `null` gider
+
+`validityDays` üç durumlu (`Patch<Int>`). Mevcut `putPatch` değeri daima metne
+çeviriyordu; `"365"` göndermek sunucuda 400 alırdı. İmzayı değiştirmek yerine
+`CustomerPatch.kt`'e `putPatchElement` eklendi — var olan çağıranlar dokunulmadan kaldı.
+`updateBodyDistinguishesClearFromUnchanged` üç hâli (yok / `null` / sayı) ayrı ayrı
+doğruluyor; mock `0`'ı 400 ile reddediyor (`validityClearVsZero`).
+
+### Emekliye ayırmanın İKİ sonucu var ve ekran tahmin etmiyor
+
+`DELETE` satılmamış tanımı arşivler, satılmışı yalnız pasife alır ve `204` döner —
+hangisinin olduğunu yanıt söylemiyor. ViewModel kaydı **yeniden çekiyor** ve ona göre
+listeden düşürüyor ya da "Pasif" gösteriyor. Onay diyaloğu da iki sonucu yazıyor;
+kullanıcı "sildim" sanmasın. Yeniden çekme `runCatching` ile DEĞİL, `ApiError`
+yakalanarak yapılıyor: `runCatching` iptal istisnasını da yutar.
+
+### Şube kapsamı dışlama değil, SORU
+
+`GET package-definitions?branchId=` şube kısıtı olmayan tanımları da döndürüyor
+(`package-definitions.repository.ts`). Mock aynısını yapıyor
+(`branchScopeIncludesUnscoped`) ve kapsam **istemcide süzülmüyor**: sayfalı bir listede
+o şubenin paketi ikinci sayfada kalabilir.
+
+### Tasarım sistemine eklenenler
+
+`KlinaraStepperRow`, `KlinaraMoneyField`, `KlinaraSelectableRow`,
+`KlinaraSearchablePicker`, `KlinaraToggleRow` — hepsi `ComponentGalleryScreen`'de.
+
+- **Adımlayıcı aralık dışındaki adımı sunmuyor** (düğme pasifleşiyor). A5.3'te kalan
+  hakkı eksiye düşürecek bir `−` hiç olmayacak.
+- **`KlinaraMoneyField` `Money`'yi import ETMİYOR**: `parse`/`format` parametre olarak
+  geliyor. `designsystem/` bugüne kadar `services/`'e hiç bağımlı değildi ve §3'ün
+  `:core:designsystem` ayrımı tetiklendiğinde bir döngü doğmamalı.
+- `material-icons-core`'da "eksi" yok; `−`/`+` metin olarak çiziliyor ve "azalt"/"artır"
+  diye duyuruluyor. Bir adımlayıcı için `material-icons-extended` eklenmedi (§7.7).
+
+### Plandan / iOS'tan sapmalar
+
+- **Tanım listesi oturum ömürlü değil.** iOS'ta `PackageDefinitionStore` oturum boyunca
+  yaşıyor ve satış sayfasıyla paylaşılıyor. Android'de oturum ömürlü store kalıbı yok;
+  her ekran kendi ViewModel'ini alıyor. Editörden dönen kayıt route ile geri
+  taşınmıyor: gezinme listeyi yeniden kurunca `LaunchedEffect` koşuyor ve liste
+  **sessizce** tazeleniyor (eldeki liste "yükleniyor"a düşmüyor —
+  `sameScopeRefreshesSilently`). Bedeli bir istek; kazancı başka oturumun yazdığını da
+  görmek.
+- **Emekliye ayırma `swipeActions` değil, kartta açık bir düğme.** Kaydırma jesti
+  Android'de keşif kalıbı değil ve TalkBack kullanıcısına hiç görünmez.
+- `ShellTab.MANAGEMENT_PERMISSIONS`'a **`package:read`** eklendi. Bugün her paket izni
+  olan rol sekmeyi başka bir izinle zaten görüyor; ama paket ekranına götüren izin
+  sekmeyi de açmalı — iOS'taki muhasebe hatasının sınıfı "şans eseri doğru" bir koşulla
+  korunmaz.
+
+### Yeni bağımlılık: YOK
+
+### Kapsam dışı
+
+- **Tanım listesinde sayfalama sonsuz kaydırma değil, "Daha fazla yükle" düğmesi.**
+  Tanım sayısı kiracı başına onlarla sınırlı; kaydırma tetikleyicisi A5.4'te süre
+  dolumu raporunda (binlerce satır olabilen tek liste) geliyor.
+- **Hizmet seçici pasif hizmetleri hiç göstermiyor** — sunucu pasif hizmeti kalem
+  olarak reddediyor; göstermek, seçilip reddedilecek bir satır sunmak olurdu.
