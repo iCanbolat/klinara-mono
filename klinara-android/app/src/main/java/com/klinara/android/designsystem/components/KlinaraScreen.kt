@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.klinara.android.designsystem.KlinaraMetrics
 import com.klinara.android.designsystem.KlinaraTheme
@@ -51,6 +53,8 @@ fun KlinaraScreen(
     modifier: Modifier = Modifier,
     onBack: (() -> Unit)? = null,
     scrollable: Boolean = true,
+    contentPadding: PaddingValues = defaultContentPadding(),
+    verticalSpacing: Dp = KlinaraMetrics.lg,
     trailing: @Composable (RowScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -62,16 +66,11 @@ fun KlinaraScreen(
                 .weight(1f)
                 .fillMaxWidth()
                 .let { if (scrollable) it.verticalScroll(rememberScrollState()) else it }
-                .padding(
-                    start = KlinaraMetrics.screenInset,
-                    end = KlinaraMetrics.screenInset,
-                    top = KlinaraMetrics.md,
-                    bottom = KlinaraMetrics.xl,
-                )
+                .padding(contentPadding)
 
         Column(
             modifier = bodyModifier,
-            verticalArrangement = Arrangement.spacedBy(KlinaraMetrics.lg),
+            verticalArrangement = Arrangement.spacedBy(verticalSpacing),
             content = content,
         )
     }
@@ -135,6 +134,23 @@ private fun TopBar(
         trailing?.invoke(this)
     }
 }
+
+/**
+ * Gövdenin varsayılan dolgusu — kart ve form ekranlarının ölçüsü.
+ *
+ * Parametreleştirilmesinin sebebi takvim ızgarası (A3): yedi sütunlu bir hafta,
+ * iki yanda 24 dp ile okunamayacak kadar daralıyor. Varsayılanı değiştirmek yerine
+ * ÇAĞIRANIN daraltabilmesi gerekiyordu; her ekranın kendi dolgusunu kurması ise
+ * `screenInset`'i tek kaynak olmaktan çıkarırdı.
+ */
+@Composable
+fun defaultContentPadding(): PaddingValues =
+    PaddingValues(
+        start = KlinaraMetrics.screenInset,
+        end = KlinaraMetrics.screenInset,
+        top = KlinaraMetrics.md,
+        bottom = KlinaraMetrics.xl,
+    )
 
 private val TOP_BAR_HEIGHT = 56.dp
 private val BACK_ICON_SIZE = 24.dp

@@ -10,12 +10,25 @@ import com.klinara.android.services.auth.LiveAuthService
 import com.klinara.android.services.auth.MockAuthService
 import com.klinara.android.services.auth.KeystoreSessionCipher
 import com.klinara.android.services.auth.TokenStore
+import com.klinara.android.services.booking.BookingService
+import com.klinara.android.services.booking.LiveBookingService
+import com.klinara.android.services.booking.MockBookingService
+import com.klinara.android.services.catalog.CatalogService
+import com.klinara.android.services.catalog.LiveCatalogService
+import com.klinara.android.services.catalog.MockCatalogService
+import com.klinara.android.services.crm.CustomerService
+import com.klinara.android.services.crm.LiveCustomerService
+import com.klinara.android.services.crm.MockCustomerService
+import com.klinara.android.services.formatting.BranchClock
 import com.klinara.android.services.mock.MockDataScenario
 import com.klinara.android.services.mock.MockScenario
 import com.klinara.android.services.networking.ApiClient
 import com.klinara.android.services.networking.ApiEnvironment
 import com.klinara.android.services.networking.OkHttpFactory
 import com.klinara.android.services.networking.SignedUploader
+import com.klinara.android.services.staff.LiveStaffService
+import com.klinara.android.services.staff.MockStaffService
+import com.klinara.android.services.staff.StaffService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -36,16 +49,32 @@ import kotlinx.coroutines.flow.SharedFlow
  * DEĞİL (boş arayüzler okunmamış uçlar için imza tahmini kodlar ve her batch'te
  * "refactor" edilir; ilerleme gibi görünen çalkantı):
  *
- *     booking A3.4 · customers A4.1 · notes A4.3 · files A4.4
- *     packages A5.1 · finance A6.1 · commissions A6.4 · catalog A7.1 · staff A7.2
- *     scheduling A7.3 · notifications A8.1 · messages A8.1 · whatsapp A8.3 · reports A9
+ *     customers A3.4 · notes A4.3 · files A4.4 · packages A5.1
+ *     finance A6.1 · commissions A6.4 · scheduling A7.3
+ *     notifications A8.1 · messages A8.1 · whatsapp A8.3 · reports A9
+ *
+ * **A3.1'de iki servis planlanandan ÖNCE geldi** ve `ANDROID_DEVELOPMENT.md` §6 buna
+ * göre güncellendi: `booking` A3.4 yerine A3.1'de (takvim onsuz çizilemez; oluşturma
+ * metotları yine A3.4'te ekleniyor) ve `staff` A7.2 yerine A3.1'de (personel adı ve
+ * `calendarColor` olmadan ne filtre çipi ne blok aksanı çizilebilir). İkisi de gerçek
+ * metot + gerçek çağıran + kendi mock'u ile geldi; boş arayüz kuralı çiğnenmedi.
  *
  * `users` A7.2'de gelir, A2.1'de DEĞİL: iOS'ta `UsersService`'in tek çağıranı
  * `StaffCreateView` (personel davet edilecek kullanıcıyı seçiyor). Kabuk ve profil
  * `AuthService.me()` + `.branches()` ile yetiniyor.
  */
+@Suppress("LongParameterList")
+// Bağımlılık kökünde uzun parametre listesi bir koku DEĞİL, tanımın kendisi: her servis
+// burada tam olarak bir kez adlandırılıyor ve A9'a kadar on dört tane daha gelecek.
+// Alternatif, servisleri bir `Services` taşıyıcısına sarmaktı — o da `container.booking`
+// yerine `container.services.booking` yazdırır ve okunurluğu artırmadan bir dolaylılık
+// katmanı eklerdi. Kural burada bilerek gevşetildi (§7.7).
 class ServiceContainer private constructor(
     val auth: AuthService,
+    val booking: BookingService,
+    val staff: StaffService,
+    val customers: CustomerService,
+    val catalog: CatalogService,
     val tokens: TokenStore,
     val sessionExpired: SharedFlow<Unit>,
     /** Yalnız mock modda dolu — geliştirici senaryo menüsü bunu kullanır. */
@@ -80,8 +109,16 @@ class ServiceContainer private constructor(
 
             val client = ApiClient(clients.api, ApiEnvironment.baseUrl)
 
+            // Şube saat dilimi oturum açılana kadar bilinmiyor; `BranchClock`'un
+            // varsayılanı zaten Europe/Istanbul ve burada YALNIZ `/appointments`
+            // sorgusunun kablo biçimi için kullanılıyor (offset'li ISO). Ekranlar
+            // kendi saatlerini `session.activeBranch.timezone` ile kuruyor.
             return ServiceContainer(
                 auth = LiveAuthService(client),
+                booking = LiveBookingService(client, BranchClock(null)),
+                staff = LiveStaffService(client),
+                customers = LiveCustomerService(client),
+                catalog = LiveCatalogService(client),
                 tokens = tokens,
                 sessionExpired = client.sessionExpired,
                 mockAuth = null,
@@ -95,8 +132,14 @@ class ServiceContainer private constructor(
          * tohumlanmış kopyalar birbirini tanımayan kimliklerle çalışır ve mock veri
          * sessizce tutarsızlaşır (iOS'ta bir kez yaşandı).
          *
-         * A0.5'te grafikte tek düğüm var: `AuthService`. Kanıtlanması gereken ŞEKİL —
-         * live/mock çifti, Application ömrü, fixture okuyucu — bir servisle kanıtlanır.
+         * A3.1'de grafik üç düğüm: `auth`, `booking`, `staff`. Randevu tohumu ile
+         * personel listesi [com.klinara.android.services.mock.MockIds] üzerinden aynı
+         * kimliklere bakar; ayrı tohumlanmış kopyalar var olmayan bir personele bağlı
+         * randevu üretirdi.
+         *
+         * `NetworkError` senaryosu artık takvimi ve personeli de düşürüyor: giriş
+         * yolunu ağ hatasına ayarlayıp oturum içinde her şeyin çalıştığını görmek,
+         * senaryonun yarısını yalan söyler hâle getirirdi.
          */
         fun mock(
             dataStore: DataStore<Preferences>,
@@ -105,9 +148,18 @@ class ServiceContainer private constructor(
         ): ServiceContainer {
             val tokens = TokenStore(dataStore, KeystoreSessionCipher())
             val mockAuth = MockAuthService(scenario)
+            val failing = scenario == MockScenario.NetworkError
+            val mockBooking = MockBookingService(data).apply { this.failing = failing }
+            val mockStaff = MockStaffService().apply { this.failing = failing }
+            val mockCustomers = MockCustomerService().apply { this.failing = failing }
+            val mockCatalog = MockCatalogService().apply { this.failing = failing }
 
             return ServiceContainer(
                 auth = mockAuth,
+                booking = mockBooking,
+                staff = mockStaff,
+                customers = mockCustomers,
+                catalog = mockCatalog,
                 tokens = tokens,
                 sessionExpired = MutableSharedFlow(extraBufferCapacity = 1),
                 mockAuth = mockAuth,
@@ -122,13 +174,22 @@ class ServiceContainer private constructor(
          * `internal` — testler aynı modülde. Alternatifi her testin bir DataStore ve bir
          * Keystore kurması olurdu ki ikincisi JVM'de zaten yok.
          */
+        @Suppress("LongParameterList")
         internal fun testing(
             auth: AuthService,
             tokens: TokenStore,
             sessionExpired: SharedFlow<Unit>,
             mockAuth: MockAuthService? = null,
+            booking: BookingService = MockBookingService(latencyEnabled = false),
+            staff: StaffService = MockStaffService(latencyEnabled = false),
+            customers: CustomerService = MockCustomerService(latencyEnabled = false),
+            catalog: CatalogService = MockCatalogService(latencyEnabled = false),
         ) = ServiceContainer(
             auth = auth,
+            booking = booking,
+            staff = staff,
+            customers = customers,
+            catalog = catalog,
             tokens = tokens,
             sessionExpired = sessionExpired,
             mockAuth = mockAuth,

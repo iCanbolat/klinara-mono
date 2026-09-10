@@ -30,14 +30,20 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
 import com.klinara.android.designsystem.KlinaraTheme
 import com.klinara.android.designsystem.KlinaraType
 import com.klinara.android.designsystem.components.EmptyStateView
 import com.klinara.android.designsystem.components.KlinaraScreen
 import com.klinara.android.features.auth.AppSession
 import com.klinara.android.features.auth.AuthEvent
+import com.klinara.android.features.calendar.AppointmentDetailScreen
+import com.klinara.android.features.calendar.AppointmentHistoryScreen
+import com.klinara.android.features.calendar.CalendarHomeScreen
+import com.klinara.android.features.calendar.booking.BookingFlowHost
 import com.klinara.android.features.profile.ProfileScreen
 import com.klinara.android.services.ServiceContainer
+import com.klinara.android.services.contracts.Permissions
 
 /**
  * Oturum açıldıktan sonraki uygulama kabuğu.
@@ -67,6 +73,10 @@ fun AppShell(
             factory = SessionViewModel.factory(initialSession, container),
         )
     val session by sessionViewModel.session.collectAsStateWithLifecycle()
+    // Şube değişimi sayacının İLK tüketicisi (A2.1'de kurulmuştu): takvim, şube
+    // değiştiğinde aynı gün için YENİDEN istek atmak zorunda — yalnız `activeBranchId`
+    // izlense, aynı şubeye geri dönüldüğünde bayat veri ekranda kalırdı.
+    val branchGeneration by sessionViewModel.branchGeneration.collectAsStateWithLifecycle()
 
     val tabs = ShellTab.visibleFor(session)
     var selectedName by rememberSaveable { mutableStateOf(ShellTab.Today.name) }
@@ -98,7 +108,7 @@ fun AppShell(
             }
 
             when (selected) {
-                ShellTab.Today -> TodayTab(todayNav, session, branchMenu)
+                ShellTab.Today -> TodayTab(todayNav, session, container, branchGeneration, branchMenu)
                 ShellTab.Customers -> CustomersTab(customersNav, branchMenu)
                 ShellTab.Management -> ManagementTab(managementNav, branchMenu)
                 ShellTab.Profile ->
@@ -119,18 +129,26 @@ fun AppShell(
 private fun TodayTab(
     navController: NavHostController,
     session: AppSession,
+    container: ServiceContainer,
+    branchGeneration: Int,
     trailing: @Composable RowScope.() -> Unit,
 ) {
     NavHost(navController = navController, startDestination = ShellRoutes.TodayHome) {
         composable<ShellRoutes.TodayHome> {
             if (ShellTab.canSeeCalendar(session)) {
-                ComingSoonScreen(
-                    title = "Bugün",
-                    headline = "Takvim hazırlanıyor",
-                    message =
-                        "Randevu takvimi Faz A3 ile geliyor. Şimdilik Yönetim sekmesinden " +
-                            "kurulum yapabilirsiniz.",
-                    icon = Icons.Filled.DateRange,
+                CalendarHomeScreen(
+                    session = session,
+                    container = container,
+                    branchGeneration = branchGeneration,
+                    onSelectAppointment = { navController.navigate(ShellRoutes.AppointmentDetail(it)) },
+                    // Giriş noktası izne bağlı (§7.4): `appointment:write` yoksa
+                    // "+" düğmesi HİÇ çizilmez, 403 ile karşılaşılmaz.
+                    onCreate =
+                        if (session.can(Permissions.APPOINTMENT_WRITE)) {
+                            { navController.navigate(ShellRoutes.BookingFlow()) }
+                        } else {
+                            null
+                        },
                     trailing = trailing,
                 )
             } else {
@@ -145,6 +163,44 @@ private fun TodayTab(
                     )
                 }
             }
+        }
+
+        composable<ShellRoutes.AppointmentDetail> { entry ->
+            val route = entry.toRoute<ShellRoutes.AppointmentDetail>()
+            AppointmentDetailScreen(
+                appointmentId = route.appointmentId,
+                session = session,
+                container = container,
+                onBack = { navController.popBackStack() },
+                onOpenHistory = { navController.navigate(ShellRoutes.AppointmentHistory(it)) },
+                onReschedule = { navController.navigate(ShellRoutes.BookingFlow(rescheduleId = it)) },
+            )
+        }
+
+        composable<ShellRoutes.BookingFlow> { entry ->
+            val route = entry.toRoute<ShellRoutes.BookingFlow>()
+            BookingFlowHost(
+                rescheduleId = route.rescheduleId,
+                session = session,
+                container = container,
+                onBack = { navController.popBackStack() },
+                onCreated = {
+                    // Oluşturduktan sonra takvime dönülür ve YENİ randevu orada görünür.
+                    // Detaya atlamak, kullanıcıyı yeni bir ekrana bırakıp "peki günün
+                    // geri kalanı?" sorusunu cevapsız bırakırdı.
+                    navController.popBackStack()
+                },
+            )
+        }
+
+        composable<ShellRoutes.AppointmentHistory> { entry ->
+            val route = entry.toRoute<ShellRoutes.AppointmentHistory>()
+            AppointmentHistoryScreen(
+                appointmentId = route.appointmentId,
+                session = session,
+                container = container,
+                onBack = { navController.popBackStack() },
+            )
         }
     }
 }

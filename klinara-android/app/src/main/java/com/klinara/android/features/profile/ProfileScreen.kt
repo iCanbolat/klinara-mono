@@ -53,6 +53,7 @@ import com.klinara.android.services.ServiceContainer
 import com.klinara.android.services.auth.PasskeySummary
 import com.klinara.android.services.contracts.RoleNames
 import com.klinara.android.services.formatting.BranchClock
+import com.klinara.android.services.networking.Loadable
 import java.time.Instant
 
 /**

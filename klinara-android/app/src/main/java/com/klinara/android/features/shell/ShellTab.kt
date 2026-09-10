@@ -83,6 +83,35 @@ object ShellRoutes {
     @Serializable
     data object TodayHome
 
+    /**
+     * Randevu detayı — bir sheet DEĞİL, gerçek bir hedef (§5.3, Kural 2).
+     *
+     * iOS'ta bu bir `sheet`; Android'de geri yığınında bir kayıt olmalı ki tahmini geri
+     * (predictive back) ve sistem geri tuşu kendiliğinden çalışsın. A2.1'de sekme başına
+     * `NavHost` kurmanın sebebi tam buydu.
+     */
+    @Serializable
+    data class AppointmentDetail(
+        val appointmentId: String,
+    )
+
+    @Serializable
+    data class AppointmentHistory(
+        val appointmentId: String,
+    )
+
+    /**
+     * Randevu oluşturma / erteleme.
+     *
+     * [rescheduleId] doluysa bu bir ERTELEME. İki ayrı hedef yerine tek hedef: form
+     * aynı, değişen yalnız kilitli alanlar ve düğme metni; ikiye bölmek aynı ekranı iki
+     * kez yazmak olurdu.
+     */
+    @Serializable
+    data class BookingFlow(
+        val rescheduleId: String? = null,
+    )
+
     @Serializable
     data object CustomerList
 

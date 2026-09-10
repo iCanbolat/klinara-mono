@@ -1,0 +1,28 @@
+{
+  "type": "https://errors.klinara.app/slot-conflict",
+  "title": "Seçilen saat dolu",
+  "status": 409,
+  "code": "SLOT_CONFLICT",
+  "detail": "Kaynak bu aralıkta başka bir kayıt tarafından tutuluyor.",
+  "instance": "/api/v1/appointments",
+  "requestId": "01JQZK9V0000000000000000",
+  "conflicts": [
+    {
+      "resourceType": "staff",
+      "resourceId": "51a11000-0000-4000-8000-000000000001",
+      "appointmentId": "a99a0000-0000-4000-8000-000000000001",
+      "from": "2026-09-07T05:55:00.000Z",
+      "to": "2026-09-07T07:10:00.000Z"
+    }
+  ],
+  "suggestions": [
+    {
+      "startsAt": "2026-09-07T10:15:00+03:00",
+      "endsAt": "2026-09-07T11:15:00+03:00",
+      "staffProfileIds": [
+        "51a11000-0000-4000-8000-000000000001",
+        "51a11000-0000-4000-8000-000000000002"
+      ]
+    }
+  ]
+}

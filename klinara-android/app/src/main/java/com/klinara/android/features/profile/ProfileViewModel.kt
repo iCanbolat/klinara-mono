@@ -8,6 +8,7 @@ import com.klinara.android.services.auth.AuthService
 import com.klinara.android.services.auth.PasskeySummary
 import com.klinara.android.services.auth.TotpStatus
 import com.klinara.android.services.networking.ApiError
+import com.klinara.android.services.networking.Loadable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,21 +16,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-
-/**
- * Bir kartın yükleme durumu.
- *
- * Ekranın tamamı için tek bir `isLoading` yeterli DEĞİL: TOTP durumu ile passkey
- * listesi iki ayrı çağrıdan geliyor ve biri düşerken diğeri gelmiş olabilir. Tek
- * bayrak, gelmiş olan veriyi de gizlerdi.
- */
-sealed interface Loadable<out T> {
-    data object Loading : Loadable<Nothing>
-
-    data class Loaded<T>(val value: T) : Loadable<T>
-
-    data class Failed(val message: String, val isRetryable: Boolean) : Loadable<Nothing>
-}
 
 data class ProfileUiState(
     val totp: Loadable<TotpStatus> = Loadable.Loading,
@@ -94,22 +80,12 @@ class ProfileViewModel(
     }
 
     private suspend fun loadTotp() {
-        val next =
-            try {
-                Loadable.Loaded(auth.totpStatus())
-            } catch (error: ApiError) {
-                Loadable.Failed(error.displayMessage, error.isRetryable)
-            }
+        val next = Loadable.of { auth.totpStatus() }
         _state.update { it.copy(totp = next) }
     }
 
     private suspend fun loadPasskeys() {
-        val next =
-            try {
-                Loadable.Loaded(auth.passkeys())
-            } catch (error: ApiError) {
-                Loadable.Failed(error.displayMessage, error.isRetryable)
-            }
+        val next = Loadable.of { auth.passkeys() }
         _state.update { it.copy(passkeys = next) }
     }
 

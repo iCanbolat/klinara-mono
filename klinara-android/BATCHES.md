@@ -694,3 +694,442 @@ Bu makinede fark edilmemesinin sebebi dosyanın diskte var olması. `git status`
 göstermediği için de kimse yokluğunu görmedi.
 
 Desen `app/build/outputs/` ile değiştirildi.
+
+---
+
+## A3.1 — Takvim çekirdeği: servis, store, şerit, ajanda, gün ızgarası ✅
+
+**Durum:** `./gradlew check` yeşil — **181 birim testi** (144 → +37) + 5 instrumented.
+R8 ile küçültülmüş release APK 2.30 MB (2.27 → +30 KB). Dex baytları tarandı: üretim
+metinleri (`calendar/day`, `calendar/week`, "gelmeyenler") **var**, mock ve fixture
+içeriği (`Ayşe Yılmaz`, `Cilt bakımı`, `Çakışma yoğun`, `Fixture bulunamadı`) **yok**.
+
+> **Sınıf adı aramak yanıltıcı.** A2.1'de release dex'inde `MockAuthService` sınıf adı
+> aranmıştı; R8 tam modda sınıflar zaten yeniden adlandırılıyor, yani o arama her hâlde
+> "yok" derdi. Dize sabitleri obfuscate edilmez — doğru kontrol odur ve bu batch'te öyle
+> yapıldı. **A2.1'in doğrulaması geriye dönük olarak zayıftır**, sonucu yanlış değil.
+
+Emülatörde (API 37, Pixel 10 Pro) üç veri senaryosu da sürüldü: `Boş gün` boş durum
+metnini gösteriyor, `Yoğun gün` sekiz randevu + iki kapanmış kayıt, `Çakışma yoğun`
+09:00'da üç eşit sütun ve 11:00 zincirinde çeyrek genişlik çiziyor. Koyu tema ve
+`fontScale 2.0` kontrol edildi (aşağıda iki kusur çıktı).
+
+### Plandan sapmalar
+
+1. **`booking` ve `staff` servisleri planlanandan önce geldi.** Doküman §6 `booking`'i
+   A3.4'e, `staff`'ı A7.2'ye koyuyordu. Takvim ikisi olmadan çizilemez: randevular
+   `booking`'den, personel adı ve `calendarColor` (filtre çipleri + blok aksanı)
+   `staff`'tan geliyor. İkisi de **gerçek metot + gerçek çağıran + kendi mock'u** ile
+   geldi, boş arayüz kuralı çiğnenmedi. `BookingService` A3.1'de üç metot; A3.3 yaşam
+   döngüsünü, A3.4 oluşturmayı ekleyecek. `ServiceContainer` KDoc'u ve
+   `ANDROID_DEVELOPMENT.md` §6 güncellendi.
+2. **Ajanda A3.1'e alındı** (dokümanda A3.2'ydi). iOS'un varsayılan görünümü ajanda;
+   dokümandaki sırayla yazılsaydı sekme bir batch boyunca modu seçilemeyen, yalnız
+   ızgara gösteren bir ekran olarak kalırdı. Mod seçici de tek seferde tam doğdu.
+   A3.2'de hafta ızgarası + yoğunluk ısı zemini kaldı.
+3. **`Loadable` `features/profile`'dan `services/networking`'e taşındı.** A2.2'de tek
+   tüketicisi vardı, artık iki. Üstüne `Loadable.of { }` ve `Loadable.failed(error)`
+   eklendi: `ApiError` → `Failed` eşlemesi artık tek yerde. Her çağrı yerinde elle
+   `catch` yazmak, bir gün birinin `isRetryable`'ı unutması ve o bölümde "Tekrar dene"
+   düğmesinin sessizce kaybolması demekti.
+
+### Yakalanan gerçek hata: `SlotConflict` sunucunun alanlarını okumuyordu
+
+A0.4'te `SlotConflict` `staffProfileId` / `startsAt` / `endsAt` alanlarıyla yazılmış —
+`API_DEVELOPMENT.md` §5.4'ün **örneğinden**. Sunucu kodu (`appointments.service.ts:844`)
+`resourceType` / `resourceId` / `appointmentId` / **`from`** / **`to`** gönderiyor.
+`SlotSuggestion` de tekil `staffProfileId` bekliyordu, sunucu `staffProfileIds` dizisi
+gönderiyor.
+
+Dört alan da nullable/varsayılanlı olduğu için **çözümleme çökmüyordu, sessizce boş
+kalıyordu**: A3.4'ün çakışma sayfası "dolu olan" satırını hiç çizemez, aday personel
+listesi hep boş görünürdü — ve sebebi kodda değil, sözleşmede olduğu için aramak zor
+olurdu. Düzeltildi ve `problem-slot-conflict.json` fixture'ı ile çivilendi.
+
+Ders: doküman örneği ile sunucu kodu çeliştiğinde **kod kazanır**. `API_DEVELOPMENT.md`
+§5.4'ün örneği de düzeltilmeli (takip işi).
+
+### Yakalanan gerçek hata: iptal edilen randevu ekranda HİÇ görünmüyordu
+
+`CalendarBlockLayout.place` yeniden yapılandırılırken terminal bloklar listenin başına
+alındı (önce `partition`, sonra kümeler). Çağıran blokları sırayla üst üste çizdiği için
+bu, **çizim sırasını** değiştirdi: 15:00–16:00 aktif blok, 15:30 iptalinin tamamını
+örttü. `uiautomator` ağacında iptal satırı **6 px genişlikte** görünüyordu.
+
+Çıktı artık **başlangıç sırasında** dönüyor — "sonra başlayan üstte" kuralı, iOS'un
+çizim sırasıyla aynı. `CalendarBlockLayoutTest` bunu sabitliyor.
+
+Bir birim testi bunu yakalayamazdı: yerleşim (x/y/genişlik/yükseklik) **doğruydu**,
+yanlış olan listenin sırasıydı ve sıra ancak çizim anında anlam kazanıyor. Test ancak
+hatayı gördükten sonra yazılabildi.
+
+### `fontScale 2.0`'da yakalanan iki kırılma
+
+Emülatörde koyu tema + 2x yazı ile sürerken çıktı; ikisi de aynı sınıftan hata (metin
+kabı için sabit `dp`):
+
+1. **Tarih şeridi gün rakamını ortadan kesiyordu** — hücrede sabit `height(60.dp)`.
+   `Row(height(IntrinsicSize.Max))` + hücrede `fillMaxHeight().heightIn(min = 60.dp)`
+   oldu: şerit en uzun hücreye göre büyür, yedi hücre yine eşit kalır. Kesilen bir
+   tarih okunamayan bir tarihtir.
+2. **Ajanda saat sütunu "09:00"u üç satıra bölüyordu** — sabit `width(48.dp)`.
+   `widthIn(min = 48.dp)` + `maxLines = 1` oldu. Saat, bir randevu satırının en çok
+   okunan parçası.
+
+### Kararlar
+
+- **Gün ızgarası saat aralığı şube saatlerinden GELMİYOR** (iOS kuralı):
+  `min(en erken, 9) ..< max(ceil(en geç), 19)`. Şube saatlerine bağlamak
+  `GET branches/:id/hours` çağrısı ve `schedule:read` izni ekler, iOS'tan ayrıştırır;
+  ızgaranın çalışma saatlerini izlemesi iki istemcide birlikte alınacak ayrı bir üründür.
+- **`AppointmentStatus` için özel serializer + `Unknown` dalı.** Sunucu bu alanı `string`
+  yazıyor (`clinic-api.ts` uyarısı). Körlemesine enum'a çevirmek, sunucuya yeni bir durum
+  eklendiği gün **tek bir satır yüzünden günün tamamını** çözümleme hatasına düşürürdü.
+  `Unknown` terminal SAYILMAZ: bilmediğimiz bir durumu kapanmış saymak, yeni bir
+  "beklemede" durumunu sessizce iptal gibi göstermek olurdu.
+- **Yükleme anahtarı `mode`'u değil türetilmiş `scope`'u taşıyor** (iOS `LoadKey`
+  paritesi): ajanda↔gün geçişi ve aynı hafta içinde gün değişimi **istek atmaz**.
+  Testle sabitlendi.
+- **`branchGeneration` ilk tüketicisini buldu.** A2.1'de kurulmuş ama hiçbir yere
+  bağlanmamıştı; `AppShell` artık sekmelere geçiriyor. Yalnız `activeBranchId` izlense,
+  aynı şubeye geri dönüldüğünde bayat gün ekranda kalırdı.
+- **Gün başına önbellek YOK** (iOS'ta da yok). Bir randevu takviminde bayat veri,
+  olmayan bir boşluğa randevu vermek demektir.
+- **`MockBookingSeed` bir tohum, fixture değil.** Takvim "bugünü" göstermek zorunda;
+  sabit tarihli bir JSON yarın yanlış olur ve boş bir gün gibi görünür. Fixture'lar
+  (`klinara-fixtures/booking/`) **çözümleme sözleşmesini** çiviliyor, tohum ekranı
+  sürüyor — ikisi ayrı iştir.
+- **Mock saati testte ViewModel'inkine bağlanır.** Bağlanmasaydı testler makinenin
+  takvimine göre bir gün geçer bir gün kalırdı; ilk koşuda tam olarak bu oldu.
+- **`MockScenario.NetworkError` artık takvimi ve personeli de düşürüyor.** Giriş yolunu
+  ağ hatasına ayarlayıp oturum içinde her şeyin çalıştığını görmek, senaryonun yarısını
+  yalan söyler hâle getirirdi.
+
+### iOS'a bildirilecek fark (§7.8)
+
+**Tarih şeridi bilmediği gün için "randevu yok" DEMİYOR.** Gün ve ajanda modunda sunucu
+yalnız seçili günün yoğunluğunu döndürür; komşu günler hakkında hiçbir şey söylemez.
+iOS o günler için ekran okuyucuya "randevu yok" duyuruyor — bilmediği bir şeyi olgu
+olarak söylüyor. Android'de bilinmeyen gün sessiz kalır (ne nokta, ne sayı). Yeni uç
+istemez, tek fark bir `Map` anahtarının yokluğunun sıfır DEĞİL "bilinmiyor" sayılması.
+
+### Yeni bağımlılık: YOK
+
+`material-icons-extended` **eklenmedi**: çekirdek sette ızgara/hafta ikonu yok ve bir mod
+seçici uğruna bağımlılık eklemek gerekçelendirilemez. `KlinaraSegmentedPicker`
+**metin-only** — "Ajanda / Gün / Hafta" kendi kendini anlatıyor, ikon orada zaten bilgi
+taşımıyordu. Grafik, paging ve tarih seçici kütüphanesi de gerekmedi.
+
+### Tasarım sistemine eklenen üç şey
+
+- `KlinaraSegmentedPicker` — A0.3'te "çağıranı yok" diye ertelenmişti, doğdu.
+- `CalendarGridPrimitives` (`CalendarGridMetrics`, `TimeAxisRuler`, `NowIndicator`,
+  `AppointmentBlockView`) — ızgara geometrisi. `KlinaraMetrics`'e KONMADI: bunlar marka
+  token'ı değil, tek bir ekranın ölçüsü ve 4pt ızgarasına uymayan tek yer.
+- `KlinaraScreen(contentPadding =, verticalSpacing =)` — ızgara modları yatay dolguyu
+  24 dp'den 16 dp'ye çekiyor; sabit `screenInset` ile saat cetveli + çakışan sütunlar
+  okunamaz hâle geliyordu. Varsayılan değişmedi.
+
+### detekt: 106 bulgu, hiçbiri susturulmadı
+
+Hepsi `MockBookingSeed`'de ve hepsi aynı sebepten: konumsal argümanlı bir randevu
+tablosu. Çözüm adlandırılmış argümanlar + saatlerin `at("09:30")` biçiminde **üretim
+çözümleyicisiyle** (`ClockTime.parse`) okunması oldu. Yan kazanç: tablodaki iki alanı
+yer değiştirmek artık derlenmiyor ve saatteki bir yazım hatası ilk testte patlıyor.
+`CyclomaticComplexMethod` (tarih şeridi hücresi) iki saf yardımcı fonksiyona bölünerek
+kapatıldı.
+
+### Kapsam dışı bırakılanlar
+
+- **Hafta ızgarası ve yoğunluk ısı zemini** → A3.2. Hafta modu bugün tarih şeridi +
+  "hazırlanıyor" notu gösteriyor; **sahte bir ızgara çizilmedi** (dolu görünen ama
+  tıklanamayan bir hafta, kullanıcıyı denemeye ve güvenini kaybetmeye götürür).
+- **Randevu detayı** → A3.3. Bloklara dokunmak bugün bir şey yapmıyor; yarım açılan bir
+  sayfa hiç açılmayandan kötüdür.
+- **Boş slota dokunup randevu oluşturma, sürükle-bırak taşıma, personel başına sütun** —
+  üçü de iOS'ta **yok** ve `calendar/staff` ucu hiçbir istemci tarafından çağrılmıyor.
+  Eklemek parite değil, yeni davranış olurdu.
+
+### Bilinen ve KABUL EDİLEN artık
+
+Tam örtüşen bir aktif ve bir terminal blok (15:00–16:00 aktif + 15:30–16:00 iptal) hâlâ
+üst üste biniyor: terminal bloklar sütun rezerve etmediği için tam genişlikte çiziliyor
+ve iki metin çakışıyor. iOS'ta da böyle ve **kasıtlı** — yerleşim iki istemcide aynı
+kalmalı. Görsel baskınlığı azaltmak için terminal bloğa bütünsel `0.6` opaklık eklendi
+(iOS'ta var, bende eksikti). Tam çözüm terminal blokları da kümelemeye sokmak olurdu ki
+o, iptal edilmiş bir randevunun aktif olanı yarıya sıkıştırması demek.
+
+---
+
+## A3.2 — Hafta ızgarası ve yoğunluk ✅
+
+**Durum:** `./gradlew check` yeşil — **186 birim testi** (181 → +5).
+Emülatörde `Yoğun gün` senaryosuyla sürüldü: yedi sütun yatay kaydırma olmadan sığıyor,
+gün başlığına dokunmak seçimi taşıyor ve **modu değiştirmiyor**, iptal edilen randevu
+soluk ve üstü çizili çiziliyor.
+
+### Yakalanan kusur: ısı zemini randevuları yutuyordu
+
+İlk yazımda hafta sütunlarının saat hücreleri `DensityScale.color` ile **tam doygunlukta**
+çizildi. `peak = 1` olan bir haftada — yani her saatte en çok bir randevu, tipik bir
+klinik haftası — ekran koyu yeşil bir duvara döndü ve blokların kendisi zeminden
+ayırt edilemez oldu.
+
+iOS ısı sütununa `.opacity(0.55)` uyguluyor; taşınırken atlanmıştı. Çift çağrıyla
+düzeltmek yerine ölçeğe açık bir varyant eklendi: `DensityScale.backgroundColor`.
+Gün modundaki `DensityStrip` tam doygunluğu **korur** — orada ısı bir zemin değil,
+bilginin kendisi. İki kullanım iki ayrı fonksiyon; aynı fonksiyonu iki farklı niyetle
+çağırmak, bir sonraki değişiklikte birini bozmak demekti.
+
+### Testin yanıldığı yer — ve yine de bir şey bulduğu yer
+
+`DensityScaleTest` "boş saat ile tek randevulu saat aynı görünmemeli" derken
+`alpha(0, 8) < alpha(1, 8)` bekliyordu ve **kırıldı** (0.35 > 0.344). Ölçek bozuk
+değildi: boş saat `border`, dolu saat `sageDeep` üzerine uygulanıyor — iki farklı renk
+ailesi ve alfaları kıyaslanamaz.
+
+Ama test yine de gerçek bir şeyi ortaya çıkardı: `alpha()` **yalnız dolu saatler için**
+tanımlıydı ve imzası bunu söylemiyordu. Fonksiyon artık `count`'u 1'e sıkıştırıyor,
+KDoc'u sınırını yazıyor ve test renkleri kıyaslıyor.
+
+### Kararlar
+
+- **Saat aralığı yedi günün TAMAMI üzerinden.** Her sütunun kendi aralığı olsaydı aynı
+  dikey konum farklı saatler demek olurdu ve hafta okunamazdı.
+- **Yatay kaydırma YOK.** Yedi sütun ekrana sığıyor; kaydırma, kullanıcının haftanın
+  tamamını asla göremediği bir "hafta görünümü" üretirdi.
+- **Hafta kendi dikey kaydırmasını kurar**, `CalendarHomeScreen` bu modda dış kaydırmayı
+  kapatır (`scrollable = mode != Week`). Gün başlıkları sabit kalmalı ve iki iç içe
+  dikey kaydırma Compose'da zaten çalışmaz.
+- **Gün başlığına dokunmak modu DEĞİŞTİRMEZ**, yalnız seçimi taşır. Kullanıcı hafta
+  görünümünde kalmak isteyip istemediğine kendisi karar verir (iOS ile aynı).
+- **Blok başlığı yalnız yükseklik ≥ 24 dp ise çizilir.** 30 dakikalık bir bloğa
+  sıkıştırılan 9sp metin okunmuyor, yalnız gürültü ekliyordu; tam metin
+  `contentDescription`'da ve dokunmak detayı açacak (A3.3).
+- **"şube geneli" notu filtre açıkken ZORUNLU.** Sunucu yoğunluğu personel filtresine
+  göre daraltmıyor; söylememek, kullanıcının seçtiği personelin yoğunluğuna bakıyormuş
+  gibi hissetmesine yol açardı ve o yanlış izlenim ekranda hiçbir yerden düzeltilemezdi.
+  `CalendarUiState.densityNote` bunu tek yerde üretiyor.
+- **Saat etiketi 5 dp yukarı çekiliyor** (metin kutusunun üst boşluğu yüzünden bir
+  sonraki saate ait görünüyordu) ve ızgara aynı kadar aşağı itiliyor — ilk etiket
+  kırpılmasın diye.
+
+### Emülatör sürüşü betiğe alındı
+
+Elle koordinat tahmini iki kez parolayı iki kez yazdırdı (klavye açıkken düğme kayıyor).
+Sürüş artık bir betik: `pm clear` ile temiz başlangıç, düğmeleri **erişilebilirlik
+ağacından bulup merkezine** dokunma, her adımda metin bekleme. Betik scratchpad'de,
+repoya girmiyor — tek bir emülatör düzenine bağlı ve sürüm kontrolüne girerse bakımı
+kimsenin üstlenmediği bir yük olur.
+
+---
+
+## A3.3 — Randevu detayı ve yaşam döngüsü ✅
+
+**Durum:** `./gradlew check` yeşil — **204 birim testi** (186 → +18).
+Emülatörde uçtan uca sürüldü: takvim satırına dokunmak detayı açıyor, "Geldi" onay
+diyaloğuyla kaydediliyor, **sistem geri tuşu** listeye dönüyor ve liste yeni durumu
+gösteriyor; geçmiş ekranı "Onaylandı → Geldi" ile "Oluşturuldu" kayıtlarını sıralıyor.
+
+### Detay bir sheet DEĞİL, bir `NavHost` hedefi
+
+Kural 2: bilgi mimarisi iOS ile aynı, etkileşim deyimi Android'in. `ShellRoutes`'a
+`AppointmentDetail(appointmentId)` ve `AppointmentHistory(appointmentId)` eklendi.
+Tahmini geri (predictive back), sistem geri tuşu ve geri yığını bedava geldi —
+A2.1'de sekme başına `NavHost` kurmanın sebebi tam buydu ve ilk kez karşılığını verdi.
+
+Yan etki, **istenen** bir yan etki: detaydan geri dönünce takvim yeniden yükleniyor
+(hedef `NavBackStackEntry`'siyle birlikte yok edilip yeniden kuruluyor). Bir randevu
+takviminde geri dönüşte tazelenmek doğru davranış; bayat bir gün, olmayan bir boşluğa
+randevu vermek demek.
+
+### `CustomerService`'in bir metodu A3.3'e alındı — çünkü detay yanıtı adı taşımıyor
+
+`AppointmentResponseDto` **`customerName` taşımıyor**; `CalendarEntryDto` taşıyor.
+Yani takvim satırında müşteri adı var, detay yanıtında yok. Müşterisi yazmayan bir
+randevu detayı işe yaramaz.
+
+İki yol vardı: adı gezinme argümanı olarak taşımak, ya da `GET customers/:id` çağırmak.
+Birincisi bir ekranın gerçeğini başka bir ekranın hafızasına bağlar ve bayatlamaya
+davetiye çıkarırdı. `CustomerService.get(id)` seçildi — gerçek metot, gerçek çağıran,
+kendi mock'u. `search` A3.4'te, kartın tamamı A4.1'de.
+
+Model **bilerek kırpık**: sunucu adres, kaynak, doğum tarihi, cinsiyet de gönderiyor;
+A3.3'ün ihtiyacı ad ve telefon. Bugün okunmayan alanları modellemek, kullanılmamış bir
+sözleşmeyi bakım yüküne çevirmek olurdu.
+
+### Mock müşteri tablosu PAYLAŞILDI
+
+Müşteri adları `MockBookingSeed`'in içinde bir listeydi. `CustomerService` gelince aynı
+kişilerin iki yerde yaşaması gerekirdi ve ayrı tohumlanmış kopyalar, detay ekranında
+takvimde görünenden **başka bir ad** göstermeye kadar giderdi — iOS'ta bir kez yaşanan
+sınıftan hata. `MockCustomers` (services/mock) tek kaynak; kimlikler **liste sırasından
+türetiliyor**, elle yazılmıyor (iki satıra aynı indeksi vermek iki müşteriyi tek kimlikte
+birleştirirdi ve bunu ancak randevular karışınca fark ederdik).
+
+### En sinsi hata: sürüm nereden geliyor
+
+`POST appointments/:id/cancel` ve `.../status` **`ETag` başlığı DÖNDÜRMÜYOR** ama
+yanıt gövdeleri `version` taşıyor. Ekran sürümü gövdeden almazsa, bir sonraki not kaydı
+kullanıcının **kendi** değişikliği yüzünden 409 `VERSION_CONFLICT` alır — ve bu ancak
+canlıda, üstelik "neden şimdi?" sorusuyla fark edilirdi.
+
+Yazma sarmalayıcısı dönen kaydı doğrudan duruma yazıyor, yeniden `GET` yapmıyor.
+Mock da iyimser kilidi uyguluyor (bayat sürüm → 409) ve iki test bunu sabitliyor:
+biri gövdeden gelen sürümle not kaydının GEÇTİĞİNİ, diğeri bayat sürümün REDDEDİLDİĞİNİ.
+
+> Web paneli bunun yerine her mutasyondan sonra yeniden okuyor. İki istemci farklı
+> davranıyor ama ikisi de doğru; bizimki bir istek daha az.
+
+### Kararlar
+
+- **İyimser güncelleme YOK.** Sunucu geçişi reddedebilir (409 `INVALID_STATUS_TRANSITION`,
+  403 `appointment:reopen`). Satırı önce değiştirip sonra geri almak, kullanıcıya bir an
+  için gerçekleşmemiş bir şeyi göstermek olurdu (A2.2'deki passkey kararının aynısı).
+  Bir test bunu sabitliyor: geçersiz geçişten sonra durum **değişmemiş** olmalı.
+- **Okuma ile yazma ayrı ele alınır.** Okuma başarısızlığı ekranı `Failed`'a düşürür,
+  yazma başarısızlığı yalnız afiş gösterir ve okunan kayda dokunmaz. Bir durum değiştirme
+  denemesinin başarısız olması, kullanıcının baktığı randevuyu ekrandan silmek için sebep
+  değil.
+- **`Cancelled` durum listesinde YOK.** İptalin kendi sebep toplayan akışı ve kendi ucu
+  var; durum satırı olarak da göstermek, aynı işe iki kapı açıp birinden sebep sormamak
+  olurdu. Bir test altı durumun hiçbirinin `Cancelled` üretmediğini doğruluyor.
+- **`Unknown` hiçbir geçiş üretmez.** Tanımadığımız bir durumdan nereye gidilebileceğini
+  de bilmiyoruz; tahmin etmek sunucuda 409 yer.
+- **Aynı duruma geçiş no-op'tur**, hata değil — sunucudaki davranış. Mock da öyle
+  davranıyor ve sürüm artırmıyor.
+- **"Kaynak" satırı yalnız `origin == online` ise çizilir.** Klinikte açılmış bir
+  randevuda "Kaynak: Klinik" demek, hiçbir soruyu cevaplamayan bir satır olurdu.
+- **Tampon dipnotu.** Tamponlar `appointments`'ta değil `resource_bookings.time_range`'de
+  yaşıyor: müşteri 14:00 görür, takvim 13:55–15:10 tutar. Ekran bunu açıkça söylüyor
+  ("Takvimde 1 sa 15 dk yer tutuyor — 1 sa işlem + hazırlık payı"); söylememek, "boş
+  görünen" bir aralığa randevu verilmeye çalışılmasına yol açar. Mock tohumu bu yüzden
+  **sıfır olmayan** tampon üretiyor — sıfır tampon dipnotu hiç sürülemez yapardı.
+- **Not silme önceden söyleniyor.** Alanı boşaltıp kaydetmek notu siler; bunu kaydettikten
+  sonra öğrenmek geri alınamayan bir sürpriz olurdu. `explicitNulls = false` yüzünden
+  gövde elle kuruluyor: `encodeToString`, `notes: null` alanını **atlar** ve silme niyeti
+  kaybolurdu.
+
+### Kapsam dışı bırakılanlar
+
+- **`AppointmentNotificationsSection`** (iOS'ta var) — `notifications` servisi A8.1'de.
+  A3.3'te yazmak boş bir arayüz kurmak olurdu.
+- **"Pakete bağla"** — A5.2. Satır modelde (`customerPackageItemId`) duruyor ve
+  tamamlandığında paketten düşeceği ekranda söylenmiyor; A5.2 rozetle birlikte gelecek.
+- **Erteleme** — A3.4'ün `BookingFlowScreen`'i ile aynı formu paylaşıyor; ayrı yazmak
+  aynı ekranı iki kez yazmak olurdu.
+
+---
+
+## A3.4 — Randevu oluşturma ve erteleme ✅
+
+**Durum:** `./gradlew check` yeşil — **231 birim testi** (204 → +27) + 5 instrumented.
+R8 release APK 2.30 MB; dex baytları tarandı: üretim metinleri (`availability`,
+"Seçilen saat dolu", "hazırlık payı") **var**, mock ve tohum içeriği **yok**.
+
+Emülatörde uçtan uca sürüldü: "Yeni randevu" → müşteri araması (**"Ayse" yazınca
+"Ayşe Yılmaz" geldi** — Türkçe katlama üretim yardımcısıyla) → hizmet → personel →
+slot → Oluştur → takvime dönüş ve **yeni randevu listede**.
+
+### Faz A3 kapandı
+
+`ANDROID_DEVELOPMENT.md` §6'daki dört batch de bitti: 144 → **231 birim testi**.
+
+### İki servisin okuma yarısı daha öne alındı
+
+`catalog` (A7.1'den) ve `customers.search` (A4.1'den). Randevu oluşturmak hizmet
+seçmeyi ve müşteri aramayı gerektiriyor; ikisi de gerçek metot + gerçek çağıran +
+kendi mock'u. Düzenleme ekranları kendi fazlarında kalıyor.
+
+Faz A3 boyunca öne alınan servisler: `booking` (A3.1), `staff` (A3.1),
+`customers.get` (A3.3), `customers.search` + `catalog` (A3.4). Hepsi §6'ya işlendi.
+Ortak sebep tek: **takvim, ürünün diğer her parçasına dokunan ekrandır** ve doküman
+servis sırasını bağımlılıklara göre değil fazlara göre dizmişti.
+
+### Yakalanan gerçek hata: mock uygunluk motoru yetkinliği yok sayıyordu
+
+Emülatörde slot çipleri **"3 kişi uygun"** diyordu — ama Onur cilt bakımında yetkin
+değil. Mock'un aday listesi yalnız `staffProfileId` filtresini uyguluyor, yetkinliği
+uygulamıyordu.
+
+Kullanıcı o slotu seçseydi ve geri düşüş Onur'u atasaydı, **canlı sunucu 422
+`RESOURCE_UNAVAILABLE` ile reddederdi**: mock'ta doğru görünüp canlıda bozulan tam olarak
+o sınıftan bir ekran. `MockBookingService.availability` artık `MockStaffService`'in
+yetkinlik matrisini uyguluyor ve bir test bunu sabitliyor.
+
+Bu, mock'un varlık sebebine dair bir ders: mock **sunucunun kurallarını** taşımak
+zorunda, yalnız sunucunun ŞEKLİNİ değil.
+
+### `BookingDraft` — kuralların yaşadığı yer
+
+Saf bir değer tipi, Compose'suz ve servis-suz. iOS'ta bu kuralların her biri bir hata
+düzeltmesiydi; ekran koduna dağılsalardı biri sessizce kaybolurdu ve kaybı ancak bir
+müşteri bedava seans alınca fark edilirdi. Her kural kendi testine sahip:
+
+- **Hizmet değişince slot düşer** — süre değişti, elde tutulan saat başka bir aralığa
+  denk geliyor. Düşürmemek, seçilen saatin sessizce kaymasına yol açardı.
+- **Müşteri değişince paket bağları TÜMÜYLE temizlenir** — seans hakkı müşteriye aittir;
+  başka birinin hakkını taşımak bedava seans demek. (Aynı müşteriye tekrar dokunmak
+  bağları korur; ayrı bir test.)
+- **Slot seçimi uyumlu personeli KORUR**, değilse ilk adaya düşer — bilerek seçilmiş bir
+  personeli sessizce değiştirmek yanlış olurdu.
+- **Erteleme müşteriyi ve hizmet dizilimini kilitler** ve **paket bağlarını korur**:
+  korumazsak erteleme, müşterinin seans hakkını sessizce çözer ve randevu ücretli olur.
+- **Hizmet sırası anlamlıdır** ve sunucuya aynen gider (ardışık uygulama).
+- **Yetkin personel = hizmetlerin HEPSİNİ verebilenler.** "Herhangi birinde yetkin"
+  olsaydı sunucu 422 ile reddederdi ve kullanıcı bunu ancak reddedildikten sonra
+  öğrenirdi.
+
+### İki eşzamanlılık kuralı, iki ayrı mekanizma
+
+1. **Çift dokunuşu `isSaving` bayrağı engeller**, idempotency anahtarı değil. Bir test
+   ard arda iki `save()` çağırıyor ve tek bir `create` gittiğini doğruluyor.
+2. **Idempotency anahtarı HER denemede yeni.** Anahtar ağ tekrarına karşıdır; düzeltilmiş
+   bir gövdeyi aynı anahtarla göndermek 409 `IDEMPOTENCY_CONFLICT` verirdi. İkinci bir
+   test iki denemenin iki farklı anahtar kullandığını sabitliyor.
+
+### 409 `SLOT_CONFLICT` bir hata değil, bir bilgidir
+
+Sunucu EXCLUDE kısıtıyla zaten yazdırmadı; kullanıcının ihtiyacı "bu saat dolu" cümlesi
+değil, **alternatif saatler**. Çakışmada hata afişi gösterilmiyor: `SlotConflictScreen`
+açılıyor, dolu aralıklar (tampon dahil olduğu dipnotla) ve en fazla üç öneri listeleniyor.
+Öneriye dokunmak taslağı **doldurur, kaydetmez** — son sözü kullanıcı söyler; bir test
+öneriden sonra hiç yeni `create` gitmediğini doğruluyor.
+
+A3.1'de düzeltilen `SlotConflict` alan adları (`resourceId`/`from`/`to`) burada
+karşılığını verdi: bir test çözülen değerlerin gerçekten dolu olduğunu sabitliyor —
+düzeltilmeseydi "dolu olan" kartı boş çizilirdi ve sebebi görünmezdi.
+
+### Kararlar
+
+- **Sihirbaz değil, tek sayfa** (iOS ile aynı): bölümler ilerledikçe açılıyor. Adım adım
+  bir sihirbaz, hizmeti değiştirmek için üç ekran geri gitmeyi gerektirirdi — ve
+  rezervasyon, kliniğin en sık düzeltilen formudur.
+- **Oluşturma ve erteleme TEK hedef** (`ShellRoutes.BookingFlow(rescheduleId)`). Form
+  aynı; değişen yalnız kilitli alanlar ve düğme metni. İkiye bölmek aynı ekranı iki kez
+  yazmak olurdu.
+- **Erteleme, formu kurmadan ÖNCE randevuyu ister.** Taslak hizmet dizilimini,
+  personelini ve paket bağlarını ondan kopyalıyor ve `If-Match` taze bir sürüm istiyor.
+  Gezinme argümanında yalnız kimlik taşınır; argümanda taşınan bir kayıt bayatlar.
+- **Oluşturduktan sonra takvime dönülür**, detaya atlanmaz: kullanıcıyı yeni bir ekrana
+  bırakmak "peki günün geri kalanı?" sorusunu cevapsız bırakırdı.
+- **Giriş noktaları izne bağlı** (§7.4): `appointment:write` yoksa "Yeni randevu" düğmesi
+  hiç çizilmez; kapanmış randevuda "Saati değiştir" görünmez (sunucu `assertMutable` ile
+  reddediyor ve reddedilecek bir düğme, yapılamayacak bir şeyi vaat etmektir).
+- **Arama kısaltması (debounce) EKLENMEDİ.** Ölçülmeden eklenen bir kısaltma "yazdım ama
+  liste gelmedi" hissi üretir; gerçek bir sorun ölçülürse eklenir.
+- **`KlinaraChipGrid` genel bileşen olarak yazılmadı** — tek çağıranı slot ızgarası.
+  A0.3'ün kuralı: ikinci çağıran doğana kadar bekle.
+- **`ServiceContainer`'da `LongParameterList` gerekçeyle gevşetildi.** Bağımlılık kökünde
+  uzun parametre listesi bir koku değil, tanımın kendisi: her servis tam olarak bir kez
+  adlandırılıyor ve A9'a kadar on dört tane daha gelecek. Alternatif bir `Services`
+  taşıyıcısıydı; o da `container.booking` yerine `container.services.booking` yazdırır ve
+  okunurluğu artırmadan bir dolaylılık katmanı eklerdi.
+
+### Kapsam dışı bırakılanlar
+
+- **Paket seçimi** (`customerPackageItemId`) — model ve kablo gövdesi taşıyor, seçim
+  arayüzü A5.2'de. Bugün bağ yalnız ERTELEMEDE korunuyor (yeni randevuda hiç kurulmuyor).
+- **"Yeni müşteri ekle"** — `customer:write` ve bir müşteri formu ister; A4.2'nin işi.
+- **Boş slota dokunup oluşturma** (takvimde) — iOS'ta da yok; `startingAt` bağlandı ama
+  çağıran yok. Eklemek parite değil, yeni davranış olurdu.

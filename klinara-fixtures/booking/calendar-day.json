@@ -1,0 +1,62 @@
+{
+  "branchId": "b1000000-0000-4000-8000-000000000001",
+  "timezone": "Europe/Istanbul",
+  "from": "2026-09-07T00:00:00+03:00",
+  "to": "2026-09-08T00:00:00+03:00",
+  "appointments": [
+    {
+      "id": "a99a0000-0000-4000-8000-000000000001",
+      "branchId": "b1000000-0000-4000-8000-000000000001",
+      "customerId": "c0570000-0000-4000-8000-000000000001",
+      "customerName": "Ayşe Yılmaz",
+      "customerPhone": "+905321112233",
+      "status": "confirmed",
+      "startsAt": "2026-09-07T09:00:00+03:00",
+      "endsAt": "2026-09-07T10:00:00+03:00",
+      "notes": null,
+      "version": 1,
+      "totalMinor": 90000,
+      "services": [
+        {
+          "id": "57170000-0000-4000-8000-000000000001",
+          "serviceId": "5e111ce0-0000-4000-8000-000000000001",
+          "serviceName": "Cilt bakımı",
+          "staffProfileId": "51a11000-0000-4000-8000-000000000001",
+          "sortOrder": 0,
+          "startsAt": "2026-09-07T09:00:00+03:00",
+          "endsAt": "2026-09-07T10:00:00+03:00",
+          "priceMinor": 90000
+        }
+      ]
+    },
+    {
+      "id": "a99a0000-0000-4000-8000-000000000002",
+      "branchId": "b1000000-0000-4000-8000-000000000001",
+      "customerId": "c0570000-0000-4000-8000-000000000002",
+      "customerName": "Elif Demir",
+      "customerPhone": null,
+      "status": "cancelled",
+      "startsAt": "2026-09-07T11:00:00+03:00",
+      "endsAt": "2026-09-07T11:45:00+03:00",
+      "notes": "Müşteri erteleme istedi.",
+      "version": 3,
+      "totalMinor": 145000,
+      "services": [
+        {
+          "id": "57170000-0000-4000-8000-000000000011",
+          "serviceId": "5e111ce0-0000-4000-8000-000000000002",
+          "serviceName": "Lazer epilasyon",
+          "staffProfileId": "51a11000-0000-4000-8000-000000000002",
+          "sortOrder": 0,
+          "startsAt": "2026-09-07T11:00:00+03:00",
+          "endsAt": "2026-09-07T11:45:00+03:00",
+          "priceMinor": 145000
+        }
+      ]
+    }
+  ],
+  "density": [
+    { "localDay": "2026-09-07", "localHour": 9, "appointmentCount": 1 },
+    { "localDay": "2026-09-07", "localHour": 14, "appointmentCount": 3 }
+  ]
+}

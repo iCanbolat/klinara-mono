@@ -3,6 +3,7 @@ package com.klinara.android.features.profile
 import com.klinara.android.services.auth.MockAuthService
 import com.klinara.android.services.contracts.ApiErrorCode
 import com.klinara.android.services.mock.MockScenario
+import com.klinara.android.services.networking.Loadable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher

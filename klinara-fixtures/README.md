@@ -29,3 +29,13 @@ gizlerdi.
 `permissions` alanı burada TUTULMAZ: `tools/gen-client-contracts.mjs` onu
 `packages/shared/src/permissions.ts`'ten üretiyor ve mock servis çalışma anında
 yerleştiriyor. Elle tutulan bir izin listesi iOS'ta bir kez saptı.
+
+## Tohum ≠ fixture (A3.1)
+
+`booking/` altındaki dosyalar **çözümleme sözleşmesini** çiviliyor: sabit tarihlidirler
+ve yalnız testler okur. Ekranı süren mock takvim verisi bir **tohumdur**
+(`MockBookingSeed`), fixture değil — takvim "bugünü" göstermek zorunda ve sabit tarihli
+bir JSON yarın boş bir gün gibi görünürdü.
+
+`calendar-day-unknown-status.json` bilerek bozuk değil, bilerek **ileri sürümlü**:
+tanımadığımız bir `status` ve fazladan bir alan taşıyor. İstemci ikisinde de çökmemeli.

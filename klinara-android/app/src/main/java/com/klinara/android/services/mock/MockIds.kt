@@ -15,4 +15,22 @@ object MockIds {
     const val BRANCH_BODRUM = "b1000000-0000-4000-8000-000000000002"
 
     const val USER_MANAGER = "u1000000-0000-4000-8000-000000000001"
+
+    // --- A3.1: takvim grafiği ---
+    //
+    // Personel, müşteri ve hizmet kimlikleri BURADA duruyor çünkü üç ayrı mock servis
+    // (staff, booking, ileride catalog) aynı kayıtlara atıfta bulunuyor. Her servisin
+    // kendi kimliğini üretmesi, var olmayan bir personele bağlı bir randevu demekti.
+
+    const val STAFF_DERYA = "51a11000-0000-4000-8000-000000000001"
+    const val STAFF_MERVE = "51a11000-0000-4000-8000-000000000002"
+    const val STAFF_ONUR = "51a11000-0000-4000-8000-000000000003"
+
+    val STAFF_ALL = listOf(STAFF_DERYA, STAFF_MERVE, STAFF_ONUR)
+
+    const val SERVICE_SKIN_CARE = "5e111ce0-0000-4000-8000-000000000001"
+    const val SERVICE_LASER = "5e111ce0-0000-4000-8000-000000000002"
+    const val SERVICE_FILLER = "5e111ce0-0000-4000-8000-000000000003"
+    const val SERVICE_CHECKUP = "5e111ce0-0000-4000-8000-000000000004"
+    const val SERVICE_MASK = "5e111ce0-0000-4000-8000-000000000005"
 }
