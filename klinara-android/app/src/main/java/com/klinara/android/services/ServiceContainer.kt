@@ -36,9 +36,13 @@ import kotlinx.coroutines.flow.SharedFlow
  * DEĞİL (boş arayüzler okunmamış uçlar için imza tahmini kodlar ve her batch'te
  * "refactor" edilir; ilerleme gibi görünen çalkantı):
  *
- *     users A2.1 · booking A3.4 · customers A4.1 · notes A4.3 · files A4.4
+ *     booking A3.4 · customers A4.1 · notes A4.3 · files A4.4
  *     packages A5.1 · finance A6.1 · commissions A6.4 · catalog A7.1 · staff A7.2
  *     scheduling A7.3 · notifications A8.1 · messages A8.1 · whatsapp A8.3 · reports A9
+ *
+ * `users` A7.2'de gelir, A2.1'de DEĞİL: iOS'ta `UsersService`'in tek çağıranı
+ * `StaffCreateView` (personel davet edilecek kullanıcıyı seçiyor). Kabuk ve profil
+ * `AuthService.me()` + `.branches()` ile yetiniyor.
  */
 class ServiceContainer private constructor(
     val auth: AuthService,

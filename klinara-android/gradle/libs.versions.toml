@@ -13,6 +13,7 @@ coroutines = "1.11.0"
 serialization = "1.11.0"
 okhttp = "5.4.0"
 datastore = "1.2.1"
+navigation = "2.9.8"
 desugar = "2.1.5"
 junit5 = "5.14.0"
 junitPlatform = "1.14.0"
@@ -39,6 +40,9 @@ androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-ru
 androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
 androidx-splashscreen = { module = "androidx.core:core-splashscreen", version.ref = "splashscreen" }
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
+# Sekme başına geri yığını + tip güvenli @Serializable route (A2.1). Giriş akışı
+# BUNU KULLANMAZ — o bir durum makinesi (§5.3); kabuk içi gezinme kullanır.
+androidx-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigation" }
 
 # --- Ağ ve serileştirme ---
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }

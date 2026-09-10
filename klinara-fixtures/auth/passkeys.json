@@ -1,0 +1,20 @@
+{
+  "data": [
+    {
+      "id": "9f1c3a52-7d20-4b6e-9a11-0c4e8f2b6d31",
+      "deviceLabel": "iPhone 15 Pro",
+      "backedUp": true,
+      "transports": ["internal", "hybrid"],
+      "lastUsedAt": "2026-09-08T07:42:11.000Z",
+      "createdAt": "2026-04-19T13:05:44.000Z"
+    },
+    {
+      "id": "2b8d47e0-63af-4c19-8f5d-11a7c9e04b62",
+      "deviceLabel": "MacBook Pro — Chrome",
+      "backedUp": false,
+      "transports": ["usb"],
+      "lastUsedAt": null,
+      "createdAt": "2026-06-02T09:17:30.000Z"
+    }
+  ]
+}

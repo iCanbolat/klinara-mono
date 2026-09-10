@@ -173,6 +173,9 @@ dependencies {
     // Şifreli oturum deposu (A0.4). security-crypto deprecated; Keystore doğrudan.
     implementation(libs.androidx.datastore.preferences)
 
+    // Kabuk içi gezinme (A2.1). Giriş akışı kullanmaz — o bir durum makinesi (§5.3).
+    implementation(libs.androidx.navigation.compose)
+
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 
     testImplementation(libs.junit.jupiter)

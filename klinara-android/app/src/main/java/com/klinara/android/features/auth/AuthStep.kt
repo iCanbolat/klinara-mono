@@ -68,6 +68,19 @@ data class AppSession(
         get() = branches.firstOrNull { it.id == activeBranchId }
 
     fun can(permission: String): Boolean = profile.permissions.contains(permission)
+
+    /**
+     * Adaylardan **herhangi biri** yeterli.
+     *
+     * Yönetim sekmesi bunu kullanıyor: yalnız çalışma saatlerini düzenleyen bir
+     * yönetici de, yalnız kasayı gören bir muhasebeci de girebilmeli.
+     */
+    fun canAny(permissions: Collection<String>): Boolean = permissions.any(::can)
+
+    fun canAny(vararg permissions: String): Boolean = permissions.any(::can)
+
+    /** Şube değiştirme menüsü yalnız seçenek varken anlamlı. */
+    val canSwitchBranch: Boolean get() = branches.size > 1
 }
 
 /** Kullanıcı tanımlayıcı olarak telefonu mu e-postayı mı veriyor. */

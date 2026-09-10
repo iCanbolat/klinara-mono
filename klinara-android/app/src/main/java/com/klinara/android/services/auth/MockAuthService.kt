@@ -1,6 +1,7 @@
 package com.klinara.android.services.auth
 
 import com.klinara.android.services.contracts.ApiErrorCode
+import com.klinara.android.services.contracts.RoleNames
 import com.klinara.android.services.contracts.RolePermissions
 import com.klinara.android.services.mock.Fixtures
 import com.klinara.android.services.mock.MockIds
@@ -36,8 +37,12 @@ class MockAuthService(
     /** `verifyPhone` başarılı olunca true'ya döner — akış ilerleyebilsin. */
     private var phoneVerified: Boolean = scenario != MockScenario.UnverifiedPhone
 
+    /** Oturum içinde silinen passkey'ler (A2.2). Fixture değişmez, görünürlük değişir. */
+    private val deletedPasskeyIds = mutableSetOf<String>()
+
     fun reset() {
         phoneVerified = scenario != MockScenario.UnverifiedPhone
+        deletedPasskeyIds.clear()
     }
 
     // ------------------------------------------------------------------ giriş
@@ -168,6 +173,40 @@ class MockAuthService(
         simulateLatency()
     }
 
+    // ------------------------------------------------------------- hesap güvenliği
+
+    override suspend fun totpStatus(): TotpStatus {
+        simulateLatency()
+        transportFailure()?.let { throw it }
+        // `PasswordOnly` hesabında 2FA kapalı: profil ekranının iki dalı da sürülebilsin.
+        if (scenario == MockScenario.PasswordOnly) return TotpStatus(enabled = false)
+        return decode("auth/totp-status.json")
+    }
+
+    override suspend fun passkeys(): List<PasskeySummary> {
+        simulateLatency()
+        transportFailure()?.let { throw it }
+        return KlinaraJson
+            .decodeFromString<ListEnvelope<PasskeySummary>>(Fixtures.read("auth/passkeys.json"))
+            .data
+            .filterNot { it.id in deletedPasskeyIds }
+    }
+
+    /**
+     * Silme mock'ta da **kalıcıdır**: liste her çağrıda fixture'dan tazelenseydi,
+     * silinen satır bir sonraki yenilemede geri gelir ve ekranın "sildim mi?"
+     * davranışı hiç sürülemezdi.
+     *
+     * Son anahtarı silmek sunucudaki gibi 409 verir — parolası olmayan bir hesabın
+     * kendini kilitlemesini engelleyen yolun ekranda ne göründüğü ancak böyle görülür.
+     */
+    override suspend fun deletePasskey(id: String) {
+        simulateLatency()
+        transportFailure()?.let { throw it }
+        if (passkeys().size <= 1) throw problem("auth/problem-credential-required.json")
+        deletedPasskeyIds += id
+    }
+
     override suspend fun passkeyAssertionOptions(): String = error("Passkey mock modda desteklenmiyor (A1.5)")
 
     override suspend fun passkeyVerify(
@@ -224,7 +263,9 @@ class MockAuthService(
         roleKey: String,
         multipleBranches: Boolean,
     ): JsonObject {
-        val roleName = if (roleKey == "practitioner") "Uygulayıcı" else "Şube Yöneticisi"
+        // Elle kurulmuş iki dallı bir eşleme buradaydı; `RoleNames` zaten üretilmiş
+        // tabloyu taşıyor ve `permissions.ts` değiştiğinde onunla birlikte değişiyor.
+        val roleName = RoleNames.turkish(roleKey)
         val memberships =
             JsonArray(
                 branchIds(multipleBranches).mapIndexed { index, branchId ->

@@ -530,3 +530,167 @@ iki varyant emülatörde yan yana kurulu.
 `CredentialManagerPasskeyService` yazılıp `UnavailablePasskeyService` yerine geçecek.
 §8'deki M1 kilometre taşı tanımı **"passkey ile giriş" → "parola ile giriş"** olarak
 güncellenmeli.
+
+---
+
+## A2.1 — Uygulama kabuğu ✅
+
+**Durum:** `./gradlew check` yeşil — **144 birim testi** (126 → +18) + 5 instrumented.
+R8 ile küçültülmüş release APK 2.27 MB; fixture, `MockAuthService`, galeriler ve
+geliştirici menüsü **yok** (dex taranarak doğrulandı).
+
+Emülatörde (API 37, Pixel 10 Pro) uçtan uca sürüldü: `Çok şubeli` senaryosu → parola →
+şube seçimi → dört sekmeli kabuk; şube menüsünden Bodrum'a geçiş üst çubuğa **ve**
+profildeki Oturum kartına aynı anda yansıdı. Koyu tema, `fontScale 2.0` ve yatay
+çevrim kontrol edildi; `uiautomator` ağacında şube menüsü "Şube: Nişantaşı" olarak,
+boş durum **tek düğüm** olarak, seçili sekme `selected="true"` ile duyuruluyor.
+
+### `accountant` elle sürülmedi, birim testine taşındı — ve gerekçesi
+
+Plan başta "emülatörde `accountant` rolüyle gir" diyordu. `MockScenario.roleKey` yalnız
+`manager`/`practitioner` veriyor, yani bu sürülemezdi. İki yol vardı: geliştirici
+menüsüne üçüncü bir eksen (senaryo × veri × **rol**) eklemek, ya da ölçütü teste taşımak.
+
+İkincisi seçildi: **sekme görünürlüğü saf bir fonksiyondur** (izin kümesi → sekme
+kümesi). `ShellTabTest` altı rolü de sürüyor ve `MANAGEMENT_PERMISSIONS`'tan finans
+izinlerini çıkarınca **kırıldığı doğrulandı** — yani iOS'ta bir kez yaşanan "muhasebe
+kendi ekranlarına ulaşamıyor" hatasının gerçek regresyon koruması var. Menüye rol ekseni
+eklemek, tek bir `assert`in kapattığı bir şey için app scope'u büyütmek olurdu.
+
+`MockScenario`'ya girdi **eklenmedi**.
+
+### Kararlar
+
+- **Sekme başına ayrı `NavHostController`.** A2'de her grafiğin tek hedefi var; şimdi
+  kurulmasının sebebi A3–A9'un sekme içi ekran eklerken kabuğu yeniden yazmaması.
+  Dört controller açıkça `remember`lanıyor (`entries.associateWith { rememberNavController() }`
+  yerine): inline lambda içinde composable çağırmak çalışır ama okuyucuya çalışıp
+  çalışmadığını düşündürür.
+- **Material3 `NavigationBar` taşıyıcı olarak kullanıldı**, kendi `Row`'umuz değil:
+  seçili sekmenin ekran okuyucuya `Tab` rolü ve "seçili" durumuyla duyurulması elle
+  kurulacak bir şeydi. Renkler token'lardan; ripple burada M3'ün işi (§5.6 "ripple,
+  tipografi ölçeği, erişilebilirlik varsayılanları" zaten taşıyıcıdan geliyor). A0.3'ün
+  ripple kapatma kararı **kendi** kontrollerimiz içindi.
+- **`KlinaraScreen` M3 `TopAppBar` KULLANMIYOR.** Kendi tipografimizi, yüksekliğimizi ve
+  ripple'sız geri düğmesini enjekte etmek için onun renk/scroll davranışının çoğunu
+  ezmek gerekiyordu; geriye taşıyıcı olarak hiçbir şey kalmıyordu. Düz bir `Row` dürüst.
+- **Sekme etiketi `maxLines = 1` + ellipsis.** `fontScale 2.0`'da dört sekme yan yana
+  sığmıyor; kırpmak sarmaktan iyi, çünkü ikon ve seçili durum anlamı zaten taşıyor.
+- **Bugün ve Profil her zaman çizilir.** Varsayılan seçili sekmenin bazı rollerde
+  kaybolması, bilgi mimarisini role göre değiştirmek olurdu (iOS gerekçesinin aynısı).
+- **`Scaffold(containerColor = Transparent)`** — zemin `KlinaraTheme`'in tam kanamalı
+  `Surface`'inden geliyor. Scaffold kendi zeminini boyasaydı A0.2'de düzeltilen "sistem
+  çubuklarının arkası beyaz" hatası geri gelirdi.
+- **`AppSession` immutable kaldı.** `SessionViewModel` onu `copy()` ile yeniliyor;
+  ikinci bir mutable model sınıfı eklenmedi. `switchBranch` sırası kritik ve testle
+  sabitlendi: **önce `TokenStore`**, sonra state — `X-Branch-Id`'nin kaynağı depo, depoya
+  yazılmadan yapılan istek hâlâ eski şubeye gider.
+- **`SavedStateHandle` yok** (A1.1 gerekçesinin aynısı): süreç ölümünde `TokenStore` tek
+  otorite. Profili ve izinleri kaydetmek bayat bir izin kümesiyle uyanmak demekti.
+
+### Yeni bağımlılık (§7.7)
+
+| Bağımlılık | Gerekçe |
+|---|---|
+| `androidx.navigation:navigation-compose 2.9.8` | §3 zaten öngörüyordu, katalogda yoktu. Sekme başına geri yığını ve tip güvenli `@Serializable` route. Gradle önbelleğinde mevcut, çevrimdışı çözülüyor; `compileSdk 37` istemiyor (A0.1'de `core-ktx`/`lifecycle`'ı düşürten kapı burada kapanmadı). |
+
+### detekt bulgusu
+
+`SpreadOperator` — `canAny(*MANAGEMENT_PERMISSIONS)` her çağrıda diziyi kopyalıyordu ve
+bu bir sekme çiziminde her recomposition demek. `AppSession.canAny`'ye `Collection`
+aşırı yüklemesi eklendi, sabit `setOf` oldu. Gerçek bir düzeltme, susturma değil.
+
+---
+
+## A2.2 — Profil ve oturum ✅
+
+### `/me` TOTP durumunu taşımıyor — doğrulandı
+
+Doküman A2.2'de "TOTP durumu" diyordu ve bunun `/me`'den geleceği varsayılmıştı.
+`MeResponseDto` (`apps/api/src/modules/identity/dto/user.dto.ts`) böyle bir alan
+taşımıyor. Ama `GET auth/2fa` **zaten var** (`totp.controller.ts`) ve
+`{ enabled, backupCodesRemaining }` dönüyor — hiçbir istemci çağırmıyordu.
+**Yeni uç eklenmedi**, var olan uç ilk kez kullanıldı.
+
+### Passkey yönetimi A1.5'i beklemiyor
+
+`GET auth/passkeys` ve `DELETE auth/passkeys/:id` Credential Manager gerektirmez; düz
+API çağrılarıdır. iOS'ta ya da web'de kaydedilmiş anahtarlar Android'de görünüyor ve
+silinebiliyor. **Kayıt** düğmesi A1.5'e kaldı — onu yazabilmek için gerçek bir https
+konak gerekiyor.
+
+`AuthService` 15 → 18 uç. detekt `thresholdInInterfaces` 25, sınır aşılmadı.
+
+### Son passkey silinemez — 409 bir çökme değil, bir ret
+
+Sunucu parolası olmayan bir hesabın son anahtarını silmesini 409 `CREDENTIAL_REQUIRED`
+ile engelliyor (kurtarılamayan tek hata sınıfı). İstemci bunu **iyimser silme
+yapmadan** ele alıyor: satır önce kaldırılıp sonra geri konmuyor, çünkü bu kullanıcıya
+bir an için gerçekleşmemiş bir şeyi göstermek olurdu. Kod `ApiError` tablosunda yok, bu
+yüzden sunucunun kendi `detail` metni gösteriliyor — ve bir test bunun gerçekten
+sunucudan geldiğini ("parola" kelimesini arayarak) sabitliyor.
+
+Mock'ta silme **kalıcı**: liste her çağrıda fixture'dan tazelenseydi silinen satır bir
+sonraki yenilemede geri gelir ve ekranın davranışı hiç sürülemezdi.
+
+### Kısmi hata: ekranın tamamı boş kalmaz
+
+`totpStatus` ve `passkeys` **paralel** isteniyor ve **bağımsız** başarısız oluyor
+(`Loadable<T>` kart başına). Kullanıcının kim olduğu zaten `AppSession`'da; ikinci
+dereceden bir bilgi gelmedi diye e-postasını ve şubesini gizlemek yanlış olurdu.
+Tek bir `isLoading` bayrağı bunu yapamazdı.
+
+### iOS'a bildirilecek farklar (§7.8)
+
+Üçü de **kasıtlı sapma** ve hiçbiri yeni uç istemiyor:
+
+1. **TOTP durumu satırı** — iOS `ProfileView`'da yok. Kullanıcı 2FA'sının açık olup
+   olmadığını hiçbir yerde göremiyor.
+2. **Passkey listesi ve silme** — iOS yalnız yerel bir `PasskeyRegistry.hasEnrolledPasskey`
+   bayrağı gösteriyor; sunucudaki gerçek listeyi hiç çağırmıyor. Bir kullanıcı kaybettiği
+   cihazın anahtarını iOS'tan silemiyor.
+3. **Uygulama sürümü** — destek çağrısında ilk sorulan şey; iOS'ta yok.
+
+Ek olarak `MockAuthService.patchedUser` rol adını elle iki dala ayırıyordu
+(`practitioner` → "Uygulayıcı", gerisi → "Şube Yöneticisi"); `RoleNames.turkish` zaten
+üretilmiş tabloyu taşıyor ve `permissions.ts` ile birlikte değişiyor. Değiştirildi.
+
+### Kapsam dışı bırakılanlar
+
+TOTP kapatma (`DELETE auth/2fa`), yedek kod yenileme (`POST auth/2fa/backup-codes`) ve
+passkey yeniden adlandırma (`PATCH auth/passkeys/:id`). Üçü de kod girişi ya da düzenleme
+ekranı ister; A2.2'nin işi profil kartıydı, hesap yönetimi ekranı değil.
+
+### Elle gezerken yakalanan iki kusur
+
+1. **Passkey satırında cihaz adı soluk çiziliyordu.** `KlinaraRow` bir etiket/değer
+   çiftidir ve etiketi `charcoalMuted` yapar; "iPhone 15 Pro" etiket yerine konunca
+   "Son kullanım" ondan baskın görünüyordu. Passkey satırı artık kendi düzenini
+   kuruyor. Test bunu yakalayamazdı — hiyerarşi bir `assert` konusu değil.
+2. **`ComingSoonScreen` başlığı iki kez okunuyordu** (üst çubukta "Bugün", boş durumda
+   yine "Bugün"). Ayrı bir `headline` parametresi eklendi: "Takvim hazırlanıyor".
+   Ekran okuyucuda da aynı kelimeyi arka arkaya iki kez duymak gürültüydü.
+
+### Doğrulanamayan: şube seçiminin soğuk açılışta korunması
+
+Uygulama yeniden başlatıldığında container **canlıya** döner (mock bir çalışma zamanı
+anahtarı) ve sunucu ayakta olmadığı için akış `Launch` adımında "Bağlantı kurulamadı +
+Tekrar dene" ile kalıyor — A1.1'de kasıtla yazılmış davranış. Senaryo değiştirmek de
+`forceLogout()` çağırıyor. Dolayısıyla "kapat-aç sonrası Bodrum seçili kalıyor" elle
+sürülemedi. Kapsayan testler: `TokenStoreTest` (şifreli diskte gidiş-dönüş, A0.4),
+`SessionViewModelTest.switchBranchWritesToTokenStore` (yazma gerçekleşiyor) ve
+`routeToBranchOrFinish` (kayıtlı şube varsa seçim ekranı atlanıyor, A1.3). Uçtan uca
+doğrulama canlı sunucuyla yapılmalı.
+
+### Yol üstünde bulunan gerçek hata: release kaynak kümesi sürüm kontrolünde DEĞİLDİ
+
+`.gitignore`'daki `release/` deseni derleme çıktısı için yazılmıştı ama Git desenleri
+dizin adına her yerde uyar: `app/src/**release**/` de eşleşiyordu. Yani A0.2'de kurulan
+varyant kaynak kümesi deseninin release yarısı — `RootContent.kt`, yani release
+varyantının **kökü** — hiç commit edilmemişti. Temiz bir klonda `assembleRelease`
+kırılırdı ve bu ancak CI kurulduğunda (A11) fark edilirdi.
+
+Bu makinede fark edilmemesinin sebebi dosyanın diskte var olması. `git status` onu hiç
+göstermediği için de kimse yokluğunu görmedi.
+
+Desen `app/build/outputs/` ile değiştirildi.

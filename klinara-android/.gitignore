@@ -14,7 +14,10 @@ captures/
 # Çıktılar
 *.apk
 *.aab
-release/
+# `release/` DEĞİL: o desen `app/src/release/` KAYNAK kümesini de yutuyordu ve
+# release varyantının kökü (`RootContent.kt`) hiç sürüm kontrolüne girmemişti —
+# temiz bir klonda release derlemesi kırılırdı. Yalnız derleme çıktısı hariç tutulur.
+app/build/outputs/
 lint-results*.html
 lint-results*.xml
 lint-results*.txt

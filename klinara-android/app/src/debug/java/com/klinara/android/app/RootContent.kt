@@ -47,6 +47,7 @@ internal fun RootContent(
         DebugPane.Auth ->
             RootScreen(
                 viewModel = viewModel,
+                container = container,
                 onSessionResolved = onSessionResolved,
                 modifier = modifier.fillMaxSize(),
                 onOpenDeveloperMenu = { pane = DebugPane.Scenarios },

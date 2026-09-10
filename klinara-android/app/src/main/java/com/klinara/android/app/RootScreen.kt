@@ -18,7 +18,7 @@ import com.klinara.android.features.auth.AuthBackHandler
 import com.klinara.android.features.auth.AuthEvent
 import com.klinara.android.features.auth.AuthFlowViewModel
 import com.klinara.android.features.auth.AuthStep
-import com.klinara.android.features.auth.screens.AuthenticatedPlaceholderScreen
+import com.klinara.android.features.shell.AppShell
 import com.klinara.android.features.auth.screens.BackupCodeEntryScreen
 import com.klinara.android.features.auth.screens.BackupCodesScreen
 import com.klinara.android.features.auth.screens.BranchSelectScreen
@@ -32,6 +32,7 @@ import com.klinara.android.features.auth.screens.PhoneVerificationScreen
 import com.klinara.android.features.auth.screens.TenantSelectScreen
 import com.klinara.android.features.auth.screens.TotpScreen
 import com.klinara.android.features.auth.screens.TotpSetupScreen
+import com.klinara.android.services.ServiceContainer
 
 /**
  * Giriş akışının kökü.
@@ -40,12 +41,13 @@ import com.klinara.android.features.auth.screens.TotpSetupScreen
  * kullanmak sistem geri tuşunu "2FA ekranından geri gidip yarım kimlikle takılma"
  * durumuna açar (§5.3). Adımlar `when` ile ekrana eşlenir.
  *
- * Oturum açıldıktan sonra (A2.1) `AppShell` normal Android gezinmesini devralır ve orada
+ * Oturum açıldıktan sonra `AppShell` (A2.1) normal Android gezinmesini devralır ve orada
  * her sekmenin kendi geri yığını olur.
  */
 @Composable
 fun RootScreen(
     viewModel: AuthFlowViewModel,
+    container: ServiceContainer,
     modifier: Modifier = Modifier,
     onOpenDeveloperMenu: (() -> Unit)? = null,
     onSessionResolved: () -> Unit = {},
@@ -74,6 +76,7 @@ fun RootScreen(
             AuthStepContent(
                 step = step,
                 state = state,
+                container = container,
                 onEvent = viewModel::onEvent,
                 onOpenDeveloperMenu = onOpenDeveloperMenu,
             )
@@ -93,6 +96,7 @@ fun RootScreen(
 private fun AuthStepContent(
     step: AuthStep,
     state: com.klinara.android.features.auth.AuthUiState,
+    container: ServiceContainer,
     onEvent: (AuthEvent) -> Unit,
     onOpenDeveloperMenu: (() -> Unit)?,
 ) {
@@ -133,8 +137,14 @@ when (step) {
 
             AuthStep.PasskeyEnrollOffer -> PasskeyEnrollOfferScreen(state, onEvent)
 
-            // A2.1'de AppShell (alt gezinme) bunun yerine geçecek.
+            // Buradan sonrası normal Android gezinmesi: her sekmenin kendi NavHost'u
+            // ve kendi geri yığını var (§5.3).
             is AuthStep.Authenticated ->
-                AuthenticatedPlaceholderScreen(step.session, onEvent)
+                AppShell(
+                    initialSession = step.session,
+                    container = container,
+                    onEvent = onEvent,
+                    onOpenDeveloperMenu = onOpenDeveloperMenu,
+                )
         }
 }

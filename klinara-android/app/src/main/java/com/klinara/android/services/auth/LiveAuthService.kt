@@ -153,6 +153,15 @@ class LiveAuthService internal constructor(
         client.sendVoid(ApiRequest.post("auth/logout"))
     }
 
+    override suspend fun totpStatus(): TotpStatus = client.send(ApiRequest.get("auth/2fa"))
+
+    override suspend fun passkeys(): List<PasskeySummary> =
+        client.send<ListEnvelope<PasskeySummary>>(ApiRequest.get("auth/passkeys")).data
+
+    override suspend fun deletePasskey(id: String) {
+        client.sendVoid(ApiRequest.delete("auth/passkeys/$id"))
+    }
+
     override suspend fun passkeyAssertionOptions(): String =
         client
             .send<JsonObject>(ApiRequest.post("auth/passkey/options", requiresAuth = false))

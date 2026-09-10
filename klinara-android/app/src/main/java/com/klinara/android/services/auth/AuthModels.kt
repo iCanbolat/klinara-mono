@@ -164,6 +164,36 @@ data class BranchSummary(
     val isActive: Boolean = true,
 )
 
+/**
+ * `GET auth/2fa` — iki adımlı doğrulama durumu.
+ *
+ * **`/me` bu bilgiyi TAŞIMIYOR** (doğrulandı: `MeResponseDto` böyle bir alan içermiyor),
+ * bu yüzden profil ekranı ayrı bir çağrı yapıyor. Yeni bir uç eklenmedi; uç zaten vardı,
+ * yalnız hiçbir istemci çağırmıyordu.
+ */
+@Serializable
+data class TotpStatus(
+    val enabled: Boolean = false,
+    val backupCodesRemaining: Int = 0,
+)
+
+/**
+ * `GET auth/passkeys` — kullanıcının kayıtlı passkey'lerinden biri.
+ *
+ * Liste A1.5'ten BAĞIMSIZ olarak anlamlıdır: Credential Manager gerekmez, düz bir API
+ * çağrısıdır ve iOS'ta ya da web'de kaydedilmiş anahtarlar burada görünür.
+ */
+@Serializable
+data class PasskeySummary(
+    val id: String,
+    val deviceLabel: String,
+    /** Bulut senkronlu bir anahtar mı — cihaz kaybında kurtarılabilir demektir. */
+    val backedUp: Boolean = false,
+    val transports: List<String> = emptyList(),
+    val lastUsedAt: String? = null,
+    val createdAt: String = "",
+)
+
 @Serializable
 data class TotpSetup(
     val secret: String,

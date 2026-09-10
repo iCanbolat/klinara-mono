@@ -56,6 +56,22 @@ interface AuthService {
     /** `POST auth/logout` */
     suspend fun logout()
 
+    // --- Hesap güvenliği (A2.2) ---
+
+    /** `GET auth/2fa` — `/me` bu bilgiyi taşımıyor, bu yüzden ayrı çağrı. */
+    suspend fun totpStatus(): TotpStatus
+
+    /** `GET auth/passkeys` — kayıtlı anahtarlar. A1.5'ten bağımsız çalışır. */
+    suspend fun passkeys(): List<PasskeySummary>
+
+    /**
+     * `DELETE auth/passkeys/:id`
+     *
+     * Son anahtar silinirken parolası olmayan hesapta sunucu 409 `CREDENTIAL_REQUIRED`
+     * döner — bu bir çökme değil, kullanıcıyı kendini kilitlemekten koruyan bir rettir.
+     */
+    suspend fun deletePasskey(id: String)
+
     // --- Passkey (A1.5'te canlanır; seam A1.1'de kurulur) ---
 
     /** `POST auth/passkey/options` — sunucunun WebAuthn options JSON'ı olduğu gibi döner. */
