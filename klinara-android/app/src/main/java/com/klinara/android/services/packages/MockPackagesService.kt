@@ -62,6 +62,7 @@ class MockPackagesService(
     /** `Idempotency-Key` → üretilen kaydın kimliği (satış/devir) ya da tüketim sonucu. */
     private val idempotentPackages: MutableMap<String, String> = mutableMapOf()
     private val idempotentConsumes: MutableMap<String, ConsumePackageResult> = mutableMapOf()
+    private val idempotentRefunds: MutableMap<String, RefundResult> = mutableMapOf()
 
     private var idCounter: Int = 0
 
@@ -357,6 +358,186 @@ class MockPackagesService(
         return ConsumePackageResult(bound = input.lines.size, consumed = consumed).also {
             idempotentConsumes[idempotencyKey] = it
         }
+    }
+
+    // --- Operasyonlar ---
+
+    override suspend fun adjust(
+        id: String,
+        version: Int,
+        input: AdjustPackageInput,
+    ): CustomerPackage {
+        settle()
+        val pkg = lockedOpen(id, version)
+        if (!OperationReason.isValid(input.reason)) {
+            throw MockErrors.validation("reason", "Gerekçe en az ${OperationReason.MIN_LENGTH} karakter olmalı.")
+        }
+        if (input.items.isEmpty() || input.items.any { it.delta == 0 }) {
+            throw MockErrors.validation("items", "Düzeltme sıfır olamaz.")
+        }
+        // Önce hepsi doğrulanır: ikinci kalem yetersizse birinci de yazılmamalı.
+        input.items.forEach { item ->
+            val current = itemOf(pkg, item.customerPackageItemId)
+            if (current.remainingSessions + item.delta < 0) throw MockErrors.packageExhausted()
+        }
+        input.items.forEach {
+            apply(it.customerPackageItemId, LedgerEntryType.ManualAdjustment, it.delta, reason = input.reason.trim())
+        }
+        return bump(id)
+    }
+
+    override suspend fun refund(
+        id: String,
+        version: Int,
+        input: RefundPackageInput,
+        idempotencyKey: String,
+    ): RefundResult {
+        settle()
+        idempotentRefunds[idempotencyKey]?.let { return it }
+        val pkg = lockedOpen(id, version)
+        if (!OperationReason.isValid(input.reason)) throw MockErrors.validation("reason", "İade gerekçesi zorunlu.")
+        val lines = resolveLines(pkg, input.items)
+        if (lines.isEmpty()) throw MockErrors.conflict("İade edilecek kalan hak yok")
+
+        // Tutar SATIŞ ANINDAKİ tahsisten — güncel katalog fiyatından DEĞİL.
+        val amount = lines.sumOf { (item, sessions) -> item.unitAllocationMinor * sessions }
+        lines.forEach { (item, sessions) ->
+            apply(item.id, LedgerEntryType.Refund, -sessions, reason = input.reason.trim())
+        }
+        val refunded = lines.sumOf { it.second }
+        update(id) { current ->
+            current.copy(
+                status = if (current.remainingSessions == 0) CustomerPackageStatus.Refunded else current.status,
+                refundedSessions = current.refundedSessions + refunded,
+                refundAmountMinor = current.refundAmountMinor + amount,
+                // Kasa hareketi YOK: borç doğar, tahsilat Faz A6'da bağlanır.
+                refundSettlementStatus = "pending",
+                refundedAt = nextInstant(),
+                refundReason = input.reason.trim(),
+                version = current.version + 1,
+            )
+        }
+        return RefundResult(refunded, amount, "pending").also { idempotentRefunds[idempotencyKey] = it }
+    }
+
+    override suspend fun transfer(
+        id: String,
+        version: Int,
+        input: TransferPackageInput,
+        idempotencyKey: String,
+    ): CustomerPackage {
+        settle()
+        idempotentPackages[idempotencyKey]?.let { return current(it) }
+        val source = lockedOpen(id, version)
+        if (!source.isTransferable) {
+            throw MockErrors.conflict("Bu paket devredilemez", "Paket devredilemez olarak satıldı.")
+        }
+        if (source.customerId == input.targetCustomerId) {
+            throw MockErrors.validation("targetCustomerId", "Paket aynı müşteriye devredilemez.")
+        }
+        if (customers().none { it.id == input.targetCustomerId }) {
+            throw MockErrors.validation("targetCustomerId", "Hedef müşteri bulunamadı.")
+        }
+        if (!OperationReason.isValid(input.reason)) throw MockErrors.validation("reason", "Devir gerekçesi zorunlu.")
+        val lines = resolveLines(source, input.items)
+        if (lines.isEmpty()) throw MockErrors.conflict("Devredilecek kalan hak yok")
+
+        val stamp = nextInstant()
+        val targetItems =
+            lines.mapIndexed { position, (item, sessions) ->
+                CustomerPackageItem(
+                    id = nextId(),
+                    serviceId = item.serviceId,
+                    serviceName = item.serviceName,
+                    quantityTotal = sessions,
+                    unitListPriceMinor = item.unitListPriceMinor,
+                    // Devredilen hakkın karşılığı KAYNAĞIN tahsisinden taşınır.
+                    itemTotalMinor = item.unitAllocationMinor * sessions,
+                    sortOrder = position,
+                )
+            }
+        val target =
+            source.copy(
+                id = nextId(),
+                customerId = input.targetCustomerId,
+                totalPriceMinor = targetItems.sumOf { it.itemTotalMinor },
+                soldAt = stamp,
+                // Aynı geçerlilik SONU: devir süreyi uzatmaz.
+                expiresAt = source.expiresAt,
+                status = CustomerPackageStatus.Active,
+                refundedSessions = 0,
+                refundAmountMinor = 0,
+                refundSettlementStatus = null,
+                refundedAt = null,
+                refundReason = null,
+                transferredFromPackageId = source.id,
+                note = null,
+                version = 1,
+                items = targetItems,
+                createdAt = stamp,
+            )
+        packageRecords += target
+        lines.forEach { (item, sessions) ->
+            apply(item.id, LedgerEntryType.TransferOut, -sessions, reason = input.reason.trim())
+        }
+        targetItems.forEach { item ->
+            val reason = input.reason.trim()
+            val entry = ledgerEntry(target, item.id, LedgerEntryType.TransferIn, item.quantityTotal, reason)
+            append(target.id, entry)
+        }
+        update(source.id) { current ->
+            current.copy(
+                status = if (current.remainingSessions == 0) CustomerPackageStatus.Transferred else current.status,
+                version = current.version + 1,
+            )
+        }
+        idempotentPackages[idempotencyKey] = target.id
+        return current(target.id)
+    }
+
+    /** İyimser kilit + açık paket: bayat sürüm 409 `VERSION_CONFLICT`, kapalı paket `PACKAGE_EXPIRED`. */
+    private fun lockedOpen(
+        id: String,
+        version: Int,
+    ): CustomerPackage {
+        val pkg = current(id)
+        if (pkg.version != version) throw MockErrors.versionConflict()
+        if (!pkg.status.isOpen) throw MockErrors.packageExpired()
+        return pkg
+    }
+
+    /**
+     * İade/devir satırlarını çözer. `null` = tüm kalan hak. Kalanı aşan satır `PACKAGE_EXHAUSTED`
+     * — ve bu kontrol HİÇBİR satır yazılmadan önce yapılır.
+     */
+    private fun resolveLines(
+        pkg: CustomerPackage,
+        items: List<SessionsItemInput>?,
+    ): List<Pair<CustomerPackageItem, Int>> {
+        val lines =
+            items?.map { itemOf(pkg, it.customerPackageItemId) to it.sessions }
+                ?: pkg.sortedItems.filter { it.remainingSessions > 0 }.map { it to it.remainingSessions }
+        lines.forEach { (item, sessions) ->
+            if (sessions < 1) throw MockErrors.validation("items", "Seans sayısı en az 1 olmalı.")
+            if (sessions > item.remainingSessions) throw MockErrors.packageExhausted()
+        }
+        return lines
+    }
+
+    private fun itemOf(
+        pkg: CustomerPackage,
+        itemId: String,
+    ): CustomerPackageItem = pkg.items.firstOrNull { it.id == itemId } ?: throw MockErrors.notFound("Paket kalemi")
+
+    private fun bump(id: String): CustomerPackage = update(id) { it.copy(version = it.version + 1) }
+
+    private fun update(
+        id: String,
+        transform: (CustomerPackage) -> CustomerPackage,
+    ): CustomerPackage {
+        val index = packageRecords.indexOfFirst { it.id == id }
+        packageRecords[index] = transform(packageRecords[index])
+        return packageRecords[index]
     }
 
     // --- Randevu kancası (MockBookingService.PackageConsumptionHook) ---

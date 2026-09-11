@@ -126,6 +126,51 @@ class LivePackagesService internal constructor(
                 idempotencyKey = idempotencyKey,
             ),
         )
+
+    // --- Operasyonlar ---
+
+    override suspend fun adjust(
+        id: String,
+        version: Int,
+        input: AdjustPackageInput,
+    ): CustomerPackage =
+        client.send(
+            ApiRequest.post(
+                "customer-packages/$id/adjust",
+                body = input.toJson().asBody(),
+                ifMatch = ApiRequest.weakETag(version),
+            ),
+        )
+
+    override suspend fun refund(
+        id: String,
+        version: Int,
+        input: RefundPackageInput,
+        idempotencyKey: String,
+    ): RefundResult =
+        client.send(
+            ApiRequest.post(
+                "customer-packages/$id/refund",
+                body = input.toJson().asBody(),
+                idempotencyKey = idempotencyKey,
+                ifMatch = ApiRequest.weakETag(version),
+            ),
+        )
+
+    override suspend fun transfer(
+        id: String,
+        version: Int,
+        input: TransferPackageInput,
+        idempotencyKey: String,
+    ): CustomerPackage =
+        client.send(
+            ApiRequest.post(
+                "customer-packages/$id/transfer",
+                body = input.toJson().asBody(),
+                idempotencyKey = idempotencyKey,
+                ifMatch = ApiRequest.weakETag(version),
+            ),
+        )
 }
 
 private fun JsonObject.asBody(): RequestBodyPayload =

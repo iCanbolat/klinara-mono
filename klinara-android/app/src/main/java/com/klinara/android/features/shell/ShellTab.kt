@@ -222,6 +222,16 @@ object ShellRoutes {
         val packageId: String,
     )
 
+    /**
+     * Paket işlemi (A5.3) — düzeltme / iade / devir. [operation] `PackageOperation.wire`.
+     * Üç ayrı hedef yerine tek hedef: yükleme, sürüm ve gerekçe ortak; değişen form ve izin.
+     */
+    @Serializable
+    data class PackageOperation(
+        val packageId: String,
+        val operation: String,
+    )
+
     /** Randevu satırını pakete bağlama (A5.2) — randevu detayından açılır. */
     @Serializable
     data class BindPackage(

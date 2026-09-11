@@ -58,6 +58,8 @@ import com.klinara.android.services.files.FilePosition
 import com.klinara.android.features.calendar.booking.BookingFlowHost
 import com.klinara.android.features.packages.BindPackageHost
 import com.klinara.android.features.packages.CustomerPackageDetailHost
+import com.klinara.android.features.packages.PackageOperation
+import com.klinara.android.features.packages.PackageOperationHost
 import com.klinara.android.features.packages.PackageDefinitionEditorScreen
 import com.klinara.android.features.packages.PackageDefinitionListScreen
 import com.klinara.android.features.packages.SellPackageHost
@@ -314,6 +316,20 @@ private fun CustomersTab(
                 session = session,
                 container = container,
                 packageId = route.packageId,
+                onOperation = { operation ->
+                    navController.navigate(ShellRoutes.PackageOperation(route.packageId, operation.wire))
+                },
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable<ShellRoutes.PackageOperation> { entry ->
+            val route = entry.toRoute<ShellRoutes.PackageOperation>()
+            PackageOperationHost(
+                session = session,
+                container = container,
+                packageId = route.packageId,
+                operation = PackageOperation.from(route.operation),
                 onBack = { navController.popBackStack() },
             )
         }

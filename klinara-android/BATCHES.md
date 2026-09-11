@@ -1782,3 +1782,83 @@ korunuyor: eksik bir defter tam görünmesin.
 - **Mock'ta müşteri paketleri ve defter sayfalanmıyor** (tek sayfa). İstemci imleci okuyor
   ve "daha fazla" düğmesi çiziyor; mock'u sayfalamak bir kartta 2–3 paket için değer
   üretmiyordu.
+
+---
+
+## A5.3 — İade, devir, düzeltme ✅
+
+**Durum:** `./gradlew check` yeşil. **406 test** (A5.2 sonunda 391'di), 57 suite.
+Emülatörde `manager` ile sürüldü: paket detayında üç işlem düğmesi; **kısmi iade** (2
+lazer seansı) tahmini **2.223,92 ₺** gösterdi — satış tahsisinden (111.196 × 2), liste
+fiyatından (1.450 × 2) değil — iade sonrası lazer 6 → 4 ve özet dipnotu "Kasa hareketi
+henüz oluşturulmadı (Faz A6)"; **devir** (1 lazer seansı, Zeynep'e): kaynak 4 → 3,
+Zeynep'in kartında 1/1'lik yeni paket, **aynı geçerlilik sonu** (10 Temmuz 2027) ve
+"Bu paket bir devirle oluştu".
+
+### Üç izin, üç ayrı kapı — ve matrisi test sürüyor
+
+`package:refund` ve `package:transfer` `package:write` üzerine BİNMEZ. `AppSession.packagePermissions`
+üçünü tek yerde çözüyor; `availableOperations` saf bir fonksiyon ve `PackagePermissionTest`
+altı rolü üretilmiş `RolePermissions`'tan sürüyor: owner/manager üçü, **resepsiyon yalnız
+düzeltme**, **muhasebe yalnız iade**, uygulayıcı hiçbiri. Mock yalnız manager ile
+practitioner'ı sürebildiği için (A2.1 kararı) matris emülatörde değil burada.
+
+Yapılamayan işlem **pasif düğme değil, hiç çizilmiyor** ve sebep dipnotta: kapanmış paket,
+süresi dolmuş paket ("durum hâlâ aktif ama tarih geçti" dahil — kapatma bir cron işi),
+devredilemez satılmış paket. `PackageOperationHost` izni **bir kez daha** kontrol ediyor:
+hedef derin bağlantıyla açılabilir ve düğmeyi gizlemek tek başına bir kapı değil.
+
+### Çıkış ölçütü bu batch'te çivilendi
+
+`MockPackageOperationsTest`'in her testi sonunda "her kalem için defter toplamı == kalan
+hak ≥ 0" doğrulanıyor. Önemlileri:
+
+- **Atomiklik:** lazer +1 ve bakım −2 (kalan 1) BİRLİKTE gönderilince `PACKAGE_EXHAUSTED`
+  ve **hiçbir kalem değişmiyor** — birinci satır yazılıp ikincide patlamıyor
+  (`adjustBeyondRemainingIsRejectedAtomically`).
+- **Tam iade paketi kapatıyor**, sonraki her işlem `PACKAGE_EXPIRED`.
+- **Aynı anahtarla ikinci iade yazılmıyor**; kalandan fazla iade hiçbir satır yazmadan
+  reddediliyor.
+- **Devirde iki tarafın toplamı korunuyor** ve devredilen hakkın karşılığı kaynağın
+  tahsisinden taşınıyor (111.196 × 3 = 333.588).
+
+### İstemci yerel kopya GÜNCELLEMİYOR — iki yanıt da buna zorluyor
+
+`refund` yanıtı paketi hiç taşımıyor (tutar ve seans sayısı döner); `transfer` yanıtı
+KAYNAĞI değil **hedefin yeni paketini** döner. İkisinden de kaynağı "yerelde düzeltmek"
+tahmin olurdu. İşlem ekranı başarıda kapanıyor, detay ve kart dönüşte sunucudan taze
+geliyor.
+
+### Bayat sürüm: tazele, formu KORU
+
+İki kişi aynı paketi düzeltirse ikincisi `VERSION_CONFLICT` alıyor; ViewModel paketi
+kendiliğinden tazeliyor ki bir sonraki deneme doğru `If-Match` ile gitsin, ama
+**seçimler ve gerekçe yerinde kalıyor** — kullanıcı yeni kalana bakıp karar veriyor
+(`versionConflictRefreshesAndKeepsForm`).
+
+### iOS'a bildirilecek fark (§7.8)
+
+iOS `PackageOperationModels.swift` "üç gövde de hem `If-Match` hem `Idempotency-Key` ister"
+diyor. Sunucu (`package-operations.controller.ts`) **`adjust` için `Idempotency-Key`
+okumuyor**; yalnız `refund` ve `transfer` okuyor. Android arayüzü bunu imzada yansıtıyor:
+`adjust(id, version, input)` anahtar almıyor. iOS'un çağrısı zararsız (başlık yok sayılıyor)
+ama not yanıltıcı.
+
+### Plandan sapmalar
+
+- **Üç sheet, TEK hedef:** `ShellRoutes.PackageOperation(packageId, operation)`. Yükleme,
+  taze sürüm, gerekçe ve hata ortak; değişen form ve izin. `PackageAdjustSheet`,
+  `PackageRefundSheet`, `PackageTransferSheet` ayrı composable'lar olarak duruyor,
+  `PackageOperationScaffold` iskeleti taşıyor. iOS `KlinaraFormScaffold` karşılığı
+  tasarım sistemine GİRMEDİ — tek çağıranı bu üç ekran.
+- **Devir hedefi sunucu aramasıyla** (`customers/search`, `q ≥ 2`, 300 ms gecikme, önceki
+  istek iptal) seçiliyor; iOS tüm müşteri listesini çekip istemcide süzüyor. Binlerce
+  müşterili bir kiracıda istemci süzmesi A4.1'de zaten reddedilmişti.
+
+### Yeni bağımlılık: YOK
+
+### Kapsam dışı
+
+- **İade tahsilatı / kasa hareketi** — A6.2. İade `pending` bir yükümlülük yazıyor ve
+  ekran bunu gizlemiyor (kart rozeti "İade ödemesi bekliyor", özet dipnotu).
+- **Devirde hedef için yeni müşteri oluşturma** — hedef var olan bir müşteri olmalı.

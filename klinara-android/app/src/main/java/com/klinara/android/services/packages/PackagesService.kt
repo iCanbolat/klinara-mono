@@ -102,6 +102,41 @@ interface PackagesService {
         input: ConsumePackageInput,
         idempotencyKey: String,
     ): ConsumePackageResult
+
+    // --- Operasyonlar (A5.3) ---
+
+    /**
+     * `POST customer-packages/:id/adjust` — `package:write`, `If-Match` zorunlu.
+     * Gerekçe zorunlu; defterde `manual_adjustment` iz bırakır. Idempotency ALMAZ.
+     */
+    suspend fun adjust(
+        id: String,
+        version: Int,
+        input: AdjustPackageInput,
+    ): CustomerPackage
+
+    /**
+     * `POST customer-packages/:id/refund` — **`package:refund`** (write'a binmez).
+     * `If-Match` + `Idempotency-Key`. Yanıt paketi DÖNDÜRMEZ; çağıran yeniden çekmeli.
+     */
+    suspend fun refund(
+        id: String,
+        version: Int,
+        input: RefundPackageInput,
+        idempotencyKey: String,
+    ): RefundResult
+
+    /**
+     * `POST customer-packages/:id/transfer` — **`package:transfer`** (write'a binmez).
+     * `If-Match` + `Idempotency-Key`. Yanıt **hedef müşteride açılan YENİ pakettir**,
+     * kaynak değil; kaynak ayrıca tazelenmeli.
+     */
+    suspend fun transfer(
+        id: String,
+        version: Int,
+        input: TransferPackageInput,
+        idempotencyKey: String,
+    ): CustomerPackage
 }
 
 /**

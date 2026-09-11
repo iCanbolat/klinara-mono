@@ -18,6 +18,8 @@ import com.klinara.android.designsystem.KlinaraTheme
 import com.klinara.android.designsystem.KlinaraType
 import com.klinara.android.designsystem.components.ErrorBanner
 import com.klinara.android.designsystem.components.KlinaraBadge
+import com.klinara.android.designsystem.components.KlinaraButton
+import com.klinara.android.designsystem.components.KlinaraButtonKind
 import com.klinara.android.designsystem.components.KlinaraCard
 import com.klinara.android.designsystem.components.KlinaraDivider
 import com.klinara.android.designsystem.components.KlinaraRow
@@ -162,3 +164,82 @@ private fun ItemRow(
         Text(detail, style = KlinaraType.bodyM, color = colors.charcoalMuted)
     }
 }
+
+/**
+ * İşlem kartı — üç düğme ÜÇ AYRI izinle (A5.3). `package:refund` ve `package:transfer`,
+ * `package:write`'a binmez: resepsiyonun düzeltme yetkisi iade yetkisi demek değil,
+ * muhasebenin iade yetkisi satış yetkisi demek değil.
+ *
+ * Yapılamayacak işlem **pasif düğme olarak değil, hiç çizilmez** ve sebebi dipnotta
+ * yazılır. Yetkisi olmayana ise ne düğme ne dipnot: yapamayacağı bir şeyi anlatmak da
+ * bir vaattir. Hiçbir işlem yapılamıyorsa kart hiç kurulmaz.
+ */
+@Composable
+fun PackageActionsCard(
+    pkg: CustomerPackage,
+    permissions: PackagePermissions,
+    now: Instant,
+    onOperation: (PackageOperation) -> Unit,
+) {
+    val available = availableOperations(pkg, permissions, now)
+    val note = actionsFootnote(pkg, permissions, now)
+    if (available.isEmpty() && note == null) return
+
+    KlinaraCard(title = "İşlemler", footnote = note) {
+        available.forEach { operation ->
+            KlinaraButton(
+                title =
+                    when (operation) {
+                        PackageOperation.Adjust -> "Kalan hakkı düzelt"
+                        PackageOperation.Refund -> "İade et"
+                        PackageOperation.Transfer -> "Devret"
+                    },
+                onClick = { onOperation(operation) },
+                kind = KlinaraButtonKind.Secondary,
+            )
+        }
+    }
+}
+
+/** Oturumdan çözülmüş paket izinleri — ekran bunları `session.can(...)`'dan kurar. */
+data class PackagePermissions(
+    val canWrite: Boolean,
+    val canRefund: Boolean,
+    val canTransfer: Boolean,
+) {
+    val any: Boolean get() = canWrite || canRefund || canTransfer
+}
+
+/**
+ * Hangi işlemler GERÇEKTEN yapılabilir — saf fonksiyon, altı rolün matrisi testte sürülüyor.
+ *
+ * Düzeltme kalan hak sıfır olsa da yapılabilir (hak EKLEMEK de bir düzeltme); iade ve devir
+ * kalan hak ister; devir ayrıca devredilebilir satılmış olmayı.
+ */
+fun availableOperations(
+    pkg: CustomerPackage,
+    permissions: PackagePermissions,
+    now: Instant,
+): List<PackageOperation> {
+    if (!pkg.status.isOpen) return emptyList()
+    val hasBalance = pkg.isConsumable(now)
+    return buildList {
+        if (permissions.canWrite) add(PackageOperation.Adjust)
+        if (permissions.canRefund && hasBalance) add(PackageOperation.Refund)
+        if (permissions.canTransfer && hasBalance && pkg.isTransferable) add(PackageOperation.Transfer)
+    }
+}
+
+private fun actionsFootnote(
+    pkg: CustomerPackage,
+    permissions: PackagePermissions,
+    now: Instant,
+): String? =
+    when {
+        !permissions.any -> null
+        !pkg.status.isOpen -> "Kapanmış pakette işlem yapılamaz."
+        (permissions.canRefund || permissions.canTransfer) && !pkg.isConsumable(now) ->
+            if (pkg.isExpired(now)) "Süresi dolmuş pakette iade ve devir yapılamaz." else "Kalan hak yok."
+        permissions.canTransfer && !pkg.isTransferable -> "Bu paket devredilemez olarak satıldı."
+        else -> null
+    }

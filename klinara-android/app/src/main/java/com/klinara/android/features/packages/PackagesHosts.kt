@@ -9,6 +9,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.klinara.android.features.auth.AppSession
 import com.klinara.android.services.ServiceContainer
+import com.klinara.android.services.contracts.Permissions
 import com.klinara.android.services.formatting.BranchClock
 
 /**
@@ -56,6 +57,7 @@ fun CustomerPackageDetailHost(
     session: AppSession,
     container: ServiceContainer,
     packageId: String,
+    onOperation: (PackageOperation) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -77,8 +79,102 @@ fun CustomerPackageDetailHost(
         onRetry = viewModel::load,
         onLoadMoreLedger = viewModel::loadMoreLedger,
         modifier = modifier,
+        actions = { pkg ->
+            PackageActionsCard(
+                pkg = pkg,
+                permissions = session.packagePermissions,
+                now = java.time.Instant.now(),
+                onOperation = onOperation,
+            )
+        },
     )
 }
+
+/**
+ * Düzeltme / iade / devir hedefi. İşlemin izni burada BİR KEZ DAHA kontrol edilir: hedef
+ * derin bağlantıyla da açılabilir ve düğmeyi gizlemek tek başına bir kapı değildir.
+ */
+@Composable
+fun PackageOperationHost(
+    session: AppSession,
+    container: ServiceContainer,
+    packageId: String,
+    operation: PackageOperation,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val permissions = session.packagePermissions
+    val allowed =
+        when (operation) {
+            PackageOperation.Adjust -> permissions.canWrite
+            PackageOperation.Refund -> permissions.canRefund
+            PackageOperation.Transfer -> permissions.canTransfer
+        }
+    if (!allowed) {
+        LaunchedEffect(Unit) { onBack() }
+        return
+    }
+
+    val viewModel: PackageOperationViewModel =
+        viewModel(
+            key = "package-${operation.wire}-$packageId",
+            factory = PackageOperationViewModel.factory(container, packageId),
+        )
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    LaunchedEffect(packageId) { viewModel.load() }
+    // Başarıda detaya dön; detay `version`'ı ve defteri taze çekecek.
+    LaunchedEffect(state.isDone) { if (state.isDone) onBack() }
+
+    val submit = { viewModel.submit(operation) }
+    when (operation) {
+        PackageOperation.Adjust ->
+            PackageAdjustSheet(
+                state = state,
+                onAmountChange = viewModel::setAmount,
+                onReasonChange = viewModel::setReason,
+                onSubmit = submit,
+                onRetry = viewModel::load,
+                onDismissError = viewModel::dismissError,
+                onBack = onBack,
+                modifier = modifier,
+            )
+        PackageOperation.Refund ->
+            PackageRefundSheet(
+                state = state,
+                onWholeChange = viewModel::setWhole,
+                onAmountChange = viewModel::setAmount,
+                onReasonChange = viewModel::setReason,
+                onSubmit = submit,
+                onRetry = viewModel::load,
+                onDismissError = viewModel::dismissError,
+                onBack = onBack,
+                modifier = modifier,
+            )
+        PackageOperation.Transfer ->
+            PackageTransferSheet(
+                state = state,
+                onQueryChange = viewModel::searchCustomers,
+                onSelectTarget = viewModel::selectTarget,
+                onWholeChange = viewModel::setWhole,
+                onAmountChange = viewModel::setAmount,
+                onReasonChange = viewModel::setReason,
+                onSubmit = submit,
+                onRetry = viewModel::load,
+                onDismissError = viewModel::dismissError,
+                onBack = onBack,
+                modifier = modifier,
+            )
+    }
+}
+
+/** Üç paket izni tek yerde — ekranlar tek tek `session.can` yazıp birini unutmasın. */
+val AppSession.packagePermissions: PackagePermissions
+    get() =
+        PackagePermissions(
+            canWrite = can(Permissions.PACKAGE_WRITE),
+            canRefund = can(Permissions.PACKAGE_REFUND),
+            canTransfer = can(Permissions.PACKAGE_TRANSFER),
+        )
 
 @Composable
 fun BindPackageHost(
