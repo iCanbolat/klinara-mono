@@ -21,6 +21,30 @@ interface NotificationsService {
      */
     suspend fun appointmentNotifications(appointmentId: String): List<ScheduledNotification>
 
+    /** `GET notification-templates` — çıplak dizi, birleştirilmiş etkin görünüm. `notification:read`. */
+    suspend fun templates(): List<NotificationTemplate>
+
+    /**
+     * `PUT notification-templates` — `(event, channel, locale)` üzerinde upsert. `notification:manage`.
+     * Bilinmeyen yer tutucu `422 TEMPLATE_INVALID`.
+     */
+    suspend fun upsertTemplate(input: NotificationTemplateUpsert): NotificationTemplate
+
+    /** `GET notification-preferences` — kiracı + şube satırları, çıplak dizi. */
+    suspend fun preferences(): List<NotificationPreference>
+
+    /** `PUT notification-preferences` — `(event, branchId)` üzerinde upsert. `notification:manage`. */
+    suspend fun upsertPreference(input: NotificationPreferenceUpsert): NotificationPreference
+
+    /** `GET branches/:id/reminder-settings` — çözülmüş ayar. */
+    suspend fun reminderSettings(branchId: String): BranchReminderSettings
+
+    /** `PUT branches/:id/reminder-settings` — kısmi; yanıt yine çözülmüş ayar. `notification:manage`. */
+    suspend fun updateReminderSettings(
+        branchId: String,
+        update: ReminderSettingsUpdate,
+    ): BranchReminderSettings
+
     /**
      * `GET customers/:id/opt-out` — `notification:read`.
      *

@@ -25,6 +25,9 @@ enum class ManagementDestination {
     PackageReports,
     Inbox,
     MessageLog,
+    ReminderSettings,
+    NotificationTemplates,
+    NotificationPreferences,
 }
 
 data class ManagementRow(
@@ -134,6 +137,27 @@ private fun communicationSection(session: AppSession): ManagementSection? {
                         "Gönderilen, ulaşan ve gönderilmeyen mesajlar",
                     ),
                 )
+                add(
+                    row(
+                        ManagementDestination.ReminderSettings,
+                        "Hatırlatma ayarları",
+                        "Randevudan kaç saat önce, gelmedi takibi",
+                    ),
+                )
+                add(
+                    row(
+                        ManagementDestination.NotificationTemplates,
+                        "Bildirim şablonları",
+                        "Olay ve kanal başına mesaj metni",
+                    ),
+                )
+                add(
+                    row(
+                        ManagementDestination.NotificationPreferences,
+                        "Bildirim tercihleri",
+                        "Kanal önceliği ve sessiz saatler",
+                    ),
+                )
             }
         }
     if (rows.isEmpty()) return null
@@ -202,4 +226,4 @@ fun ManagementHomeScreen(
 }
 
 private const val COMING_SOON =
-    "Kasa ve prim Faz A6, bildirim ayarları ve WhatsApp Faz A8, raporlar Faz A9 ile geliyor."
+    "Kasa ve prim Faz A6, WhatsApp entegrasyonu Faz A8.3, raporlar Faz A9 ile geliyor."

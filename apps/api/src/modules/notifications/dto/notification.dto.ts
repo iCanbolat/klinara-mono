@@ -157,6 +157,18 @@ export class NotificationPreferenceResponseDto {
   @ApiPropertyOptional({ nullable: true, example: '09:00' })
   quietHoursEnd: string | null;
 
+  /**
+   * Türetilmiş: `quietHoursStart !== quietHoursEnd`.
+   *
+   * Kayıtlı pencere `null` ise platform varsayılanı döner ve dispatcher de onu
+   * uygular — yani "sessiz saat yok" `null` ile ifade EDİLEMEZ. Sözleşme: eşit
+   * başlangıç ve bitiş (`00:00`–`00:00`) boş penceredir (`isQuietHour` zaten
+   * `start === end` için `false` döner). Bu alan istemcinin o kuralı kendisi
+   * yeniden yazmaması için var.
+   */
+  @ApiProperty({ description: 'Sessiz saat uygulanıyor mu? Eşit başlangıç/bitiş = kapalı' })
+  quietHoursEnabled: boolean;
+
   @ApiProperty({ description: 'Kiracı satırı yoksa kod içindeki varsayılan geçerlidir' })
   isDefault: boolean;
 }
@@ -177,6 +189,7 @@ export class UpsertNotificationPreferenceDto {
   @IsIn(ALL_CHANNELS, { each: true })
   channels: NotificationChannel[];
 
+  /** Başlangıç ile bitiş EŞİTSE (`00:00`–`00:00`) sessiz saat uygulanmaz. */
   @ApiPropertyOptional({ example: '21:00', nullable: true })
   @IsOptional()
   @Matches(CLOCK, { message: "'HH:MM' biçiminde olmalı" })

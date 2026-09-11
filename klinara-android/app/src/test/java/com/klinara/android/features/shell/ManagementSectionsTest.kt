@@ -37,8 +37,14 @@ class ManagementSectionsTest {
         listOf("owner", "manager", "receptionist", "practitioner").forEach { role ->
             val card = managementSections(ShellSessions.forRole(role)).firstOrNull { it.title == "İletişim" }
             assertEquals(
-                listOf(ManagementDestination.Inbox, ManagementDestination.MessageLog),
-                card?.rows?.map { it.destination }?.take(2),
+                listOf(
+                    ManagementDestination.Inbox,
+                    ManagementDestination.MessageLog,
+                    ManagementDestination.ReminderSettings,
+                    ManagementDestination.NotificationTemplates,
+                    ManagementDestination.NotificationPreferences,
+                ),
+                card?.rows?.map { it.destination }?.take(5),
                 role,
             )
         }

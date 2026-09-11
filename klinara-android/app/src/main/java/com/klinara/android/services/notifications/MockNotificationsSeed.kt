@@ -151,6 +151,98 @@ internal object MockNotificationsSeed {
             ),
         )
 
+    const val TEMPLATE_REMINDER_WHATSAPP = "e4000000-0000-4000-8000-000000000001"
+
+    /**
+     * Kiracının kendi metnini yazdığı TEK şablon — ve kod varsayılanı OLMAYAN bir kanalda
+     * (WhatsApp): sunucu onu listenin sonuna ekliyor, mock da öyle.
+     */
+    fun tenantTemplates(): List<NotificationTemplate> =
+        listOf(
+            NotificationTemplate(
+                templateId = TEMPLATE_REMINDER_WHATSAPP,
+                event = NotificationEvent.AppointmentReminder,
+                channel = NotificationChannel.WhatsApp,
+                kind = NotificationKind.Transactional,
+                body = "Sayın {{customerName}}, {{appointmentAt}} tarihli {{serviceName}} randevunuzu hatırlatırız.",
+                whatsappTemplateName = "randevu_hatirlatma",
+                whatsappTemplateLanguage = "tr",
+                whatsappVariables = listOf("customerName", "appointmentAt", "serviceName"),
+                variables = listOf("customerName", "appointmentAt", "serviceName"),
+            ),
+        )
+
+    /**
+     * Kod varsayılanları — sunucudaki `default-templates.ts`'in `templates` anahtarlarıyla
+     * **birebir aynı kanallar** (çoğu olayda SMS + e-posta; WhatsApp yalnız otomatik yanıtta).
+     *
+     * iOS mock'u varsayılanı olayın TÜM kanallarından üretiyordu ve canlıda hiç görünmeyen
+     * WhatsApp satırlarını gösteriyordu; sunucunun gerçek davranışı saklanıyordu.
+     */
+    fun defaultTemplates(): List<NotificationTemplate> =
+        DEFAULT_BODIES.flatMap { (event, byChannel) ->
+            byChannel.map { (channel, body) ->
+                NotificationTemplate(
+                    event = event,
+                    channel = channel,
+                    kind = NotificationEventCatalog.kind(event),
+                    subject = event.turkishName.takeIf { channel == NotificationChannel.Email },
+                    body = body,
+                    isDefault = true,
+                    variables = NotificationEventCatalog.placeholders(body),
+                )
+            }
+        }
+
+    private val DEFAULT_BODIES: List<Pair<NotificationEvent, List<Pair<NotificationChannel, String>>>> =
+        listOf(
+            NotificationEvent.AppointmentConfirmation to
+                smsEmail("Sayın {{customerName}}, {{appointmentAt}} randevunuz oluşturuldu. {{branchName}}"),
+            NotificationEvent.AppointmentReminder to
+                smsEmail("Sayın {{customerName}}, {{appointmentAt}} randevunuzu hatırlatırız. {{branchName}}"),
+            NotificationEvent.AppointmentCancelled to
+                smsEmail("Sayın {{customerName}}, {{appointmentAt}} randevunuz iptal edilmiştir. {{branchName}}"),
+            NotificationEvent.NoShowFollowup to
+                listOf(
+                    NotificationChannel.Sms to
+                        "Sayın {{customerName}}, randevunuza katılamadınız. " +
+                            "{{branchName}} olarak yeni randevu için bekleriz.",
+                ),
+            NotificationEvent.PackageBalance to
+                smsEmail("Sayın {{customerName}}, {{packageName}} paketinizde {{remainingSessions}} seans kaldı."),
+            NotificationEvent.PackageExpiring to
+                smsEmail("Sayın {{customerName}}, {{packageName}} paketiniz {{expiresAt}} tarihinde doluyor."),
+            NotificationEvent.Birthday to
+                listOf(NotificationChannel.Sms to "Sayın {{customerName}}, doğum gününüzü kutlarız! {{branchName}}"),
+            NotificationEvent.AutoReply to
+                listOf(NotificationChannel.WhatsApp to "{{message}}", NotificationChannel.Sms to "{{message}}"),
+            NotificationEvent.StaffInternal to listOf(NotificationChannel.Email to "{{message}}"),
+        )
+
+    private fun smsEmail(body: String) = listOf(NotificationChannel.Sms to body, NotificationChannel.Email to body)
+
+    /**
+     * Kiracı doğum günü mesajını kapatmış (`channels: []`) ve randevu hatırlatmasında sessiz
+     * saati daraltmış. Kalan olaylar sunucunun sentezlediği varsayılanla gelir.
+     */
+    fun tenantPreferences(): List<NotificationPreference> =
+        listOf(
+            NotificationPreference(
+                preferenceId = "e5000000-0000-4000-8000-000000000001",
+                event = NotificationEvent.AppointmentReminder,
+                kind = NotificationKind.Transactional,
+                channels = listOf(NotificationChannel.WhatsApp, NotificationChannel.Email),
+                quietHoursStart = "22:00",
+                quietHoursEnd = "08:00",
+            ),
+            NotificationPreference(
+                preferenceId = "e5000000-0000-4000-8000-000000000002",
+                event = NotificationEvent.Birthday,
+                kind = NotificationKind.Marketing,
+                channels = emptyList(),
+            ),
+        )
+
     /**
      * Mehmet tüm kanallarda ticari ileti almıyor — [MESSAGE_BIRTHDAY_SKIPPED] satırının sebebi.
      *

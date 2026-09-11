@@ -165,6 +165,7 @@ export class NotificationSettingsService {
       channels: EVENT_DEFINITIONS[event].channels,
       quietHoursStart: this.defaultQuietHours().start,
       quietHoursEnd: this.defaultQuietHours().end,
+      quietHoursEnabled: this.defaultQuietHours().start !== this.defaultQuietHours().end,
       isDefault: true,
     }));
 
@@ -201,14 +202,19 @@ export class NotificationSettingsService {
   private toPreferenceResponse(
     row: repo.NotificationPreferenceRow,
   ): NotificationPreferenceResponseDto {
+    const start = row.quietHoursStart?.slice(0, 5) ?? this.defaultQuietHours().start;
+    const end = row.quietHoursEnd?.slice(0, 5) ?? this.defaultQuietHours().end;
     return {
       id: row.id,
       branchId: row.branchId,
       event: row.event,
       kind: EVENT_DEFINITIONS[row.event].kind,
       channels: row.channels,
-      quietHoursStart: row.quietHoursStart?.slice(0, 5) ?? this.defaultQuietHours().start,
-      quietHoursEnd: row.quietHoursEnd?.slice(0, 5) ?? this.defaultQuietHours().end,
+      quietHoursStart: start,
+      quietHoursEnd: end,
+      // Kayıtlı `null` pencere varsayılana düşer (dispatcher de öyle uygular);
+      // "kapalı" ancak eşit uçlarla ifade edilir. Bkz. DTO notu.
+      quietHoursEnabled: start !== end,
       isDefault: false,
     };
   }

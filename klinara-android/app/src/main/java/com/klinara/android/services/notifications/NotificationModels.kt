@@ -29,10 +29,21 @@ enum class NotificationChannel(val wire: String) {
                 Unknown -> "Bilinmeyen kanal"
             }
 
+    /**
+     * MVP'de yalnız WhatsApp ve e-posta gerçekten gönderim yapıyor; SMS ve push kanal
+     * soyutlamasında var ama sağlayıcısı yok (Ek M). Ekran bunu söylemeli, yoksa kullanıcı
+     * kanalı açıp mesajın neden gitmediğini arar.
+     */
+    val isDeliverable: Boolean get() = this == WhatsApp || this == Email
+
     companion object {
         fun from(wire: String): NotificationChannel = entries.firstOrNull { it.wire == wire } ?: Unknown
 
+        /** İletişim izni kapsamı — push'a ticari ileti gitmiyor. */
         val selectable: List<NotificationChannel> = listOf(WhatsApp, Sms, Email)
+
+        /** Tercih editörünün kanal kümesi — sunucunun `ALL_CHANNELS`'ı. */
+        val all: List<NotificationChannel> = listOf(WhatsApp, Sms, Email, Push)
     }
 }
 

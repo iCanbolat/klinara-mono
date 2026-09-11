@@ -2403,3 +2403,75 @@ opt-out mock'u "bilerek boş değil" diyordu ama boştu — Mehmet Aslan'ın kay
 - **Müşteri kartından mesaj günlüğü** — iOS `MessageLogView(customerId:)` kodu var ama
   hiçbir çağıranı yok; `MessageFilter.customerId` taşınıyor, giriş noktası açılmadı.
 - Tarih aralığı süzgeci (`from`/`to`) — iOS'ta da kontrol yok.
+
+---
+
+## A8.2 — Şablon, tercih, hatırlatma ayarı (+ sunucu düzeltmesi [S]) ✅
+
+**Durum:** `./gradlew check` yeşil. **547 test** (A8.1 sonunda 522), 74 suite. Sunucu:
+`notifications.test.ts` 23/23 (yeni: "eşit başlangıç ve bitiş sessiz saati KAPATIR"),
+`typecheck` temiz. Emülatörde manager ile: Hatırlatma ayarları (Nişantaşı "Şubeye özel",
+24 + 4) → 48 eklendi → Kaydet (şube menüsü kirliyken gizli, kayıttan sonra geri geldi) →
+"Kiracı varsayılanına dön" → onay diyaloğu → rozet "Kiracı varsayılanı", saatler 24 + 2 →
+**yalnız gecikme** 2 → 4 saat, Kaydet → rozet hâlâ "Kiracı varsayılanı" (iOS'ta burada
+override yazılıyordu). Şablonlar: Randevu onayında **"Şablon yok"** WhatsApp satırı → gövdeye
+`{{packageName}}` → canlı "Tanımsız değişken: packageName" → düzeltip Kaydet → satır kiracı
+şablonu oldu. Tercihler: Randevu hatırlatması → "Sessiz saat uygula" kapatıldı → listede
+**"Sessiz saat yok"**, editör yeniden açılınca anahtar kapalı. Müşteri kartı: SMS anahtarı
+kapatıldı → "SMS · Müşteri talebi · Kapalı" satırı, diğer iki kanal açık.
+
+### [S] Sessiz saat kapatılamıyordu — sunucu düzeltildi
+
+Kayıtlı pencere `null` ise hem liste hem dispatcher 21:00–09:00'a düşüyor; iOS anahtarı
+kapatınca iki ucu atlıyor ve satır yeniden "açık" geliyordu — sessiz saat **hiç**
+kapatılamıyordu. Sözleşme: eşit uçlar (`00:00`–`00:00`) boş pencere (`isQuietHour` zaten
+`start === end → false`), migration yok. Yanıta türetilmiş `quietHoursEnabled` eklendi;
+Android eski sunucuda aynı kuralı kendisi uyguluyor (`legacyEqualEndsAreDisabled`).
+`API_DEVELOPMENT.md` Faz 8 sonuna [S] bölümü yazıldı.
+
+### Hatırlatma: yalnız değişen alanlar, boş liste asla
+
+`ReminderDraft.update()` açılıştan beri değişen alanları gönderiyor
+(`onlyChangedFieldsAreSent`). iOS her kayıtta saat listesini gönderdiği için kiracı
+varsayılanını kullanan bir şubede yalnız gelmedi takibini değiştirmek, kiracı saatlerini o
+şubeye **kazara override** olarak yazıyordu. Sunucu `[]`'ı "override'ı kaldır" okuyor —
+taslak boş listeyi kaydetmiyor ve "hatırlatmayı kapatmak için tercihlerde kanalları boşaltın"
+diyor; override'ı kaldırmanın tek yolu onay diyaloglu "Kiracı varsayılanına dön". Bu bir
+sunucu kusuru değil, iOS kusuru — sunucuya dokunulmadı.
+
+### "Şablon yok" satırları — WhatsApp eşlemesi oluşturulabiliyor
+
+Sunucu şablon listesinde yalnız kod varsayılanı olan kanalları döndürüyor (çoğu olayda SMS +
+e-posta; WhatsApp yalnız otomatik yanıtta). iOS'ta "ekle" yok, yani randevu hatırlatmasının
+**Meta template eşlemesi hiç oluşturulamıyordu** — WhatsApp birincil kanal olduğu hâlde. Liste
+olayın katalogdaki eksik kanallarını "Şablon yok" satırı olarak çiziyor; kaydetmek aynı
+`PUT notification-templates`'e gidiyor. iOS mock'u varsayılanı TÜM kanallardan ürettiği için
+bunu gizliyordu; Android mock'u sunucunun gerçek kanallarını kullanıyor.
+
+### Kanal bazlı iletişim izni (A4.2'den)
+
+Müşteri kartında WhatsApp / SMS / E-posta anahtarları (açık = izin veriliyor). Tüm kanallar
+kapalıyken "İzni geri ver" — ve kanal kayıtları da varsa "kanal bazlı kapatmaları da kaldırır"
+notu: sunucu kanalsız `DELETE`'te kanal kayıtlarını da iptal ediyor.
+
+### Liste ↔ editör
+
+Şablon ve tercih editörleri ayrı route; satırı listenin geri yığını sahipli ViewModel'inden
+okuyor (A8.1 mesaj detayı emsali), kayıttan sonra liste yeniden çekiyor (birleştirilmiş
+görünümü yerel yamalamak bir varsayılanı ezince iki satır bırakabilirdi). İzinsiz kullanıcıda
+**iki liste de** editörü salt okunur açıyor — iOS'ta tercih satırları ölüydü.
+
+### iOS'a bildirilecek fark (§7.8)
+
+1. Tercih editörü sessiz saati kapatırken `00:00/00:00` göndermeli, `quietHoursEnabled`'ı okumalı.
+2. Hatırlatma kaydı yalnız değişen alanları göndermeli; boş saat listesi kaydedilmemeli.
+3. Şablon listesi eksik kanalları ("Şablon yok") göstermeli — WhatsApp eşlemesi bugün iOS'ta
+   oluşturulamıyor. Mock varsayılanları sunucunun kanallarıyla hizalanmalı.
+4. Tercih listesinde salt okunur kullanıcı satırı açabilmeli.
+
+### Yeni bağımlılık: YOK
+
+### Kapsam dışı
+
+- Şablon **silme / varsayılana dönme** — sunucuda uç yok.
+- Çok dilli şablon (`locale` hep `tr`) — iOS gibi.

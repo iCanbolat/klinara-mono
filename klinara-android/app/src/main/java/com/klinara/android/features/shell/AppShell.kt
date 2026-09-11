@@ -685,7 +685,7 @@ private fun ManagementTab(
             )
         }
 
-        communicationDestinations(navController, session, container, openCustomer)
+        communicationDestinations(navController, session, container, trailing, openCustomer)
     }
 }
 
@@ -775,4 +775,7 @@ private fun ManagementDestination.route(): Any =
         ManagementDestination.PackageReports -> ShellRoutes.PackageReportsHome
         ManagementDestination.Inbox -> ShellRoutes.Inbox
         ManagementDestination.MessageLog -> ShellRoutes.MessageLog
+        ManagementDestination.ReminderSettings -> ShellRoutes.ReminderSettings
+        ManagementDestination.NotificationTemplates -> ShellRoutes.NotificationTemplates
+        ManagementDestination.NotificationPreferences -> ShellRoutes.NotificationPreferences
     }

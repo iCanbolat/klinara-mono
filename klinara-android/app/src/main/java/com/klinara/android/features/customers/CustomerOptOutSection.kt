@@ -20,6 +20,7 @@ import com.klinara.android.designsystem.components.KlinaraButton
 import com.klinara.android.designsystem.components.KlinaraButtonKind
 import com.klinara.android.designsystem.components.KlinaraCard
 import com.klinara.android.designsystem.components.KlinaraRow
+import com.klinara.android.designsystem.components.KlinaraToggleRow
 import com.klinara.android.features.auth.AppSession
 import com.klinara.android.services.ServiceContainer
 import com.klinara.android.services.contracts.Permissions
@@ -88,6 +89,9 @@ fun CustomerOptOutSection(
                     clock = clock,
                     onOptOutAll = { viewModel.optOut(null) },
                     onRevokeAll = { viewModel.revoke(null) },
+                    onToggleChannel = { channel, allowed ->
+                        if (allowed) viewModel.revoke(channel) else viewModel.optOut(channel)
+                    },
                 )
         }
     }
@@ -102,6 +106,7 @@ private fun OptOutBody(
     clock: BranchClock,
     onOptOutAll: () -> Unit,
     onRevokeAll: () -> Unit,
+    onToggleChannel: (NotificationChannel, Boolean) -> Unit,
 ) {
     val colors = KlinaraTheme.colors
 
@@ -130,7 +135,30 @@ private fun OptOutBody(
         return
     }
 
+    if (!blocksEverything) {
+        // A8.2 (A4.2'den devreden): kanal bazlı kapsam. Anahtar AÇIK = izin veriliyor.
+        OPT_OUT_CHANNELS.forEach { channel ->
+            val closed = records.any { it.channel == channel }
+            KlinaraToggleRow(
+                label = channel.turkishName,
+                isOn = !closed,
+                onToggle = { allowed -> onToggleChannel(channel, allowed) },
+                detail = if (closed) "Ticari ileti kapalı" else "Ticari iletiye izin veriliyor",
+                enabled = !isSaving,
+            )
+        }
+    }
+
     if (blocksEverything) {
+        // Sunucu kanalsız geri almada KANAL kayıtlarını da kaldırıyor; bunu söylemeden geri
+        // vermek, kullanıcının bilerek kapattığı tek bir kanalı sessizce açardı.
+        if (records.any { it.channel != null }) {
+            Text(
+                "İzni geri vermek kanal bazlı kapatmaları da kaldırır.",
+                style = KlinaraType.bodyM,
+                color = colors.charcoalMuted,
+            )
+        }
         KlinaraButton(
             title = "İzni geri ver",
             onClick = onRevokeAll,
@@ -151,5 +179,5 @@ private fun OptOutBody(
     }
 }
 
-/** Kanal listesi A8.2'de kanal bazlı kontrole dönüşecek; bugün kapsam "tümü". */
+/** Kanal bazlı kapsam (A8.2) — push'a ticari ileti gitmiyor, listede yok. */
 internal val OPT_OUT_CHANNELS: List<NotificationChannel> = NotificationChannel.selectable

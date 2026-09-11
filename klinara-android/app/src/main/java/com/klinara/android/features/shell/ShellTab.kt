@@ -321,6 +321,30 @@ object ShellRoutes {
         val messageId: String,
     )
 
+    /** Hatırlatma ayarları (A8.2) — SEÇİLİ şubenin. */
+    @Serializable
+    data object ReminderSettings
+
+    /** Bildirim şablonları (A8.2) — editörle PAYLAŞILAN ViewModel'in sahibi. */
+    @Serializable
+    data object NotificationTemplates
+
+    /** [rowId] `event|channel|locale` — sunucunun upsert anahtarı. */
+    @Serializable
+    data class NotificationTemplateEditor(
+        val rowId: String,
+    )
+
+    /** Bildirim tercihleri (A8.2). */
+    @Serializable
+    data object NotificationPreferences
+
+    /** [rowId] `event|branchId` (kiracı satırında `tenant`). */
+    @Serializable
+    data class NotificationPreferenceEditor(
+        val rowId: String,
+    )
+
     @Serializable
     data object ProfileHome
 }

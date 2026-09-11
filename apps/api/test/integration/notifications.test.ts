@@ -308,6 +308,41 @@ describe('bildirim çekirdeği (Batch 8.1)', () => {
       expect(queued.scheduledFor.toISOString()).toBe('2026-09-07T19:00:00.000Z');
     });
 
+    it('eşit başlangıç ve bitiş sessiz saati KAPATIR — gece üretilen mesaj ertelenmez', async () => {
+      const saved = await setPreference({
+        branchId: clinic.branch.id,
+        event: 'appointment_reminder',
+        channels: ['sms'],
+        quietHoursStart: '00:00',
+        quietHoursEnd: '00:00',
+      }).expect(200);
+      expect((saved.body as { quietHoursEnabled: boolean }).quietHoursEnabled).toBe(false);
+
+      // 23:30 İstanbul — varsayılan pencerede (21:00–09:00) sabaha kalırdı.
+      const queued = await enqueue(reminder({ scheduledFor: new Date('2026-09-07T20:30:00Z') }));
+      if (queued.status !== 'queued') throw new Error('kuyruğa yazılmalıydı');
+      expect(queued.scheduledFor.toISOString()).toBe('2026-09-07T20:30:00.000Z');
+
+      const listed = await http(app)
+        .get('/api/v1/notification-preferences')
+        .set(ownerAuth())
+        .expect(200);
+      const rows = listed.body as {
+        event: string;
+        branchId: string | null;
+        quietHoursEnabled: boolean;
+      }[];
+      // Kiracı varsayılanı hâlâ açık; kapatılan yalnız şube satırı.
+      expect(
+        rows.find((r) => r.event === 'appointment_reminder' && r.branchId === null)
+          ?.quietHoursEnabled,
+      ).toBe(true);
+      expect(
+        rows.find((r) => r.event === 'appointment_reminder' && r.branchId === clinic.branch.id)
+          ?.quietHoursEnabled,
+      ).toBe(false);
+    });
+
     it('personele giden iç bildirim ERTELENMEZ', async () => {
       const queued = await enqueue({
         event: 'staff_internal',
