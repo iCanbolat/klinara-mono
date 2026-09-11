@@ -39,6 +39,12 @@ class MockCustomerService(
 
     private var idCounter: Int = MockCustomers.ALL.size
 
+    /**
+     * Başka mock'ların müşteri tablosunu OKUMASI için (A5: paket satışı müşteri varlığını,
+     * raporlar müşteri adını soruyor). Kopya döner — dışarıdan yazılamasın.
+     */
+    internal fun snapshot(): List<Customer> = rows.toList()
+
     override suspend fun list(query: CustomerListQuery): Page<Customer> {
         settle()
 

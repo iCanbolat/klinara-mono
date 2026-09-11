@@ -1697,3 +1697,88 @@ o şubenin paketi ikinci sayfada kalabilir.
   dolumu raporunda (binlerce satır olabilen tek liste) geliyor.
 - **Hizmet seçici pasif hizmetleri hiç göstermiyor** — sunucu pasif hizmeti kalem
   olarak reddediyor; göstermek, seçilip reddedilecek bir satır sunmak olurdu.
+
+---
+
+## A5.2 — Satış, bağlama, müşteri paketleri ✅
+
+**Durum:** `./gradlew check` yeşil. **391 test** (A5.1 sonunda 369'du), 54 suite.
+Emülatörde uçtan uca sürüldü: Ayşe'nin kartında "7/12 seans kaldı · Lazer epilasyon: 6/10
+· Cilt bakımı: 1/2"; paket detayı ve defter (satış, kullanımlar, ters kayıt rozeti,
+manuel düzeltme gerekçesi); **Bugün → Ayşe'nin 09:00 cilt bakımı → "Pakete bağla"**
+yalnız cilt bakımı hakkını listeledi (lazer DEĞİL), dipnot "seans randevu tamamlandığında
+düşer" dedi; bağlamadan sonra kalan hak değişmedi; randevu Geldi → İşlemde → Tamamlandı
+yapılınca kart **0/2**'ye düştü ve deftere yeni bir `−1 Kullanım` satırı girdi. Kart
+üzerinden "5 Seans Cilt Bakımı" satışı: önizleme (Süresiz · Devredilemez · indirim) →
+satış → karta dönüşte yeni paket en üstte.
+
+### Kalan hak mock'ta da bir sayaç DEĞİL — defterin toplamı
+
+Fazın çıkış ölçütü "istemci sayacı sunucu defteriyle ayrışmıyor". Mock'ta bunu yapısal
+kıldık: `MockPackagesService.append` her satırdan sonra kalem kalanını **defter
+satırlarının toplamından** yeniden hesaplıyor; hiçbir yerde `remaining -= 1` yok. Seed de
+kalanı elle YAZMIYOR — Ayşe'nin paketi satış anındaki hâliyle kurulup defter satırları
+aynı yazma noktasından geçiriliyor. `assertLedgerMatches` her testte her kalem için
+"satırların toplamı == kalan hak ve ≥ 0" diyor.
+
+İstemci tarafında da kalan hak **hiçbir akışta yerelde güncellenmiyor**: kart, detay ve
+satış dönüşleri gezinme ekranı yeniden kurduğunda sunucudan taze geliyor. Tazeleme hatası
+eldeki listeyi silmiyor (`refreshFailureKeepsList`).
+
+### Tamamlanma ile seans düşme AYNI "transaction"
+
+Sunucuda bağlı bir randevunun `completed`'a geçişi paketten seans düşürür ve hak
+yetersizse **durum değişikliği de reddedilir**. Mock bunu `MockBookingService`'e eklenen
+bir kanca (`PackageConsumptionHook`) ile kuruyor: defter önce, sonra durum.
+`exhaustedBlocksCompletion` iki randevuyu tek kalan bakım hakkına bağlıyor; ikincinin
+tamamlanması `PACKAGE_EXHAUSTED` alıyor **ve randevu `İşlemde` kalıyor**.
+
+Yeniden açma (`completed → in_progress`) satırı SİLMİYOR, onu geri alan bir ters kayıt
+ekliyor (`completionConsumesAndReopenReverses`). Booking → packages doğrudan bağımlılığı
+yerine kanca: paketler zaten bağlama için booking'e bakıyor ve iki mock birbirine
+kilitlenirdi.
+
+### Kuruş kaybolmuyor
+
+Satış tutarı kalemlere liste ağırlığıyla **largest-remainder** ile dağıtılıyor (sunucudaki
+`allocateMinor`): 12.500 ₺ → 11.119,63 + 1.380,37. `allocationNeverLosesAKurus` ağırlıksız
+(hepsi sıfır) durumu da çiviliyor.
+
+### Idempotency anahtarı ekranın değil SATIŞIN ömründe
+
+`SellPackageViewModel` ve `BindPackageViewModel` anahtarı doğarken üretiyor.
+`sellRetryAfterLostResponseDoesNotDuplicate` gerçek senaryoyu kuruyor: sunucu satışı
+YAZIYOR ama yanıt kayboluyor; kullanıcı tekrar basıyor; iki deneme **tek anahtar**, tek
+paket.
+
+### Çıplak dizi ve bilinmeyen defter türü
+
+`package-entitlements` zarfsız döner — fixture'ı `ListEnvelope` ile çözmeye çalışan test
+**başarısız olmayı** bekliyor. Bilinmeyen `entryType` `Unknown`'a düşüyor ve deltası
+korunuyor: eksik bir defter tam görünmesin.
+
+### Plandan / iOS'tan sapmalar
+
+- **`PackageLedgerScreen` ayrı bir hedef değil, `PackageLedgerSection`** — iOS'ta da
+  defter detayın içinde bir görünüm. Ayrı route, aynı veriyi ikinci bir ViewModel'le
+  çekmek olurdu; "daha eski kayıtlar" düğmesi sayfalamayı detayın içinde yapıyor.
+- **Paket bölümü `CustomerPackagesCard` içinde kendi ViewModel'ini kuruyor** ve izin yoksa
+  hiç çizilmiyor. `CustomerDetailScreen`'e gömmek onu detekt'in karmaşıklık eşiğine
+  itiyordu; eşiği yükseltmek yerine blok ayrıldı.
+- **Randevu satırı hizmet ADINI taşımıyor**; bağlama sayfası başlığı hakların taşıdığı
+  hizmet adına düşüyor.
+- **`MockCustomerService.snapshot()` ve `MockBookingService.current()` `internal` oldu** —
+  paket mock'u müşteri varlığını ve randevu durumunu okumak zorunda.
+- `ApiError.MESSAGES`'a `PACKAGE_EXHAUSTED` ve `PACKAGE_EXPIRED` için eyleme dönük Türkçe
+  metin eklendi; iOS paritesi (`Phase5DecodingTests`'in "Türkçe mesajı vardır" testi).
+
+### Yeni bağımlılık: YOK
+
+### Kapsam dışı
+
+- **Rezervasyon formunda paket seçimi.** `AppointmentServiceInput.customerPackageItemId`
+  kabloda var; bağlama bugün randevu detayından yapılıyor. Oluşturma anında seçim iOS'ta
+  da yok.
+- **Mock'ta müşteri paketleri ve defter sayfalanmıyor** (tek sayfa). İstemci imleci okuyor
+  ve "daha fazla" düğmesi çiziyor; mock'u sayfalamak bir kartta 2–3 paket için değer
+  üretmiyordu.

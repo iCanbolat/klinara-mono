@@ -54,6 +54,57 @@ class MockBookingService(
     /** Oturum içinde OLUŞTURULAN randevular — tohumda yoklar, listede görünmeliler. */
     private val extras = mutableListOf<Appointment>()
 
+    /**
+     * Paket defterine bağlantı (A5.2).
+     *
+     * Sunucuda tamamlanma geçişi ile paketten seans düşme AYNI transaction: hak yetersizse
+     * durum değişikliği de reddedilir. Mock bunu bir kanca ile kuruyor — booking → packages
+     * doğrudan bağımlılığı iki mock'u birbirine kilitlerdi (paketler de bağlama için
+     * booking'e bakıyor). Kanca `ServiceContainer.mock()`'ta bağlanır; bağlanmamışsa
+     * (testler) tamamlanma paketsiz davranır.
+     */
+    interface PackageConsumptionHook {
+        /** Tamamlanmadan HEMEN ÖNCE; fırlatırsa geçiş olmaz. */
+        fun onCompleted(appointment: Appointment)
+
+        /** Tamamlanmış randevu yeniden açılınca — defter ters kayıt alır. */
+        fun onReopened(appointment: Appointment)
+    }
+
+    var packageHook: PackageConsumptionHook? = null
+
+    /**
+     * Randevu satırını bir paket kalemine bağlar ve randevunun GÜNCEL durumunu döner —
+     * paket mock'u "şimdi düşmeli mi" kararını buna göre verir.
+     */
+    internal fun bindPackageItem(
+        appointmentId: String,
+        appointmentServiceId: String,
+        customerPackageItemId: String,
+    ): Appointment {
+        val existing = current(appointmentId)
+        if (existing.services.none { it.id == appointmentServiceId }) {
+            throw ApiError.Problem(
+                ProblemDetails(
+                    code = ApiErrorCode.NOT_FOUND,
+                    title = "Randevu kalemi bulunamadı",
+                    status = HTTP_NOT_FOUND,
+                ),
+            )
+        }
+        val updated =
+            existing.copy(
+                services =
+                    existing.services.map { line ->
+                        if (line.id != appointmentServiceId) return@map line
+                        line.copy(customerPackageItemId = customerPackageItemId)
+                    },
+                version = existing.version + 1,
+            )
+        edits[appointmentId] = updated
+        return updated
+    }
+
     /** Geliştirici menüsü senaryoyu değiştirince oturum içi değişiklikler de düşer. */
     fun reset() {
         edits.clear()
@@ -129,6 +180,12 @@ class MockBookingService(
                     status = HTTP_CONFLICT,
                 ),
             )
+        }
+        // Defter önce: hak yetersizse (`PACKAGE_EXHAUSTED`) durum da değişmemeli.
+        when {
+            status == AppointmentStatus.Completed -> packageHook?.onCompleted(existing)
+            existing.status == AppointmentStatus.Completed -> packageHook?.onReopened(existing)
+            else -> Unit
         }
         return commit(
             existing.copy(status = status),
@@ -357,8 +414,8 @@ class MockBookingService(
         )
     }
 
-    /** Tohum + oturum içi değişiklik. */
-    private fun current(id: String): Appointment =
+    /** Tohum + oturum içi değişiklik. `internal`: paket mock'u bağlamadan önce randevuyu okuyor. */
+    internal fun current(id: String): Appointment =
         edits[id]
             ?: MockBookingSeed
                 .entries(scenario, clock, mockClock.reference)

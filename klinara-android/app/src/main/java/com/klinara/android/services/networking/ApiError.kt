@@ -163,6 +163,12 @@ sealed class ApiError(
                 ApiErrorCode.VERSION_CONFLICT to
                     "Bu kayıt siz bakarken değişti. Sayfayı yenileyip tekrar deneyin.",
                 ApiErrorCode.SLOT_CONFLICT to "Bu saat dolu.",
+                // A5: iki paket kodu da kullanıcının yapabileceği bir şey söylemeli —
+                // "hata oluştu" demek resepsiyonu müşterinin önünde çaresiz bırakır.
+                ApiErrorCode.PACKAGE_EXHAUSTED to
+                    "Pakette bu işlem için yeterli seans hakkı kalmadı.",
+                ApiErrorCode.PACKAGE_EXPIRED to
+                    "Bu paket kullanılamaz: süresi dolmuş ya da iade/devirle kapatılmış.",
                 ApiErrorCode.OUTSIDE_WORKING_HOURS to "Bu saat çalışma saatleri dışında.",
             )
     }

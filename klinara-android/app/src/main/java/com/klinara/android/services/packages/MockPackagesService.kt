@@ -1,9 +1,15 @@
 package com.klinara.android.services.packages
 
+import com.klinara.android.services.booking.Appointment
+import com.klinara.android.services.booking.AppointmentStatus
+import com.klinara.android.services.booking.MockBookingService
 import com.klinara.android.services.catalog.CatalogService
 import com.klinara.android.services.catalog.ClinicService
 import com.klinara.android.services.catalog.MockCatalogService
+import com.klinara.android.services.crm.Customer
 import com.klinara.android.services.crm.Patch
+import com.klinara.android.services.mock.MockCustomers
+import com.klinara.android.services.mock.MockIds
 import com.klinara.android.services.mock.MockErrors
 import com.klinara.android.services.networking.ApiError
 import com.klinara.android.services.networking.Page
@@ -26,24 +32,67 @@ import kotlin.random.Random
  * Eşzamanlılık: her metodun tek askıya alma noktası baştaki [settle]; tablolar ondan
  * SONRA askıya alınmadan okunup yazılıyor, yani ana iş parçacığında atomik.
  */
+@Suppress("TooManyFunctions")
+// Sunucudaki dört controller'ın mock'u tek sınıfta: defter tabloları paylaşılıyor ve
+// bölmek, kalan hakkı iki sınıfın ortak durumuna dağıtmak olurdu (§7.7 gevşetmesi).
 class MockPackagesService(
     private val catalog: CatalogService = MockCatalogService(latencyEnabled = false),
     private val latencyEnabled: Boolean = true,
     private val random: Random = Random.Default,
-) : PackagesService {
+    /** Müşteri tablosu — satış varlığı, devir hedefi ve rapor adları buradan okunur. */
+    private val customers: () -> List<Customer> = { MockCustomers.ALL.map { it.toCustomer() } },
+    /** Randevu bağlama için. `null` ise (birim testleri) `consume` 404 verir. */
+    private val booking: MockBookingService? = null,
+    /** Süre dolumu kararı için "şimdi" — testler sabitler. */
+    private val now: () -> Instant = Instant::now,
+) : PackagesService,
+    MockBookingService.PackageConsumptionHook {
     var failing: Boolean = false
 
     private val definitionRecords: MutableList<PackageDefinition> = MockPackagesSeed.definitions().toMutableList()
 
+    private val packageRecords: MutableList<CustomerPackage> = mutableListOf()
+
     /**
-     * Satışı yapılmış tanımlar. A5.2'de gerçek satış tablosuyla değişecek; bugün yalnız
-     * `retireDefinition`'ın "satılmışsa arşivleme" kuralını sürülebilir kılıyor. Lazer
-     * paketi seed'de satılmış sayılır — Ayşe'nin paketi ondan satıldı.
+     * `customerPackageId` → defter satırları, **yeniden eskiye**. APPEND-ONLY: bu tabloda
+     * hiçbir satır değiştirilmez ya da silinmez; düzeltme ters kayıttır.
      */
-    private val soldDefinitionIds: MutableSet<String> = mutableSetOf(MockPackagesSeed.DEFINITION_LASER_10)
+    private val ledgerEntries: MutableMap<String, MutableList<PackageLedgerEntry>> = mutableMapOf()
+
+    /** `Idempotency-Key` → üretilen kaydın kimliği (satış/devir) ya da tüketim sonucu. */
+    private val idempotentPackages: MutableMap<String, String> = mutableMapOf()
+    private val idempotentConsumes: MutableMap<String, ConsumePackageResult> = mutableMapOf()
 
     private var idCounter: Int = 0
-    private var tick: Long = 0
+
+    init {
+        seedSoldPackage()
+    }
+
+    /**
+     * Ayşe'nin paketi satış anındaki hâliyle eklenir ve defter satırları TEK YAZMA
+     * NOKTASINDAN ([append]) geçirilir — kalan hak defterden doğar, seed'den değil.
+     */
+    private fun seedSoldPackage() {
+        val sold = MockPackagesSeed.soldPackageAtSale()
+        packageRecords += sold
+        val written = mutableListOf<PackageLedgerEntry>()
+        MockPackagesSeed.AYSE_LEDGER.forEach { seed ->
+            val entry =
+                ledgerEntry(
+                    pkg = sold,
+                    itemId = seed.itemId,
+                    type = seed.type,
+                    delta = seed.delta,
+                    reason = seed.reason,
+                    reversesEntryId = seed.reversesIndex?.let { written[it].id },
+                    createdAt = MockPackagesSeed.SEED_NOW.minusSeconds(seed.daysAgo * MockPackagesSeed.DAY_SECONDS),
+                    appointmentId = if (seed.type == LedgerEntryType.Consume) "a99a0000-seed-${written.size}" else null,
+                )
+            written += entry
+            append(sold.id, entry)
+        }
+    }
 
     // --- Tanımlar ---
 
@@ -75,7 +124,7 @@ class MockPackagesService(
         }
         validate(input.totalPriceMinor, input.validityDays, input.items)
         val items = resolveItems(input.items, services)
-        val now = nextInstant()
+        val stamp = nextInstant()
         val created =
             PackageDefinition(
                 id = nextId(),
@@ -90,8 +139,8 @@ class MockPackagesService(
                 isOnlineSellable = input.isOnlineSellable ?: false,
                 isActive = input.isActive ?: true,
                 items = items,
-                createdAt = now,
-                updatedAt = now,
+                createdAt = stamp,
+                updatedAt = stamp,
             )
         definitionRecords.add(created)
         return created
@@ -143,20 +192,295 @@ class MockPackagesService(
         if (index < 0) throw MockErrors.notFound("Paket tanımı")
         val old = definitionRecords[index]
         if (old.version != version) throw MockErrors.versionConflict()
-        val now = nextInstant()
+        val stamp = nextInstant()
         // Satılmışsa arşivlenmez, yalnız pasife alınır — satış izi kopmasın.
         definitionRecords[index] =
             old.copy(
                 isActive = false,
                 version = old.version + 1,
-                updatedAt = now,
-                deletedAt = if (isSold(id)) null else now,
+                updatedAt = stamp,
+                deletedAt = if (isSold(id)) null else stamp,
             )
+    }
+
+    // --- Satış ve defter ---
+
+    override suspend fun sell(
+        input: CreateCustomerPackageInput,
+        idempotencyKey: String,
+    ): CustomerPackage {
+        settle()
+        // Aynı anahtar = aynı satış. Tekrarı İKİNCİ bir paket üretmez, ilkini döndürür.
+        idempotentPackages[idempotencyKey]?.let { id -> return packageRecords.first { it.id == id } }
+
+        val definition =
+            definitionRecords.firstOrNull { it.id == input.definitionId && it.isActive && !it.isArchived }
+                ?: throw MockErrors.validation("definitionId", "Paket tanımı satışa kapalı.")
+        if (customers().none { it.id == input.customerId }) {
+            throw MockErrors.validation("customerId", "Müşteri bulunamadı.")
+        }
+
+        val soldAt = now()
+        val allocations =
+            MockPackagesSeed.allocate(definition.totalPriceMinor, definition.sortedItems.map { it.listTotalMinor })
+        val items =
+            definition.sortedItems.mapIndexed { index, item ->
+                CustomerPackageItem(
+                    id = nextId(),
+                    serviceId = item.serviceId,
+                    serviceName = item.serviceName,
+                    quantityTotal = item.quantity,
+                    unitListPriceMinor = item.unitListPriceMinor,
+                    itemTotalMinor = allocations[index],
+                    sortOrder = item.sortOrder,
+                )
+            }
+        val sold =
+            CustomerPackage(
+                id = nextId(),
+                customerId = input.customerId,
+                // Mock `X-Branch-Id`'yi görmüyor: şubeye özel tanım kendi şubesinde, genel
+                // tanım varsayılan şubede satılır.
+                branchId = definition.branchId ?: MockIds.BRANCH_NISANTASI,
+                definitionId = definition.id,
+                name = definition.name,
+                definitionRevision = definition.revision,
+                totalPriceMinor = definition.totalPriceMinor,
+                currency = definition.currency,
+                isTransferable = definition.isTransferable,
+                validityDays = definition.validityDays,
+                soldAt = soldAt,
+                expiresAt = definition.validityDays?.let { soldAt.plusSeconds(it * MockPackagesSeed.DAY_SECONDS) },
+                note = input.note,
+                items = items,
+                createdAt = soldAt,
+            )
+        packageRecords += sold
+        items.forEach { item ->
+            append(sold.id, ledgerEntry(sold, item.id, LedgerEntryType.Purchase, item.quantityTotal))
+        }
+        idempotentPackages[idempotencyKey] = sold.id
+        return current(sold.id)
+    }
+
+    override suspend fun packages(
+        customerId: String,
+        query: CustomerPackageQuery,
+    ): Page<CustomerPackage> {
+        settle()
+        val rows =
+            packageRecords
+                .filter { it.customerId == customerId }
+                .filter { query.status == null || it.status == query.status }
+                .sortedByDescending { it.soldAt }
+        return Page(rows, PageInfo(nextCursor = null, hasMore = false))
+    }
+
+    override suspend fun customerPackage(id: String): CustomerPackage {
+        settle()
+        return current(id)
+    }
+
+    override suspend fun ledger(
+        packageId: String,
+        cursor: String?,
+        limit: Int?,
+    ): Page<PackageLedgerEntry> {
+        settle()
+        current(packageId)
+        return Page(ledgerEntries[packageId].orEmpty().toList(), PageInfo(nextCursor = null, hasMore = false))
+    }
+
+    override suspend fun entitlements(
+        customerId: String,
+        serviceId: String?,
+        branchId: String?,
+    ): List<PackageEntitlement> {
+        settle()
+        val instant = now()
+        return packageRecords
+            .filter { it.customerId == customerId && it.isConsumable(instant) }
+            .filter { branchId == null || it.branchId == branchId }
+            .flatMap { pkg ->
+                pkg.sortedItems
+                    .filter { it.remainingSessions > 0 && (serviceId == null || it.serviceId == serviceId) }
+                    .map { item ->
+                        PackageEntitlement(
+                            customerPackageItemId = item.id,
+                            customerPackageId = pkg.id,
+                            packageName = pkg.name,
+                            serviceId = item.serviceId,
+                            serviceName = item.serviceName,
+                            remainingSessions = item.remainingSessions,
+                            expiresAt = pkg.expiresAt,
+                            branchId = pkg.branchId,
+                        )
+                    }
+            }
+    }
+
+    override suspend fun consume(
+        appointmentId: String,
+        input: ConsumePackageInput,
+        idempotencyKey: String,
+    ): ConsumePackageResult {
+        settle()
+        idempotentConsumes[idempotencyKey]?.let { return it }
+        val bookingMock = booking ?: throw MockErrors.notFound("Randevu")
+        val appointment = bookingMock.current(appointmentId)
+
+        // Önce HEPSİ doğrulanır, sonra yazılır: yarısı bağlanmış bir randevu olmasın.
+        input.lines.forEach { line ->
+            val serviceLine =
+                appointment.services.firstOrNull { it.id == line.appointmentServiceId }
+                    ?: throw MockErrors.notFound("Randevu kalemi")
+            val (pkg, item) = locate(line.customerPackageItemId)
+            if (pkg.customerId != appointment.customerId) throw MockErrors.forbidden("Paket bu müşteriye ait değil.")
+            if (item.serviceId != serviceLine.serviceId) {
+                throw MockErrors.validation("lines", "Paket kalemi bu hizmet için kullanılamaz.")
+            }
+            if (!pkg.isConsumable(now())) throw MockErrors.packageExpired()
+            if (item.remainingSessions < 1) throw MockErrors.packageExhausted()
+        }
+
+        var consumed = 0
+        input.lines.forEach { line ->
+            // Bağlama her durumda; DÜŞME yalnız randevu zaten `completed` ise. Sunucudaki
+            // kural bu ve mock'un ayrışması arayüzü canlıda ilk denemede yanıltırdı.
+            val bound =
+                bookingMock.bindPackageItem(appointmentId, line.appointmentServiceId, line.customerPackageItemId)
+            if (bound.status == AppointmentStatus.Completed) {
+                apply(line.customerPackageItemId, LedgerEntryType.Consume, -1, appointmentId = appointmentId)
+                consumed += 1
+            }
+        }
+        return ConsumePackageResult(bound = input.lines.size, consumed = consumed).also {
+            idempotentConsumes[idempotencyKey] = it
+        }
+    }
+
+    // --- Randevu kancası (MockBookingService.PackageConsumptionHook) ---
+
+    override fun onCompleted(appointment: Appointment) {
+        val lines = appointment.services.mapNotNull { it.customerPackageItemId }
+        // Önce kontrol, sonra yazma: iki kalemden biri yetersizse hiçbiri düşmez.
+        lines.forEach { itemId ->
+            val (pkg, item) = locate(itemId)
+            if (!pkg.isConsumable(now())) throw MockErrors.packageExpired()
+            if (item.remainingSessions < 1) throw MockErrors.packageExhausted()
+        }
+        lines.forEach { apply(it, LedgerEntryType.Consume, -1, appointmentId = appointment.id) }
+    }
+
+    override fun onReopened(appointment: Appointment) {
+        // Yeniden açma satırı SİLMEZ: tüketimi geri alan bir ters kayıt ekler.
+        packageRecords.map { it.id }.forEach { packageId ->
+            val entries = ledgerEntries[packageId].orEmpty()
+            val reversed = entries.mapNotNull { it.reversesEntryId }.toSet()
+            entries
+                .filter { it.appointmentId == appointment.id && it.entryType == LedgerEntryType.Consume }
+                .filter { it.delta < 0 && it.id !in reversed }
+                .forEach { original ->
+                    apply(
+                        original.customerPackageItemId,
+                        LedgerEntryType.Consume,
+                        -original.delta,
+                        reason = "Randevu yeniden açıldı",
+                        appointmentId = appointment.id,
+                        reversesEntryId = original.id,
+                    )
+                }
+        }
+    }
+
+    // --- Defter uygulaması ---
+
+    /**
+     * TEK yazma noktası — sunucudaki `apply_package_ledger_entry()` trigger'ının aynası.
+     * **Hak kontrolü yazmadan ÖNCE** yapılır ve kendi hatasını döner; kalan hak asla
+     * eksiye inmez.
+     */
+    @Suppress("LongParameterList")
+    private fun apply(
+        itemId: String,
+        type: LedgerEntryType,
+        delta: Int,
+        reason: String? = null,
+        appointmentId: String? = null,
+        reversesEntryId: String? = null,
+    ) {
+        val (pkg, item) = locate(itemId)
+        if (delta < 0 && !pkg.isConsumable(now())) throw MockErrors.packageExpired()
+        if (item.remainingSessions + delta < 0) throw MockErrors.packageExhausted()
+        append(pkg.id, ledgerEntry(pkg, itemId, type, delta, reason, appointmentId, reversesEntryId))
+    }
+
+    /**
+     * Satırı deftere ekler ve paketin yansımalarını (kalem kalanı, karşılık, toplam)
+     * DEFTERDEN yeniden hesaplar. Kalan hak bir sayaç olarak artırılıp azaltılmıyor —
+     * satırların toplamı.
+     */
+    private fun append(
+        packageId: String,
+        entry: PackageLedgerEntry,
+    ) {
+        val entries = ledgerEntries.getOrPut(packageId) { mutableListOf() }
+        entries.add(0, entry)
+        val index = packageRecords.indexOfFirst { it.id == packageId }
+        val pkg = packageRecords[index]
+        val items =
+            pkg.items.map { item ->
+                val remaining = entries.filter { it.customerPackageItemId == item.id }.sumOf { it.delta }
+                item.copy(remainingSessions = remaining, outstandingMinor = item.unitAllocationMinor * remaining)
+            }
+        packageRecords[index] =
+            pkg.copy(
+                items = items,
+                remainingSessions = items.sumOf { it.remainingSessions },
+                outstandingMinor = items.sumOf { it.outstandingMinor },
+            )
+    }
+
+    @Suppress("LongParameterList")
+    private fun ledgerEntry(
+        pkg: CustomerPackage,
+        itemId: String,
+        type: LedgerEntryType,
+        delta: Int,
+        reason: String? = null,
+        appointmentId: String? = null,
+        reversesEntryId: String? = null,
+        createdAt: Instant = nextInstant(),
+    ): PackageLedgerEntry {
+        val item = pkg.items.first { it.id == itemId }
+        return PackageLedgerEntry(
+            id = "f5000000-0000-4000-8000-%012d".format(++idCounter),
+            customerPackageItemId = itemId,
+            serviceId = item.serviceId,
+            serviceName = item.serviceName,
+            entryType = type,
+            delta = delta,
+            appointmentId = appointmentId,
+            actorUserId = MockIds.USER_MANAGER,
+            reason = reason,
+            reversesEntryId = reversesEntryId,
+            createdAt = createdAt,
+        )
+    }
+
+    private fun current(packageId: String): CustomerPackage =
+        packageRecords.firstOrNull { it.id == packageId } ?: throw MockErrors.notFound("Paket")
+
+    private fun locate(itemId: String): Pair<CustomerPackage, CustomerPackageItem> {
+        val pkg =
+            packageRecords.firstOrNull { pkg -> pkg.items.any { it.id == itemId } }
+                ?: throw MockErrors.notFound("Paket kalemi")
+        return pkg to pkg.items.first { it.id == itemId }
     }
 
     // --- Yardımcılar ---
 
-    private fun isSold(definitionId: String): Boolean = definitionId in soldDefinitionIds
+    private fun isSold(definitionId: String): Boolean = packageRecords.any { it.definitionId == definitionId }
 
     /**
      * Sunucudaki DTO doğrulamasının aynası — yol adları `FieldError.path` ile birebir.
@@ -209,8 +533,16 @@ class MockPackagesService(
 
     private fun nextId(): String = "f9000000-0000-4000-8000-%012d".format(++idCounter)
 
-    /** Monotonik: oluşturulan kayıtlar deterministik sıralansın. */
-    private fun nextInstant(): Instant = MockPackagesSeed.SEED_NOW.plusSeconds(++tick)
+    /**
+     * Monotonik "şimdi": aynı milisaniyede yazılan iki defter satırı eşit zaman almasın ve
+     * defter sırası deterministik kalsın.
+     */
+    private fun nextInstant(): Instant {
+        lastInstant = maxOf(now(), lastInstant.plusMillis(1))
+        return lastInstant
+    }
+
+    private var lastInstant: Instant = Instant.EPOCH
 
     private suspend fun settle() {
         if (latencyEnabled) delay(random.nextLong(MIN_LATENCY_MILLIS, MAX_LATENCY_MILLIS))

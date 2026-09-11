@@ -94,5 +94,131 @@ internal object MockPackagesSeed {
         )
     }
 
+    // --- A5.2: satılmış paket ve defteri ---
+
+    const val SOLD_AYSE_PACKAGE = "f2000000-0000-4000-8000-000000000001"
+    const val SOLD_AYSE_ITEM_LASER = "f3000000-0000-4000-8000-000000000001"
+    const val SOLD_AYSE_ITEM_SKIN = "f3000000-0000-4000-8000-000000000002"
+
+    /** Ayşe Yılmaz — `MockCustomers.ALL` ilk satırı. */
+    val AYSE_ID: String = com.klinara.android.services.mock.MockCustomers.ALL.first().id
+
+    private const val AYSE_SOLD_DAYS_AGO = 60L
+
+    /**
+     * Ayşe'nin yarısı kullanılmış paketi — **kalan hak burada YAZILMIYOR**.
+     *
+     * Kalemler satış anındaki hâlleriyle (kalan = adet) kurulur; kalan hak, [ledger]'ın
+     * mock tarafından uygulanmasıyla oluşur. Seed'de "kalan 6" diye elle yazmak, defterle
+     * ayrışabilen ikinci bir gerçek demekti — fazın önlemek için var olduğu hata.
+     */
+    fun soldPackageAtSale(): CustomerPackage {
+        val definition = definitions().first { it.id == DEFINITION_LASER_10 }
+        val allocations = allocate(definition.totalPriceMinor, definition.sortedItems.map { it.listTotalMinor })
+        val itemIds = listOf(SOLD_AYSE_ITEM_LASER, SOLD_AYSE_ITEM_SKIN)
+        val soldAt = SEED_NOW.minusSeconds(AYSE_SOLD_DAYS_AGO * DAY_SECONDS)
+        val items =
+            definition.sortedItems.mapIndexed { index, item ->
+                CustomerPackageItem(
+                    id = itemIds[index],
+                    serviceId = item.serviceId,
+                    serviceName = item.serviceName,
+                    quantityTotal = item.quantity,
+                    remainingSessions = item.quantity,
+                    unitListPriceMinor = item.unitListPriceMinor,
+                    itemTotalMinor = allocations[index],
+                    outstandingMinor = allocations[index],
+                    sortOrder = item.sortOrder,
+                )
+            }
+        return CustomerPackage(
+            id = SOLD_AYSE_PACKAGE,
+            customerId = AYSE_ID,
+            branchId = com.klinara.android.services.mock.MockIds.BRANCH_NISANTASI,
+            definitionId = definition.id,
+            name = definition.name,
+            definitionRevision = definition.revision,
+            totalPriceMinor = definition.totalPriceMinor,
+            isTransferable = definition.isTransferable,
+            validityDays = definition.validityDays,
+            soldAt = soldAt,
+            expiresAt = definition.validityDays?.let { soldAt.plusSeconds(it * DAY_SECONDS) },
+            remainingSessions = items.sumOf { it.quantityTotal },
+            outstandingMinor = definition.totalPriceMinor,
+            items = items,
+            createdAt = soldAt,
+        )
+    }
+
+    /**
+     * Satış + dört kullanım (biri ters kayıtla geri alınmış) + bir bakım kullanımı + bir
+     * manuel düzeltme: defter ekranının bütün satır tiplerini tek pakette gösterir.
+     * Sonuç: lazer 10 → 6, bakım 2 → 1, toplam 7.
+     */
+    data class SeedEntry(
+        val itemId: String,
+        val type: LedgerEntryType,
+        val delta: Int,
+        val daysAgo: Long,
+        val reason: String? = null,
+        val reversesIndex: Int? = null,
+    )
+
+    val AYSE_LEDGER: List<SeedEntry> =
+        listOf(
+            SeedEntry(SOLD_AYSE_ITEM_LASER, LedgerEntryType.Purchase, delta = 10, daysAgo = 60),
+            SeedEntry(SOLD_AYSE_ITEM_SKIN, LedgerEntryType.Purchase, delta = 2, daysAgo = 60),
+            SeedEntry(SOLD_AYSE_ITEM_LASER, LedgerEntryType.Consume, delta = -1, daysAgo = 50),
+            SeedEntry(SOLD_AYSE_ITEM_LASER, LedgerEntryType.Consume, delta = -1, daysAgo = 36),
+            SeedEntry(SOLD_AYSE_ITEM_LASER, LedgerEntryType.Consume, delta = -1, daysAgo = 22),
+            SeedEntry(SOLD_AYSE_ITEM_LASER, LedgerEntryType.Consume, delta = -1, daysAgo = 14),
+            SeedEntry(
+                SOLD_AYSE_ITEM_LASER,
+                LedgerEntryType.Consume,
+                delta = 1,
+                daysAgo = 14,
+                reason = "Randevu tamamlanmadan işaretlenmiş",
+                reversesIndex = 5,
+            ),
+            SeedEntry(SOLD_AYSE_ITEM_SKIN, LedgerEntryType.Consume, delta = -1, daysAgo = 5),
+            SeedEntry(
+                SOLD_AYSE_ITEM_LASER,
+                LedgerEntryType.ManualAdjustment,
+                delta = -1,
+                daysAgo = 2,
+                reason = "Kayıt dışı yapılan seans",
+            ),
+        )
+
+    /**
+     * Largest-remainder dağıtımı — sunucudaki `allocateMinor` ile aynı kural: paylar
+     * toplamı DAİMA `total`'e eşittir, kuruş kaybolmaz. Ağırlık toplamı sıfırsa eşit
+     * dağıtılır ve artık ilk kaleme gider.
+     */
+    fun allocate(
+        total: Long,
+        weights: List<Long>,
+    ): List<Long> {
+        if (weights.isEmpty()) return emptyList()
+        val sum = weights.sum()
+        if (sum <= 0L) {
+            val equal = MutableList(weights.size) { total / weights.size }
+            equal[0] += total - equal.sum()
+            return equal
+        }
+        val shares = weights.map { it * total / sum }.toMutableList()
+        var leftover = total - shares.sum()
+        weights
+            .withIndex()
+            .sortedByDescending { (it.value * total) % sum }
+            .forEach { (index, _) ->
+                if (leftover > 0) {
+                    shares[index] += 1
+                    leftover -= 1
+                }
+            }
+        return shares
+    }
+
     const val DAY_SECONDS = 86_400L
 }

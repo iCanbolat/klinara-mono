@@ -49,6 +49,59 @@ interface PackagesService {
         id: String,
         version: Int,
     )
+
+    // --- Satış ve defter (A5.2) ---
+
+    /**
+     * `POST customer-packages` — `package:write`. Satış SEÇİLİ ŞUBEDE yapılır (`X-Branch-Id`).
+     *
+     * [idempotencyKey] aynı satışın iki kez yazılmasını engeller ve **çağıran boyunca sabit
+     * kalmalıdır**: ağ hatasından sonra "tekrar"a basmak çok olası bir senaryo.
+     */
+    suspend fun sell(
+        input: CreateCustomerPackageInput,
+        idempotencyKey: String,
+    ): CustomerPackage
+
+    /** `GET customers/:id/packages` — `package:read`. Kalemler gömülü, cursor sayfalı. */
+    suspend fun packages(
+        customerId: String,
+        query: CustomerPackageQuery = CustomerPackageQuery(),
+    ): Page<CustomerPackage>
+
+    /** `GET customer-packages/:id` — `package:read`. */
+    suspend fun customerPackage(id: String): CustomerPackage
+
+    /** `GET customer-packages/:id/ledger` — `package:read`. Yeniden eskiye, append-only. */
+    suspend fun ledger(
+        packageId: String,
+        cursor: String? = null,
+        limit: Int? = null,
+    ): Page<PackageLedgerEntry>
+
+    /**
+     * `GET customers/:id/package-entitlements` — `package:read`. Randevunun paket seçimi.
+     *
+     * ⚠️ Yanıt **çıplak dizi**dir, `{ "data": [...] }` zarfı YOKTUR — müşteri aramasıyla
+     * aynı istisna.
+     */
+    suspend fun entitlements(
+        customerId: String,
+        serviceId: String? = null,
+        branchId: String? = null,
+    ): List<PackageEntitlement>
+
+    /**
+     * `POST appointments/:id/consume-package` — `package:write`.
+     *
+     * Randevu kalemlerini pakete BAĞLAR; randevu zaten `completed` ise aynı çağrıda DÜŞER de.
+     * Tamamlanmamışsa düşme, tamamlanma geçişiyle aynı transaction'da olur.
+     */
+    suspend fun consume(
+        appointmentId: String,
+        input: ConsumePackageInput,
+        idempotencyKey: String,
+    ): ConsumePackageResult
 }
 
 /**

@@ -26,6 +26,7 @@ import com.klinara.android.designsystem.components.AuthLoadingOverlay
 import com.klinara.android.designsystem.components.ColorDot
 import com.klinara.android.designsystem.components.ErrorBanner
 import com.klinara.android.designsystem.components.KlinaraBadge
+import com.klinara.android.designsystem.components.KlinaraBadgeTone
 import com.klinara.android.designsystem.components.KlinaraButton
 import com.klinara.android.designsystem.components.KlinaraButtonKind
 import com.klinara.android.designsystem.components.KlinaraCard
@@ -64,6 +65,8 @@ fun AppointmentDetailScreen(
     onOpenHistory: (String) -> Unit,
     onReschedule: (String) -> Unit,
     modifier: Modifier = Modifier,
+    /** A5.2 — `null` ise (`package:write` yok) satırlarda "Pakete bağla" çizilmez. */
+    onBindPackage: ((appointmentId: String, appointmentServiceId: String) -> Unit)? = null,
 ) {
     val clock = remember(session.activeBranch?.timezone) { BranchClock(session.activeBranch?.timezone) }
     val viewModel: AppointmentDetailViewModel =
@@ -100,6 +103,7 @@ fun AppointmentDetailScreen(
                         viewModel = viewModel,
                         onOpenHistory = onOpenHistory,
                         onReschedule = onReschedule,
+                        onBindPackage = onBindPackage,
                     )
             }
         }
@@ -125,12 +129,22 @@ private fun androidx.compose.foundation.layout.ColumnScope.DetailBody(
     viewModel: AppointmentDetailViewModel,
     onOpenHistory: (String) -> Unit,
     onReschedule: (String) -> Unit,
+    onBindPackage: ((appointmentId: String, appointmentServiceId: String) -> Unit)?,
 ) {
     val canWrite = session.can(Permissions.APPOINTMENT_WRITE)
     val canReopen = session.can(Permissions.APPOINTMENT_REOPEN)
 
     SummaryCard(appointment, state, clock)
-    ServicesCard(appointment, state, clock)
+    ServicesCard(
+        appointment = appointment,
+        state = state,
+        clock = clock,
+        // İptal edilmiş / gelmemiş randevuda seans hiç düşmeyecek; bağlamak anlamsız.
+        onBindPackage =
+            onBindPackage?.takeIf { appointment.status.canBindPackage }?.let { bind ->
+                { lineId: String -> bind(appointment.id, lineId) }
+            },
+    )
     NotesCard(appointment, canWrite, viewModel)
 
     // Aksiyon kartı YALNIZ yetkiliye çizilir (§7.4): yetkisi olmayana düğmeyi gösterip
@@ -227,6 +241,7 @@ private fun ServicesCard(
     appointment: Appointment,
     state: AppointmentDetailUiState,
     clock: BranchClock,
+    onBindPackage: ((appointmentServiceId: String) -> Unit)?,
 ) {
     KlinaraCard(title = "Hizmetler", footnote = occupiedFootnote(appointment)) {
         appointment.services.sortedBy { it.sortOrder }.forEachIndexed { index, line ->
@@ -262,7 +277,26 @@ private fun ServicesCard(
                     color = KlinaraTheme.colors.charcoal,
                 )
             }
+            PackageBinding(line.customerPackageItemId, onBind = onBindPackage?.let { bind -> { bind(line.id) } })
         }
+    }
+}
+
+/**
+ * Satırın paket durumu (A5.2). Bağlıysa rozet; değilse ve izin varsa "Pakete bağla".
+ *
+ * Bağlı satırın rozeti "seans düştü" DEMİYOR: düşme tamamlanmada oluyor ve randevu henüz
+ * tamamlanmadıysa bu bir söz, bir kayıt değil.
+ */
+@Composable
+private fun PackageBinding(
+    customerPackageItemId: String?,
+    onBind: (() -> Unit)?,
+) {
+    when {
+        customerPackageItemId != null -> KlinaraBadge(text = "Pakete bağlı", tone = KlinaraBadgeTone.Positive)
+        onBind != null ->
+            KlinaraButton(title = "Pakete bağla", onClick = onBind, kind = KlinaraButtonKind.Tertiary)
     }
 }
 

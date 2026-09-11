@@ -207,6 +207,28 @@ object ShellRoutes {
         val definitionId: String? = null,
     )
 
+    /** Paket satışı (A5.2) — sheet değil, hedef. Satış SEÇİLİ ŞUBEDE yapılır. */
+    @Serializable
+    data class SellPackage(
+        val customerId: String,
+    )
+
+    /**
+     * Müşteri paketi detayı. Yalnız KİMLİK taşınır: iade/düzeltme sonrası ekran taze kayda
+     * bakmalı, açılışta kopyalanmış bayat bir modele değil.
+     */
+    @Serializable
+    data class CustomerPackageDetail(
+        val packageId: String,
+    )
+
+    /** Randevu satırını pakete bağlama (A5.2) — randevu detayından açılır. */
+    @Serializable
+    data class BindPackage(
+        val appointmentId: String,
+        val appointmentServiceId: String,
+    )
+
     @Serializable
     data object ProfileHome
 }

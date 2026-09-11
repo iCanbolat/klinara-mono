@@ -35,6 +35,24 @@ object MockErrors {
             "Bu kaydı siz açtıktan sonra başka biri güncelledi.",
         )
 
+    /** Paket hakkı bu işlem için yetersiz — kalan hak eksiye inemez (A5). */
+    fun packageExhausted(): ApiError.Problem =
+        problem(
+            ApiErrorCode.PACKAGE_EXHAUSTED,
+            "Paket hakkı yetersiz",
+            HTTP_CONFLICT,
+            "Kalan hak bu işlem için yeterli değil.",
+        )
+
+    /** Paket süresi dolmuş ya da kapatılmış (iade/devir) — tüketilemez (A5). */
+    fun packageExpired(): ApiError.Problem =
+        problem(
+            ApiErrorCode.PACKAGE_EXPIRED,
+            "Paket kullanılamaz",
+            HTTP_CONFLICT,
+            "Paketin süresi dolmuş ya da paket kapatılmış.",
+        )
+
     /**
      * Alan bazlı doğrulama hatası.
      *

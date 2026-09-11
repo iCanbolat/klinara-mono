@@ -1,0 +1,21 @@
+{
+  "data": [
+    {
+      "id": "f5000000-0000-4000-8000-000000000099",
+      "customerPackageItemId": "f3000000-0000-4000-8000-000000000001",
+      "serviceId": "5e111ce0-0000-4000-8000-000000000002",
+      "serviceName": "Lazer epilasyon",
+      "entryType": "loyalty_bonus",
+      "delta": 2,
+      "appointmentId": null,
+      "actorUserId": "u1000000-0000-4000-8000-000000000001",
+      "reason": "Sadakat hediyesi",
+      "reversesEntryId": null,
+      "createdAt": "2026-07-10T09:00:00.000Z"
+    }
+  ],
+  "pageInfo": {
+    "nextCursor": null,
+    "hasMore": false
+  }
+}

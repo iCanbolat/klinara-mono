@@ -1,0 +1,47 @@
+{
+  "data": [
+    {
+      "id": "f5000000-0000-4000-8000-000000000003",
+      "customerPackageItemId": "f3000000-0000-4000-8000-000000000001",
+      "serviceId": "5e111ce0-0000-4000-8000-000000000002",
+      "serviceName": "Lazer epilasyon",
+      "entryType": "consume",
+      "delta": 1,
+      "appointmentId": "a99a0000-0000-4000-8000-000000000011",
+      "actorUserId": "u1000000-0000-4000-8000-000000000001",
+      "reason": "Randevu yeniden açıldı",
+      "reversesEntryId": "f5000000-0000-4000-8000-000000000002",
+      "createdAt": "2026-08-27T10:00:00.000Z"
+    },
+    {
+      "id": "f5000000-0000-4000-8000-000000000002",
+      "customerPackageItemId": "f3000000-0000-4000-8000-000000000001",
+      "serviceId": "5e111ce0-0000-4000-8000-000000000002",
+      "serviceName": "Lazer epilasyon",
+      "entryType": "consume",
+      "delta": -1,
+      "appointmentId": "a99a0000-0000-4000-8000-000000000011",
+      "actorUserId": null,
+      "reason": null,
+      "reversesEntryId": null,
+      "createdAt": "2026-08-27T09:00:00.000Z"
+    },
+    {
+      "id": "f5000000-0000-4000-8000-000000000001",
+      "customerPackageItemId": "f3000000-0000-4000-8000-000000000001",
+      "serviceId": "5e111ce0-0000-4000-8000-000000000002",
+      "serviceName": "Lazer epilasyon",
+      "entryType": "purchase",
+      "delta": 10,
+      "appointmentId": null,
+      "actorUserId": "u1000000-0000-4000-8000-000000000001",
+      "reason": null,
+      "reversesEntryId": null,
+      "createdAt": "2026-07-10T09:00:00.000Z"
+    }
+  ],
+  "pageInfo": {
+    "nextCursor": "bGVkZ2VyLTM",
+    "hasMore": true
+  }
+}

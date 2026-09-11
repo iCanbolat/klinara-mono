@@ -80,6 +80,13 @@ enum class AppointmentStatus(val wire: String) {
             NoShow, Cancelled, Unknown -> emptyList()
         }
 
+    /**
+     * Pakete bağlanabilir mi (A5.2). İptal ve gelmedi'de seans hiç düşmeyecek; tamamlanmış
+     * randevu bağlanabilir ve bağlama o anda düşer.
+     */
+    val canBindPackage: Boolean
+        get() = this != Cancelled && this != NoShow && this != Unknown
+
     /** İptal edilmiş, gelmemiş ve tamamlanmış randevu ERTELENEMEZ (sunucu `assertMutable`). */
     val canReschedule: Boolean
         get() = this != Cancelled && this != NoShow && this != Completed && this != Unknown

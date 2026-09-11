@@ -1,0 +1,12 @@
+[
+  {
+    "customerPackageItemId": "f3000000-0000-4000-8000-000000000001",
+    "customerPackageId": "f2000000-0000-4000-8000-000000000001",
+    "packageName": "10 Seans Lazer + 2 Bakım",
+    "serviceId": "5e111ce0-0000-4000-8000-000000000002",
+    "serviceName": "Lazer epilasyon",
+    "remainingSessions": 6,
+    "expiresAt": "2027-07-10T09:00:00.000Z",
+    "branchId": "b1000000-0000-4000-8000-000000000001"
+  }
+]

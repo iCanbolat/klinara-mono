@@ -28,6 +28,7 @@ import com.klinara.android.designsystem.components.KlinaraScreen
 import com.klinara.android.designsystem.components.PhoneNumber
 import com.klinara.android.features.auth.AppSession
 import com.klinara.android.features.customers.files.CustomerFilesSection
+import com.klinara.android.features.packages.CustomerPackagesCard
 import com.klinara.android.features.customers.files.CustomerFilesViewModel
 import com.klinara.android.services.ServiceContainer
 import com.klinara.android.services.contracts.Permissions
@@ -40,7 +41,7 @@ import com.klinara.android.services.networking.Loadable
  *
  * A4.1 kartın **kimlik yarısını** çiziyor: ad, iletişim, adres, kaynak, etiket.
  * Notlar ve zaman çizelgesi A4.3'te, fotoğraf ve dosyalar A4.4'te bu ekranın altına
- * biner; paket (A5.2) ve cari hesap (A6.1) bölümleri de buraya gelecek.
+ * biner; paket bölümü A5.2'de geldi, cari hesap (A6.1) de buraya gelecek.
  *
  * **Sheet değil, gerçek bir `NavHost` hedefi** (Kural 2): sistem geri tuşu ve tahmini
  * geri kendiliğinden çalışsın diye.
@@ -58,6 +59,9 @@ fun CustomerDetailScreen(
     onOpenDocument: (customerId: String, fileId: String) -> Unit,
     onOpenGroups: (String) -> Unit,
     onUploadFile: (customerId: String, isPhoto: Boolean) -> Unit,
+    onOpenPackage: (packageId: String) -> Unit,
+    /** `null` ise (`package:write` yok) "Paket sat" çizilmez. */
+    onSellPackage: ((customerId: String) -> Unit)?,
     modifier: Modifier = Modifier,
     trailing: @Composable (RowScope.() -> Unit)? = null,
 ) {
@@ -142,6 +146,15 @@ fun CustomerDetailScreen(
                         clock = clock,
                         onSelectNote = { onOpenNote(customerId, it) },
                         onCreateNote = { onOpenNote(customerId, null) },
+                    )
+
+                    CustomerPackagesCard(
+                        session = session,
+                        container = container,
+                        customerId = customerId,
+                        clock = clock,
+                        onOpen = onOpenPackage,
+                        onSell = onSellPackage,
                     )
 
                     CustomerFilesSection(

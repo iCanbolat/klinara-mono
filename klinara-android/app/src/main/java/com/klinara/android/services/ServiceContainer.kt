@@ -185,7 +185,14 @@ class ServiceContainer private constructor(
             val mockCatalog = MockCatalogService().apply { this.failing = failing }
             // Paket kalemleri katalogdan fiyat ve ad alıyor — ayrı bir katalog kopyası,
             // pakete eklenen hizmetin rezervasyon formunda bulunamaması demek olurdu.
-            val mockPackages = MockPackagesService(catalog = mockCatalog).apply { this.failing = failing }
+            val mockPackages =
+                MockPackagesService(
+                    catalog = mockCatalog,
+                    customers = mockCustomers::snapshot,
+                    booking = mockBooking,
+                ).apply { this.failing = failing }
+            // Tamamlanma → seans düşme aynı "transaction": hak yetersizse durum da değişmez.
+            mockBooking.packageHook = mockPackages
 
             return ServiceContainer(
                 auth = mockAuth,

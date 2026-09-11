@@ -56,8 +56,11 @@ import com.klinara.android.features.customers.files.PhotoDetailHost
 import com.klinara.android.features.customers.files.PhotoGroupsHost
 import com.klinara.android.services.files.FilePosition
 import com.klinara.android.features.calendar.booking.BookingFlowHost
+import com.klinara.android.features.packages.BindPackageHost
+import com.klinara.android.features.packages.CustomerPackageDetailHost
 import com.klinara.android.features.packages.PackageDefinitionEditorScreen
 import com.klinara.android.features.packages.PackageDefinitionListScreen
+import com.klinara.android.features.packages.SellPackageHost
 import com.klinara.android.features.profile.ProfileScreen
 import com.klinara.android.services.ServiceContainer
 import com.klinara.android.services.contracts.Permissions
@@ -191,6 +194,24 @@ private fun TodayTab(
                 onBack = { navController.popBackStack() },
                 onOpenHistory = { navController.navigate(ShellRoutes.AppointmentHistory(it)) },
                 onReschedule = { navController.navigate(ShellRoutes.BookingFlow(rescheduleId = it)) },
+                onBindPackage =
+                    if (session.can(Permissions.PACKAGE_WRITE)) {
+                        { appointment, line -> navController.navigate(ShellRoutes.BindPackage(appointment, line)) }
+                    } else {
+                        null
+                    },
+            )
+        }
+
+        composable<ShellRoutes.BindPackage> { entry ->
+            val route = entry.toRoute<ShellRoutes.BindPackage>()
+            BindPackageHost(
+                session = session,
+                container = container,
+                appointmentId = route.appointmentId,
+                appointmentServiceId = route.appointmentServiceId,
+                serviceName = null,
+                onBack = { navController.popBackStack() },
             )
         }
 
@@ -267,6 +288,33 @@ private fun CustomersTab(
                 onUploadFile = { customer, isPhoto ->
                     navController.navigate(ShellRoutes.FileUpload(customer, isPhoto))
                 },
+                onOpenPackage = { navController.navigate(ShellRoutes.CustomerPackageDetail(it)) },
+                onSellPackage =
+                    if (session.can(Permissions.PACKAGE_WRITE)) {
+                        { navController.navigate(ShellRoutes.SellPackage(it)) }
+                    } else {
+                        null
+                    },
+            )
+        }
+
+        composable<ShellRoutes.SellPackage> { entry ->
+            val route = entry.toRoute<ShellRoutes.SellPackage>()
+            SellPackageHost(
+                session = session,
+                container = container,
+                customerId = route.customerId,
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable<ShellRoutes.CustomerPackageDetail> { entry ->
+            val route = entry.toRoute<ShellRoutes.CustomerPackageDetail>()
+            CustomerPackageDetailHost(
+                session = session,
+                container = container,
+                packageId = route.packageId,
+                onBack = { navController.popBackStack() },
             )
         }
 

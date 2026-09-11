@@ -1,0 +1,50 @@
+{
+  "id": "f2000000-0000-4000-8000-000000000001",
+  "customerId": "c0570000-0000-4000-8000-000000000001",
+  "branchId": "b1000000-0000-4000-8000-000000000001",
+  "definitionId": "f1000000-0000-4000-8000-000000000001",
+  "name": "10 Seans Lazer + 2 Bakım",
+  "definitionRevision": 1,
+  "totalPriceMinor": 1250000,
+  "currency": "TRY",
+  "isTransferable": true,
+  "validityDays": 365,
+  "soldAt": "2026-07-10T09:00:00.000Z",
+  "expiresAt": "2027-07-10T09:00:00.000Z",
+  "status": "active",
+  "remainingSessions": 7,
+  "outstandingMinor": 736194,
+  "refundedSessions": 0,
+  "refundAmountMinor": 0,
+  "refundSettlementStatus": null,
+  "refundedAt": null,
+  "refundReason": null,
+  "transferredFromPackageId": null,
+  "note": null,
+  "version": 4,
+  "items": [
+    {
+      "id": "f3000000-0000-4000-8000-000000000001",
+      "serviceId": "5e111ce0-0000-4000-8000-000000000002",
+      "serviceName": "Lazer epilasyon",
+      "quantityTotal": 10,
+      "remainingSessions": 6,
+      "unitListPriceMinor": 145000,
+      "itemTotalMinor": 1111963,
+      "outstandingMinor": 667176,
+      "sortOrder": 0
+    },
+    {
+      "id": "f3000000-0000-4000-8000-000000000002",
+      "serviceId": "5e111ce0-0000-4000-8000-000000000001",
+      "serviceName": "Cilt bakımı",
+      "quantityTotal": 2,
+      "remainingSessions": 1,
+      "unitListPriceMinor": 90000,
+      "itemTotalMinor": 138037,
+      "outstandingMinor": 69018,
+      "sortOrder": 1
+    }
+  ],
+  "createdAt": "2026-07-10T09:00:00.000Z"
+}

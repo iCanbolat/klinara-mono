@@ -63,3 +63,10 @@ tanımadığımız bir `status` ve fazladan bir alan taşıyor. İstemci ikisind
 `version` bilerek FARKLI — ikisi iki ayrı sayaç ve eşit olsalardı karıştırıldıkları hiç
 görünmezdi. `package-definition-page.json` imleçli sayfayı, **`validityDays: null`**
 (süresiz — `0` değil) ve ileri sürümlü bir alanı taşıyor.
+
+`customer-package.json` kalem bazlı bakiyeyi (lazer 6/10, bakım 1/2) ve satış tahsisini
+taşıyor; `customer-package-page.json`'daki iade edilmiş paket **kasa hareketi bekleyen**
+(`refundSettlementStatus: "pending"`) bir yükümlülük. `package-ledger.json` bir tüketimi
+ve onu geri alan **ters kaydı** (`reversesEntryId`) taşıyor; `ledger-unknown-kind.json`
+bilerek tanımadığımız bir `entryType` içeriyor. `package-entitlements.json` **çıplak
+dizi** — zarf YOK.
