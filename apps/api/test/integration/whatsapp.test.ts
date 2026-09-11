@@ -180,6 +180,26 @@ describe('WhatsApp Cloud API adapter (Batch 8.2)', () => {
       expect((account.body as AccountBody).status).toBe('error');
     });
 
+    it('Meta hata metnindeki ham token yanıta ve `last_error`a SIZMAZ', async () => {
+      await configure().expect(200);
+      graph.queue(graphError(400, 190, `Malformed access token ${TOKEN}`));
+
+      const verified = await http(app)
+        .post('/api/v1/integrations/whatsapp/verify')
+        .set(ownerAuth())
+        .expect(200);
+      const account = await http(app)
+        .get('/api/v1/integrations/whatsapp')
+        .set(ownerAuth())
+        .expect(200);
+
+      const error = (verified.body as { error: string }).error;
+      const lastError = (account.body as { lastError: string }).lastError;
+      expect(error).not.toContain(TOKEN);
+      expect(lastError).not.toContain(TOKEN);
+      expect(lastError).toContain('a91f');
+    });
+
     it('kimlik bilgisi güncellemesi hesabı yeniden DOĞRULANMAMIŞ yapar', async () => {
       await configure().expect(200);
       await http(app).post('/api/v1/integrations/whatsapp/verify').set(ownerAuth()).expect(200);
@@ -190,6 +210,23 @@ describe('WhatsApp Cloud API adapter (Batch 8.2)', () => {
         .set(ownerAuth())
         .expect(200);
       expect((account.body as AccountBody).status).toBe('unconfigured');
+    });
+
+    it('app secret verilmeyen güncelleme KAYITLI secret’ı korur', async () => {
+      await configure().expect(200);
+
+      const updated = await http(app)
+        .put('/api/v1/integrations/whatsapp')
+        .set(ownerAuth())
+        .send({
+          wabaId: '102290129340398',
+          phoneNumberId: '106540352242922',
+          accessToken: 'EAAG-yeni-token-b22e',
+        })
+        .expect(200);
+
+      // Eskiden `null` yazılıyordu: webhook imzası doğrulanamaz, gelen kutusu boş kalırdı.
+      expect((updated.body as AccountBody).hasAppSecret).toBe(true);
     });
 
     it('yetkisiz rol entegrasyonu okuyamaz', async () => {

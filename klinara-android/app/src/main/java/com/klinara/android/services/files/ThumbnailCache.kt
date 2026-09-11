@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.collection.LruCache
 import com.klinara.android.services.networking.ApiError
+import com.klinara.android.services.networking.executeOffMain
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import okhttp3.OkHttpClient
@@ -54,11 +55,15 @@ class ThumbnailCache(
             null
         }
 
-    private fun download(url: String): Bitmap? =
+    /** Ağ ve çözümleme IO'da (A8.3 düzeltmesi — `executeOffMain`). */
+    private suspend fun download(url: String): Bitmap? =
         try {
-            http.newCall(Request.Builder().url(url).build()).execute().use { response ->
-                if (!response.isSuccessful) return null
-                response.body.byteStream().use { BitmapFactory.decodeStream(it) }
+            http.executeOffMain(Request.Builder().url(url).build()) { response ->
+                if (!response.isSuccessful) {
+                    null
+                } else {
+                    response.body.byteStream().use { BitmapFactory.decodeStream(it) }
+                }
             }
         } catch (_: IOException) {
             null

@@ -89,11 +89,12 @@ export class WhatsAppSenderService {
     const account = await repo.findAccount(tx);
     if (account === undefined) return { ok: false, error: 'Hesap yapılandırılmamış' };
 
+    const accessToken = this.encryption.decrypt(account.accessTokenEncrypted);
     try {
       const templates = await this.client.listTemplates(
         {
           phoneNumberId: account.phoneNumberId,
-          accessToken: this.encryption.decrypt(account.accessTokenEncrypted),
+          accessToken,
           apiVersion: account.apiVersion,
         },
         account.wabaId,
@@ -102,9 +103,19 @@ export class WhatsAppSenderService {
       await repo.markVerified(tx, tenantId, { ok: true });
       return { ok: true };
     } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error);
+      // Meta bozuk token'ı hata metnine AYNEN yazıyor ("Malformed access token EAAG…").
+      // Metin `last_error`'a ve yanıta gidiyordu: "ham token hiçbir yanıtta dönmez"
+      // sözleşmesi bu yoldan deliniyordu (Android A8.3 canlı denemesinde görüldü).
+      const raw = error instanceof Error ? error.message : String(error);
+      const detail = redactToken(raw, accessToken);
       await repo.markVerified(tx, tenantId, { ok: false, error: detail });
       return { ok: false, error: detail };
     }
   }
+}
+
+/** Metindeki token'ı (varsa) son dört karakteri dışında maskeler. */
+export function redactToken(text: string, token: string): string {
+  if (token.length === 0) return text;
+  return text.split(token).join(`${'•'.repeat(8)}${token.slice(-4)}`);
 }

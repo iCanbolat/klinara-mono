@@ -2,6 +2,11 @@ package com.klinara.android.services.notifications
 
 import com.klinara.android.services.contracts.ApiErrorCode
 import com.klinara.android.services.integrations.InboxItem
+import com.klinara.android.services.integrations.WhatsAppAccount
+import com.klinara.android.services.integrations.WhatsAppAccountStatus
+import com.klinara.android.services.integrations.WhatsAppTemplate
+import com.klinara.android.services.integrations.WhatsAppTemplateButton
+import com.klinara.android.services.integrations.WhatsAppTemplateStatus
 import com.klinara.android.services.mock.MockCustomers
 import com.klinara.android.services.mock.MockIds
 import java.time.Duration
@@ -240,6 +245,59 @@ internal object MockNotificationsSeed {
                 event = NotificationEvent.Birthday,
                 kind = NotificationKind.Marketing,
                 channels = emptyList(),
+            ),
+        )
+
+    fun account(now: Instant): WhatsAppAccount =
+        WhatsAppAccount(
+            wabaId = "1029384756",
+            phoneNumberId = "5647382910",
+            businessPhone = "+902121234567",
+            apiVersion = "v21.0",
+            status = WhatsAppAccountStatus.Active,
+            accessTokenMasked = "••••••••aF3k",
+            hasAppSecret = true,
+            lastVerifiedAt = now.ago(hours = 6),
+        )
+
+    /** Biri değişkenli, biri test edilebilir (değişkensiz + onaylı), biri onay bekliyor. */
+    fun whatsAppTemplates(now: Instant): List<WhatsAppTemplate> =
+        listOf(
+            WhatsAppTemplate(
+                name = "randevu_hatirlatma",
+                language = "tr",
+                category = "UTILITY",
+                status = WhatsAppTemplateStatus.Approved,
+                bodyVariableCount = 3,
+                buttons =
+                    listOf(
+                        WhatsAppTemplateButton("QUICK_REPLY", "Onayla"),
+                        WhatsAppTemplateButton("QUICK_REPLY", "İptal Et"),
+                    ),
+                syncedAt = now.ago(hours = 6),
+            ),
+            WhatsAppTemplate(
+                name = "baglanti_testi",
+                language = "tr",
+                category = "UTILITY",
+                status = WhatsAppTemplateStatus.Approved,
+                syncedAt = now.ago(hours = 6),
+            ),
+            // Aynı ad başka dilde: test ekranı seçimi ad + dil ile yapmalı (iOS yalnız ada bakıyordu).
+            WhatsAppTemplate(
+                name = "baglanti_testi",
+                language = "en",
+                category = "UTILITY",
+                status = WhatsAppTemplateStatus.Approved,
+                syncedAt = now.ago(hours = 6),
+            ),
+            WhatsAppTemplate(
+                name = "dogum_gunu",
+                language = "tr",
+                category = "MARKETING",
+                status = WhatsAppTemplateStatus.Pending,
+                bodyVariableCount = 2,
+                syncedAt = now.ago(hours = 6),
             ),
         )
 

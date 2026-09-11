@@ -56,7 +56,9 @@ export class UpsertWhatsAppAccountDto {
   @MaxLength(500)
   accessToken: string;
 
-  @ApiPropertyOptional({ description: 'Webhook imza doğrulaması için (8.3)' })
+  @ApiPropertyOptional({
+    description: 'Webhook imza doğrulaması için (8.3). Verilmezse kayıtlı değer KORUNUR.',
+  })
   @IsOptional()
   @IsString()
   @MinLength(8)

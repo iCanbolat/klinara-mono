@@ -40,18 +40,26 @@ export class WhatsAppService {
   }
 
   async upsert(input: UpsertWhatsAppAccountDto): Promise<WhatsAppAccountResponseDto> {
-    const row = await this.tx.run((tx) =>
-      repo.upsertAccount(tx, this.tx.tenantId, {
+    const row = await this.tx.run(async (tx) => {
+      // `appSecret` verilmezse KAYITLI değer korunur. Eskiden `null` yazılıyordu: kimlik
+      // bilgisini güncelleyen (ör. yalnız token'ı yenileyen) her kayıt webhook imza
+      // sırrını sessizce siliyor, gelen mesajlar doğrulanamayıp düşüyor ve gelen kutusu
+      // boş kalıyordu. Token okunamadığı için her kayıtta yeniden istenir; secret'ı da
+      // yeniden istemek, kullanıcıyı Meta panelinden bir sırrı daha kopyalamaya zorlardı.
+      const current = input.appSecret === undefined ? await repo.findAccount(tx) : undefined;
+      return repo.upsertAccount(tx, this.tx.tenantId, {
         wabaId: input.wabaId,
         phoneNumberId: input.phoneNumberId,
         businessPhone:
           input.businessPhone === undefined ? null : normalizePhone(input.businessPhone),
         accessTokenEncrypted: this.encryption.encrypt(input.accessToken),
         appSecretEncrypted:
-          input.appSecret === undefined ? null : this.encryption.encrypt(input.appSecret),
+          input.appSecret === undefined
+            ? (current?.appSecretEncrypted ?? null)
+            : this.encryption.encrypt(input.appSecret),
         apiVersion: input.apiVersion ?? this.config.get('WHATSAPP_API_VERSION', { infer: true }),
-      }),
-    );
+      });
+    });
     return this.toResponse(row);
   }
 

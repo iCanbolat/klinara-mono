@@ -1,0 +1,20 @@
+[
+  {
+    "name": "randevu_hatirlatma",
+    "language": "tr",
+    "category": "UTILITY",
+    "status": "approved",
+    "bodyVariableCount": 2,
+    "buttons": [
+      {
+        "text": "Onayla",
+        "type": "QUICK_REPLY"
+      },
+      {
+        "text": "İptal Et",
+        "type": "QUICK_REPLY"
+      }
+    ],
+    "syncedAt": "2026-08-28T22:36:45.177Z"
+  }
+]

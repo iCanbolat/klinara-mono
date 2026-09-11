@@ -97,9 +97,10 @@ class ApiClient internal constructor(
     internal suspend fun execute(request: ApiRequest): ByteArray {
         val httpRequest = build(request)
 
-        val response =
+        // Ağ G/Ç'si IO'da (A8.3 düzeltmesi — `executeOffMain`): ViewModel'ler Main'den çağırıyor.
+        val (bytes, status, ok) =
             try {
-                http.newCall(httpRequest).execute()
+                http.executeOffMain(httpRequest) { Triple(it.body.bytes(), it.code, it.isSuccessful) }
             } catch (e: IOException) {
                 // OkHttp iptal edilmiş çağrıyı IOException("Canceled") olarak yüzeye
                 // çıkarır. Bunu `Network`e eşlemek her gezinmeyi sahte bir "bağlantı
@@ -109,11 +110,8 @@ class ApiClient internal constructor(
                 throw ApiError.Network(e)
             }
 
-        response.use {
-            val bytes = it.body.bytes()
-            if (!it.isSuccessful) throw problem(bytes, it.code)
-            return bytes
-        }
+        if (!ok) throw problem(bytes, status)
+        return bytes
     }
 
     private fun build(request: ApiRequest): Request {

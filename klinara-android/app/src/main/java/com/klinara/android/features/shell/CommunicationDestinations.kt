@@ -8,6 +8,10 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
 import com.klinara.android.features.auth.AppSession
+import com.klinara.android.features.integrations.WhatsAppEditorHost
+import com.klinara.android.features.integrations.WhatsAppSettingsHost
+import com.klinara.android.features.integrations.WhatsAppTemplatesHost
+import com.klinara.android.features.integrations.WhatsAppTestHost
 import com.klinara.android.features.notifications.InboxScreen
 import com.klinara.android.features.notifications.MessageDetailHost
 import com.klinara.android.features.notifications.MessageLogHost
@@ -21,7 +25,7 @@ import com.klinara.android.services.ServiceContainer
 /**
  * Yönetim sekmesinin İletişim hedefleri (A8).
  *
- * `ManagementTab`'ın içine yazılmadı: A8 on hedef getiriyor ve tek bir `NavHost` bloğunu
+ * `ManagementTab`'ın içine yazılmadı: A8 on dört hedef getiriyor ve tek bir `NavHost` bloğunu
  * 400 satıra taşımak, kabuğun "hangi hedef nerede" sorusunu okunmaz kılardı. Grafik yine
  * TEK — bu yalnız bir `NavGraphBuilder` uzantısı, ikinci bir NavHost değil.
  */
@@ -63,6 +67,17 @@ internal fun NavGraphBuilder.communicationDestinations(
         )
     }
 
+    notificationSettingsDestinations(navController, session, container, trailing)
+    whatsAppDestinations(navController, session, container)
+}
+
+/** Hatırlatma, şablon ve tercih hedefleri (A8.2). */
+private fun NavGraphBuilder.notificationSettingsDestinations(
+    navController: NavHostController,
+    session: AppSession,
+    container: ServiceContainer,
+    trailing: @Composable RowScope.() -> Unit,
+) {
     composable<ShellRoutes.ReminderSettings> {
         ReminderSettingsHost(
             session = session,
@@ -113,6 +128,50 @@ internal fun NavGraphBuilder.communicationDestinations(
             container = container,
             owner = owner,
             rowId = route.rowId,
+            onBack = { navController.popBackStack() },
+        )
+    }
+}
+
+/** WhatsApp entegrasyonunun dört hedefi (A8.3) — hepsi ayar ekranının ViewModel'ini paylaşır. */
+private fun NavGraphBuilder.whatsAppDestinations(
+    navController: NavHostController,
+    session: AppSession,
+    container: ServiceContainer,
+) {
+    composable<ShellRoutes.WhatsAppSettings> { entry ->
+        WhatsAppSettingsHost(
+            session = session,
+            container = container,
+            owner = entry,
+            onEdit = { navController.navigate(ShellRoutes.WhatsAppEditor) },
+            onOpenTemplates = { navController.navigate(ShellRoutes.WhatsAppTemplates) },
+            onTest = { navController.navigate(ShellRoutes.WhatsAppTest) },
+            onBack = { navController.popBackStack() },
+        )
+    }
+
+    composable<ShellRoutes.WhatsAppEditor> { entry ->
+        val owner = remember(entry) { navController.getBackStackEntry<ShellRoutes.WhatsAppSettings>() }
+        WhatsAppEditorHost(container = container, owner = owner, onBack = { navController.popBackStack() })
+    }
+
+    composable<ShellRoutes.WhatsAppTemplates> { entry ->
+        val owner = remember(entry) { navController.getBackStackEntry<ShellRoutes.WhatsAppSettings>() }
+        WhatsAppTemplatesHost(
+            session = session,
+            container = container,
+            owner = owner,
+            onBack = { navController.popBackStack() },
+        )
+    }
+
+    composable<ShellRoutes.WhatsAppTest> { entry ->
+        val owner = remember(entry) { navController.getBackStackEntry<ShellRoutes.WhatsAppSettings>() }
+        WhatsAppTestHost(
+            session = session,
+            container = container,
+            owner = owner,
             onBack = { navController.popBackStack() },
         )
     }

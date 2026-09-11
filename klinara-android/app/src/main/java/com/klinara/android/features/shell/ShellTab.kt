@@ -345,6 +345,19 @@ object ShellRoutes {
         val rowId: String,
     )
 
+    /** WhatsApp entegrasyonu (A8.3) — editör, şablon ve test hedefleriyle PAYLAŞILAN ViewModel'in sahibi. */
+    @Serializable
+    data object WhatsAppSettings
+
+    @Serializable
+    data object WhatsAppEditor
+
+    @Serializable
+    data object WhatsAppTemplates
+
+    @Serializable
+    data object WhatsAppTest
+
     @Serializable
     data object ProfileHome
 }

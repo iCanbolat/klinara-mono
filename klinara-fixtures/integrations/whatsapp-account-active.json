@@ -1,0 +1,11 @@
+{
+  "wabaId": "1029384756",
+  "phoneNumberId": "5647382910",
+  "businessPhone": "+902121234567",
+  "apiVersion": "v21.0",
+  "status": "active",
+  "accessTokenMasked": "••••••••a91f",
+  "hasAppSecret": true,
+  "lastVerifiedAt": "2026-08-28T22:36:45.178Z",
+  "lastError": null
+}

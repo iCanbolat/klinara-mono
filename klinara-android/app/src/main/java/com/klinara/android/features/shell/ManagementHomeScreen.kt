@@ -28,6 +28,7 @@ enum class ManagementDestination {
     ReminderSettings,
     NotificationTemplates,
     NotificationPreferences,
+    WhatsApp,
 }
 
 data class ManagementRow(
@@ -159,6 +160,17 @@ private fun communicationSection(session: AppSession): ManagementSection? {
                     ),
                 )
             }
+            // Kimlik bilgileri `notification:manage` (receptionist görmez); test gönderimi ekranın içinde
+            // `notification:send` ile ayrıca sorulur.
+            if (session.can(Permissions.NOTIFICATION_MANAGE)) {
+                add(
+                    row(
+                        ManagementDestination.WhatsApp,
+                        "WhatsApp entegrasyonu",
+                        "WABA kimlik bilgileri, şablonlar ve test gönderimi",
+                    ),
+                )
+            }
         }
     if (rows.isEmpty()) return null
     return ManagementSection(
@@ -226,4 +238,4 @@ fun ManagementHomeScreen(
 }
 
 private const val COMING_SOON =
-    "Kasa ve prim Faz A6, WhatsApp entegrasyonu Faz A8.3, raporlar Faz A9 ile geliyor."
+    "Kasa ve prim Faz A6, raporlar Faz A9 ile geliyor."

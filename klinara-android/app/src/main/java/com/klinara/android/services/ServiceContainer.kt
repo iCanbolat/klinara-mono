@@ -79,7 +79,7 @@ import kotlinx.coroutines.flow.SharedFlow
  *
  *     customers A3.4 · notifications(opt-out) A4.2 · notes A4.3 ✓ · files A4.4 ✓ · packages A5.1 ✓
  *     finance A6.1 · commissions A6.4 · catalog/staff/users/scheduling A7 ✓
- *     notifications/messages/whatsapp(gelen kutusu) A8.1 ✓ · whatsapp(hesap) A8.3 · reports A9
+ *     notifications/messages/whatsapp A8 ✓ · reports A9
  *
  * **A3.1'de iki servis planlanandan ÖNCE geldi** ve `ANDROID_DEVELOPMENT.md` §6 buna
  * göre güncellendi: `booking` A3.4 yerine A3.1'de (takvim onsuz çizilemez; oluşturma
@@ -217,7 +217,8 @@ class ServiceContainer private constructor(
             // plan da kaymalı, ayrı bir tablo bunu bilemezdi.
             val mockNotifications = MockNotificationsService(booking = mockBooking).apply { this.failing = failing }
             val mockMessages = MockMessagesService().apply { this.failing = failing }
-            val mockWhatsApp = MockWhatsAppService().apply { this.failing = failing }
+            // Test gönderimi mesaj günlüğüne düşer — sunucuda ikisi aynı `message_log` tablosu.
+            val mockWhatsApp = MockWhatsAppService(messages = mockMessages).apply { this.failing = failing }
             val mockNotes = MockNotesService().apply { this.failing = failing }
             val mockFiles = MockFilesService().apply { this.failing = failing }
             // Paket kalemleri katalogdan fiyat ve ad alıyor — ayrı bir katalog kopyası,

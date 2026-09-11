@@ -778,4 +778,5 @@ private fun ManagementDestination.route(): Any =
         ManagementDestination.ReminderSettings -> ShellRoutes.ReminderSettings
         ManagementDestination.NotificationTemplates -> ShellRoutes.NotificationTemplates
         ManagementDestination.NotificationPreferences -> ShellRoutes.NotificationPreferences
+        ManagementDestination.WhatsApp -> ShellRoutes.WhatsAppSettings
     }

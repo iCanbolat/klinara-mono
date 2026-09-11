@@ -36,16 +36,14 @@ class SignedUploader internal constructor(
                 .put(data.toRequestBody(contentType.toMediaType()))
                 .build()
 
-        val response =
+        val (ok, status) =
             try {
-                bareHttp.newCall(request).execute()
+                bareHttp.executeOffMain(request) { it.isSuccessful to it.code }
             } catch (e: IOException) {
                 currentCoroutineContext().ensureActive()
                 throw ApiError.Network(e)
             }
 
-        response.use {
-            if (!it.isSuccessful) throw ApiError.UploadFailed(it.code)
-        }
+        if (!ok) throw ApiError.UploadFailed(status)
     }
 }

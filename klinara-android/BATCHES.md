@@ -2475,3 +2475,81 @@ görünümü yerel yamalamak bir varsayılanı ezince iki satır bırakabilirdi)
 
 - Şablon **silme / varsayılana dönme** — sunucuda uç yok.
 - Çok dilli şablon (`locale` hep `tr`) — iOS gibi.
+
+---
+
+## A8.3 — WhatsApp (+ iki sunucu düzeltmesi [S]) ✅
+
+**Durum:** `./gradlew check` yeşil. **558 test** (A8.2 sonunda 547), 76 suite. Sunucu:
+`whatsapp.test.ts` 19/19 (yeni: secret korunuyor, token sızmıyor), `whatsapp-webhook.test.ts`
+yeşil, `typecheck` temiz. Emülatörde **mock**: Durum kartı "Bağlı", maskeli token, "Webhook
+imzası · Doğrulanabilir" → Bağlantıyı doğrula → "Bağlantı doğrulandı · Senkronlanan şablon: 4"
+→ Test mesajı: yalnız değişkensiz onaylı iki şablon (`baglanti_testi` TR ve EN) → EN seçildi →
+"Sağlayıcı kabul etti · wamid.mock-1" → Mesaj günlüğünün başında "Otomatik yanıt · WhatsApp ·
++90********33". **Canlı** (yerel API + seed, `sahip@demo-klinik.test`): Hatırlatma ayarı —
+yalnız gecikme 2 → 3 kaydedildi, `GET` `isBranchOverride: false` (iOS burada override yazardı;
+sonra 2'ye geri alındı). WhatsApp — boş gövdeli 200 → "WhatsApp bağlı değil" boş durumu (hata
+değil) → Yapılandır → kaydedildi (`unconfigured`) → **yalnız token** değiştirilerek yeniden
+kaydedildi → `hasAppSecret: true` korundu → Doğrula Meta'ya gerçekten gitti, `ok: false`.
+
+### Yakalanan gerçek hata — canlı modda HER istek uygulamayı düşürüyordu
+
+`ApiClient.execute`, `SignedUploader.upload` ve `ThumbnailCache.download` OkHttp'nin engelleyen
+`call.execute()`'unu **çağıranın** dispatcher'ında koşturuyordu; ViewModel'ler Main'den çağırıyor.
+Canlı sunucuya ilk istek (`me()`) `NetworkOnMainThreadException` ile uygulamayı düşürdü. Mock mod
+OkHttp'ye hiç inmediği için A3–A8 emülatör yürüyüşlerinin hiçbiri görmedi; sunucu kapalıyken
+bağlantı reddi istisnadan önce geldiği için "Bağlantı kurulamadı" ekranı da maskeledi. Düzeltme
+tek yardımcıda: `networking/OkHttpCalls.executeOffMain` — çağrı ve gövde okuma IO'da, coroutine
+iptal edilince `call.cancel()`. Regresyon testi `ApiClientThreadingTest` (JVM'de StrictMode yok;
+ağ işini yapan iş parçacığının çağıranınki olmadığı ölçülüyor). `ApiClientTest` 22/22 değişmedi.
+
+### [S] App secret kayboluyordu — sunucu düzeltildi
+
+`PUT integrations/whatsapp`'ta `appSecret` verilmezse `null` yazılıyordu: token'ı yenileyen her
+kayıt webhook imza sırrını sessizce siliyor, gelen mesajlar doğrulanamayıp düşüyor, gelen kutusu
+boş kalıyordu — iOS editörü tam tersini ("Boş bırakırsanız korunur") söylüyordu. Artık kayıtlı
+şifreli değer aynı transaction'da okunup korunuyor; iOS metni doğru hâle geldi, iOS'ta değişiklik
+yok. Android gövdeye `appSecret: null` yazmıyor (alan hiç yok).
+
+### [S] Ham token `lastError` üzerinden sızıyordu — sunucu düzeltildi (canlı denemede görüldü)
+
+Meta bozuk token'ı hata metnine aynen yazıyor ("Malformed access token EAAG…"); metin
+`last_error`'a ve doğrulama yanıtına gidiyordu. "Ham token hiçbir yanıtta dönmez" sözleşmesi bu
+yoldan deliniyordu ve ekranda "Son hata" satırında görünüyordu. `redactToken` metindeki token'ı
+maskeliyor (`••••••••b22e`); canlıda doğrulandı.
+
+### WhatsApp servisi — beş uç, yeni uç YOK
+
+`account()` **`sendOptional`** (kurulmamış = `Loaded(null)`, boş durum), `upsertAccount` (PUT,
+`null` alan yazılmaz), `verify()` (`ok: false` bir sonuç), `templates()`, `sendTest`. Dört hedef
+(durum, kimlik bilgileri, şablonlar, test) ayar ekranının geri yığını sahipli ViewModel'ini
+paylaşıyor; sheet'ler route. Test düğmesi `notification:send`, hub satırı `notification:manage`
+(resepsiyon görmez).
+
+### iOS'tan sapmalar / iOS'a bildirilecek fark (§7.8)
+
+1. Test şablonu **ad + dil** ile seçiliyor; iOS yalnız adı tutuyor ve aynı ad iki dilde varsa hep
+   ilk dili gönderiyor (mock'ta `baglanti_testi` TR/EN ile sürülebilir).
+2. Test gönderiminde yalnız kota (503) "Tekrar dene" gösteriyor; kalıcı 422'ler göstermiyor.
+3. iOS mock'u geçersiz numarada `WHATSAPP_INVALID_RECIPIENT` diyordu; sunucu Meta'ya gitmeden
+   `VALIDATION_FAILED` veriyor — Android mock'u sunucuyu izliyor (alan hatası "to").
+4. iOS `APIClient`'ta aynı "ana iş parçacığında ağ" riski yok (URLSession zaten asenkron) — not
+   yalnız bilgi için.
+
+### Yeni bağımlılık: YOK
+
+### Kapsam dışı
+
+- Test gönderimine `Idempotency-Key` — sunucu uç okumuyor.
+- Kimlik bilgisini silme / entegrasyonu kapatma — sunucuda uç yok.
+
+### Faz A8 kapandı
+
+Üç batch, 558 test (faz başında 498). Çıkış ölçütü — **hatırlatma ayarı değişikliği sunucuya
+yazılıyor ve sonucu görülüyor** — canlıda: kısmi `PUT` override yazmadan kaydedildi ve `GET` ile
+okundu; mock'ta randevu detayındaki plan şube ayarından türüyor ve test gönderimi mesaj
+günlüğüne düşüyor. Faz boyunca **dört sunucu kusuru** bulundu, üçü düzeltildi (sessiz saat
+kapatılamıyordu, app secret siliniyordu, token `lastError`'dan sızıyordu); dördüncüsü (hatırlatma
+override'ı) iOS kusuru çıktı. Canlı modu tamamen kıran `NetworkOnMainThreadException` fazın en
+değerli bulgusu: A3'ten beri yalnız mock yürüyüş yapılmış olmasının bedeli. Kalan borç: iOS'a
+4 + 4 + 3 fark notu.

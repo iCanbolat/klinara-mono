@@ -105,3 +105,8 @@ iOS `NotificationFixtures.swift`'ten **aynen** çıkarıldı — gövdeler sunuc
 kod varsayılanını (`id: null`, `isDefault: true`) ve kiracı satırını ayrı ayrı çiviliyor;
 `problem-template-invalid.json`'ın `detail`'i izinli değişkenleri sayıyor — ekran onu
 gösteriyor, tablo metnini değil.
+
+## `integrations/` (A8.3)
+
+iOS `NotificationFixtures.swift`'ten. `whatsapp-account-active.json` yalnız **maskeli** token
+taşıyor (`accessToken` anahtarı hiç yok — test bunu da doğruluyor); şablon durumu küçük harf.
