@@ -228,6 +228,8 @@ fun PackageReportsHost(
     onOpen: (PackageReportScreen) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Satırdan müşteri kartına (Müşteriler sekmesi). `null` → satır tıklanmaz (izin yok). */
+    onOpenCustomer: ((String) -> Unit)? = null,
 ) {
     val clock = remember(session.activeBranch?.timezone) { BranchClock(session.activeBranch?.timezone) }
     val viewModel: PackageReportsViewModel =
@@ -274,6 +276,7 @@ fun PackageReportsHost(
                 onLoadMore = viewModel::loadMoreExpiring,
                 onRetry = viewModel::loadExpiring,
                 onBack = onBack,
+                onOpenCustomer = onOpenCustomer,
                 modifier = modifier,
             )
         }

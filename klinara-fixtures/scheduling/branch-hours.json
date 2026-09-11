@@ -1,0 +1,89 @@
+{
+  "branchId": "b1000000-0000-4000-8000-000000000001",
+  "entries": [
+    {
+      "id": "h1000000-0000-4000-8000-000000000000",
+      "tenantId": "7f3d1a20-0000-4000-8000-000000000001",
+      "branchId": "b1000000-0000-4000-8000-000000000001",
+      "dayOfWeek": 0,
+      "isClosed": true,
+      "openTime": null,
+      "closeTime": null,
+      "breakStartTime": null,
+      "breakEndTime": null,
+      "createdAt": "2026-05-02T09:30:00.000Z"
+    },
+    {
+      "id": "h1000000-0000-4000-8000-000000000001",
+      "tenantId": "7f3d1a20-0000-4000-8000-000000000001",
+      "branchId": "b1000000-0000-4000-8000-000000000001",
+      "dayOfWeek": 1,
+      "isClosed": false,
+      "openTime": "09:00:00",
+      "closeTime": "19:00:00",
+      "breakStartTime": "13:00:00",
+      "breakEndTime": "14:00:00",
+      "createdAt": "2026-05-02T09:30:00.000Z"
+    },
+    {
+      "id": "h1000000-0000-4000-8000-000000000002",
+      "tenantId": "7f3d1a20-0000-4000-8000-000000000001",
+      "branchId": "b1000000-0000-4000-8000-000000000001",
+      "dayOfWeek": 2,
+      "isClosed": false,
+      "openTime": "09:00:00",
+      "closeTime": "19:00:00",
+      "breakStartTime": "13:00:00",
+      "breakEndTime": "14:00:00",
+      "createdAt": "2026-05-02T09:30:00.000Z"
+    },
+    {
+      "id": "h1000000-0000-4000-8000-000000000003",
+      "tenantId": "7f3d1a20-0000-4000-8000-000000000001",
+      "branchId": "b1000000-0000-4000-8000-000000000001",
+      "dayOfWeek": 3,
+      "isClosed": false,
+      "openTime": "09:00:00",
+      "closeTime": "19:00:00",
+      "breakStartTime": "13:00:00",
+      "breakEndTime": "14:00:00",
+      "createdAt": "2026-05-02T09:30:00.000Z"
+    },
+    {
+      "id": "h1000000-0000-4000-8000-000000000004",
+      "tenantId": "7f3d1a20-0000-4000-8000-000000000001",
+      "branchId": "b1000000-0000-4000-8000-000000000001",
+      "dayOfWeek": 4,
+      "isClosed": false,
+      "openTime": "09:00:00",
+      "closeTime": "19:00:00",
+      "breakStartTime": "13:00:00",
+      "breakEndTime": "14:00:00",
+      "createdAt": "2026-05-02T09:30:00.000Z"
+    },
+    {
+      "id": "h1000000-0000-4000-8000-000000000005",
+      "tenantId": "7f3d1a20-0000-4000-8000-000000000001",
+      "branchId": "b1000000-0000-4000-8000-000000000001",
+      "dayOfWeek": 5,
+      "isClosed": false,
+      "openTime": "09:00:00",
+      "closeTime": "19:00:00",
+      "breakStartTime": "13:00:00",
+      "breakEndTime": "14:00:00",
+      "createdAt": "2026-05-02T09:30:00.000Z"
+    },
+    {
+      "id": "h1000000-0000-4000-8000-000000000006",
+      "tenantId": "7f3d1a20-0000-4000-8000-000000000001",
+      "branchId": "b1000000-0000-4000-8000-000000000001",
+      "dayOfWeek": 6,
+      "isClosed": false,
+      "openTime": "09:00:00",
+      "closeTime": "16:00:00",
+      "breakStartTime": null,
+      "breakEndTime": null,
+      "createdAt": "2026-05-02T09:30:00.000Z"
+    }
+  ]
+}

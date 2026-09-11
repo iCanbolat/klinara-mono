@@ -18,6 +18,8 @@ enum class ManagementDestination {
     Services,
     ServiceCategories,
     Staff,
+    BranchHours,
+    ScheduleExceptions,
     CustomerTags,
     PackageDefinitions,
     PackageReports,
@@ -50,76 +52,77 @@ fun managementSections(session: AppSession): List<ManagementSection> =
     buildList {
         if (session.can(Permissions.SERVICE_READ)) {
             add(
-                ManagementSection(
-                    title = "Katalog",
-                    rows =
-                        listOf(
-                            ManagementRow(
-                                ManagementDestination.Services,
-                                "Hizmetler",
-                                "Süre, hazırlık payı, fiyat ve şube farkları",
-                            ),
-                            ManagementRow(
-                                ManagementDestination.ServiceCategories,
-                                "Kategoriler",
-                                "Hizmetlerin gruplanması ve sırası",
-                            ),
-                        ),
+                section(
+                    "Katalog",
+                    row(ManagementDestination.Services, "Hizmetler", "Süre, hazırlık payı, fiyat ve şube farkları"),
+                    row(ManagementDestination.ServiceCategories, "Kategoriler", "Hizmetlerin gruplanması ve sırası"),
                 ),
             )
         }
         if (session.can(Permissions.STAFF_READ)) {
             add(
-                ManagementSection(
-                    title = "Ekip",
-                    rows =
-                        listOf(
-                            ManagementRow(
-                                ManagementDestination.Staff,
-                                "Personel",
-                                "Profil, uzmanlık ve hizmet yetkinlikleri",
-                            ),
-                        ),
+                section(
+                    "Ekip",
+                    row(ManagementDestination.Staff, "Personel", "Profil, uzmanlık ve hizmet yetkinlikleri"),
                     footnote = "Bir personele yetkin olmadığı hizmetten randevu açılamaz.",
+                ),
+            )
+        }
+        if (session.can(Permissions.SCHEDULE_READ)) {
+            add(
+                section(
+                    "Takvim kurulumu",
+                    row(ManagementDestination.BranchHours, "Şube çalışma saatleri", "Açılış, kapanış ve mola"),
+                    row(
+                        ManagementDestination.ScheduleExceptions,
+                        "İzin ve istisnalar",
+                        "Tatil, yarım gün, tekrarlı izinler",
+                    ),
+                    footnote =
+                        session.activeBranch?.let {
+                            "Saatler ${it.name} şubesinin saat diliminde (${it.timezone}) gösterilir."
+                        },
                 ),
             )
         }
         if (session.can(Permissions.CUSTOMER_READ)) {
             add(
-                ManagementSection(
-                    title = "Müşteriler",
-                    rows =
-                        listOf(
-                            ManagementRow(
-                                ManagementDestination.CustomerTags,
-                                "Müşteri etiketleri",
-                                "Kiracı genelinde tanımlı etiketler",
-                            ),
-                        ),
+                section(
+                    "Müşteriler",
+                    row(ManagementDestination.CustomerTags, "Müşteri etiketleri", "Kiracı genelinde tanımlı etiketler"),
                 ),
             )
         }
         if (session.can(Permissions.PACKAGE_READ)) {
             add(
-                ManagementSection(
-                    title = "Paketler",
-                    rows =
-                        listOf(
-                            ManagementRow(
-                                ManagementDestination.PackageDefinitions,
-                                "Paket tanımları",
-                                "Satılabilir seans paketleri ve fiyatları",
-                            ),
-                            ManagementRow(
-                                ManagementDestination.PackageReports,
-                                "Paket raporları",
-                                "Yükümlülük, süre dolumu ve dönem kullanımı",
-                            ),
-                        ),
+                section(
+                    "Paketler",
+                    row(
+                        ManagementDestination.PackageDefinitions,
+                        "Paket tanımları",
+                        "Satılabilir seans paketleri ve fiyatları",
+                    ),
+                    row(
+                        ManagementDestination.PackageReports,
+                        "Paket raporları",
+                        "Yükümlülük, süre dolumu ve dönem kullanımı",
+                    ),
                 ),
             )
         }
     }
+
+private fun section(
+    title: String,
+    vararg rows: ManagementRow,
+    footnote: String? = null,
+) = ManagementSection(title = title, rows = rows.toList(), footnote = footnote)
+
+private fun row(
+    destination: ManagementDestination,
+    label: String,
+    detail: String,
+) = ManagementRow(destination, label, detail)
 
 /**
  * Yönetim kökü — iOS `ManagementHomeView` paritesi.
@@ -165,4 +168,4 @@ fun ManagementHomeScreen(
 }
 
 private const val COMING_SOON =
-    "Çalışma saatleri A7 içinde; kasa ve prim Faz A6, mesajlar Faz A8, raporlar Faz A9 ile geliyor."
+    "Kasa ve prim Faz A6, mesajlar ve WhatsApp Faz A8, raporlar Faz A9 ile geliyor."

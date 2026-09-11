@@ -13,6 +13,7 @@ import com.klinara.android.designsystem.components.KlinaraButton
 import com.klinara.android.designsystem.components.KlinaraButtonKind
 import com.klinara.android.designsystem.components.KlinaraCard
 import com.klinara.android.designsystem.components.KlinaraDivider
+import com.klinara.android.designsystem.components.KlinaraNavigationRow
 import com.klinara.android.designsystem.components.KlinaraRow
 import com.klinara.android.designsystem.components.KlinaraScreen
 import com.klinara.android.designsystem.components.ReportPeriodBar
@@ -28,8 +29,9 @@ import com.klinara.android.services.packages.ExpiringRow
  * ve ekran **"—"** yazar. "0 ₺" yazmak taşınmayan bir borç iddiası olurdu ve "göremiyorsun"
  * ile "sıfır" arasındaki fark kaybolurdu.
  *
- * Satırlar müşteri kartına GİTMİYOR (iOS gidiyor): rapor Yönetim sekmesinde, kart
- * Müşteriler sekmesinde ve sekmeler arası gezinme kabukta henüz yok (A7 hub'ı).
+ * Satır müşteri kartını açar (iOS gibi) — A5.4'te yoktu; A7.3'te kabuk sekmeler arası
+ * gezinmeyi kazandı: rapor Yönetim'de, kart Müşteriler sekmesinde açılır. `customer:read`
+ * yoksa ([onOpenCustomer] `null`) satır tıklanmaz.
  *
  * Liste imleçlidir ve **sonraki sayfa okunur**: iOS'ta bir kez `pageInfo` okunmadan rapor
  * ilk 50 satırda sessizce kesilmiş, kullanıcı listenin bittiğini sanmıştı.
@@ -44,6 +46,7 @@ fun ExpiringReportScreen(
     onRetry: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenCustomer: ((String) -> Unit)? = null,
 ) {
     KlinaraScreen(title = "Süre dolumu", modifier = modifier, onBack = onBack) {
         ReportPeriodBar(label = periodLabel, onShift = onShift)
@@ -63,11 +66,20 @@ fun ExpiringReportScreen(
                     KlinaraCard(title = "Paketler", footnote = "Dönem sonu tarihi aralığa dâhil değildir.") {
                         report.value.data.forEachIndexed { index, row ->
                             if (index > 0) KlinaraDivider()
-                            KlinaraRow(
-                                label = row.customerName,
-                                value = amountLabel(row),
-                                detail = rowDetail(row, clock),
-                            )
+                            if (onOpenCustomer != null) {
+                                KlinaraNavigationRow(
+                                    label = row.customerName,
+                                    value = amountLabel(row),
+                                    detail = rowDetail(row, clock),
+                                    onClick = { onOpenCustomer(row.customerId) },
+                                )
+                            } else {
+                                KlinaraRow(
+                                    label = row.customerName,
+                                    value = amountLabel(row),
+                                    detail = rowDetail(row, clock),
+                                )
+                            }
                         }
                         if (state.canLoadMoreExpiring || state.isLoadingMoreExpiring) {
                             KlinaraButton(

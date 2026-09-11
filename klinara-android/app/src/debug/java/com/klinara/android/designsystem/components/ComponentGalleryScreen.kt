@@ -40,6 +40,8 @@ fun ComponentGalleryScreen(modifier: Modifier = Modifier) {
     var transferable by remember { mutableStateOf(true) }
     var picked by remember { mutableStateOf("Lazer epilasyon") }
     var specialties by remember { mutableStateOf(listOf("Lazer", "Dolgu")) }
+    var opening by remember { mutableStateOf(java.time.LocalTime.of(9, 0)) }
+    var leaveDate by remember { mutableStateOf(java.time.LocalDate.of(2026, 9, 17)) }
 
     AuthScaffold(
         modifier = modifier.fillMaxSize(),
@@ -140,6 +142,13 @@ fun ComponentGalleryScreen(modifier: Modifier = Modifier) {
         SectionLabel("Etiket alanı")
         KlinaraCard {
             KlinaraTagField(label = "Uzmanlıklar", tags = specialties, onTagsChange = { specialties = it })
+        }
+
+        // A7.3 — çalışma saatleri ve istisnalar.
+        SectionLabel("Saat ve tarih")
+        KlinaraCard {
+            KlinaraTimeField(label = "Açılış", value = opening, onValueChange = { opening = it })
+            KlinaraDateField(label = "Başlangıç", value = leaveDate, onValueChange = { leaveDate = it })
         }
 
         SectionLabel("Rapor dönemi")

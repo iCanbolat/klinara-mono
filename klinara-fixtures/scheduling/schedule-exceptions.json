@@ -1,0 +1,38 @@
+{
+  "data": [
+    {
+      "id": "x1000000-0000-4000-8000-000000000001",
+      "tenantId": "7f3d1a20-0000-4000-8000-000000000001",
+      "staffProfileId": "f1000000-0000-4000-8000-000000000001",
+      "branchId": "b1000000-0000-4000-8000-000000000001",
+      "startsAt": "2026-09-17T15:00:00.000+03:00",
+      "endsAt": "2026-09-17T16:30:00.000+03:00",
+      "reason": "Eğitim",
+      "recurrenceType": "weekly",
+      "recurrenceIntervalWeeks": 2,
+      "recurrenceUntil": "2026-11-12T23:59:00.000+03:00",
+      "recurrenceWeekdays": [
+        4,
+        1
+      ],
+      "isActive": true,
+      "createdAt": "2026-09-10T08:00:00.000Z"
+    },
+    {
+      "id": "x1000000-0000-4000-8000-000000000002",
+      "tenantId": "7f3d1a20-0000-4000-8000-000000000001",
+      "staffProfileId": "f1000000-0000-4000-8000-000000000001",
+      "branchId": "b1000000-0000-4000-8000-000000000001",
+      "startsAt": "2026-09-18T06:00:00.000Z",
+      "endsAt": "2026-09-21T15:00:00.000Z",
+      "reason": null,
+      "recurrenceType": "monthly",
+      "recurrenceIntervalWeeks": 1,
+      "recurrenceUntil": null,
+      "recurrenceWeekdays": [],
+      "isActive": true,
+      "createdAt": "2026-09-10T08:00:00.000Z",
+      "source": "import"
+    }
+  ]
+}

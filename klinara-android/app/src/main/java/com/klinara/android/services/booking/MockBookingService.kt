@@ -9,6 +9,7 @@ import com.klinara.android.services.contracts.ApiErrorCode
 import com.klinara.android.services.formatting.ClockTime
 import com.klinara.android.services.mock.MockCustomers
 import com.klinara.android.services.networking.SlotConflict
+import com.klinara.android.services.scheduling.MockSchedulingService
 import com.klinara.android.services.staff.MockStaffService
 import com.klinara.android.services.staff.StaffProfile
 import com.klinara.android.services.networking.SlotSuggestion
@@ -48,6 +49,12 @@ class MockBookingService(
     private val catalog: () -> List<ClinicService> = { MockCatalogService.ALL },
     /** Personel tablosu (A7.2) — pasif personel ve kaldırılan yetkinlik slot adayından düşer. */
     private val staff: () -> List<StaffProfile> = { MockStaffService.ALL },
+    /**
+     * Çalışma saatleri (A7.3). Bağlıysa slotlar şube saatleri ∩ personel programı − mola −
+     * istisnalar içinde üretilir (sunucunun kuralı); `null` ise (birim testleri) eski sabit
+     * 09:00–18:00 penceresi — tohumlu testler haftanın gününe bağımlı olmasın diye.
+     */
+    private val scheduling: MockSchedulingService? = null,
 ) : BookingService {
     /** Ağ hatası senaryosunda takvim de düşsün diye. */
     var failing: Boolean = false
@@ -228,18 +235,21 @@ class MockBookingService(
         // çıkarılarak üretiliyor. Boş bir motor (her saat uygun) çakışma akışını
         // sürülemez yapardı — asıl sınanacak şey o.
         val busy = visible(query.from, query.to, staffProfileId = null).filterNot { it.status.isTerminal }
+        val day = clock.startOfDay(query.from)
+        val windows = candidates.associateWith { staffId -> workingWindows(staffId, query.branchId, day) }
         val slots = mutableListOf<AvailabilitySlot>()
-        var cursor = clock.date(clock.startOfDay(query.from), ClockTime.nineAM)
-        val dayEnd = clock.date(clock.startOfDay(query.from), ClockTime.sixPM)
+        var cursor = day
+        val dayEnd = clock.adding(1L, day)
 
         while (cursor < dayEnd && cursor < query.to) {
             val end = clock.addingMinutes(totalMinutes.toLong(), cursor)
             val at = cursor
             val free =
-                candidates.filter { staff ->
-                    busy.none { it.overlaps(at, end) && staff in it.staffProfileIds }
+                candidates.filter { staffId ->
+                    windows.getValue(staffId).any { at >= it.start && end <= it.endInclusive } &&
+                        busy.none { it.overlaps(at, end) && staffId in it.staffProfileIds }
                 }
-            if (cursor >= query.from && end <= dayEnd && free.isNotEmpty()) {
+            if (cursor >= query.from && free.isNotEmpty()) {
                 slots += AvailabilitySlot(startsAt = cursor, endsAt = end, staffProfileIds = free)
             }
             cursor = clock.addingMinutes(SLOT_GRANULARITY_MINUTES.toLong(), cursor)
@@ -591,6 +601,15 @@ class MockBookingService(
                     )
                 },
         )
+
+    /** Personelin o günkü çalışma aralıkları; takvim bağlı değilse sabit 09:00–18:00. */
+    private fun workingWindows(
+        staffId: String,
+        branchId: String,
+        day: Instant,
+    ): List<ClosedRange<Instant>> =
+        scheduling?.workingIntervals(staffId, branchId, day)
+            ?: listOf(clock.date(day, ClockTime.nineAM)..clock.date(day, ClockTime.sixPM))
 
     private fun CalendarEntry.overlaps(
         from: Instant,

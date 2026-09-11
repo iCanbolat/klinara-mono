@@ -2167,3 +2167,139 @@ etikete dokunmak kaldırır ve TalkBack'e "… kaldır" diye duyuruluyor (iOS'ta
 
 - **Davet** (`POST invitations`) ve kullanıcı/üyelik düzenleme — iOS'ta da yok.
 - Yetkinlikte **özel fiyat** arayüzü — iOS'ta da yok; değer korunuyor.
+
+---
+
+## A7.3 — Çalışma saatleri ✅
+
+**Durum:** `./gradlew check` yeşil. **497 test** (A7.2 sonunda 470'ti), 69 suite.
+Emülatörde `Çok şubeli` senaryosu, Nişantaşı ile sürüldü: Yönetim → Takvim kurulumu →
+Şube çalışma saatleri → Pazartesi kapanışı 08:00 yapıldı → kart altında **"Kapanış
+açılıştan sonra olmalı."**, Kaydet pasif, şube menüsü gizli; sistem geri tuşu
+"Değişiklikler kaydedilmedi" diyaloğunu açtı → 18:00'e düzeltilip Cumartesi **kapatıldı**
+ve kaydedildi → Bugün → Yeni randevu → Cilt bakımı: Cuma 11 Eylül'de slotlar 12:15–13:45
+**mola** aralığını atlıyor; Cumartesi 12 Eylül'de "Bu günde uygun saat yok". İzin ve
+istisnalar: tohumdaki iki kayıt ("Cmt · Her hafta", "Yıllık izin") → Yeni istisna → Onur,
+Haftalık, Per → Oluştur → listede "Per · Her hafta". Paket raporları → Süre dolumu →
+Fatma Şahin satırı → **Müşteriler sekmesi** müşteri kartıyla açıldı. Personel programı
+koyu temada kontrol edildi.
+
+### Scheduling servisi — yedi uç, yeni uç YOK
+
+`SchedulingService` (+`Live*`/`Mock*`): şube saatleri GET/PUT, personel programı GET/PUT,
+istisnalar GET/POST/DELETE (204, `sendVoid`). Hepsi `X-Branch-Id` ister; şube seçili değilse
+ekran çağırmıyor, iOS'un "Şube seçilmedi" metnini gösteriyor. PUT'lar tam 7 gün. Saat biçimi
+asimetrik: gönderim `HH:mm`, dönüş `HH:mm:ss` — yanıt `String?` tutulup `ClockTime.parse` ile
+okunuyor (`branchHoursDecode`, `bodies`). `holidays` uçları iOS'ta yok, burada da yok.
+
+### Sıralama kuralları İSTEMCİDE — sunucunun yanıltıcı 409'una düşülmüyor
+
+Sunucu açılış < kapanış, mola içeride ve başlangıç < bitiş kurallarını yalnız DB CHECK'te
+tutuyor; ihlal "Şube bu kiracıya ait değil" başlıklı bir 409 dönüyor. iOS doğrulamadığı için
+kullanıcı o metni görüyor. `WeekHoursDraft`/`StaffWeekDraft` gün başına hata taşıyor ve
+geçersiz hafta **gönderilmiyor** (`invalidWeekNotSent`: sayaç 0). Mock bu 409'u sunucunun
+başlığıyla taklit ediyor (`mockValidations`). `API_DEVELOPMENT.md` Faz 2 açık maddelerine
+yazıldı.
+
+### İstisna listesi `from` göndermiyor — iOS'ta süren istisnalar görünmüyor
+
+Sunucu `from`/`to`'yu yalnız `startsAt` ile karşılaştırıyor. iOS `from = bugün` gönderiyor:
+geçen hafta başlamış süren bir izin ya da haftalık bir tekrar listede hiç yok. Android yalnız
+`to` gönderip "hâlâ geçerli olanları" (`endsAt ≥ bugün` ya da haftalıkta `recurrenceUntil ≥
+bugün`) istemcide süzüyor (`stillRelevant`). Mock sunucunun kusurlu süzgecini **aynen**
+taklit ediyor — daha doğru bir mock canlıda görünmeyen bir satırı gösterirdi
+(`mockExceptions`). Açık soru olarak `API_DEVELOPMENT.md`'ye yazıldı.
+
+### Zaman şubenin duvar saatinde; kablo şube offset'iyle
+
+`ScheduleExceptionDraft` `LocalDate` + `ClockTime` tutuyor ve `BranchClock` ile offset'li
+ISO'ya çeviriyor. `wireUsesBranchOffset`: İstanbul `+03:00`; Berlin'de aynı 09:00 Eylül'de
+`+02:00`, Kasım'da `+01:00` — duvar saati korunuyor. Tekrarın son günü **23:59'a kadar**
+(iOS tarih seçicinin taşıdığı rastgele saati gönderiyor; o günün öğleden sonraki örneği
+düşebiliyor). `none`'da tekrar alanları gövdeye hiç girmiyor (sunucu 400). Başlangıç
+değişince bitiş/tekrar bitişi iOS kuralıyla itiliyor (`pushRules`, gece yarısını geçen itme
+ertesi güne).
+
+### Mock randevu motoru çalışma saatlerine TAM bağlı (kullanıcı kararı)
+
+`MockBookingService.availability` artık sabit 09:00–18:00 yerine **şube saatleri ∩ personel
+programı − mola − istisnalar** içinde slot üretiyor (`MockSchedulingService.workingIntervals`,
+sunucunun `availability.repository.ts` kuralı). Haftalık istisna şube yerel tarihinde
+açılıyor, `startsAt`'in yerel saatini koruyor ve aralık ilk örneğin ISO haftasından sayılıyor
+(`biweekly`). Programı olmayan personel slot üretmiyor (sunucu gibi). Tohum: iki şube
+Pzt–Cmt 09:00–19:00, 13–14 mola, Pazar kapalı; Merve Çarşamba izinli; Onur Bodrum'da yalnız
+Cumartesi; Merve'ye yarının gününde haftalık "Eğitim". **Takvim bağlanmamış motor** (birim
+testleri) eski sabit pencereyi koruyor: tohumlu testler haftanın gününe bağımlı olmasın
+(`fallbackWindow`) — var olan hiçbir beklenti değişmedi.
+
+### Kaydedilmemiş hafta korunuyor — iOS sheet'inin Android karşılığı
+
+Hafta ekranları kirliyken şube menüsü gizleniyor (iOS gibi) ve hem sistem geri tuşu hem üst
+çubuk oku "Değişiklikler kaydedilmedi" diyaloğunu açıyor (`rememberUnsavedChangesGuard`).
+ViewModel anahtarı şubeyi taşıyor: şube değişince yeni taslak, eskisi başka şubeye
+kaydedilemez. Programı hiç olmayan personelde ekran kırmızı bir satırla "randevu açılamaz"
+diyor ve varsayılan saatler kirli olmasa da kaydedilebiliyor (`staffWithoutRecordCanSave`).
+
+### Yakalanan gerçek hata: "Pazartesi" ve "Pazar" ikisi de "Paz"
+
+iOS `Weekday.shortName` ilk üç harfi alıyor; haftalık tekrar rozeti Pazartesi ile Pazar'ı
+ayırt edemiyor. `recurrenceText` testi yakaladı; kısaltmalar standart Türkçe (Pzt, Sal, Çar,
+Per, Cum, Cmt, Paz) ve tekillikleri testli. `dow` artık bildirim sırasından (`ordinal`) —
+Pazar ilk; sabit sayı yok.
+
+### Sekmeler arası gezinme (A5.4'ten bırakılmıştı)
+
+Süre dolumu raporunun satırı müşteri kartını açıyor (iOS gibi). Hedef sekmenin `NavHost`'u
+hiç çizilmemiş olabilir (grafiği yok, `navigate` çöker) — istek `pendingCustomerId` olarak
+bekletiliyor, sekme çizilince bir kez tüketiliyor. `customer:read` yoksa satır tıklanmıyor.
+
+### Tasarım sistemine eklenenler
+
+- `KlinaraTimeField` (M3 `TimePicker`, 24 saat) ve `KlinaraDateField` (M3 `DatePicker`) —
+  ikisi de `java.time` konuşuyor, `services/`'e bağımlı değil. `DatePicker` UTC-milisaniye
+  verdiği için çeviri tek yerde (`DatePickerMillis`, testli). M3'ün seçili olmayan saat
+  kutusunu boyadığı **mor** ton marka token'larıyla değiştirildi (emülatörde görüldü).
+- `BranchClock` üç yardımcı kazandı: `instant(date, time)`, `localDate`, `clockTime`, ve
+  iki uçlu aralık için `formatSpan`.
+
+### iOS'a bildirilecek fark (§7.8)
+
+1. **Gün kısaltmaları çakışıyor** (Paz/Paz).
+2. **Çalışma saatlerinde istemci doğrulaması yok** — kullanıcı sunucunun alakasız 409'unu görüyor.
+3. **İstisna listesi süren kayıtları göstermiyor** (`from` kusuru).
+4. **Tekrar bitişi günün rastgele saatinde** gönderiliyor.
+
+### Plandan / iOS'tan sapmalar
+
+- **`KlinaraDateTimeField` yerine iki alan** (`KlinaraDateField` + `KlinaraTimeField`): M3'te
+  birleşik bir seçici yok; iki diyaloğu tek bileşene sarmak yalnız bir sarmalayıcı olurdu.
+- İstisna editörü bir hedef, sheet değil; "yeni" formu iOS gibi her zaman "kirli" sayılıyor.
+- Personel detayındaki program/istisna satırları `schedule:read` ile çiziliyor; istisna
+  listesi personelden açılınca editör o personeli ön seçiyor.
+- Hafta ekranlarında "Kaydet" sayfa sonunda (A5 deseni).
+
+### Kararsız test (A7 dokunmadı)
+
+`ApiClientTest` › "Eş zamanlı üç 401 TEK bir /auth/refresh tetikler" tam `check` sırasında
+bir kez düştü; izole üç koşuda geçti. Yük altında zamanlamaya bağlı; ayrı bir iş olarak
+işaretlendi.
+
+### Yeni bağımlılık: YOK
+
+### Kapsam dışı
+
+- **Tatiller** (`holidays` CRUD) — iOS kullanmıyor.
+- **İstisna düzenleme** — sunucuda PATCH yok; sil + yeniden oluştur taklit edilmiyor.
+- Randevu **oluşturmada** çalışma saati kontrolü mock'ta yok (yalnız uygunluk); sunucu
+  `OUTSIDE_WORKING_HOURS` döndürüyor ve metni zaten `ApiError` tablosunda.
+
+### Faz A7 kapandı
+
+Üç batch, 497 test (faz başında 418). Çıkış ölçütü — **`ManagementHomeScreen` tüm bölümleri
+izne göre listeliyor; kurulum akışı uçtan uca sürülebiliyor** — iki katmanda korunuyor: hub
+saf bir fonksiyon (`managementSections`) ve altı rolün matrisi üç testte
+(`ManagementSectionsTest`, `StaffFeatureTest.permissions`, `SchedulingFeatureTest.permissions`);
+mock randevu motoru katalog, personel ve çalışma saatleri **tablolarını** okuyor, yani
+"hizmet ekle → yetkinlik ver → program yaz → istisna gir → slot gör" zinciri emülatörde
+sunucusuz sürülebiliyor. Temiz derleme 29,5 sn — §4'ün modül bölme tetikleyicisi (90 sn)
+uzakta. Kalan borç: iOS'a dört + üç + üç fark notu (§7.8) ve iki sunucu açık sorusu.

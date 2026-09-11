@@ -16,6 +16,7 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -69,6 +70,10 @@ import com.klinara.android.features.packages.PackageDefinitionEditorScreen
 import com.klinara.android.features.packages.PackageDefinitionListScreen
 import com.klinara.android.features.packages.SellPackageHost
 import com.klinara.android.features.profile.ProfileScreen
+import com.klinara.android.features.scheduling.BranchHoursScreen
+import com.klinara.android.features.scheduling.ScheduleExceptionEditorScreen
+import com.klinara.android.features.scheduling.ScheduleExceptionListScreen
+import com.klinara.android.features.scheduling.StaffScheduleScreen
 import com.klinara.android.features.staff.StaffCreateScreen
 import com.klinara.android.features.staff.StaffDetailActions
 import com.klinara.android.features.staff.StaffDetailScreen
@@ -115,6 +120,16 @@ fun AppShell(
     // İzinler `reloadProfile` ile daralabilir; seçili sekme kaybolursa ilkine düşülür.
     val selected = tabs.firstOrNull { it.name == selectedName } ?: tabs.first()
 
+    // Sekmeler arası gezinme (A7.3; A5.4'ten bırakılmıştı): Yönetim'deki bir rapor satırı
+    // müşteri kartını açar. Hedef sekmenin NavHost'u henüz hiç çizilmemiş olabilir (grafiği
+    // yok) — bu yüzden istek bekletilir ve sekme çizilince tüketilir.
+    var pendingCustomerId by rememberSaveable { mutableStateOf<String?>(null) }
+    val openCustomer: ((String) -> Unit)? =
+        { id: String ->
+            pendingCustomerId = id
+            selectedName = ShellTab.Customers.name
+        }.takeIf { ShellTab.Customers in tabs }
+
     val todayNav = rememberNavController()
     val customersNav = rememberNavController()
     val managementNav = rememberNavController()
@@ -141,8 +156,11 @@ fun AppShell(
 
             when (selected) {
                 ShellTab.Today -> TodayTab(todayNav, session, container, branchGeneration, branchMenu)
-                ShellTab.Customers -> CustomersTab(customersNav, session, container, branchMenu)
-                ShellTab.Management -> ManagementTab(managementNav, session, container, branchMenu)
+                ShellTab.Customers ->
+                    CustomersTab(customersNav, session, container, branchMenu, pendingCustomerId) {
+                        pendingCustomerId = null
+                    }
+                ShellTab.Management -> ManagementTab(managementNav, session, container, branchMenu, openCustomer)
                 ShellTab.Profile ->
                     ProfileTab(
                         navController = profileNav,
@@ -261,7 +279,16 @@ private fun CustomersTab(
     session: AppSession,
     container: ServiceContainer,
     trailing: @Composable RowScope.() -> Unit,
+    pendingCustomerId: String?,
+    onPendingConsumed: () -> Unit,
 ) {
+    // NavHost aynı kompozisyonda grafiği kurduktan SONRA koşar; istek bir kez tüketilir.
+    LaunchedEffect(pendingCustomerId) {
+        pendingCustomerId?.let {
+            navController.navigate(ShellRoutes.CustomerDetail(it))
+            onPendingConsumed()
+        }
+    }
     NavHost(navController = navController, startDestination = ShellRoutes.CustomerList) {
         composable<ShellRoutes.CustomerList> {
             CustomerListScreen(
@@ -462,6 +489,7 @@ private fun ManagementTab(
     session: AppSession,
     container: ServiceContainer,
     trailing: @Composable RowScope.() -> Unit,
+    openCustomer: ((String) -> Unit)?,
 ) {
     NavHost(navController = navController, startDestination = ShellRoutes.ManagementHome) {
         composable<ShellRoutes.ManagementHome> {
@@ -528,6 +556,13 @@ private fun ManagementTab(
                 actions =
                     StaffDetailActions(
                         onOpenSkills = { navController.navigate(ShellRoutes.StaffServiceMatrix(route.staffId)) },
+                        // Program ve istisna satırları `schedule:read` ister (iOS gibi); yoksa HİÇ çizilmez.
+                        onOpenSchedule =
+                            { navController.navigate(ShellRoutes.StaffSchedule(route.staffId)) }
+                                .takeIf { session.can(Permissions.SCHEDULE_READ) },
+                        onOpenExceptions =
+                            { navController.navigate(ShellRoutes.ScheduleExceptionList(route.staffId)) }
+                                .takeIf { session.can(Permissions.SCHEDULE_READ) },
                     ),
             )
         }
@@ -539,6 +574,50 @@ private fun ManagementTab(
                 container = container,
                 staffId = route.staffId,
                 onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable<ShellRoutes.BranchHours> {
+            BranchHoursScreen(
+                session = session,
+                container = container,
+                onBack = { navController.popBackStack() },
+                trailing = trailing,
+            )
+        }
+
+        composable<ShellRoutes.StaffSchedule> { entry ->
+            val route = entry.toRoute<ShellRoutes.StaffSchedule>()
+            StaffScheduleScreen(
+                session = session,
+                container = container,
+                staffProfileId = route.staffId,
+                onBack = { navController.popBackStack() },
+                trailing = trailing,
+            )
+        }
+
+        composable<ShellRoutes.ScheduleExceptionList> { entry ->
+            val route = entry.toRoute<ShellRoutes.ScheduleExceptionList>()
+            ScheduleExceptionListScreen(
+                session = session,
+                container = container,
+                staffProfileId = route.staffId,
+                onBack = { navController.popBackStack() },
+                onCreate = { navController.navigate(ShellRoutes.ScheduleExceptionEditor(route.staffId)) },
+                trailing = trailing,
+            )
+        }
+
+        composable<ShellRoutes.ScheduleExceptionEditor> { entry ->
+            val route = entry.toRoute<ShellRoutes.ScheduleExceptionEditor>()
+            ScheduleExceptionEditorScreen(
+                session = session,
+                container = container,
+                presetStaffProfileId = route.staffId,
+                onBack = { navController.popBackStack() },
+                // Liste dönüşte kendini yeniden çekiyor.
+                onSaved = { navController.popBackStack() },
             )
         }
 
@@ -558,6 +637,7 @@ private fun ManagementTab(
                 owner = entry,
                 onOpen = { navController.navigate(ShellRoutes.PackageReport(it.name)) },
                 onBack = { navController.popBackStack() },
+                onOpenCustomer = openCustomer,
             )
         }
 
@@ -572,6 +652,7 @@ private fun ManagementTab(
                 owner = owner,
                 onOpen = { navController.navigate(ShellRoutes.PackageReport(it.name)) },
                 onBack = { navController.popBackStack() },
+                onOpenCustomer = openCustomer,
             )
         }
 
@@ -685,6 +766,8 @@ private fun ManagementDestination.route(): Any =
         ManagementDestination.Services -> ShellRoutes.ServiceList
         ManagementDestination.ServiceCategories -> ShellRoutes.ServiceCategoryList
         ManagementDestination.Staff -> ShellRoutes.StaffList
+        ManagementDestination.BranchHours -> ShellRoutes.BranchHours
+        ManagementDestination.ScheduleExceptions -> ShellRoutes.ScheduleExceptionList()
         ManagementDestination.CustomerTags -> ShellRoutes.CustomerTagList
         ManagementDestination.PackageDefinitions -> ShellRoutes.PackageDefinitionList
         ManagementDestination.PackageReports -> ShellRoutes.PackageReportsHome

@@ -88,3 +88,11 @@ miras** demek (sıfır değil) ve `isOnlineBookable: false` şubede online'ı ka
 `staff-profile.json` aynı hizmet için **iki şube kapsamı** (kiracı geneli + Bodrum, özel
 süre/fiyatlı) ve bir **pasif** yetkinlik taşıyor — matris taslağının kayıpsızlık testi
 bunun üzerinde. `users-list.json` davet bekleyen (`hasPassword: false`) bir kullanıcı.
+
+## `scheduling/` (A7.3)
+
+`branch-hours.json` sunucunun **`HH:mm:ss`** biçimini (istemci `HH:mm` gönderir), kapalı
+Pazar'ı (saatler `null`) ve molasız Cumartesi'yi çiviliyor. `staff-schedule.json` Çarşamba
+izinli bir hafta. `schedule-exceptions.json` offset'li (`+03:00`) haftalık, iki haftada bir
+bir istisna ile bilerek **ileri sürümlü** bir kayıt taşıyor: tanımadığımız `recurrenceType`
+(`monthly`) ve fazladan bir alan — liste çökmemeli.

@@ -86,6 +86,21 @@ class BranchClock(timeZoneIdentifier: String?) {
         to: Instant,
     ): String = "${formatTime(from)} – ${formatTime(to)}"
 
+    /**
+     * İki uçlu aralık (A7.3 istisnaları): aynı gün "12 Eylül 2026, 09:00 – 18:00", farklı
+     * günler "12 Eylül 2026, 09:00 – 15 Eylül 2026, 18:00". iOS `formatRange` paritesi; bu
+     * sınıftaki [formatRange] yalnız saat veriyor ve takvim onu kullanıyor.
+     */
+    fun formatSpan(
+        from: Instant,
+        to: Instant,
+    ): String =
+        if (isSameDay(from, to)) {
+            "${formatDateTime(from)} – ${formatTime(to)}"
+        } else {
+            "${formatDateTime(from)} – ${formatDateTime(to)}"
+        }
+
     /** Tarih şeridi için tek harf: P S Ç P C C P. */
     fun weekdayInitial(instant: Instant): String = WEEKDAY_INITIAL.format(instant.atZone(zone))
 
@@ -113,6 +128,21 @@ class BranchClock(timeZoneIdentifier: String?) {
             .atZone(zone)
             .with(LocalTime.of(at.hour, at.minute))
             .toInstant()
+
+    /** Şubenin yerel tarihi. */
+    fun localDate(instant: Instant): LocalDate = instant.atZone(zone).toLocalDate()
+
+    /** Şubenin duvar saatinde [date] + [time] → an. DST boşluğunda `java.time` ileri kaydırır. */
+    fun instant(
+        date: LocalDate,
+        time: ClockTime,
+    ): Instant = date.atTime(time.hour, time.minute).atZone(zone).toInstant()
+
+    /** Şubenin duvar saati. */
+    fun clockTime(instant: Instant): ClockTime {
+        val zoned = instant.atZone(zone)
+        return ClockTime(zoned.hour, zoned.minute)
+    }
 
     fun startOfDay(instant: Instant): Instant = instant.atZone(zone).toLocalDate().atStartOfDay(zone).toInstant()
 

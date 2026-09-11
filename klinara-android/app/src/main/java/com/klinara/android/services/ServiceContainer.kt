@@ -42,6 +42,9 @@ import com.klinara.android.services.networking.ApiClient
 import com.klinara.android.services.networking.ApiEnvironment
 import com.klinara.android.services.networking.OkHttpFactory
 import com.klinara.android.services.networking.SignedUploader
+import com.klinara.android.services.scheduling.LiveSchedulingService
+import com.klinara.android.services.scheduling.MockSchedulingService
+import com.klinara.android.services.scheduling.SchedulingService
 import com.klinara.android.services.staff.LiveStaffService
 import com.klinara.android.services.staff.MockStaffService
 import com.klinara.android.services.staff.LiveUsersService
@@ -69,7 +72,7 @@ import kotlinx.coroutines.flow.SharedFlow
  * "refactor" edilir; ilerleme gibi görünen çalkantı):
  *
  *     customers A3.4 · notifications(opt-out) A4.2 · notes A4.3 ✓ · files A4.4 ✓ · packages A5.1 ✓
- *     finance A6.1 · commissions A6.4 · scheduling A7.3
+ *     finance A6.1 · commissions A6.4 · catalog/staff/users/scheduling A7 ✓
  *     notifications A8.1 · messages A8.1 · whatsapp A8.3 · reports A9
  *
  * **A3.1'de iki servis planlanandan ÖNCE geldi** ve `ANDROID_DEVELOPMENT.md` §6 buna
@@ -93,6 +96,7 @@ class ServiceContainer private constructor(
     val booking: BookingService,
     val staff: StaffService,
     val users: UsersService,
+    val scheduling: SchedulingService,
     val customers: CustomerService,
     val notifications: NotificationsService,
     val notes: NotesService,
@@ -144,6 +148,7 @@ class ServiceContainer private constructor(
                 booking = LiveBookingService(client, BranchClock(null)),
                 staff = LiveStaffService(client),
                 users = LiveUsersService(client),
+                scheduling = LiveSchedulingService(client),
                 customers = LiveCustomerService(client),
                 notifications = LiveNotificationsService(client),
                 notes = LiveNotesService(client),
@@ -187,13 +192,15 @@ class ServiceContainer private constructor(
             val mockUsers = MockUsersService().apply { this.failing = failing }
             val mockStaff =
                 MockStaffService(catalog = mockCatalog::snapshotServices).apply { this.failing = failing }
-            // Randevu motoru katalog ve personel TABLOLARINI okur (A7.1–A7.2): pasife alınan
-            // hizmet ya da personel rezervasyondan düşer, yenisi orada görünür.
+            val mockScheduling = MockSchedulingService().apply { this.failing = failing }
+            // Randevu motoru katalog, personel ve çalışma saatleri TABLOLARINI okur (A7): pasife
+            // alınan hizmet/personel rezervasyondan düşer; kapalı gün, izin ve mola slot üretmez.
             val mockBooking =
                 MockBookingService(
                     data,
                     catalog = mockCatalog::snapshotServices,
                     staff = mockStaff::snapshotProfiles,
+                    scheduling = mockScheduling,
                 ).apply { this.failing = failing }
             val mockCustomers = MockCustomerService().apply { this.failing = failing }
             val mockNotifications = MockNotificationsService().apply { this.failing = failing }
@@ -220,6 +227,7 @@ class ServiceContainer private constructor(
                 booking = mockBooking,
                 staff = mockStaff,
                 users = mockUsers,
+                scheduling = mockScheduling,
                 customers = mockCustomers,
                 notifications = mockNotifications,
                 notes = mockNotes,
@@ -250,6 +258,7 @@ class ServiceContainer private constructor(
             booking: BookingService = MockBookingService(latencyEnabled = false),
             staff: StaffService = MockStaffService(latencyEnabled = false),
             users: UsersService = MockUsersService(latencyEnabled = false),
+            scheduling: SchedulingService = MockSchedulingService(latencyEnabled = false),
             customers: CustomerService = MockCustomerService(latencyEnabled = false),
         notifications: NotificationsService = MockNotificationsService(latencyEnabled = false),
         notes: NotesService = MockNotesService(latencyEnabled = false),
@@ -261,6 +270,7 @@ class ServiceContainer private constructor(
             booking = booking,
             staff = staff,
             users = users,
+            scheduling = scheduling,
             customers = customers,
             notifications = notifications,
             notes = notes,

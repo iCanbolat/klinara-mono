@@ -285,6 +285,28 @@ object ShellRoutes {
         val staffId: String,
     )
 
+    /** Şube çalışma saatleri (A7.3) — SEÇİLİ şubenin. */
+    @Serializable
+    data object BranchHours
+
+    /** Personelin seçili şubedeki haftalık programı. */
+    @Serializable
+    data class StaffSchedule(
+        val staffId: String,
+    )
+
+    /** İzin ve istisnalar. [staffId] null ise şube geneli. */
+    @Serializable
+    data class ScheduleExceptionList(
+        val staffId: String? = null,
+    )
+
+    /** Yeni istisna. [staffId] verilirse personel ön seçili. */
+    @Serializable
+    data class ScheduleExceptionEditor(
+        val staffId: String? = null,
+    )
+
     @Serializable
     data object ProfileHome
 }
