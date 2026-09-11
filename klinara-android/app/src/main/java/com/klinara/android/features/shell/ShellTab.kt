@@ -239,6 +239,19 @@ object ShellRoutes {
         val appointmentServiceId: String,
     )
 
+    /**
+     * Paket raporları (A5.4). Giriş hedefi, üç raporun PAYLAŞTIĞI ViewModel'in sahibi;
+     * rapor hedefleri [PackageReport] ile açılır.
+     */
+    @Serializable
+    data object PackageReportsHome
+
+    /** [screen] `PackageReportScreen.name` — Outstanding / Expiring / Usage. */
+    @Serializable
+    data class PackageReport(
+        val screen: String,
+    )
+
     @Serializable
     data object ProfileHome
 }

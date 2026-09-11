@@ -137,6 +137,32 @@ interface PackagesService {
         input: TransferPackageInput,
         idempotencyKey: String,
     ): CustomerPackage
+
+    // --- Raporlar (A5.4) ---
+
+    /** `GET reports/packages/outstanding` — **`report.revenue:read`**. */
+    suspend fun outstandingReport(
+        branchId: String? = null,
+        groupBy: OutstandingGrouping = OutstandingGrouping.Service,
+    ): OutstandingReport
+
+    /**
+     * `GET reports/packages/expiring` — `package:read`. Aralık **yarı açık** `[from, to)`.
+     * Parasal alan yalnız `report.revenue:read` ile dolu; değilse `null`.
+     */
+    suspend fun expiringReport(
+        period: ReportPeriod,
+        branchId: String? = null,
+        cursor: String? = null,
+        limit: Int? = null,
+    ): ExpiringReport
+
+    /** `GET reports/packages/usage` — `package:read`. Aralık **yarı açık** `[from, to)`. */
+    suspend fun usageReport(
+        period: ReportPeriod,
+        branchId: String? = null,
+        groupBy: UsageGrouping = UsageGrouping.Service,
+    ): UsageReport
 }
 
 /**

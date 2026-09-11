@@ -105,22 +105,95 @@ internal object MockPackagesSeed {
 
     private const val AYSE_SOLD_DAYS_AGO = 60L
 
+    // --- A5.4: raporlar için süresi YAKLAŞAN iki paket ---
+    //
+    // Süre dolumu raporu boş bir ekranla sınanamaz; biri Nişantaşı'nda, biri Bodrum'da
+    // (şube kırılımı da ancak iki şubeyle görünür). Satışları bir yıl kadar önce: 365
+    // günlük geçerlilik seed anından iki-üç hafta sonra doluyor.
+    const val SOLD_FATMA_PACKAGE = "f2000000-0000-4000-8000-000000000002"
+    const val SOLD_SELIN_PACKAGE = "f2000000-0000-4000-8000-000000000003"
+    private const val FATMA_SOLD_DAYS_AGO = 350L
+    private const val SELIN_SOLD_DAYS_AGO = 355L
+
+    /** Satılmış bir seed paketinin tarifi — kalan hak YOK, defter satırları var. */
+    data class SeedPackage(
+        val id: String,
+        val customerId: String,
+        val branchId: String,
+        val soldDaysAgo: Long,
+        val itemIds: List<String>,
+        val ledger: List<SeedEntry>,
+    )
+
+    val SOLD_PACKAGES: List<SeedPackage> by lazy {
+        val customers = com.klinara.android.services.mock.MockCustomers.ALL
+        val fatmaItems = listOf("f3000000-0000-4000-8000-000000000003", "f3000000-0000-4000-8000-000000000004")
+        val selinItems = listOf("f3000000-0000-4000-8000-000000000005", "f3000000-0000-4000-8000-000000000006")
+        listOf(
+            SeedPackage(
+                SOLD_AYSE_PACKAGE,
+                AYSE_ID,
+                com.klinara.android.services.mock.MockIds.BRANCH_NISANTASI,
+                AYSE_SOLD_DAYS_AGO,
+                listOf(SOLD_AYSE_ITEM_LASER, SOLD_AYSE_ITEM_SKIN),
+                AYSE_LEDGER,
+            ),
+            SeedPackage(
+                SOLD_FATMA_PACKAGE,
+                customers[FATMA_INDEX].id,
+                com.klinara.android.services.mock.MockIds.BRANCH_NISANTASI,
+                FATMA_SOLD_DAYS_AGO,
+                fatmaItems,
+                purchaseThenConsume(fatmaItems, laserUsed = 7, soldDaysAgo = FATMA_SOLD_DAYS_AGO),
+            ),
+            SeedPackage(
+                SOLD_SELIN_PACKAGE,
+                customers[SELIN_INDEX].id,
+                com.klinara.android.services.mock.MockIds.BRANCH_BODRUM,
+                SELIN_SOLD_DAYS_AGO,
+                selinItems,
+                purchaseThenConsume(selinItems, laserUsed = 3, soldDaysAgo = SELIN_SOLD_DAYS_AGO),
+            ),
+        )
+    }
+
+    /** Satış + ayda bir lazer kullanımı; bakım kalemine hiç dokunulmamış. */
+    private fun purchaseThenConsume(
+        itemIds: List<String>,
+        laserUsed: Int,
+        soldDaysAgo: Long,
+    ): List<SeedEntry> =
+        listOf(
+            SeedEntry(itemIds[0], LedgerEntryType.Purchase, delta = 10, daysAgo = soldDaysAgo),
+            SeedEntry(itemIds[1], LedgerEntryType.Purchase, delta = 2, daysAgo = soldDaysAgo),
+        ) +
+            (1..laserUsed).map { month ->
+                val daysAgo = soldDaysAgo - month * DAYS_PER_MONTH
+                SeedEntry(itemIds[0], LedgerEntryType.Consume, delta = -1, daysAgo = daysAgo)
+            }
+
+    private const val DAYS_PER_MONTH = 30L
+
+    /** `MockCustomers.ALL` sırası: Fatma Şahin (Nişantaşı), Selin Arslan (Bodrum). */
+    private const val FATMA_INDEX = 3
+    private const val SELIN_INDEX = 5
+
     /**
-     * Ayşe'nin yarısı kullanılmış paketi — **kalan hak burada YAZILMIYOR**.
+     * Satılmış paketin satış anındaki hâli — **kalan hak burada YAZILMIYOR**.
      *
-     * Kalemler satış anındaki hâlleriyle (kalan = adet) kurulur; kalan hak, [ledger]'ın
-     * mock tarafından uygulanmasıyla oluşur. Seed'de "kalan 6" diye elle yazmak, defterle
-     * ayrışabilen ikinci bir gerçek demekti — fazın önlemek için var olduğu hata.
+     * Kalemler satış anındaki hâlleriyle (kalan = adet) kurulur; kalan hak, defter
+     * satırlarının mock tarafından uygulanmasıyla oluşur. Seed'de "kalan 6" diye elle
+     * yazmak, defterle ayrışabilen ikinci bir gerçek demekti — fazın önlemek için var
+     * olduğu hata. Üç seed paketi de lazer tanımından satılmış.
      */
-    fun soldPackageAtSale(): CustomerPackage {
+    fun soldPackageAtSale(spec: SeedPackage = SOLD_PACKAGES.first()): CustomerPackage {
         val definition = definitions().first { it.id == DEFINITION_LASER_10 }
         val allocations = allocate(definition.totalPriceMinor, definition.sortedItems.map { it.listTotalMinor })
-        val itemIds = listOf(SOLD_AYSE_ITEM_LASER, SOLD_AYSE_ITEM_SKIN)
-        val soldAt = SEED_NOW.minusSeconds(AYSE_SOLD_DAYS_AGO * DAY_SECONDS)
+        val soldAt = SEED_NOW.minusSeconds(spec.soldDaysAgo * DAY_SECONDS)
         val items =
             definition.sortedItems.mapIndexed { index, item ->
                 CustomerPackageItem(
-                    id = itemIds[index],
+                    id = spec.itemIds[index],
                     serviceId = item.serviceId,
                     serviceName = item.serviceName,
                     quantityTotal = item.quantity,
@@ -132,9 +205,9 @@ internal object MockPackagesSeed {
                 )
             }
         return CustomerPackage(
-            id = SOLD_AYSE_PACKAGE,
-            customerId = AYSE_ID,
-            branchId = com.klinara.android.services.mock.MockIds.BRANCH_NISANTASI,
+            id = spec.id,
+            customerId = spec.customerId,
+            branchId = spec.branchId,
             definitionId = definition.id,
             name = definition.name,
             definitionRevision = definition.revision,

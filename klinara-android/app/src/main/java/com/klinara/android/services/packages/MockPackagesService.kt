@@ -45,19 +45,20 @@ class MockPackagesService(
     private val booking: MockBookingService? = null,
     /** Süre dolumu kararı için "şimdi" — testler sabitler. */
     private val now: () -> Instant = Instant::now,
+    /**
+     * Oturumdaki rolün `report.revenue:read`'i var mı. Sunucu parasal alanları buna göre
+     * `null`'lar ve yükümlülük raporunu 403 ile kapatır; mock da aynısını yapmazsa
+     * "tutar gizleme" dalı hiç sürülemez.
+     */
+    private val canReadRevenue: () -> Boolean = { true },
 ) : PackagesService,
     MockBookingService.PackageConsumptionHook {
     var failing: Boolean = false
 
     private val definitionRecords: MutableList<PackageDefinition> = MockPackagesSeed.definitions().toMutableList()
 
-    private val packageRecords: MutableList<CustomerPackage> = mutableListOf()
-
-    /**
-     * `customerPackageId` → defter satırları, **yeniden eskiye**. APPEND-ONLY: bu tabloda
-     * hiçbir satır değiştirilmez ya da silinmez; düzeltme ters kayıttır.
-     */
-    private val ledgerEntries: MutableMap<String, MutableList<PackageLedgerEntry>> = mutableMapOf()
+    /** Paket ve defter tabloları + TEK yazma noktası — [MockPackageLedger]. */
+    private val ledger = MockPackageLedger(now)
 
     /** `Idempotency-Key` → üretilen kaydın kimliği (satış/devir) ya da tüketim sonucu. */
     private val idempotentPackages: MutableMap<String, String> = mutableMapOf()
@@ -65,35 +66,6 @@ class MockPackagesService(
     private val idempotentRefunds: MutableMap<String, RefundResult> = mutableMapOf()
 
     private var idCounter: Int = 0
-
-    init {
-        seedSoldPackage()
-    }
-
-    /**
-     * Ayşe'nin paketi satış anındaki hâliyle eklenir ve defter satırları TEK YAZMA
-     * NOKTASINDAN ([append]) geçirilir — kalan hak defterden doğar, seed'den değil.
-     */
-    private fun seedSoldPackage() {
-        val sold = MockPackagesSeed.soldPackageAtSale()
-        packageRecords += sold
-        val written = mutableListOf<PackageLedgerEntry>()
-        MockPackagesSeed.AYSE_LEDGER.forEach { seed ->
-            val entry =
-                ledgerEntry(
-                    pkg = sold,
-                    itemId = seed.itemId,
-                    type = seed.type,
-                    delta = seed.delta,
-                    reason = seed.reason,
-                    reversesEntryId = seed.reversesIndex?.let { written[it].id },
-                    createdAt = MockPackagesSeed.SEED_NOW.minusSeconds(seed.daysAgo * MockPackagesSeed.DAY_SECONDS),
-                    appointmentId = if (seed.type == LedgerEntryType.Consume) "a99a0000-seed-${written.size}" else null,
-                )
-            written += entry
-            append(sold.id, entry)
-        }
-    }
 
     // --- Tanımlar ---
 
@@ -125,7 +97,7 @@ class MockPackagesService(
         }
         validate(input.totalPriceMinor, input.validityDays, input.items)
         val items = resolveItems(input.items, services)
-        val stamp = nextInstant()
+        val stamp = ledger.nextInstant()
         val created =
             PackageDefinition(
                 id = nextId(),
@@ -178,7 +150,7 @@ class MockPackagesService(
                 revision = if (input.affectsSale) old.revision + 1 else old.revision,
                 version = old.version + 1,
                 items = items,
-                updatedAt = nextInstant(),
+                updatedAt = ledger.nextInstant(),
             )
         definitionRecords[index] = updated
         return updated
@@ -193,7 +165,7 @@ class MockPackagesService(
         if (index < 0) throw MockErrors.notFound("Paket tanımı")
         val old = definitionRecords[index]
         if (old.version != version) throw MockErrors.versionConflict()
-        val stamp = nextInstant()
+        val stamp = ledger.nextInstant()
         // Satılmışsa arşivlenmez, yalnız pasife alınır — satış izi kopmasın.
         definitionRecords[index] =
             old.copy(
@@ -212,7 +184,7 @@ class MockPackagesService(
     ): CustomerPackage {
         settle()
         // Aynı anahtar = aynı satış. Tekrarı İKİNCİ bir paket üretmez, ilkini döndürür.
-        idempotentPackages[idempotencyKey]?.let { id -> return packageRecords.first { it.id == id } }
+        idempotentPackages[idempotencyKey]?.let { id -> return ledger.packages.first { it.id == id } }
 
         val definition =
             definitionRecords.firstOrNull { it.id == input.definitionId && it.isActive && !it.isArchived }
@@ -256,12 +228,12 @@ class MockPackagesService(
                 items = items,
                 createdAt = soldAt,
             )
-        packageRecords += sold
+        ledger.add(sold)
         items.forEach { item ->
-            append(sold.id, ledgerEntry(sold, item.id, LedgerEntryType.Purchase, item.quantityTotal))
+            ledger.append(sold.id, ledger.entry(sold, item.id, LedgerEntryType.Purchase, item.quantityTotal))
         }
         idempotentPackages[idempotencyKey] = sold.id
-        return current(sold.id)
+        return ledger.current(sold.id)
     }
 
     override suspend fun packages(
@@ -270,7 +242,7 @@ class MockPackagesService(
     ): Page<CustomerPackage> {
         settle()
         val rows =
-            packageRecords
+            ledger.packages
                 .filter { it.customerId == customerId }
                 .filter { query.status == null || it.status == query.status }
                 .sortedByDescending { it.soldAt }
@@ -279,7 +251,7 @@ class MockPackagesService(
 
     override suspend fun customerPackage(id: String): CustomerPackage {
         settle()
-        return current(id)
+        return ledger.current(id)
     }
 
     override suspend fun ledger(
@@ -288,8 +260,8 @@ class MockPackagesService(
         limit: Int?,
     ): Page<PackageLedgerEntry> {
         settle()
-        current(packageId)
-        return Page(ledgerEntries[packageId].orEmpty().toList(), PageInfo(nextCursor = null, hasMore = false))
+        ledger.current(packageId)
+        return Page(ledger.entries(packageId).toList(), PageInfo(nextCursor = null, hasMore = false))
     }
 
     override suspend fun entitlements(
@@ -299,7 +271,7 @@ class MockPackagesService(
     ): List<PackageEntitlement> {
         settle()
         val instant = now()
-        return packageRecords
+        return ledger.packages
             .filter { it.customerId == customerId && it.isConsumable(instant) }
             .filter { branchId == null || it.branchId == branchId }
             .flatMap { pkg ->
@@ -335,7 +307,7 @@ class MockPackagesService(
             val serviceLine =
                 appointment.services.firstOrNull { it.id == line.appointmentServiceId }
                     ?: throw MockErrors.notFound("Randevu kalemi")
-            val (pkg, item) = locate(line.customerPackageItemId)
+            val (pkg, item) = ledger.locate(line.customerPackageItemId)
             if (pkg.customerId != appointment.customerId) throw MockErrors.forbidden("Paket bu müşteriye ait değil.")
             if (item.serviceId != serviceLine.serviceId) {
                 throw MockErrors.validation("lines", "Paket kalemi bu hizmet için kullanılamaz.")
@@ -351,7 +323,7 @@ class MockPackagesService(
             val bound =
                 bookingMock.bindPackageItem(appointmentId, line.appointmentServiceId, line.customerPackageItemId)
             if (bound.status == AppointmentStatus.Completed) {
-                apply(line.customerPackageItemId, LedgerEntryType.Consume, -1, appointmentId = appointmentId)
+                ledger.apply(line.customerPackageItemId, LedgerEntryType.Consume, -1, appointmentId = appointmentId)
                 consumed += 1
             }
         }
@@ -377,13 +349,14 @@ class MockPackagesService(
         }
         // Önce hepsi doğrulanır: ikinci kalem yetersizse birinci de yazılmamalı.
         input.items.forEach { item ->
-            val current = itemOf(pkg, item.customerPackageItemId)
+            val current = ledger.itemOf(pkg, item.customerPackageItemId)
             if (current.remainingSessions + item.delta < 0) throw MockErrors.packageExhausted()
         }
         input.items.forEach {
-            apply(it.customerPackageItemId, LedgerEntryType.ManualAdjustment, it.delta, reason = input.reason.trim())
+            val reason = input.reason.trim()
+            ledger.apply(it.customerPackageItemId, LedgerEntryType.ManualAdjustment, it.delta, reason = reason)
         }
-        return bump(id)
+        return ledger.bump(id)
     }
 
     override suspend fun refund(
@@ -402,17 +375,17 @@ class MockPackagesService(
         // Tutar SATIŞ ANINDAKİ tahsisten — güncel katalog fiyatından DEĞİL.
         val amount = lines.sumOf { (item, sessions) -> item.unitAllocationMinor * sessions }
         lines.forEach { (item, sessions) ->
-            apply(item.id, LedgerEntryType.Refund, -sessions, reason = input.reason.trim())
+            ledger.apply(item.id, LedgerEntryType.Refund, -sessions, reason = input.reason.trim())
         }
         val refunded = lines.sumOf { it.second }
-        update(id) { current ->
+        ledger.update(id) { current ->
             current.copy(
                 status = if (current.remainingSessions == 0) CustomerPackageStatus.Refunded else current.status,
                 refundedSessions = current.refundedSessions + refunded,
                 refundAmountMinor = current.refundAmountMinor + amount,
                 // Kasa hareketi YOK: borç doğar, tahsilat Faz A6'da bağlanır.
                 refundSettlementStatus = "pending",
-                refundedAt = nextInstant(),
+                refundedAt = ledger.nextInstant(),
                 refundReason = input.reason.trim(),
                 version = current.version + 1,
             )
@@ -427,7 +400,7 @@ class MockPackagesService(
         idempotencyKey: String,
     ): CustomerPackage {
         settle()
-        idempotentPackages[idempotencyKey]?.let { return current(it) }
+        idempotentPackages[idempotencyKey]?.let { return ledger.current(it) }
         val source = lockedOpen(id, version)
         if (!source.isTransferable) {
             throw MockErrors.conflict("Bu paket devredilemez", "Paket devredilemez olarak satıldı.")
@@ -442,7 +415,7 @@ class MockPackagesService(
         val lines = resolveLines(source, input.items)
         if (lines.isEmpty()) throw MockErrors.conflict("Devredilecek kalan hak yok")
 
-        val stamp = nextInstant()
+        val stamp = ledger.nextInstant()
         val targetItems =
             lines.mapIndexed { position, (item, sessions) ->
                 CustomerPackageItem(
@@ -476,23 +449,23 @@ class MockPackagesService(
                 items = targetItems,
                 createdAt = stamp,
             )
-        packageRecords += target
+        ledger.add(target)
         lines.forEach { (item, sessions) ->
-            apply(item.id, LedgerEntryType.TransferOut, -sessions, reason = input.reason.trim())
+            ledger.apply(item.id, LedgerEntryType.TransferOut, -sessions, reason = input.reason.trim())
         }
         targetItems.forEach { item ->
             val reason = input.reason.trim()
-            val entry = ledgerEntry(target, item.id, LedgerEntryType.TransferIn, item.quantityTotal, reason)
-            append(target.id, entry)
+            val entry = ledger.entry(target, item.id, LedgerEntryType.TransferIn, item.quantityTotal, reason)
+            ledger.append(target.id, entry)
         }
-        update(source.id) { current ->
+        ledger.update(source.id) { current ->
             current.copy(
                 status = if (current.remainingSessions == 0) CustomerPackageStatus.Transferred else current.status,
                 version = current.version + 1,
             )
         }
         idempotentPackages[idempotencyKey] = target.id
-        return current(target.id)
+        return ledger.current(target.id)
     }
 
     /** İyimser kilit + açık paket: bayat sürüm 409 `VERSION_CONFLICT`, kapalı paket `PACKAGE_EXPIRED`. */
@@ -500,7 +473,7 @@ class MockPackagesService(
         id: String,
         version: Int,
     ): CustomerPackage {
-        val pkg = current(id)
+        val pkg = ledger.current(id)
         if (pkg.version != version) throw MockErrors.versionConflict()
         if (!pkg.status.isOpen) throw MockErrors.packageExpired()
         return pkg
@@ -515,7 +488,7 @@ class MockPackagesService(
         items: List<SessionsItemInput>?,
     ): List<Pair<CustomerPackageItem, Int>> {
         val lines =
-            items?.map { itemOf(pkg, it.customerPackageItemId) to it.sessions }
+            items?.map { ledger.itemOf(pkg, it.customerPackageItemId) to it.sessions }
                 ?: pkg.sortedItems.filter { it.remainingSessions > 0 }.map { it to it.remainingSessions }
         lines.forEach { (item, sessions) ->
             if (sessions < 1) throw MockErrors.validation("items", "Seans sayısı en az 1 olmalı.")
@@ -524,21 +497,46 @@ class MockPackagesService(
         return lines
     }
 
-    private fun itemOf(
-        pkg: CustomerPackage,
-        itemId: String,
-    ): CustomerPackageItem = pkg.items.firstOrNull { it.id == itemId } ?: throw MockErrors.notFound("Paket kalemi")
+    // --- Raporlar ---
+    //
+    // Hesap `MockPackageReports`'ta: sunucuda da raporlar ayrı bir modülde
+    // (`modules/reporting`) ve defter tablolarını yalnız OKUYOR. Burada kalan iş izin
+    // kapısı ve tabloların okunur kopyasını vermek.
 
-    private fun bump(id: String): CustomerPackage = update(id) { it.copy(version = it.version + 1) }
-
-    private fun update(
-        id: String,
-        transform: (CustomerPackage) -> CustomerPackage,
-    ): CustomerPackage {
-        val index = packageRecords.indexOfFirst { it.id == id }
-        packageRecords[index] = transform(packageRecords[index])
-        return packageRecords[index]
+    override suspend fun outstandingReport(
+        branchId: String?,
+        groupBy: OutstandingGrouping,
+    ): OutstandingReport {
+        settle()
+        if (!canReadRevenue()) throw MockErrors.forbidden("Parasal raporlar bu rolde görüntülenemez.")
+        return reports().outstanding(branchId, groupBy)
     }
+
+    override suspend fun expiringReport(
+        period: ReportPeriod,
+        branchId: String?,
+        cursor: String?,
+        limit: Int?,
+    ): ExpiringReport {
+        settle()
+        return reports().expiring(period, branchId, cursor, limit, canReadRevenue())
+    }
+
+    override suspend fun usageReport(
+        period: ReportPeriod,
+        branchId: String?,
+        groupBy: UsageGrouping,
+    ): UsageReport {
+        settle()
+        return reports().usage(period, branchId, groupBy)
+    }
+
+    private fun reports() =
+        MockPackageReports(
+            packages = ledger.packages.toList(),
+            ledger = ledger.snapshot(),
+            customerNames = customers().associate { it.id to it.fullName },
+        )
 
     // --- Randevu kancası (MockBookingService.PackageConsumptionHook) ---
 
@@ -546,23 +544,23 @@ class MockPackagesService(
         val lines = appointment.services.mapNotNull { it.customerPackageItemId }
         // Önce kontrol, sonra yazma: iki kalemden biri yetersizse hiçbiri düşmez.
         lines.forEach { itemId ->
-            val (pkg, item) = locate(itemId)
+            val (pkg, item) = ledger.locate(itemId)
             if (!pkg.isConsumable(now())) throw MockErrors.packageExpired()
             if (item.remainingSessions < 1) throw MockErrors.packageExhausted()
         }
-        lines.forEach { apply(it, LedgerEntryType.Consume, -1, appointmentId = appointment.id) }
+        lines.forEach { ledger.apply(it, LedgerEntryType.Consume, -1, appointmentId = appointment.id) }
     }
 
     override fun onReopened(appointment: Appointment) {
         // Yeniden açma satırı SİLMEZ: tüketimi geri alan bir ters kayıt ekler.
-        packageRecords.map { it.id }.forEach { packageId ->
-            val entries = ledgerEntries[packageId].orEmpty()
+        ledger.packages.map { it.id }.forEach { packageId ->
+            val entries = ledger.entries(packageId)
             val reversed = entries.mapNotNull { it.reversesEntryId }.toSet()
             entries
                 .filter { it.appointmentId == appointment.id && it.entryType == LedgerEntryType.Consume }
                 .filter { it.delta < 0 && it.id !in reversed }
                 .forEach { original ->
-                    apply(
+                    ledger.apply(
                         original.customerPackageItemId,
                         LedgerEntryType.Consume,
                         -original.delta,
@@ -574,94 +572,9 @@ class MockPackagesService(
         }
     }
 
-    // --- Defter uygulaması ---
-
-    /**
-     * TEK yazma noktası — sunucudaki `apply_package_ledger_entry()` trigger'ının aynası.
-     * **Hak kontrolü yazmadan ÖNCE** yapılır ve kendi hatasını döner; kalan hak asla
-     * eksiye inmez.
-     */
-    @Suppress("LongParameterList")
-    private fun apply(
-        itemId: String,
-        type: LedgerEntryType,
-        delta: Int,
-        reason: String? = null,
-        appointmentId: String? = null,
-        reversesEntryId: String? = null,
-    ) {
-        val (pkg, item) = locate(itemId)
-        if (delta < 0 && !pkg.isConsumable(now())) throw MockErrors.packageExpired()
-        if (item.remainingSessions + delta < 0) throw MockErrors.packageExhausted()
-        append(pkg.id, ledgerEntry(pkg, itemId, type, delta, reason, appointmentId, reversesEntryId))
-    }
-
-    /**
-     * Satırı deftere ekler ve paketin yansımalarını (kalem kalanı, karşılık, toplam)
-     * DEFTERDEN yeniden hesaplar. Kalan hak bir sayaç olarak artırılıp azaltılmıyor —
-     * satırların toplamı.
-     */
-    private fun append(
-        packageId: String,
-        entry: PackageLedgerEntry,
-    ) {
-        val entries = ledgerEntries.getOrPut(packageId) { mutableListOf() }
-        entries.add(0, entry)
-        val index = packageRecords.indexOfFirst { it.id == packageId }
-        val pkg = packageRecords[index]
-        val items =
-            pkg.items.map { item ->
-                val remaining = entries.filter { it.customerPackageItemId == item.id }.sumOf { it.delta }
-                item.copy(remainingSessions = remaining, outstandingMinor = item.unitAllocationMinor * remaining)
-            }
-        packageRecords[index] =
-            pkg.copy(
-                items = items,
-                remainingSessions = items.sumOf { it.remainingSessions },
-                outstandingMinor = items.sumOf { it.outstandingMinor },
-            )
-    }
-
-    @Suppress("LongParameterList")
-    private fun ledgerEntry(
-        pkg: CustomerPackage,
-        itemId: String,
-        type: LedgerEntryType,
-        delta: Int,
-        reason: String? = null,
-        appointmentId: String? = null,
-        reversesEntryId: String? = null,
-        createdAt: Instant = nextInstant(),
-    ): PackageLedgerEntry {
-        val item = pkg.items.first { it.id == itemId }
-        return PackageLedgerEntry(
-            id = "f5000000-0000-4000-8000-%012d".format(++idCounter),
-            customerPackageItemId = itemId,
-            serviceId = item.serviceId,
-            serviceName = item.serviceName,
-            entryType = type,
-            delta = delta,
-            appointmentId = appointmentId,
-            actorUserId = MockIds.USER_MANAGER,
-            reason = reason,
-            reversesEntryId = reversesEntryId,
-            createdAt = createdAt,
-        )
-    }
-
-    private fun current(packageId: String): CustomerPackage =
-        packageRecords.firstOrNull { it.id == packageId } ?: throw MockErrors.notFound("Paket")
-
-    private fun locate(itemId: String): Pair<CustomerPackage, CustomerPackageItem> {
-        val pkg =
-            packageRecords.firstOrNull { pkg -> pkg.items.any { it.id == itemId } }
-                ?: throw MockErrors.notFound("Paket kalemi")
-        return pkg to pkg.items.first { it.id == itemId }
-    }
-
     // --- Yardımcılar ---
 
-    private fun isSold(definitionId: String): Boolean = packageRecords.any { it.definitionId == definitionId }
+    private fun isSold(definitionId: String): Boolean = ledger.packages.any { it.definitionId == definitionId }
 
     /**
      * Sunucudaki DTO doğrulamasının aynası — yol adları `FieldError.path` ile birebir.
@@ -713,17 +626,6 @@ class MockPackagesService(
         }
 
     private fun nextId(): String = "f9000000-0000-4000-8000-%012d".format(++idCounter)
-
-    /**
-     * Monotonik "şimdi": aynı milisaniyede yazılan iki defter satırı eşit zaman almasın ve
-     * defter sırası deterministik kalsın.
-     */
-    private fun nextInstant(): Instant {
-        lastInstant = maxOf(now(), lastInstant.plusMillis(1))
-        return lastInstant
-    }
-
-    private var lastInstant: Instant = Instant.EPOCH
 
     private suspend fun settle() {
         if (latencyEnabled) delay(random.nextLong(MIN_LATENCY_MILLIS, MAX_LATENCY_MILLIS))

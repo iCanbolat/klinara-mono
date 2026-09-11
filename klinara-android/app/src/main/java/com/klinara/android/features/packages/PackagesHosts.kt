@@ -210,3 +210,84 @@ fun BindPackageHost(
         modifier = modifier,
     )
 }
+
+
+/** Paket raporlarının dört hedefi. */
+enum class PackageReportScreen { Home, Outstanding, Expiring, Usage }
+
+/**
+ * Rapor hedefleri TEK ViewModel'i paylaşır — [owner] rapor girişinin geri yığını kaydı.
+ * Şube ve dönem bir rapordan diğerine taşınır; Yönetim'den çıkınca ViewModel de ölür.
+ */
+@Composable
+fun PackageReportsHost(
+    session: AppSession,
+    container: ServiceContainer,
+    screen: PackageReportScreen,
+    owner: androidx.lifecycle.ViewModelStoreOwner,
+    onOpen: (PackageReportScreen) -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val clock = remember(session.activeBranch?.timezone) { BranchClock(session.activeBranch?.timezone) }
+    val viewModel: PackageReportsViewModel =
+        viewModel(
+            viewModelStoreOwner = owner,
+            key = "package-reports-${session.activeBranchId}",
+            factory = PackageReportsViewModel.factory(container, clock, session.activeBranchId),
+        )
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val canReadRevenue = session.can(Permissions.REPORT_REVENUE_READ)
+
+    when (screen) {
+        PackageReportScreen.Home ->
+            PackageReportsHomeScreen(
+                canReadRevenue = canReadRevenue,
+                onOpenOutstanding = { onOpen(PackageReportScreen.Outstanding) },
+                onOpenExpiring = { onOpen(PackageReportScreen.Expiring) },
+                onOpenUsage = { onOpen(PackageReportScreen.Usage) },
+                onBack = onBack,
+                modifier = modifier,
+            )
+        PackageReportScreen.Outstanding -> {
+            // Derin bağlantıyla gelinse bile izinsiz rol sunucuya 403 için gitmez.
+            if (!canReadRevenue) {
+                LaunchedEffect(Unit) { onBack() }
+                return
+            }
+            LaunchedEffect(Unit) { viewModel.loadOutstanding() }
+            OutstandingReportScreen(
+                state = state,
+                onGroupingChange = viewModel::setOutstandingGrouping,
+                onRetry = viewModel::loadOutstanding,
+                onBack = onBack,
+                modifier = modifier,
+            )
+        }
+        PackageReportScreen.Expiring -> {
+            LaunchedEffect(state.periodStart) { viewModel.loadExpiring() }
+            ExpiringReportScreen(
+                state = state,
+                periodLabel = viewModel.periodLabel(state),
+                clock = clock,
+                onShift = viewModel::shiftPeriod,
+                onLoadMore = viewModel::loadMoreExpiring,
+                onRetry = viewModel::loadExpiring,
+                onBack = onBack,
+                modifier = modifier,
+            )
+        }
+        PackageReportScreen.Usage -> {
+            LaunchedEffect(state.periodStart) { viewModel.loadUsage() }
+            UsageReportScreen(
+                state = state,
+                periodLabel = viewModel.periodLabel(state),
+                onShift = viewModel::shiftPeriod,
+                onGroupingChange = viewModel::setUsageGrouping,
+                onRetry = viewModel::loadUsage,
+                onBack = onBack,
+                modifier = modifier,
+            )
+        }
+    }
+}

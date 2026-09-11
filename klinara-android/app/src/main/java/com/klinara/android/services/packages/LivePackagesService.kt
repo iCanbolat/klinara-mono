@@ -6,6 +6,7 @@ import com.klinara.android.services.networking.KlinaraJson
 import com.klinara.android.services.networking.Page
 import com.klinara.android.services.networking.RequestBodyPayload
 import kotlinx.serialization.json.JsonObject
+import java.time.format.DateTimeFormatter
 
 class LivePackagesService internal constructor(
     private val client: ApiClient,
@@ -171,7 +172,58 @@ class LivePackagesService internal constructor(
                 ifMatch = ApiRequest.weakETag(version),
             ),
         )
+
+    // --- Raporlar ---
+
+    override suspend fun outstandingReport(
+        branchId: String?,
+        groupBy: OutstandingGrouping,
+    ): OutstandingReport =
+        client.send(
+            ApiRequest.get(
+                "reports/packages/outstanding",
+                query = listOfNotNull(branchId?.let { "branchId" to it }, "groupBy" to groupBy.wire),
+            ),
+        )
+
+    override suspend fun expiringReport(
+        period: ReportPeriod,
+        branchId: String?,
+        cursor: String?,
+        limit: Int?,
+    ): ExpiringReport =
+        client.send(
+            ApiRequest.get(
+                "reports/packages/expiring",
+                query =
+                    period.wire() +
+                        listOfNotNull(
+                            branchId?.let { "branchId" to it },
+                            cursor?.let { "cursor" to it },
+                            limit?.let { "limit" to it.toString() },
+                        ),
+            ),
+        )
+
+    override suspend fun usageReport(
+        period: ReportPeriod,
+        branchId: String?,
+        groupBy: UsageGrouping,
+    ): UsageReport =
+        client.send(
+            ApiRequest.get(
+                "reports/packages/usage",
+                query = period.wire() + listOfNotNull(branchId?.let { "branchId" to it }, "groupBy" to groupBy.wire),
+            ),
+        )
 }
+
+/**
+ * Sunucu `@IsISO8601({ strict: true })` istiyor; UTC `Z` biçimi geçerli ve şube saatine
+ * dönüşüm istemcide yapılmış oluyor (dönem sınırları `BranchClock` ile hesaplanıyor).
+ */
+private fun ReportPeriod.wire(): List<Pair<String, String>> =
+    listOf("from" to DateTimeFormatter.ISO_INSTANT.format(from), "to" to DateTimeFormatter.ISO_INSTANT.format(to))
 
 private fun JsonObject.asBody(): RequestBodyPayload =
     RequestBodyPayload(KlinaraJson.encodeToString(JsonObject.serializer(), this))

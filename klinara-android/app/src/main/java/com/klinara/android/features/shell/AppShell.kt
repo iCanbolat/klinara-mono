@@ -60,6 +60,8 @@ import com.klinara.android.features.packages.BindPackageHost
 import com.klinara.android.features.packages.CustomerPackageDetailHost
 import com.klinara.android.features.packages.PackageOperation
 import com.klinara.android.features.packages.PackageOperationHost
+import com.klinara.android.features.packages.PackageReportScreen
+import com.klinara.android.features.packages.PackageReportsHost
 import com.klinara.android.features.packages.PackageDefinitionEditorScreen
 import com.klinara.android.features.packages.PackageDefinitionListScreen
 import com.klinara.android.features.packages.SellPackageHost
@@ -459,7 +461,33 @@ private fun ManagementTab(
                 session = session,
                 onOpenCustomerTags = { navController.navigate(ShellRoutes.CustomerTagList) },
                 onOpenPackageDefinitions = { navController.navigate(ShellRoutes.PackageDefinitionList) },
+                onOpenPackageReports = { navController.navigate(ShellRoutes.PackageReportsHome) },
                 trailing = trailing,
+            )
+        }
+
+        composable<ShellRoutes.PackageReportsHome> { entry ->
+            PackageReportsHost(
+                session = session,
+                container = container,
+                screen = PackageReportScreen.Home,
+                owner = entry,
+                onOpen = { navController.navigate(ShellRoutes.PackageReport(it.name)) },
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable<ShellRoutes.PackageReport> { entry ->
+            val route = entry.toRoute<ShellRoutes.PackageReport>()
+            // Üç rapor girişin ViewModel'ini paylaşır: şube ve dönem raporlar arasında taşınsın.
+            val owner = remember(entry) { navController.getBackStackEntry<ShellRoutes.PackageReportsHome>() }
+            PackageReportsHost(
+                session = session,
+                container = container,
+                screen = PackageReportScreen.valueOf(route.screen),
+                owner = owner,
+                onOpen = { navController.navigate(ShellRoutes.PackageReport(it.name)) },
+                onBack = { navController.popBackStack() },
             )
         }
 
@@ -506,6 +534,7 @@ private fun ManagementHomeScreen(
     session: AppSession,
     onOpenCustomerTags: () -> Unit,
     onOpenPackageDefinitions: () -> Unit,
+    onOpenPackageReports: () -> Unit,
     trailing: @Composable RowScope.() -> Unit,
 ) {
     KlinaraScreen(title = "Yönetim", trailing = trailing) {
@@ -526,6 +555,12 @@ private fun ManagementHomeScreen(
                     label = "Paket tanımları",
                     value = "Satılabilir seans paketleri ve fiyatları",
                     onClick = onOpenPackageDefinitions,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                KlinaraNavigationRow(
+                    label = "Paket raporları",
+                    value = "Yükümlülük, süre dolumu ve dönem kullanımı",
+                    onClick = onOpenPackageReports,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }

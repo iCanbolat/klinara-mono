@@ -70,3 +70,8 @@ taşıyor; `customer-package-page.json`'daki iade edilmiş paket **kasa hareketi
 ve onu geri alan **ters kaydı** (`reversesEntryId`) taşıyor; `ledger-unknown-kind.json`
 bilerek tanımadığımız bir `entryType` içeriyor. `package-entitlements.json` **çıplak
 dizi** — zarf YOK.
+
+Raporlar: `outstanding-report.json` silinmiş bir kırılımın **`groupId: null`** hâlini;
+`expiring-report-no-revenue.json` `report.revenue:read` olmayan rolün yanıtını taşıyor —
+bir satırda açık `"outstandingMinor": null`, diğerinde alan HİÇ yok. İkisi de ekranda
+"—" olmalı, "0 ₺" değil. `usage-report.json` dönem kullanımını.

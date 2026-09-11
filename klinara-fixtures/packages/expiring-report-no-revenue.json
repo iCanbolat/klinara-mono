@@ -1,0 +1,27 @@
+{
+  "data": [
+    {
+      "customerPackageId": "f2000000-0000-4000-8000-000000000003",
+      "customerId": "c0570000-0000-4000-8000-000000000006",
+      "customerName": "Selin Arslan",
+      "packageName": "10 Seans Lazer + 2 Bakım",
+      "branchId": "b1000000-0000-4000-8000-000000000002",
+      "remainingSessions": 9,
+      "expiresAt": "2026-09-13T09:00:00.000Z",
+      "outstandingMinor": null
+    },
+    {
+      "customerPackageId": "f2000000-0000-4000-8000-000000000002",
+      "customerId": "c0570000-0000-4000-8000-000000000004",
+      "customerName": "Fatma Şahin",
+      "packageName": "10 Seans Lazer + 2 Bakım",
+      "branchId": "b1000000-0000-4000-8000-000000000001",
+      "remainingSessions": 5,
+      "expiresAt": "2026-09-23T09:00:00.000Z"
+    }
+  ],
+  "pageInfo": {
+    "nextCursor": "MTc5MDAwMDAwMDAwMHxmMg",
+    "hasMore": true
+  }
+}

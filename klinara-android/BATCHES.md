@@ -1862,3 +1862,104 @@ ama not yanıltıcı.
 - **İade tahsilatı / kasa hareketi** — A6.2. İade `pending` bir yükümlülük yazıyor ve
   ekran bunu gizlemiyor (kart rozeti "İade ödemesi bekliyor", özet dipnotu).
 - **Devirde hedef için yeni müşteri oluşturma** — hedef var olan bir müşteri olmalı.
+
+---
+
+## A5.4 — Paket raporları ✅
+
+**Durum:** `./gradlew check` yeşil. **418 test** (A5.3 sonunda 406'ydı; A4.4 sonunda 345),
+59 suite. Emülatörde iki rolle sürüldü. **`manager`** (Nişantaşı): yükümlülük 12.078,18 ₺
+· 2 paket · 12 seans (Bodrum'daki paket kapsam dışı — şube filtresi), hizmet kırılımı;
+süre dolumu "1 Eylül 2026 – 30 Eylül 2026" etiketiyle Fatma'nın paketi ve tutarı; dönem
+kullanımında cilt bakımı "Tüketilen 1 seans". **`Uygulayıcı kapsamı`** (practitioner):
+rapor girişinde yükümlülük satırı YOK ve sebebi yazıyor; süre dolumunda tutar **"—"**;
+müşteri kartında paket bölümü görünüyor ama "Paket sat" ve paket detayında işlem kartı yok.
+
+### Yarı açık aralık: sunucuya `[1 Eyl, 1 Eki)`, kullanıcıya "1 – 30 Eylül"
+
+`PackageReportsViewModel` dönemi daima ayın ilk anından ertesi ayın ilk anına kuruyor
+(`BranchClock.startOfMonth` + `addingMonths`, şube saatinde); etiket üst sınırın **bir
+gün öncesini** yazıyor. `periodIsHalfOpenAndLabelInclusive` iki tarafı ayrı çiviliyor;
+mock da `to`'yu dışarıda bırakıyor — tam `to` anında dolan paket o dönemde görünmüyor,
+sonrakinde görünüyor (`expiringIsHalfOpen`).
+
+### `null` tutar "—", sıfır DEĞİL — iki ayrı yerde
+
+`report.revenue:read` olmayan rolde (practitioner, receptionist) sunucu süre dolumu
+satırlarındaki tutarı `null`'lıyor ve yükümlülük raporunu 403 ile kapatıyor. Mock ikisini
+de yapıyor (`canReadRevenue` kancası senaryonun rolünden besleniyor), ekran:
+
+- süre dolumunda `null`'u **"—"** yazıyor (`amountLabel`) — "0 ₺" taşınmayan bir borç
+  iddiası olurdu;
+- rapor girişinde yükümlülük satırını **çizmiyor** ve "Parasal raporlar bu rolde
+  görüntülenemez" diyor — eksik ile kapalı arasındaki fark;
+- hedef derin bağlantıyla açılsa bile izinsiz rol sunucuya 403 için gitmiyor.
+
+Fixture'da iki hâl birden var: açık `"outstandingMinor": null` ve alanın HİÇ olmadığı satır.
+
+### Süre dolumu imleci OKUNUYOR ve sayfalar kayıpsız
+
+iOS'ta rapor bir kez `pageInfo` okunmadan ilk 50 satırda sessizce kesilmişti.
+`expiringPaginationIsLossless` `limit = 1` ile sayfaları yürüyüp sayfasız yanıtın
+**aynısını** aldığını doğruluyor; keyset sırası `(expiresAt, id)` artan (eşit tarihte
+`id` olmadan sınırdaki kayıt ya iki kez çıkar ya hiç çıkmaz).
+
+### Kullanımda ters kayıt tüketimden DÜŞÜYOR
+
+Rakamlar defterden; geri alınmış bir tamamlama "tüketildi" sayılmıyor (−1 ve onun tersi
++1 → net 0). Ayşe'nin defterinde 4 kullanım + 1 ters kayıt → 3 (`usageSubtractsReversals`).
+
+### Mock ikiye bölündü — detekt'in büyük sınıf eşiği, ama sunucunun çizgisinden
+
+Dört controller'ın mock'u tek sınıfta 780 satırı geçti ve `LargeClass` verdi. Eşik
+susturulmadı; iki ayrım yapıldı ve ikisi de sunucuda zaten var:
+
+- **`MockPackageLedger`** — tablolar ve TEK yazma noktası (`apply`/`append`), yani
+  `apply_package_ledger_entry()` trigger'ının aynası. Uç kuralları (izin, sürüm,
+  idempotency, doğrulama) `MockPackagesService`'te kaldı.
+- **`MockPackageReports`** — raporlar tabloların OKUNUR kopyası üzerinde; sunucuda da
+  `modules/reporting` paket tablolarına yazmıyor.
+
+Bölme sırasında bir başlatma sırası tuzağı yakalandı: `lastInstant` `init { seed() }`'den
+sonra tanımlıydı ve Kotlin başlatıcıları metin sırasıyla koşar. Seed bugün `nextInstant`
+çağırmıyor ama çağırsaydı alan başlatılmamış olurdu; yukarı taşındı ve yorumu yazıldı.
+
+### Seed genişledi: süresi YAKLAŞAN iki paket
+
+Süre dolumu raporu boş bir ekranla sınanamaz. Fatma (Nişantaşı) ve Selin (Bodrum) için
+bir yıl önce satılmış, seed anından iki-üç hafta sonra dolan lazer paketleri eklendi;
+şube kırılımı da ancak iki şubeyle görünüyor. Kalan hakları yine **defterden** doğuyor.
+
+### Plandan / iOS'tan sapmalar
+
+- **Süre dolumu satırı müşteri kartına GİTMİYOR** (iOS gidiyor). Rapor Yönetim
+  sekmesinde, kart Müşteriler sekmesinde; sekmeler arası gezinme kabukta henüz yok ve
+  Yönetim'e ikinci bir müşteri kartı grafiği kurmak, kartın bütün alt hedeflerini
+  (not, dosya, paket işlemleri) orada da kaydetmek demekti. A7 hub'ında ele alınacak.
+- **Üç rapor TEK ViewModel'i paylaşıyor** — sahibi rapor girişinin geri yığını kaydı
+  (`navController.getBackStackEntry<PackageReportsHome>()`). iOS'taki "ortak filtre"
+  kararının Android karşılığı; Yönetim'den çıkınca ViewModel de ölüyor.
+- **Sayfalama sonsuz kaydırma değil, "Sonraki sayfa" düğmesi.** `KlinaraScreen`'in
+  kaydırılabilir `Column`'u görünürlük tetikleyicisi vermiyor; `LazyColumn`'a geçmek
+  ekran iskeletini yalnız bu rapor için değiştirmek olurdu.
+- Yeni bileşen: `ReportPeriodBar` (tasarım sistemi, galeride) — tarih bilmiyor, yalnız
+  yön bildiriyor; kapsayıcı etiketi çağıran kuruyor.
+
+### Yeni bağımlılık: YOK
+
+### Kapsam dışı
+
+- **Rapor dışa aktarımı** (CSV/PDF) — sunucuda `report-export.controller.ts` var; A9'da
+  diğer raporlarla birlikte.
+- **Çok aylık pencere** — iOS `months` alanını taşıyor ama arayüzü yok; burada da tek ay.
+
+### Faz A5 kapandı
+
+Dört batch, 418 test (faz başında 345). Çıkış ölçütü — **kalan seans hiçbir akışta
+negatife düşmüyor ve istemci sayacı sunucu defteriyle ayrışmıyor** — üç katmanda
+korunuyor: istemci kalan hakkı hiçbir yerde hesaplamıyor ya da yerelde güncellemiyor
+(her yazmadan sonra sunucudan taze); mock'ta kalan hak defter satırlarının toplamı ve
+tek yazma noktası hakkı yazmadan önce kontrol ediyor; `assertLedgerMatches` satış,
+bağlama, tamamlama, yeniden açma, düzeltme, iade ve devrin her birinden sonra "defter
+toplamı == kalan hak ≥ 0" diyor. Kalan borç: randevu oluşturma formunda paket
+seçimi (kabloda var, arayüzü yok) ve iade tahsilatı (A6.2).

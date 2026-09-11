@@ -1,0 +1,14 @@
+{
+  "data": [
+    {
+      "groupId": "5e111ce0-0000-4000-8000-000000000002",
+      "groupLabel": "Lazer epilasyon",
+      "purchased": 10,
+      "consumed": 3,
+      "refunded": 2,
+      "expired": 0,
+      "transferred": 1,
+      "adjusted": 1
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "totals": {
+    "packages": 3,
+    "remainingSessions": 14,
+    "outstandingMinor": 1548000,
+    "currency": "TRY"
+  },
+  "data": [
+    {
+      "groupId": "5e111ce0-0000-4000-8000-000000000002",
+      "groupLabel": "Lazer epilasyon",
+      "packages": 3,
+      "remainingSessions": 9,
+      "outstandingMinor": 1000764
+    },
+    {
+      "groupId": null,
+      "groupLabel": "Silinmiş hizmet",
+      "packages": 1,
+      "remainingSessions": 5,
+      "outstandingMinor": 547236
+    }
+  ]
+}

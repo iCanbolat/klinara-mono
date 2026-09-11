@@ -16,6 +16,8 @@ import com.klinara.android.services.booking.MockBookingService
 import com.klinara.android.services.catalog.CatalogService
 import com.klinara.android.services.catalog.LiveCatalogService
 import com.klinara.android.services.catalog.MockCatalogService
+import com.klinara.android.services.contracts.Permissions
+import com.klinara.android.services.contracts.RolePermissions
 import com.klinara.android.services.crm.CustomerService
 import com.klinara.android.services.crm.LiveCustomerService
 import com.klinara.android.services.crm.LiveNotesService
@@ -190,6 +192,11 @@ class ServiceContainer private constructor(
                     catalog = mockCatalog,
                     customers = mockCustomers::snapshot,
                     booking = mockBooking,
+                    // Rol senaryodan geliyor (`PractitionerScope` → practitioner): parasal
+                    // alanların `null` dalı ancak böyle sürülebilir.
+                    canReadRevenue = {
+                        Permissions.REPORT_REVENUE_READ in RolePermissions.forRole(mockAuth.scenario.roleKey)
+                    },
                 ).apply { this.failing = failing }
             // Tamamlanma → seans düşme aynı "transaction": hak yetersizse durum da değişmez.
             mockBooking.packageHook = mockPackages

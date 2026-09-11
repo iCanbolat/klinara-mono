@@ -135,6 +135,9 @@ fun ComponentGalleryScreen(modifier: Modifier = Modifier) {
             )
         }
 
+        SectionLabel("Rapor dönemi")
+        ReportPeriodBar(label = "1 Eylül 2026 – 30 Eylül 2026", onShift = {})
+
         SectionLabel("Seçim listesi")
         KlinaraCard {
             KlinaraSearchablePicker(
