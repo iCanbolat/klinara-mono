@@ -1,0 +1,33 @@
+{
+  "id": "e1000000-0000-4000-8000-000000000001",
+  "tenantId": "7f3d1a20-0000-4000-8000-000000000001",
+  "categoryId": "d1000000-0000-4000-8000-000000000001",
+  "slug": "tum-vucut-lazer",
+  "name": "Tüm Vücut Lazer Epilasyon",
+  "description": "Diyot lazer, tüm vücut.",
+  "durationMinutes": 90,
+  "bufferBeforeMinutes": 10,
+  "bufferAfterMinutes": 15,
+  "priceMinor": 250000,
+  "vatRateBasisPoints": 2000,
+  "calendarColor": "#7F9A76",
+  "isOnlineBookable": true,
+  "isActive": true,
+  "createdAt": "2026-05-02T09:30:00.000Z",
+  "branchOverrides": [
+    {
+      "id": "0e0e0000-0000-4000-8000-000000000001",
+      "tenantId": "7f3d1a20-0000-4000-8000-000000000001",
+      "serviceId": "e1000000-0000-4000-8000-000000000001",
+      "branchId": "b1000000-0000-4000-8000-000000000002",
+      "durationMinutes": 75,
+      "bufferBeforeMinutes": null,
+      "bufferAfterMinutes": null,
+      "priceMinor": 285000,
+      "vatRateBasisPoints": null,
+      "isOnlineBookable": false,
+      "isActive": null,
+      "createdAt": "2026-05-02T09:30:00.000Z"
+    }
+  ]
+}

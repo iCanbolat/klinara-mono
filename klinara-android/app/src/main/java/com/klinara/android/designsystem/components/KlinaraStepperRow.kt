@@ -47,6 +47,8 @@ fun KlinaraStepperRow(
     detail: String? = null,
     enabled: Boolean = true,
     format: (Int) -> String = { it.toString() },
+    /** A7.1: süre ve tampon 5 dakikalık adımla ilerler (iOS `step: 5`). */
+    step: Int = 1,
 ) {
     val colors = KlinaraTheme.colors
     Row(
@@ -62,8 +64,8 @@ fun KlinaraStepperRow(
         StepButton(
             glyph = "−",
             description = "$label azalt",
-            enabled = enabled && value - 1 >= range.first,
-            onClick = { onValueChange(value - 1) },
+            enabled = enabled && value - step >= range.first,
+            onClick = { onValueChange(value - step) },
         )
         Text(
             format(value),
@@ -79,8 +81,8 @@ fun KlinaraStepperRow(
         StepButton(
             glyph = "+",
             description = "$label artır",
-            enabled = enabled && value + 1 <= range.last,
-            onClick = { onValueChange(value + 1) },
+            enabled = enabled && value + step <= range.last,
+            onClick = { onValueChange(value + step) },
         )
     }
 }

@@ -252,6 +252,20 @@ object ShellRoutes {
         val screen: String,
     )
 
+    /** Hizmet kataloğu (A7.1). */
+    @Serializable
+    data object ServiceList
+
+    /** Hizmet oluşturma / düzenleme. [serviceId] null ise YENİ hizmet. */
+    @Serializable
+    data class ServiceEditor(
+        val serviceId: String? = null,
+    )
+
+    /** Hizmet kategorileri (A7.1). Editör bir diyalog, ayrı hedef değil. */
+    @Serializable
+    data object ServiceCategoryList
+
     @Serializable
     data object ProfileHome
 }

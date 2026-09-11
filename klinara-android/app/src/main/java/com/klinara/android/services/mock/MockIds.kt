@@ -33,4 +33,13 @@ object MockIds {
     const val SERVICE_FILLER = "5e111ce0-0000-4000-8000-000000000003"
     const val SERVICE_CHECKUP = "5e111ce0-0000-4000-8000-000000000004"
     const val SERVICE_MASK = "5e111ce0-0000-4000-8000-000000000005"
+
+    // --- A7.1: katalog kategorileri ---
+    //
+    // İlki A3.4'ten beri tek kategori kimliğiydi (hepsi oradaydı); korunuyor ki eski bir
+    // mock kaydı kategorisiz kalmasın.
+
+    const val CATEGORY_SKIN_CARE = "ca7e0000-0000-4000-8000-000000000001"
+    const val CATEGORY_EPILATION = "ca7e0000-0000-4000-8000-000000000002"
+    const val CATEGORY_INJECTION = "ca7e0000-0000-4000-8000-000000000003"
 }

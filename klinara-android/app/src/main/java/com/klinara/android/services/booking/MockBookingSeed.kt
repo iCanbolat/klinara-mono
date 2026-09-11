@@ -1,5 +1,7 @@
 package com.klinara.android.services.booking
 
+import com.klinara.android.services.catalog.ClinicService
+import com.klinara.android.services.catalog.MockCatalogService
 import com.klinara.android.services.formatting.BranchClock
 import com.klinara.android.services.formatting.ClockTime
 import com.klinara.android.services.formatting.VatRate
@@ -130,7 +132,7 @@ object MockBookingSeed {
         minutes: Int,
         staffProfileId: String,
         customerIndex: Int,
-        services: List<Catalog.Entry>,
+        services: List<ClinicService>,
         status: AppointmentStatus,
     ) = Template(dayOffset, start, minutes, staffProfileId, customerIndex, services, status)
 
@@ -292,15 +294,20 @@ object MockBookingSeed {
             ),
         )
 
-    /** Mock hizmet kataloğu — A7.1'de gerçek `CatalogService` gelene kadarki karşılığı. */
+    /**
+     * Tohumun hizmetleri — ad ve fiyat [MockCatalogService.ALL]'dan TÜRETİLİR (A7.1).
+     *
+     * A3.1'den beri burada özel bir kopya duruyordu; katalog tohumu değişince takvim
+     * satırındaki ad ile rezervasyon formundaki ad ayrışırdı.
+     */
     private object Catalog {
-        val SKIN_CARE = Entry(MockIds.SERVICE_SKIN_CARE, name = "Cilt bakımı", priceMinor = 90_000)
-        val LASER = Entry(MockIds.SERVICE_LASER, name = "Lazer epilasyon", priceMinor = 145_000)
-        val FILLER = Entry(MockIds.SERVICE_FILLER, name = "Dolgu", priceMinor = 480_000)
-        val CHECKUP = Entry(MockIds.SERVICE_CHECKUP, name = "Kontrol", priceMinor = 0)
-        val MASK = Entry(MockIds.SERVICE_MASK, name = "Maske", priceMinor = 35_000)
+        val SKIN_CARE = seed(MockIds.SERVICE_SKIN_CARE)
+        val LASER = seed(MockIds.SERVICE_LASER)
+        val FILLER = seed(MockIds.SERVICE_FILLER)
+        val CHECKUP = seed(MockIds.SERVICE_CHECKUP)
+        val MASK = seed(MockIds.SERVICE_MASK)
 
-        data class Entry(val id: String, val name: String, val priceMinor: Long)
+        private fun seed(id: String): ClinicService = MockCatalogService.ALL.first { it.id == id }
     }
 
     private data class Template(
@@ -309,7 +316,7 @@ object MockBookingSeed {
         val minutes: Int,
         val staffProfileId: String,
         val customerIndex: Int,
-        val services: List<Catalog.Entry>,
+        val services: List<ClinicService>,
         val status: AppointmentStatus,
     ) {
         fun toEntry(

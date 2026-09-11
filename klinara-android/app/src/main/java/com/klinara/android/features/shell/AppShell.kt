@@ -43,6 +43,9 @@ import com.klinara.android.features.auth.AuthEvent
 import com.klinara.android.features.calendar.AppointmentDetailScreen
 import com.klinara.android.features.calendar.AppointmentHistoryScreen
 import com.klinara.android.features.calendar.CalendarHomeScreen
+import com.klinara.android.features.catalog.ServiceCategoryListScreen
+import com.klinara.android.features.catalog.ServiceEditorScreen
+import com.klinara.android.features.catalog.ServiceListScreen
 import com.klinara.android.features.customers.CustomerDetailScreen
 import com.klinara.android.features.customers.CustomerEditorScreen
 import com.klinara.android.features.customers.CustomerListScreen
@@ -459,10 +462,37 @@ private fun ManagementTab(
         composable<ShellRoutes.ManagementHome> {
             ManagementHomeScreen(
                 session = session,
-                onOpenCustomerTags = { navController.navigate(ShellRoutes.CustomerTagList) },
-                onOpenPackageDefinitions = { navController.navigate(ShellRoutes.PackageDefinitionList) },
-                onOpenPackageReports = { navController.navigate(ShellRoutes.PackageReportsHome) },
+                onOpen = { destination -> navController.navigate(destination.route()) },
                 trailing = trailing,
+            )
+        }
+
+        composable<ShellRoutes.ServiceList> {
+            ServiceListScreen(
+                session = session,
+                container = container,
+                onBack = { navController.popBackStack() },
+                onOpen = { id -> navController.navigate(ShellRoutes.ServiceEditor(id)) },
+            )
+        }
+
+        composable<ShellRoutes.ServiceEditor> { entry ->
+            val route = entry.toRoute<ShellRoutes.ServiceEditor>()
+            ServiceEditorScreen(
+                session = session,
+                container = container,
+                serviceId = route.serviceId,
+                onBack = { navController.popBackStack() },
+                // Liste dönüşte kendini sessizce tazeliyor; kaydı geri taşımaya gerek yok.
+                onSaved = { navController.popBackStack() },
+            )
+        }
+
+        composable<ShellRoutes.ServiceCategoryList> {
+            ServiceCategoryListScreen(
+                session = session,
+                container = container,
+                onBack = { navController.popBackStack() },
             )
         }
 
@@ -517,61 +547,6 @@ private fun ManagementTab(
                 session = session,
                 container = container,
                 onBack = { navController.popBackStack() },
-            )
-        }
-    }
-}
-
-/**
- * Yönetim kökü.
- *
- * Gerçek hub (katalog, personel, çalışma saatleri, kasa, prim) A7'de; bugün yalnız
- * A4.2'nin etiketleri ve A5'in paketleri gerçek. Kalanı için **sahte satır çizilmiyor** —
- * açılmayan bir menü, kullanıcıya var olmayan bir özellik vaat eder.
- */
-@Composable
-private fun ManagementHomeScreen(
-    session: AppSession,
-    onOpenCustomerTags: () -> Unit,
-    onOpenPackageDefinitions: () -> Unit,
-    onOpenPackageReports: () -> Unit,
-    trailing: @Composable RowScope.() -> Unit,
-) {
-    KlinaraScreen(title = "Yönetim", trailing = trailing) {
-        if (session.can(Permissions.CUSTOMER_READ)) {
-            KlinaraCard(title = "Müşteriler") {
-                KlinaraNavigationRow(
-                    label = "Müşteri etiketleri",
-                    value = "Kiracı genelinde tanımlı etiketler",
-                    onClick = onOpenCustomerTags,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        }
-
-        if (session.can(Permissions.PACKAGE_READ)) {
-            KlinaraCard(title = "Paketler") {
-                KlinaraNavigationRow(
-                    label = "Paket tanımları",
-                    value = "Satılabilir seans paketleri ve fiyatları",
-                    onClick = onOpenPackageDefinitions,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                KlinaraNavigationRow(
-                    label = "Paket raporları",
-                    value = "Yükümlülük, süre dolumu ve dönem kullanımı",
-                    onClick = onOpenPackageReports,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        }
-
-        KlinaraCard(title = "Yakında") {
-            Text(
-                text =
-                    "Hizmetler, ekip ve çalışma saatleri Faz A7 ile; kasa ve prim Faz A6 ile geliyor.",
-                style = KlinaraType.bodyM,
-                color = KlinaraTheme.colors.charcoalMuted,
             )
         }
     }
@@ -649,3 +624,13 @@ private fun ShellNavigationBar(
         }
     }
 }
+
+/** Hub hedefi → tip güvenli route. Tek yerde: hub yeni bir satır kazanınca derleyici burayı sorar. */
+private fun ManagementDestination.route(): Any =
+    when (this) {
+        ManagementDestination.Services -> ShellRoutes.ServiceList
+        ManagementDestination.ServiceCategories -> ShellRoutes.ServiceCategoryList
+        ManagementDestination.CustomerTags -> ShellRoutes.CustomerTagList
+        ManagementDestination.PackageDefinitions -> ShellRoutes.PackageDefinitionList
+        ManagementDestination.PackageReports -> ShellRoutes.PackageReportsHome
+    }

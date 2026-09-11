@@ -178,13 +178,16 @@ class ServiceContainer private constructor(
             val tokens = TokenStore(dataStore, KeystoreSessionCipher())
             val mockAuth = MockAuthService(scenario)
             val failing = scenario == MockScenario.NetworkError
-            val mockBooking = MockBookingService(data).apply { this.failing = failing }
+            val mockCatalog = MockCatalogService().apply { this.failing = failing }
+            // Randevu motoru katalog TABLOSUNU okur (A7.1): pasife alınan hizmet
+            // rezervasyondan düşer, yeni hizmet orada görünür.
+            val mockBooking =
+                MockBookingService(data, catalog = mockCatalog::snapshotServices).apply { this.failing = failing }
             val mockStaff = MockStaffService().apply { this.failing = failing }
             val mockCustomers = MockCustomerService().apply { this.failing = failing }
             val mockNotifications = MockNotificationsService().apply { this.failing = failing }
             val mockNotes = MockNotesService().apply { this.failing = failing }
             val mockFiles = MockFilesService().apply { this.failing = failing }
-            val mockCatalog = MockCatalogService().apply { this.failing = failing }
             // Paket kalemleri katalogdan fiyat ve ad alıyor — ayrı bir katalog kopyası,
             // pakete eklenen hizmetin rezervasyon formunda bulunamaması demek olurdu.
             val mockPackages =

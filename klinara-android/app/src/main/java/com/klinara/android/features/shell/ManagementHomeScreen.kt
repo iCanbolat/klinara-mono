@@ -1,0 +1,151 @@
+package com.klinara.android.features.shell
+
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import com.klinara.android.designsystem.KlinaraTheme
+import com.klinara.android.designsystem.KlinaraType
+import com.klinara.android.designsystem.components.KlinaraCard
+import com.klinara.android.designsystem.components.KlinaraNavigationRow
+import com.klinara.android.designsystem.components.KlinaraScreen
+import com.klinara.android.features.auth.AppSession
+import com.klinara.android.services.contracts.Permissions
+
+/** Yönetim hub'ından açılan hedefler. Route'a çevirme `AppShell`'in işi. */
+enum class ManagementDestination {
+    Services,
+    ServiceCategories,
+    CustomerTags,
+    PackageDefinitions,
+    PackageReports,
+}
+
+data class ManagementRow(
+    val destination: ManagementDestination,
+    val label: String,
+    val detail: String,
+)
+
+data class ManagementSection(
+    val title: String,
+    val rows: List<ManagementRow>,
+    val footnote: String? = null,
+)
+
+/**
+ * Yönetim hub'ının kart kümesi — **saf bir fonksiyon** (izin kümesi → kartlar).
+ *
+ * `ShellTab.visibleFor` ile aynı gerekçe: altı rolün matrisi emülatörde gezilmeden birim
+ * testiyle doğrulanır (`ManagementSectionsTest`). iOS `ManagementHomeView` gibi kapı
+ * **kart** düzeyinde: kartı görmek okuma izni ister; yazma izni ekranların içinde sorulur
+ * (salt okunur açılırlar).
+ *
+ * **Sahte satır yok** — açılmayan bir satır, var olmayan bir özellik vaat eder. Henüz
+ * gelmemiş fazlar tek bir "Yakında" kartında metin olarak anılır.
+ */
+fun managementSections(session: AppSession): List<ManagementSection> =
+    buildList {
+        if (session.can(Permissions.SERVICE_READ)) {
+            add(
+                ManagementSection(
+                    title = "Katalog",
+                    rows =
+                        listOf(
+                            ManagementRow(
+                                ManagementDestination.Services,
+                                "Hizmetler",
+                                "Süre, hazırlık payı, fiyat ve şube farkları",
+                            ),
+                            ManagementRow(
+                                ManagementDestination.ServiceCategories,
+                                "Kategoriler",
+                                "Hizmetlerin gruplanması ve sırası",
+                            ),
+                        ),
+                ),
+            )
+        }
+        if (session.can(Permissions.CUSTOMER_READ)) {
+            add(
+                ManagementSection(
+                    title = "Müşteriler",
+                    rows =
+                        listOf(
+                            ManagementRow(
+                                ManagementDestination.CustomerTags,
+                                "Müşteri etiketleri",
+                                "Kiracı genelinde tanımlı etiketler",
+                            ),
+                        ),
+                ),
+            )
+        }
+        if (session.can(Permissions.PACKAGE_READ)) {
+            add(
+                ManagementSection(
+                    title = "Paketler",
+                    rows =
+                        listOf(
+                            ManagementRow(
+                                ManagementDestination.PackageDefinitions,
+                                "Paket tanımları",
+                                "Satılabilir seans paketleri ve fiyatları",
+                            ),
+                            ManagementRow(
+                                ManagementDestination.PackageReports,
+                                "Paket raporları",
+                                "Yükümlülük, süre dolumu ve dönem kullanımı",
+                            ),
+                        ),
+                ),
+            )
+        }
+    }
+
+/**
+ * Yönetim kökü — iOS `ManagementHomeView` paritesi.
+ *
+ * A2'de bir `ComingSoon`, A4.2–A5'te `AppShell.kt` içinde private bir ara çözümdü; A7.1'de
+ * kendi dosyasına ve [managementSections]'a taşındı.
+ */
+@Composable
+fun ManagementHomeScreen(
+    session: AppSession,
+    onOpen: (ManagementDestination) -> Unit,
+    trailing: @Composable RowScope.() -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    KlinaraScreen(title = "Yönetim", modifier = modifier, trailing = trailing) {
+        Text(
+            text = "${session.activeBranch?.name ?: "Klinik"} · Hizmetler, ekip ve çalışma saatleri buradan yönetilir.",
+            style = KlinaraType.bodyM,
+            color = KlinaraTheme.colors.charcoalMuted,
+        )
+
+        managementSections(session).forEach { section ->
+            KlinaraCard(title = section.title, footnote = section.footnote) {
+                section.rows.forEach { row ->
+                    KlinaraNavigationRow(
+                        label = row.label,
+                        value = row.detail,
+                        onClick = { onOpen(row.destination) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+        }
+
+        KlinaraCard(title = "Yakında") {
+            Text(
+                text = COMING_SOON,
+                style = KlinaraType.bodyM,
+                color = KlinaraTheme.colors.charcoalMuted,
+            )
+        }
+    }
+}
+
+private const val COMING_SOON =
+    "Ekip ve çalışma saatleri A7 içinde; kasa ve prim Faz A6, mesajlar Faz A8, raporlar Faz A9 ile geliyor."

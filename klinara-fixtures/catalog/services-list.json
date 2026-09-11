@@ -1,0 +1,23 @@
+{
+  "data": [
+    {
+      "id": "e1000000-0000-4000-8000-000000000004",
+      "tenantId": "7f3d1a20-0000-4000-8000-000000000001",
+      "categoryId": "d1000000-0000-4000-8000-000000000002",
+      "slug": "kimyasal-peeling",
+      "name": "Kimyasal Peeling",
+      "description": null,
+      "durationMinutes": 45,
+      "bufferBeforeMinutes": 5,
+      "bufferAfterMinutes": 15,
+      "priceMinor": 140000,
+      "vatRateBasisPoints": 1000,
+      "calendarColor": null,
+      "isOnlineBookable": false,
+      "isActive": true,
+      "createdAt": "2026-05-02T09:30:00.000Z",
+      "branchOverrides": [],
+      "requiresConsent": true
+    }
+  ]
+}

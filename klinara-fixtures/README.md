@@ -75,3 +75,10 @@ Raporlar: `outstanding-report.json` silinmiş bir kırılımın **`groupId: null
 `expiring-report-no-revenue.json` `report.revenue:read` olmayan rolün yanıtını taşıyor —
 bir satırda açık `"outstandingMinor": null`, diğerinde alan HİÇ yok. İkisi de ekranda
 "—" olmalı, "0 ₺" değil. `usage-report.json` dönem kullanımını.
+
+## `catalog/` (A7.1)
+
+`service.json` şube farkı taşıyan bir hizmeti çiviliyor: override'daki **`null` alanlar
+miras** demek (sıfır değil) ve `isOnlineBookable: false` şubede online'ı kapatıyor.
+`service-category.json` pasif bir kategori; `services-list.json` liste zarfını, açık
+`null` açıklama/rengi ve ileri sürümlü bir alanı (`requiresConsent`) taşıyor.

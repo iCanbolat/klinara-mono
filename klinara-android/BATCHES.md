@@ -1963,3 +1963,116 @@ tek yazma noktası hakkı yazmadan önce kontrol ediyor; `assertLedgerMatches` s
 bağlama, tamamlama, yeniden açma, düzeltme, iade ve devrin her birinden sonra "defter
 toplamı == kalan hak ≥ 0" diyor. Kalan borç: randevu oluşturma formunda paket
 seçimi (kabloda var, arayüzü yok) ve iade tahsilatı (A6.2).
+
+---
+
+## A7.1 — Hizmet kataloğu ✅
+
+**Durum:** `./gradlew check` yeşil. **452 test** (A5.4 sonunda 418'di), 65 suite.
+Faz A6 (finans) henüz yapılmadı; A7 onu beklemiyor — hiçbir A7 ekranı paraya yazmıyor.
+Temiz debug derlemesi **29,5 sn** (§4 tetikleyicisi 90 sn): modül bölme gündemde değil.
+Emülatörde `Çok şubeli` senaryosu, **Bodrum** şubesiyle sürüldü: Yönetim → Katalog kartı →
+Hizmetler (kategori grupları, Bodrum'un lazer farkı 1.650,00 ₺ / 1 sa "Şubeye özel"),
+lazer editöründe Bodrum süresi + → kaydet → liste sessizce "1 sa 5 dk · takvimde 1 sa
+20 dk"; Kategoriler'de hizmeti olan "Enjeksiyon İşlemleri"ni pasife almak afişte
+**sunucunun metnini** gösterdi ("Kullanımda olan hizmet kategorisi pasife alınamaz").
+
+### Katalog servisi okuma yarısından tam CRUD'a — yeni uç YOK
+
+A3.4'ün tek metodu (`services()`) sekiz metotla tamamlandı: kategoriler (liste/oluştur/
+güncelle/pasife al) ve hizmetler (tekil/oluştur/güncelle/pasife al). İkisi de sunucuda
+`DELETE` ama **kaydı silmez, pasife alır ve 200 ile kaydı döner** — `sendVoid` değil
+`send`. Katalog uçlarında If-Match, sürüm, sayfalama yok; son yazan kazanır.
+
+### PATCH alan TEMİZLEYEBİLİYOR — iOS'ta açıklama ve renk kaldırılamıyor
+
+`UpdateServiceInput.description` ve `.calendarColor` `Patch<String>`. iOS her alanı
+`String?` ile gönderiyor ve `nil` JSON'dan atıldığı için hizmetin rengini ya da
+açıklamasını **silemiyor** — sunucu eskisini koruyor. `updateClearsWithExplicitNull`
+açık `null`'u, `updateSendsOnlyChanges` rengi kaldırmanın `Patch.Clear` ürettiğini
+çiviliyor. Form ayrıca yalnız DEĞİŞEN alanları gönderiyor (iOS hepsini).
+
+### Şube farkları tam değiştirme; değişmediyse hiç gönderilmiyor
+
+`branchOverrides` verilirse liste tamamen yazılıyor, `null` "dokunma", boş liste "hepsini
+kaldır". Ekran yalnız fiyat ve süreyi düzenliyor (iOS gibi); sunucudan gelen tampon/KDV/
+online/aktif override alanları formda **korunup aynen geri yazılıyor**. İki alan da
+boşalan şube satırı listeden düşüyor: değer taşımayan satır sunucuda 400
+(`overrideEditing`, `overrideListSemantics`). Farklar değişmediyse liste gövdeye girmiyor
+— her kayıtta override kimliklerini boşuna yenilemek yok.
+
+### `effective(branchId)` artık tüm override alanlarını çözüyor
+
+A3.4'teki hâli yalnız süre/fiyat veriyordu ve `isActive == false` olan override'ı yok
+sayıyordu. Şimdi tampon, online, aktiflik ve `isOverridden` da geliyor; override'da
+`null` **miras** demek (`serviceDecodesWithOverride`). Liste satırları seçili şubenin
+gerçeğini gösteriyor; pasif süzgeci de şubenin etkin aktifliğine bakıyor.
+
+### Mock katalog yazılabilir bir tablo — randevu motoru onu okuyor
+
+`MockCatalogService.ALL` artık yalnız **tohum**; çalışma verisi örnekte ve
+`snapshotServices()` ile paylaşılıyor. `MockBookingService` statik `ALL` yerine enjekte
+edilen `catalog` sağlayıcısını okuyor (`ServiceContainer.mock()` bağlıyor; testlerde
+varsayılan tohum) — oturumda eklenen hizmetin süresi randevuya, adı takvim satırına
+yansıyor. `MockBookingSeed`'in A3.1'den kalma özel katalog kopyası kaldırıldı; tohum
+adları ve fiyatları katalog tohumundan türüyor. Mock sunucunun kurallarını taklit ediyor:
+büyük/küçük harf duyarsız slug çakışması 409, bilinmeyen kategori 404, **aktif hizmeti
+olan kategori pasife alınamaz** 409 (`MockCatalogServiceTest`). Kategoriler üçe bölündü
+(Cilt Bakımı / Epilasyon / Enjeksiyon); A3.4'ün tek kategori kimliği korundu. Lazerin
+Bodrum farkı tohumda: "Şubeye özel" rozeti ve şube farkları kartı ancak öyle sürülebilir.
+
+### Kategori sıralaması iki PATCH — hata olursa sunucudan yeniden çekiliyor
+
+Toplu sıralama ucu yok (Kural 1). Taşınan kategori komşunun `sortOrder`'ını, komşu da
+onunkini alıyor. İkinci yazma düşerse iki kategori aynı sırayı taşır; ekran yerel bir
+tahmin göstermiyor, **sunucunun gerçeğini** yeniden çekiyor (`moveFailureReloads`: sıra
+`[1, 1, 2]`). Eşit sıralı eski veride takas indeksten kuruluyor.
+
+### Yönetim hub'ı kendi dosyasında ve saf bir fonksiyon
+
+`ManagementHomeScreen` `AppShell.kt`'deki private ara çözümden
+`features/shell/ManagementHomeScreen.kt`'ye taşındı; kart kümesi
+`managementSections(session)` (izin → kart). Kapı **kart** düzeyinde, iOS gibi: okuma
+izni kartı açar, yazma izni ekranın içinde sorulur (salt okunur editör). Hedef → route
+eşlemesi tek bir `when` — yeni satır eklenince derleyici soruyor. `ManagementSectionsTest`
+altı rolü geziyor: `accountant` Katalog kartını görmüyor.
+
+### Tasarım sistemine eklenenler
+
+- `KlinaraStepperRow(step = …)` — süre ve tamponlar 5 dakikalık adımla (iOS `step: 5`);
+  varsayılan 1, var olan çağıranlar değişmedi.
+- `ColorSwatchPicker` paletin **dışındaki** kayıtlı rengi seçili bir "özel renk" örneği
+  olarak gösteriyor. Web-admin'den ya da eski bir kayıttan gelen renk gösterilmezse hiçbir
+  örnek seçili görünmez ve kullanıcı rengin "renksiz" olduğunu sanar.
+
+### iOS'a bildirilecek fark (§7.8)
+
+1. **PATCH temizleyemiyor** (yukarıda) — `ServiceForm.updateInput` ve iOS
+   `StaffProfileDraft` aynı hatayı taşıyor.
+2. **Pasife alma hataları yutuluyor** — `ServiceListView` ve `ServiceCategoryListView`
+   `try?` kullanıyor; kullanımdaki kategori 409'u kullanıcıya hiç ulaşmıyor.
+3. **Kategori kartındaki "Sıralamak için basılı tutup sürükleyin" dipnotu yanlış** —
+   arayüzde sürükleme yok, yukarı/aşağı düğmesi var. Android'de o metin yazılmadı.
+
+### Plandan / iOS'tan sapmalar
+
+- **Oturum ömürlü `CatalogStore` yok** (A5.1 kararı): her ekran kendi ViewModel'ini
+  alıyor, ortak okuma `CatalogService.snapshot()` (kategoriler + hizmetler paralel).
+  Gruplama/süzme kuralı `CatalogSnapshot`'ta tek yerde.
+- **Hizmet editörü sheet değil `NavHost` hedefi**; kategori editörü bir diyalog
+  (`CustomerTagListScreen` deseni) — üç alanlık bir form için ayrı hedef fazla.
+  Diyalog açıkken sunucu hatası diyalogun **içinde** gösteriliyor, arkadaki afişte değil.
+- **Pasife alma kaydırma jesti değil kartta düğme** (A5.1 gerekçesi).
+- **Kategori seçici menü değil, seçilebilir satırlar** — kiracı başına bir avuç kategori;
+  seçili pasif kategori listede kalıyor, yoksa düzenlenen hizmetin kategorisi boş görünürdü.
+- KDV seçici listede olmayan oranı (%1 gibi) ek bir parça olarak gösteriyor; iOS'ta öyle
+  bir değerde hiçbir parça seçili görünmüyor.
+
+### Yeni bağımlılık: YOK
+
+### Kapsam dışı
+
+- **Hizmet silme / arşiv** — sunucuda yok; pasife alma tek yol.
+- **Override'ın tampon, KDV, online ve aktiflik alanları** için arayüz (iOS'ta da yok);
+  değerleri korunuyor.
+- **`holidays` uçları** — iOS kullanmıyor; A7.3'te de kapsam dışı (parite).

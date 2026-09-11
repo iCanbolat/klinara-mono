@@ -1,0 +1,9 @@
+{
+  "id": "d1000000-0000-4000-8000-000000000003",
+  "tenantId": "7f3d1a20-0000-4000-8000-000000000001",
+  "slug": "enjeksiyon",
+  "name": "Enjeksiyon İşlemleri",
+  "sortOrder": 2,
+  "isActive": false,
+  "createdAt": "2026-05-02T09:30:00.000Z"
+}

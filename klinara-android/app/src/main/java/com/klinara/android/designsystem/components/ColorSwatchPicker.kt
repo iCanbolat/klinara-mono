@@ -70,6 +70,13 @@ fun ColorSwatchPicker(
                     onClick = { onSelect(hex) },
                 )
             }
+
+            // Paletin DIŞINDAKİ kayıtlı renk (web-admin'den ya da eski bir kayıttan):
+            // gösterilmezse hiçbir örnek seçili görünmez ve kullanıcı rengin "renksiz"
+            // olduğunu sanar. Seçili durur; başka bir örneğe dokunmak onu değiştirir.
+            if (selected != null && PALETTE.none { it.equals(selected, ignoreCase = true) }) {
+                Swatch(hex = selected, isSelected = true, onClick = {})
+            }
         }
     }
 }
@@ -82,8 +89,8 @@ private fun Swatch(
 ) {
     val colors = KlinaraTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
-    val fill = hex?.let { Color(it.removePrefix("#").toLong(RADIX) or OPAQUE) } ?: colors.disabled
-    val description = if (hex == null) "Renksiz" else PALETTE_NAMES[hex] ?: hex
+    val fill = hex?.removePrefix("#")?.toLongOrNull(RADIX)?.let { Color(it or OPAQUE) } ?: colors.disabled
+    val description = if (hex == null) "Renksiz" else PALETTE_NAMES[hex.uppercase()] ?: "Özel renk $hex"
 
     Column(
         modifier =

@@ -3,6 +3,7 @@ package com.klinara.android.services.booking
 import com.klinara.android.services.formatting.BranchClock
 import com.klinara.android.services.mock.MockClock
 import com.klinara.android.services.mock.MockDataScenario
+import com.klinara.android.services.catalog.ClinicService
 import com.klinara.android.services.catalog.MockCatalogService
 import com.klinara.android.services.contracts.ApiErrorCode
 import com.klinara.android.services.formatting.ClockTime
@@ -39,6 +40,11 @@ class MockBookingService(
     private val mockClock: MockClock = MockClock(clock),
     private val latencyEnabled: Boolean = true,
     private val random: Random = Random.Default,
+    /**
+     * Katalog tablosu (A7.1). Varsayılan tohum; `ServiceContainer.mock()` canlı mock
+     * kataloğu bağlar ki pasife alınan hizmet rezervasyondan düşsün, yenisi görünsün.
+     */
+    private val catalog: () -> List<ClinicService> = { MockCatalogService.ALL },
 ) : BookingService {
     /** Ağ hatası senaryosunda takvim de düşsün diye. */
     var failing: Boolean = false
@@ -202,7 +208,7 @@ class MockBookingService(
 
         val totalMinutes =
             query.serviceIds.sumOf { serviceId ->
-                MockCatalogService.ALL.firstOrNull { it.id == serviceId }?.durationMinutes ?: DEFAULT_SLOT_MINUTES
+                catalog().firstOrNull { it.id == serviceId }?.durationMinutes ?: DEFAULT_SLOT_MINUTES
             }
         // Aday personel YETKİNLİĞE göre süzülür: sunucunun uygunluk motoru da öyle
         // yapıyor. Süzmezsek mock "3 kişi uygun" der, kullanıcı o slotu seçer ve canlı
@@ -255,7 +261,7 @@ class MockBookingService(
             OffsetDateTime.parse(input.startsAt, DateTimeFormatter.ISO_OFFSET_DATE_TIME).toInstant()
         val minutes =
             input.services.sumOf { line ->
-                MockCatalogService.ALL.firstOrNull { it.id == line.serviceId }?.durationMinutes
+                catalog().firstOrNull { it.id == line.serviceId }?.durationMinutes
                     ?: DEFAULT_SLOT_MINUTES
             }
         val endsAt = clock.addingMinutes(minutes.toLong(), startsAt)
@@ -379,7 +385,7 @@ class MockBookingService(
         var cursor = startsAt
         val lines =
             input.services.mapIndexed { order, line ->
-                val service = MockCatalogService.ALL.firstOrNull { it.id == line.serviceId }
+                val service = catalog().firstOrNull { it.id == line.serviceId }
                 val minutes = service?.durationMinutes ?: DEFAULT_SLOT_MINUTES
                 val lineStart = cursor
                 cursor = clock.addingMinutes(minutes.toLong(), cursor)
@@ -573,7 +579,7 @@ class MockBookingService(
                         id = line.id,
                         serviceId = line.serviceId,
                         serviceName =
-                            MockCatalogService.ALL.firstOrNull { it.id == line.serviceId }?.name ?: "Hizmet",
+                            catalog().firstOrNull { it.id == line.serviceId }?.name ?: "Hizmet",
                         staffProfileId = line.staffProfileId,
                         sortOrder = line.sortOrder,
                         startsAt = line.startsAt,
