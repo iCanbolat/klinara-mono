@@ -25,7 +25,24 @@ class ManagementSectionsTest {
     @Test
     @DisplayName("Kart sırası iOS ile aynı: Katalog, Ekip, Takvim kurulumu, sonra Müşteriler ve Paketler")
     fun order() {
-        assertEquals(listOf("Katalog", "Ekip", "Takvim kurulumu", "Müşteriler", "Paketler"), titles("manager"))
+        assertEquals(
+            listOf("Katalog", "Ekip", "Takvim kurulumu", "Müşteriler", "Paketler", "İletişim"),
+            titles("manager"),
+        )
+    }
+
+    @Test
+    @DisplayName("İletişim kartı `notification:read` ile: muhasebe görmez, uygulayıcı görür (A8.1)")
+    fun communicationCard() {
+        listOf("owner", "manager", "receptionist", "practitioner").forEach { role ->
+            val card = managementSections(ShellSessions.forRole(role)).firstOrNull { it.title == "İletişim" }
+            assertEquals(
+                listOf(ManagementDestination.Inbox, ManagementDestination.MessageLog),
+                card?.rows?.map { it.destination }?.take(2),
+                role,
+            )
+        }
+        assertEquals(false, "İletişim" in titles("accountant"))
     }
 
     @Test

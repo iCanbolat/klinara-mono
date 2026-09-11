@@ -1,0 +1,21 @@
+{
+  "id": "56036745-512f-4608-945c-3c6bb361a9af",
+  "event": "appointment_reminder",
+  "channel": "whatsapp",
+  "locale": "tr",
+  "kind": "transactional",
+  "subject": null,
+  "body": "Sayın {{customerName}}, {{appointmentAt}} randevunuzu hatırlatırız.",
+  "whatsappTemplateName": "randevu_hatirlatma",
+  "whatsappTemplateLanguage": "tr",
+  "whatsappVariables": [
+    "customerName",
+    "appointmentAt"
+  ],
+  "isActive": true,
+  "isDefault": false,
+  "variables": [
+    "customerName",
+    "appointmentAt"
+  ]
+}

@@ -1,21 +1,26 @@
 package com.klinara.android.services.notifications
 
 /**
- * Bildirim uçları — **yalnız opt-out dilimi**.
+ * Bildirim uçları — iOS `NotificationsService` paritesi.
  *
- * Doküman bu servisi A8.1'e koyuyor; **üç metodu A4.2'ye alındı** çünkü müşteri
- * kartının iletişim tercihi bölümü onlarsız çizilemez. A3'ün `booking`, `staff` ve
- * `catalog`'u öne alma deseninin aynısı: gerçek metot, gerçek çağıran, kendi mock'u.
- *
- * Gelen kutusu, mesaj günlüğü, şablonlar ve tercihler A8'de bu arayüzün üstüne biner.
- * Bugün çağıranı olmayan on metot yazmak, okunmamış uçlar için imza tahmini kodlamak
- * olurdu (§A0.5).
+ * **Opt-out dilimi A4.2'de** geldi (müşteri kartının iletişim tercihi bölümü onsuz
+ * çizilemezdi); randevu bildirim planı A8.1'de, şablon/tercih/hatırlatma ayarı A8.2'de.
+ * Gelen kutusu `WhatsAppService`'te, mesaj günlüğü `MessagesService`'te — sunucudaki
+ * modül sınırlarının aynası.
  *
  * **İzin `customer:*` DEĞİL:** okuma `notification:read`, yazma `notification:manage`.
  * Müşteri kartında duran bir bölümün müşteri iznine bağlı olmaması şaşırtıcı ama
  * doğru — kayıt bir iletişim kaydıdır, bir müşteri alanı değil.
  */
 interface NotificationsService {
+    /**
+     * `GET appointments/:id/notifications` — izin `appointment:read.*` (bildirim izni DEĞİL).
+     *
+     * **Çıplak dizi.** `cancelled` ve `superseded` satırlar da gelir: "hatırlatma neden
+     * gitmedi" sorusunun cevabı tam da onlarda.
+     */
+    suspend fun appointmentNotifications(appointmentId: String): List<ScheduledNotification>
+
     /**
      * `GET customers/:id/opt-out` — `notification:read`.
      *

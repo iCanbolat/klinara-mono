@@ -23,6 +23,8 @@ enum class ManagementDestination {
     CustomerTags,
     PackageDefinitions,
     PackageReports,
+    Inbox,
+    MessageLog,
 }
 
 data class ManagementRow(
@@ -110,7 +112,39 @@ fun managementSections(session: AppSession): List<ManagementSection> =
                 ),
             )
         }
+        communicationSection(session)?.let(::add)
     }
+
+/**
+ * İletişim kartı (A8) — iOS `communicationCard` paritesi: `notification:read` ya da `:manage`.
+ *
+ * Okuma satırları `notification:read` ister; kart yalnız `:manage` ile de görünür (iOS'ta
+ * WhatsApp satırı böyle tek başına kalabiliyor). Bugün hiçbir rol `:manage`'i `:read`'siz
+ * taşımıyor ama kapı sözleşmeye göre yazılıyor, rol tablosuna göre değil.
+ */
+private fun communicationSection(session: AppSession): ManagementSection? {
+    val rows =
+        buildList {
+            if (session.can(Permissions.NOTIFICATION_READ)) {
+                add(row(ManagementDestination.Inbox, "Gelen kutusu", "Müşterilerin WhatsApp'tan yazdığı mesajlar"))
+                add(
+                    row(
+                        ManagementDestination.MessageLog,
+                        "Mesaj günlüğü",
+                        "Gönderilen, ulaşan ve gönderilmeyen mesajlar",
+                    ),
+                )
+            }
+        }
+    if (rows.isEmpty()) return null
+    return ManagementSection(
+        title = "İletişim",
+        rows = rows,
+        footnote =
+            "Randevu hatırlatması ticari ileti değildir; iletişim izni iptali yalnız pazarlama " +
+                "mesajlarını durdurur.",
+    )
+}
 
 private fun section(
     title: String,
@@ -168,4 +202,4 @@ fun ManagementHomeScreen(
 }
 
 private const val COMING_SOON =
-    "Kasa ve prim Faz A6, mesajlar ve WhatsApp Faz A8, raporlar Faz A9 ile geliyor."
+    "Kasa ve prim Faz A6, bildirim ayarları ve WhatsApp Faz A8, raporlar Faz A9 ile geliyor."

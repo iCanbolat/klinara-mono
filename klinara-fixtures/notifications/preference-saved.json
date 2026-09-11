@@ -1,0 +1,13 @@
+{
+  "id": "5c11e229-1a38-425a-92a2-aee85bb7427f",
+  "branchId": null,
+  "event": "appointment_reminder",
+  "kind": "transactional",
+  "channels": [
+    "whatsapp",
+    "sms"
+  ],
+  "quietHoursStart": "22:00",
+  "quietHoursEnd": "08:00",
+  "isDefault": false
+}

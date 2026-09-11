@@ -684,6 +684,8 @@ private fun ManagementTab(
                 onBack = { navController.popBackStack() },
             )
         }
+
+        communicationDestinations(navController, session, container, openCustomer)
     }
 }
 
@@ -771,4 +773,6 @@ private fun ManagementDestination.route(): Any =
         ManagementDestination.CustomerTags -> ShellRoutes.CustomerTagList
         ManagementDestination.PackageDefinitions -> ShellRoutes.PackageDefinitionList
         ManagementDestination.PackageReports -> ShellRoutes.PackageReportsHome
+        ManagementDestination.Inbox -> ShellRoutes.Inbox
+        ManagementDestination.MessageLog -> ShellRoutes.MessageLog
     }

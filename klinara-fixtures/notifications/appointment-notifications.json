@@ -1,0 +1,18 @@
+[
+  {
+    "id": "c0ad11b7-7117-40cc-a244-36e40f252f28",
+    "event": "appointment_reminder",
+    "offsetHours": 24,
+    "scheduledFor": "2026-09-10T09:00:00.000Z",
+    "status": "pending",
+    "messageId": null
+  },
+  {
+    "id": "74d3ed94-8417-454f-9337-fd4ff0f52d5d",
+    "event": "appointment_reminder",
+    "offsetHours": 4,
+    "scheduledFor": "2026-09-11T05:00:00.000Z",
+    "status": "pending",
+    "messageId": null
+  }
+]

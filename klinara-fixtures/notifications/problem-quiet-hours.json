@@ -1,0 +1,8 @@
+{
+  "type": "https://errors.klinara.app/validation-failed",
+  "title": "Sessiz saat başlangıcı ve bitişi birlikte verilmeli",
+  "status": 422,
+  "code": "VALIDATION_FAILED",
+  "instance": "/api/v1/notification-preferences",
+  "requestId": "25fd73e0-5ada-443f-8037-b06930b204d2"
+}

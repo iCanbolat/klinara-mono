@@ -1,0 +1,14 @@
+{
+  "id": null,
+  "branchId": null,
+  "event": "appointment_cancelled",
+  "kind": "transactional",
+  "channels": [
+    "whatsapp",
+    "sms",
+    "email"
+  ],
+  "quietHoursStart": "21:00",
+  "quietHoursEnd": "09:00",
+  "isDefault": true
+}

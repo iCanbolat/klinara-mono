@@ -63,7 +63,10 @@ sealed class ApiError(
      * Tabloda olmayan kodlarda sunucunun `detail`/`title`'ına düşülür.
      */
     private fun Problem.problemMessage(): String =
-        MESSAGES[problem.code]
+        // A8.2: `TEMPLATE_INVALID`'in `detail`'i izinli değişkenleri sayıyor — genel bir cümle
+        // kullanıcıya hangi adı yazacağını söylemezdi. Tablo burada sunucunun ARKASINDA durur.
+        (if (problem.code == ApiErrorCode.TEMPLATE_INVALID) problem.detail else null)
+            ?: MESSAGES[problem.code]
             ?: problem.detail
             ?: problem.title.ifEmpty { GENERIC_MESSAGE }
 
@@ -94,6 +97,9 @@ sealed class ApiError(
                             ApiErrorCode.SERVICE_UNAVAILABLE,
                             ApiErrorCode.RATE_LIMITED,
                             ApiErrorCode.INTERNAL_ERROR,
+                            // A8: 503 ile geliyor; kalıcı WhatsApp hatalarından (422) farkı tam
+                            // da bu — yalnız kota dolunca "tekrar dene" anlamlı (iOS paritesi).
+                            ApiErrorCode.WHATSAPP_RATE_LIMITED,
                         )
                 else -> false
             }
@@ -170,6 +176,24 @@ sealed class ApiError(
                 ApiErrorCode.PACKAGE_EXPIRED to
                     "Bu paket kullanılamaz: süresi dolmuş ya da iade/devirle kapatılmış.",
                 ApiErrorCode.OUTSIDE_WORKING_HOURS to "Bu saat çalışma saatleri dışında.",
+                // A8 — iOS `APIError.swift` metinleriyle birebir. Mesaj günlüğü `errorCode`'u
+                // da bu tablodan okuyor (`Message.failureMessage`).
+                ApiErrorCode.OPT_OUT to
+                    "Müşteri ticari ileti almayı kapatmış. Randevu hatırlatmaları bundan etkilenmez.",
+                ApiErrorCode.TEMPLATE_INVALID to "Şablonda tanımlı olmayan bir değişken var.",
+                ApiErrorCode.CHANNEL_NOT_CONFIGURED to
+                    "Bu kanal henüz kurulmadı. Entegrasyon ayarlarından yapılandırın.",
+                ApiErrorCode.WHATSAPP_NOT_CONFIGURED to
+                    "WhatsApp entegrasyonu kurulmamış. Yönetim → İletişim → WhatsApp entegrasyonu'ndan " +
+                    "kimlik bilgilerini girin.",
+                ApiErrorCode.WHATSAPP_TEMPLATE_NOT_APPROVED to
+                    "Bu şablon Meta'da onaylı değil. Onay sürecini Meta Business Manager'dan takip edin.",
+                ApiErrorCode.WHATSAPP_INVALID_RECIPIENT to
+                    "Numara WhatsApp'ta geçerli değil. Ülke kodunu ve numarayı kontrol edin.",
+                ApiErrorCode.WHATSAPP_WINDOW_CLOSED to
+                    "Müşteriyle 24 saatlik yanıt penceresi kapandı. Yalnız onaylı bir şablon gönderilebilir.",
+                ApiErrorCode.WHATSAPP_RATE_LIMITED to
+                    "WhatsApp gönderim kotası doldu. Bir süre sonra tekrar deneyin.",
             )
     }
 }

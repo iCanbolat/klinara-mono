@@ -1,0 +1,19 @@
+{
+  "id": null,
+  "event": "appointment_confirmation",
+  "channel": "sms",
+  "locale": "tr",
+  "kind": "transactional",
+  "subject": null,
+  "body": "Sayın {{customerName}}, {{appointmentAt}} randevunuz oluşturuldu. {{branchName}}",
+  "whatsappTemplateName": null,
+  "whatsappTemplateLanguage": null,
+  "whatsappVariables": [],
+  "isActive": true,
+  "isDefault": true,
+  "variables": [
+    "customerName",
+    "appointmentAt",
+    "branchName"
+  ]
+}

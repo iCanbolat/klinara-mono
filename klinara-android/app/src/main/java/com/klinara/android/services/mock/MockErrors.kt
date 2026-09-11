@@ -73,7 +73,8 @@ object MockErrors {
             ),
         )
 
-    private fun problem(
+    /** Kod ve durumu doğrudan verilen sorun — A8'in bildirim/WhatsApp kodları için. */
+    fun problem(
         code: ApiErrorCode,
         title: String,
         status: Int,
@@ -81,7 +82,9 @@ object MockErrors {
     ): ApiError.Problem =
         ApiError.Problem(ProblemDetails(code = code, title = title, detail = detail, status = status))
 
-    private const val HTTP_BAD_REQUEST = 400
+    const val HTTP_BAD_REQUEST = 400
+    const val HTTP_UNPROCESSABLE = 422
+    const val HTTP_SERVICE_UNAVAILABLE = 503
     private const val HTTP_FORBIDDEN = 403
     private const val HTTP_NOT_FOUND = 404
     private const val HTTP_CONFLICT = 409

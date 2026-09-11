@@ -2328,3 +2328,78 @@ mock randevu motoru katalog, personel ve çalışma saatleri **tablolarını** o
 "hizmet ekle → yetkinlik ver → program yaz → istisna gir → slot gör" zinciri emülatörde
 sunucusuz sürülebiliyor. Temiz derleme 29,5 sn — §4'ün modül bölme tetikleyicisi (90 sn)
 uzakta. Kalan borç: iOS'a dört + üç + üç fark notu (§7.8) ve iki sunucu açık sorusu.
+
+---
+
+## A8.1 — Gelen kutusu, mesaj günlüğü, randevu bildirimleri ✅
+
+**Durum:** `./gradlew check` yeşil. **522 test** (A7.3 sonrası 498), 72 suite. Emülatörde
+`Passkey ile tek dokunuş` (manager) ile sürüldü: Yönetim → **İletişim** kartı (dipnot
+"Randevu hatırlatması ticari ileti değildir…") → Gelen kutusu: işlenmemiş iki mesaj,
+tanınmayan numarada "Kayıtlı müşteri değil" rozeti → ikincisi "İşlendi olarak işaretle" →
+listeden düştü → "Tümü": üç satır, işaretlenen "İşlendi" rozetiyle, görsel satırında
+"(Görsel)" → "Müşteri kartı" → **Müşteriler sekmesinde** Ayşe Yılmaz'ın kartı açıldı. Mesaj
+günlüğü: üç satır + "Sonraki sayfa" → beş satır, `skipped` doğum günü mesajı listede →
+başarısız hatırlatma → "Neden gönderilmedi": "Numara WhatsApp'ta geçerli değil…",
+`WHATSAPP_INVALID_RECIPIENT`, deneme 1 → geri: süzgeç ve sayfalar yerinde. Bugün → 17:00
+randevusu → **Bildirimler** kartı: Nişantaşı override'ı (24 + 4 saat), ikisi de geçmişte →
+"Gönderildi". Mesaj günlüğü koyu temada kontrol edildi.
+
+### Üç servis dilimi — yeni uç YOK
+
+- `NotificationsService.appointmentNotifications` → `GET appointments/:id/notifications`
+  (çıplak dizi; izin `appointment:read.*`, bildirim izni değil — bölüm detayda kapısız).
+- `MessagesService` (+`Live*`/`Mock*`) → `GET messages`: yalnız dolu sorgu alanları,
+  `from`/`to` ISO anı. Tek uçlu ayrı sözleşme iOS'taki gerekçeyle.
+- `WhatsAppService` (+`Live*`/`Mock*`) → `GET inbox` (`onlyUnhandled` her zaman
+  gönderiliyor: sunucu `"false"` dışındaki her şeyi `true` sayıyor), `POST inbox/:id/handle`
+  (204, `sendVoid`). **Gelen kutusu bildirim servisinde değil WhatsApp servisinde** — iOS ve
+  sunucu modül sınırı. Hesap/doğrulama/test gönderimi A8.3'te aynı arayüze biner.
+
+### Açık enum'lar ve tek serileştirici
+
+Dokuz yeni enum (`NotificationEvent`, `NotificationKind`, `MessageStatus`,
+`ScheduledNotificationStatus`…) `Unknown` koluyla. iOS'ta `NotificationKind` kapalı; burada
+değil (A4.2'nin kanal gerekçesi). Her biri için on satırlık bir `KSerializer` nesnesi yerine
+`networking/WireEnumSerializer` doğdu; eski enum'lar kendi nesnelerini koruyor.
+
+`ApiError` tablosuna sekiz Faz 8 kodu iOS metinleriyle; `TEMPLATE_INVALID` sunucunun
+`detail`'ini gösteriyor (izinli değişkenleri sayıyor), `WHATSAPP_RATE_LIMITED` tek geçici
+WhatsApp kodu (`isRetryable`). Mesaj günlüğü `errorCode`'u aynı tablodan okuyor; tanınmayan
+kod **ham** gösteriliyor (`keepsUnknownCode`).
+
+### Mesaj detayı günlüğün ViewModel'inden okuyor
+
+`GET /messages/:id` yok; açmak Kural 1'i çiğnerdi. Günlük ve detay tek
+`MessageLogViewModel`'i paylaşıyor — sahibi `ShellRoutes.MessageLog` geri yığını girdisi
+(A5.4 `PackageReportsHost` emsali). Route yalnız `messageId` taşıyor; süreç ölümünden sonra
+kayıt yoksa dürüst bir "artık listede değil" ekranı.
+
+### iOS'tan sapmalar
+
+1. **Sonraki sayfa hatası yutulmuyor.** iOS'ta sessizce düşüyor ve sondaki spinner
+   `onAppear`'ı bir daha tetiklemediği için sonsuza dek dönüyor. Burada A5.4 emsaliyle açık
+   bir "Sonraki sayfa" düğmesi; hata satırları silmeden `ErrorBanner` + "Tekrar dene"
+   (`loadMoreFailureIsVisible`).
+2. **"Ulaştı" süzgeci okunanları kapsamıyor** — sunucu tek `status` alıyor. iOS bunu
+   söylemiyor; burada dipnotta yazıyor.
+3. **Aşağı çekip yenileme yok** — Android listelerinde bu deyim hiç kullanılmadı (A4.1
+   müşteri listesi dahil); gelen kutusu ekrana her girişte yeniden okunuyor.
+
+### Mock
+
+`MockNotificationsSeed` iOS tohumunun aynası, müşteri kimlikleri `MockCustomers`'tan (gelen
+kutusu bağlantısı gerçek bir karta açılıyor). Mesaj günlüğü **gerçek keyset imleci**
+(`createdAt|id`) ve sayfa boyu 3 — beş satırlık tohumda ikinci sayfa gerçekten oluşuyor.
+Randevu planı `MockBookingService`'ten **türüyor** (kurucuyla bağlı): iptal edilen randevuda
+satırlar `cancelled` kalıyor, gelmedi'de negatif offset'li takip ekleniyor. A4.2'deki
+opt-out mock'u "bilerek boş değil" diyordu ama boştu — Mehmet Aslan'ın kaydı tohumlandı ve
+`skipped` doğum günü mesajının sebebi oldu.
+
+### Yeni bağımlılık: YOK
+
+### Kapsam dışı
+
+- **Müşteri kartından mesaj günlüğü** — iOS `MessageLogView(customerId:)` kodu var ama
+  hiçbir çağıranı yok; `MessageFilter.customerId` taşınıyor, giriş noktası açılmadı.
+- Tarih aralığı süzgeci (`from`/`to`) — iOS'ta da kontrol yok.

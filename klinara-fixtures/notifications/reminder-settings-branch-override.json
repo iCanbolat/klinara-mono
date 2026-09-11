@@ -1,0 +1,10 @@
+{
+  "branchId": "ba90a182-4468-4fea-b5d6-4c8e112770e5",
+  "reminderHoursBefore": [
+    24,
+    4
+  ],
+  "isBranchOverride": true,
+  "noShowFollowupEnabled": true,
+  "noShowFollowupDelayHours": 3
+}

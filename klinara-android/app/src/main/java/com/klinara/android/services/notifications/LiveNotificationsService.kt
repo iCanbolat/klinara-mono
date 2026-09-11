@@ -11,6 +11,9 @@ import kotlinx.serialization.json.put
 class LiveNotificationsService internal constructor(
     private val client: ApiClient,
 ) : NotificationsService {
+    override suspend fun appointmentNotifications(appointmentId: String): List<ScheduledNotification> =
+        client.send(ApiRequest.get("appointments/$appointmentId/notifications"))
+
     // Zarf YOK: yanıt doğrudan bir dizi (arama ucuyla aynı istisna).
     override suspend fun optOuts(customerId: String): List<OptOutRecord> =
         client.send(ApiRequest.get("customers/$customerId/opt-out"))

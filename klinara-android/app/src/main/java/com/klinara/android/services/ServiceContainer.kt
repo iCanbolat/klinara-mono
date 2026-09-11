@@ -29,7 +29,13 @@ import com.klinara.android.services.files.LiveFilesService
 import com.klinara.android.services.files.MockFilesService
 import com.klinara.android.services.files.ThumbnailCache
 import okhttp3.OkHttpClient
+import com.klinara.android.services.integrations.LiveWhatsAppService
+import com.klinara.android.services.integrations.MockWhatsAppService
+import com.klinara.android.services.integrations.WhatsAppService
+import com.klinara.android.services.notifications.LiveMessagesService
 import com.klinara.android.services.notifications.LiveNotificationsService
+import com.klinara.android.services.notifications.MessagesService
+import com.klinara.android.services.notifications.MockMessagesService
 import com.klinara.android.services.notifications.MockNotificationsService
 import com.klinara.android.services.notifications.NotificationsService
 import com.klinara.android.services.packages.LivePackagesService
@@ -73,7 +79,7 @@ import kotlinx.coroutines.flow.SharedFlow
  *
  *     customers A3.4 · notifications(opt-out) A4.2 · notes A4.3 ✓ · files A4.4 ✓ · packages A5.1 ✓
  *     finance A6.1 · commissions A6.4 · catalog/staff/users/scheduling A7 ✓
- *     notifications A8.1 · messages A8.1 · whatsapp A8.3 · reports A9
+ *     notifications/messages/whatsapp(gelen kutusu) A8.1 ✓ · whatsapp(hesap) A8.3 · reports A9
  *
  * **A3.1'de iki servis planlanandan ÖNCE geldi** ve `ANDROID_DEVELOPMENT.md` §6 buna
  * göre güncellendi: `booking` A3.4 yerine A3.1'de (takvim onsuz çizilemez; oluşturma
@@ -99,6 +105,8 @@ class ServiceContainer private constructor(
     val scheduling: SchedulingService,
     val customers: CustomerService,
     val notifications: NotificationsService,
+    val messages: MessagesService,
+    val whatsapp: WhatsAppService,
     val notes: NotesService,
     val files: FilesService,
     val thumbnails: ThumbnailCache,
@@ -151,6 +159,8 @@ class ServiceContainer private constructor(
                 scheduling = LiveSchedulingService(client),
                 customers = LiveCustomerService(client),
                 notifications = LiveNotificationsService(client),
+                messages = LiveMessagesService(client),
+                whatsapp = LiveWhatsAppService(client),
                 notes = LiveNotesService(client),
                 files = liveFiles,
                 // Küçük görsel indirmesi imzalı URL'ye gidiyor: `bare` istemci, yani
@@ -203,7 +213,11 @@ class ServiceContainer private constructor(
                     scheduling = mockScheduling,
                 ).apply { this.failing = failing }
             val mockCustomers = MockCustomerService().apply { this.failing = failing }
-            val mockNotifications = MockNotificationsService().apply { this.failing = failing }
+            // Randevu bildirim planı randevunun kendi saatinden türüyor: ertelenen bir randevuda
+            // plan da kaymalı, ayrı bir tablo bunu bilemezdi.
+            val mockNotifications = MockNotificationsService(booking = mockBooking).apply { this.failing = failing }
+            val mockMessages = MockMessagesService().apply { this.failing = failing }
+            val mockWhatsApp = MockWhatsAppService().apply { this.failing = failing }
             val mockNotes = MockNotesService().apply { this.failing = failing }
             val mockFiles = MockFilesService().apply { this.failing = failing }
             // Paket kalemleri katalogdan fiyat ve ad alıyor — ayrı bir katalog kopyası,
@@ -230,6 +244,8 @@ class ServiceContainer private constructor(
                 scheduling = mockScheduling,
                 customers = mockCustomers,
                 notifications = mockNotifications,
+                messages = mockMessages,
+                whatsapp = mockWhatsApp,
                 notes = mockNotes,
                 files = mockFiles,
                 thumbnails = ThumbnailCache(mockFiles, OkHttpClient()),
@@ -260,9 +276,11 @@ class ServiceContainer private constructor(
             users: UsersService = MockUsersService(latencyEnabled = false),
             scheduling: SchedulingService = MockSchedulingService(latencyEnabled = false),
             customers: CustomerService = MockCustomerService(latencyEnabled = false),
-        notifications: NotificationsService = MockNotificationsService(latencyEnabled = false),
-        notes: NotesService = MockNotesService(latencyEnabled = false),
-        files: FilesService = MockFilesService(latencyEnabled = false, thumbnailDelayMillis = 0),
+            notifications: NotificationsService = MockNotificationsService(latencyEnabled = false),
+            messages: MessagesService = MockMessagesService(latencyEnabled = false),
+            whatsapp: WhatsAppService = MockWhatsAppService(latencyEnabled = false),
+            notes: NotesService = MockNotesService(latencyEnabled = false),
+            files: FilesService = MockFilesService(latencyEnabled = false, thumbnailDelayMillis = 0),
             catalog: CatalogService = MockCatalogService(latencyEnabled = false),
             packages: PackagesService = MockPackagesService(latencyEnabled = false),
         ) = ServiceContainer(
@@ -273,6 +291,8 @@ class ServiceContainer private constructor(
             scheduling = scheduling,
             customers = customers,
             notifications = notifications,
+            messages = messages,
+            whatsapp = whatsapp,
             notes = notes,
             files = files,
             thumbnails = ThumbnailCache(files, OkHttpClient()),

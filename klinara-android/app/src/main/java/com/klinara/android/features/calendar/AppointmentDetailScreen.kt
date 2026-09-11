@@ -99,6 +99,7 @@ fun AppointmentDetailScreen(
                         appointment = appointment.value,
                         state = state,
                         session = session,
+                        container = container,
                         clock = clock,
                         viewModel = viewModel,
                         onOpenHistory = onOpenHistory,
@@ -125,6 +126,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.DetailBody(
     appointment: Appointment,
     state: AppointmentDetailUiState,
     session: AppSession,
+    container: ServiceContainer,
     clock: BranchClock,
     viewModel: AppointmentDetailViewModel,
     onOpenHistory: (String) -> Unit,
@@ -164,6 +166,10 @@ private fun androidx.compose.foundation.layout.ColumnScope.DetailBody(
             }
         }
     }
+
+    // A8.1 (A3.3'ten ertelenmişti): uç `appointment:read.*` ile korunuyor, yani bu ekranı açabilen
+    // herkes planı görebilir — ayrı bir izin kapısı yok (iOS gibi).
+    AppointmentNotificationsSection(container = container, appointmentId = appointment.id, clock = clock)
 
     KlinaraCard {
         KlinaraNavigationRow(label = "Geçmiş", onClick = { onOpenHistory(appointment.id) })

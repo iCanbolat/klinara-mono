@@ -1,0 +1,25 @@
+{
+  "data": [
+    {
+      "id": "cde431f8-13be-4a88-9303-dd27b369f570",
+      "customerId": "070b8993-8adf-44ab-852d-123b5e72dcc2",
+      "userId": null,
+      "channel": "sms",
+      "event": "appointment_reminder",
+      "status": "queued",
+      "to": "+90********67",
+      "subject": null,
+      "body": "Sayın Ayşe Yılmaz, 7 Eylül 14:00 randevunuzu hatırlatırız. Merkez",
+      "errorCode": null,
+      "attempt": 0,
+      "scheduledFor": "2026-08-29T05:00:00.000Z",
+      "sentAt": null,
+      "deliveredAt": null,
+      "createdAt": "2026-08-28T22:36:45.305Z"
+    }
+  ],
+  "pageInfo": {
+    "hasMore": false,
+    "nextCursor": null
+  }
+}

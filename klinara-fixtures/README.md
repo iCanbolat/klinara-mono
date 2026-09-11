@@ -96,3 +96,12 @@ Pazar'ı (saatler `null`) ve molasız Cumartesi'yi çiviliyor. `staff-schedule.j
 izinli bir hafta. `schedule-exceptions.json` offset'li (`+03:00`) haftalık, iki haftada bir
 bir istisna ile bilerek **ileri sürümlü** bir kayıt taşıyor: tanımadığımız `recurrenceType`
 (`monthly`) ve fazladan bir alan — liste çökmemeli.
+
+## `notifications/` (A8)
+
+iOS `NotificationFixtures.swift`'ten **aynen** çıkarıldı — gövdeler sunucudan yakalanmış.
+`message-page.json` `{ data, pageInfo }` zarfı ve maskeli alıcı (`+90********67`),
+`appointment-notifications.json` çıplak dizi (zarf YOK). Şablon ve tercih dosyaları
+kod varsayılanını (`id: null`, `isDefault: true`) ve kiracı satırını ayrı ayrı çiviliyor;
+`problem-template-invalid.json`'ın `detail`'i izinli değişkenleri sayıyor — ekran onu
+gösteriyor, tablo metnini değil.

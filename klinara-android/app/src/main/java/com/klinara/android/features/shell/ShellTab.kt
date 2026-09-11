@@ -307,6 +307,20 @@ object ShellRoutes {
         val staffId: String? = null,
     )
 
+    /** Gelen kutusu (A8.1). */
+    @Serializable
+    data object Inbox
+
+    /** Mesaj günlüğü (A8.1) — detayla PAYLAŞILAN ViewModel'in sahibi. */
+    @Serializable
+    data object MessageLog
+
+    /** Tek mesaj. Yalnız kimlik taşınır; kayıt [MessageLog]'un ViewModel'inden okunur. */
+    @Serializable
+    data class MessageDetail(
+        val messageId: String,
+    )
+
     @Serializable
     data object ProfileHome
 }

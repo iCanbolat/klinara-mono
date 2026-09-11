@@ -1,0 +1,9 @@
+{
+  "type": "https://errors.klinara.app/template-invalid",
+  "title": "Bu olayda tanımlı olmayan değişken: musteriAdi",
+  "status": 422,
+  "code": "TEMPLATE_INVALID",
+  "instance": "/api/v1/notification-templates",
+  "requestId": "2cff67c7-6a2f-45a8-9132-dc935f387656",
+  "detail": "Kullanılabilir değişkenler: customerName, branchName, appointmentAt, serviceName"
+}
