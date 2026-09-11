@@ -16,6 +16,16 @@ object MockIds {
 
     const val USER_MANAGER = "u1000000-0000-4000-8000-000000000001"
 
+    // --- A7.2: personel profillerinin kullanıcıları ---
+    //
+    // A3.1'de üç profil de USER_MANAGER'a bağlıydı; sunucu bir kullanıcıya TEK profil
+    // tanıyor (409). Oturumdaki yönetici (Ayşe) ve resepsiyon (Elif) profilsiz: personel
+    // oluşturma ekranının aday listesi ancak böyle boş değil.
+    const val USER_DERYA = "u1000000-0000-4000-8000-000000000011"
+    const val USER_MERVE = "u1000000-0000-4000-8000-000000000012"
+    const val USER_ONUR = "u1000000-0000-4000-8000-000000000013"
+    const val USER_RECEPTION = "u1000000-0000-4000-8000-000000000014"
+
     // --- A3.1: takvim grafiği ---
     //
     // Personel, müşteri ve hizmet kimlikleri BURADA duruyor çünkü üç ayrı mock servis

@@ -1,0 +1,50 @@
+{
+  "id": "f1000000-0000-4000-8000-000000000002",
+  "tenantId": "7f3d1a20-0000-4000-8000-000000000001",
+  "userId": "u1000000-0000-4000-8000-000000000002",
+  "userFullName": "Mehmet Demir",
+  "userEmail": "mehmet@demo-klinik.test",
+  "primaryBranchId": "b1000000-0000-4000-8000-000000000002",
+  "title": "Lazer Uygulayıcısı",
+  "specialties": ["Lazer epilasyon"],
+  "calendarColor": "#5E7856",
+  "bio": null,
+  "isVisibleOnline": true,
+  "isActive": true,
+  "createdAt": "2026-05-02T09:30:00.000Z",
+  "services": [
+    {
+      "id": "5c110000-0000-4000-8000-000000000001",
+      "tenantId": "7f3d1a20-0000-4000-8000-000000000001",
+      "staffProfileId": "f1000000-0000-4000-8000-000000000002",
+      "serviceId": "e1000000-0000-4000-8000-000000000001",
+      "branchId": null,
+      "customDurationMinutes": null,
+      "customPriceMinor": null,
+      "isActive": true,
+      "createdAt": "2026-05-02T09:30:00.000Z"
+    },
+    {
+      "id": "5c110000-0000-4000-8000-000000000002",
+      "tenantId": "7f3d1a20-0000-4000-8000-000000000001",
+      "staffProfileId": "f1000000-0000-4000-8000-000000000002",
+      "serviceId": "e1000000-0000-4000-8000-000000000001",
+      "branchId": "b1000000-0000-4000-8000-000000000002",
+      "customDurationMinutes": 75,
+      "customPriceMinor": 300000,
+      "isActive": true,
+      "createdAt": "2026-05-02T09:30:00.000Z"
+    },
+    {
+      "id": "5c110000-0000-4000-8000-000000000003",
+      "tenantId": "7f3d1a20-0000-4000-8000-000000000001",
+      "staffProfileId": "f1000000-0000-4000-8000-000000000002",
+      "serviceId": "e1000000-0000-4000-8000-000000000002",
+      "branchId": null,
+      "customDurationMinutes": null,
+      "customPriceMinor": null,
+      "isActive": false,
+      "createdAt": "2026-05-02T09:30:00.000Z"
+    }
+  ]
+}

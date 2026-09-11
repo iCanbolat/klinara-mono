@@ -2076,3 +2076,94 @@ altı rolü geziyor: `accountant` Katalog kartını görmüyor.
 - **Override'ın tampon, KDV, online ve aktiflik alanları** için arayüz (iOS'ta da yok);
   değerleri korunuyor.
 - **`holidays` uçları** — iOS kullanmıyor; A7.3'te de kapsam dışı (parite).
+
+---
+
+## A7.2 — Personel ✅
+
+**Durum:** `./gradlew check` yeşil. **470 test** (A7.1 sonunda 452'ydi), 67 suite.
+Emülatörde `Çok şubeli` senaryosu, Nişantaşı ile sürüldü: Yönetim → Ekip → Personel (renk
+noktası, "3 hizmet", Online rozetleri) → Yeni personel → aday listesinde yalnız
+**profilsiz** iki kullanıcı (Ayşe Yılmaz, Elif Kaya) → Elif + unvan → Oluştur → ekran
+**detaya** geçti → Yetkinlikler → Lazer açıldı (kapsam seçici: Tüm şubeler / Nişantaşı /
+Bodrum) → Kaydet → "Yetkinlikler kaydedildi." → listede Elif "1 hizmet".
+
+### Personel servisi tam — silme yok, `users` geldi
+
+`StaffService` dört metot kazandı (`profile`, `create`, `update`, `replaceSkills`);
+`UsersService` (`GET users`, `user:read`) yeni ve tek çağıranı oluşturma ekranı — iOS
+paritesi. Profil var olan bir kullanıcıya bağlanıyor; davet akışı bu istemcide yok (iOS'ta
+da yok), aday kalmadığında ekran davet yolunu anlatıyor. Pasife almak `PATCH isActive`.
+
+### Yetkinlik matrisi KAYIPSIZ — iOS'ta bir hizmetin ikinci şube kapsamı siliniyor
+
+`PUT staff/:id/services` listeyi tamamen değiştiriyor. iOS taslağı `serviceId` ile
+anahtarlıyor: aynı hizmette iki şube kapsamı olan personelde biri, ayrıca pasif yetkinlik
+satırları ve ekranı olmayan `customPriceMinor` kayıtta **sessizce** gidiyor.
+`SkillMatrixDraft` hizmet başına bir satırı düzenliyor, gösterilmeyenleri `preserved`'da
+aynen geri yazıyor (`matrixIsLossless`: iOS'un 1 yazacağı yerde 3). Kullanıcı bir satırın
+kapsamını korunan bir satırınkiyle aynı yaparsa korunan düşüyor — aynı çift sunucuda 400
+(`scopeCollisionDedupes`). Satırda "+N şube kapsamı daha" yazıyor.
+
+### Pasif hizmetin yetkinliği geri YAZILAMAZ — ekran bunu söylüyor
+
+Sunucu pasif hizmete yetkinliği `K0002` → 409 ile reddediyor ve PUT tüm satırları yeniden
+ekliyor; yani pasif hizmetteki eski bir yetkinlik bir sonraki kayıtta ya düşmeli ya da
+kaydı bozmalı. Taslak onları `dropped`'a ayırıyor ve matris kırmızı bir satırla "Pasif
+hizmetlerdeki N yetkinlik bir sonraki kayıtta kaldırılır" diyor. iOS aynı durumda
+kaydedilemeyen bir 409 alıyor.
+
+### PATCH unvan, tanıtım, renk ve birincil şubeyi TEMİZLEYEBİLİYOR
+
+`UpdateStaffProfileInput` dört alanı `Patch<String>` ile taşıyor; `StaffProfileDraft` yalnız
+değişeni gönderiyor. iOS boş unvanı `nil` yapıp gövdeden atıyor ve sunucu eskisini
+koruyor (§7.8, A7.1'deki hatanın ikizi).
+
+### Oluşturma iki izin ister: `staff:write` + `user:read`
+
+Aday listesi `GET users`'tan geliyor. Yalnız `staff:write`'a sahip bir rol düğmeyi görüp
+içeride 403 alırdı. Bugün iki izin aynı rollerde (owner, manager) ama koşul "şans eseri
+doğru" olmamalı — `canCreateStaff` saf fonksiyon, altı rol `StaffFeatureTest.permissions`'ta.
+
+### Mock personel yazılabilir tablo, randevu motoru onu okuyor
+
+`MockStaffService` A7.1'deki katalog kalıbıyla: tohum `ALL`, çalışma verisi örnekte,
+`snapshotProfiles()` ile paylaşılıyor; `MockBookingService` adayları enjekte edilen
+`staff` sağlayıcısından alıyor (`bookingSeesSkillChanges`: Merve'nin lazer yetkinliği
+kalkınca o günün slotları boşalıyor). Sunucu kuralları: aynı kullanıcıya ikinci profil 409,
+bilinmeyen kullanıcı/hizmet 404, pasif hizmet 409, aynı (hizmet, şube) çifti 400.
+**Tohum düzeltmesi:** A3.1'de üç profil de `USER_MANAGER`'a bağlıydı — sunucunun bir
+kullanıcıya tek profil kuralını çiğniyordu. Her profile kendi kullanıcısı verildi; oturumdaki
+yönetici ve resepsiyon profilsiz kaldı ki aday listesi boş olmasın.
+
+### Tasarım sistemine eklenenler
+
+`KlinaraTagField` (galeride) — "Bitti" ile ekler, kırpar, büyük/küçük harf duyarsız tekil;
+etikete dokunmak kaldırır ve TalkBack'e "… kaldır" diye duyuruluyor (iOS'ta ipucu yok).
+
+### iOS'a bildirilecek fark (§7.8)
+
+1. **Matris kaydı veri siliyor** — ikinci şube kapsamı, pasif yetkinlik satırları ve
+   `customPriceMinor` (yukarıda).
+2. **Profil PATCH'i temizleyemiyor** — unvan, tanıtım, renk, birincil şube.
+3. **Pasif hizmetteki eski yetkinlik** matrisi kaydedilemez hâle getiriyor (409).
+
+### Plandan / iOS'tan sapmalar
+
+- **Oluşturma sheet değil hedef; oluşunca DETAYA geçiliyor**, geri yığınından çıkarak
+  (`popUpTo<StaffCreate> { inclusive = true }`). iOS listeye dönüyor; profilin bir sonraki
+  adımı yetkinlik ve giriş noktası detayda. Geri tuşu dolu bir forma dönmüyor (ikinci
+  dokunuş 409 alırdı).
+- **Detay ve matriste "Kaydet" üst çubukta değil sayfa sonunda** (A5 deseni).
+- Detaydan matrise gidip dönmek taslağı **ezmiyor**: kirli taslak korunuyor, yalnız profil
+  tazeleniyor (`detailSaveAndReload`).
+- Birincil şube seçici oturumun erişemediği bir şubeyi "Erişiminiz olmayan bir şube" diye
+  seçili gösteriyor; iOS'ta öyle bir kayıtta hiçbir satır seçili görünmüyor.
+- Program ve istisna satırları A7.2'de **çizilmedi** (sahte satır yok); A7.3'te bağlanıyor.
+
+### Yeni bağımlılık: YOK
+
+### Kapsam dışı
+
+- **Davet** (`POST invitations`) ve kullanıcı/üyelik düzenleme — iOS'ta da yok.
+- Yetkinlikte **özel fiyat** arayüzü — iOS'ta da yok; değer korunuyor.

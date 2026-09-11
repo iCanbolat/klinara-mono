@@ -69,6 +69,11 @@ import com.klinara.android.features.packages.PackageDefinitionEditorScreen
 import com.klinara.android.features.packages.PackageDefinitionListScreen
 import com.klinara.android.features.packages.SellPackageHost
 import com.klinara.android.features.profile.ProfileScreen
+import com.klinara.android.features.staff.StaffCreateScreen
+import com.klinara.android.features.staff.StaffDetailActions
+import com.klinara.android.features.staff.StaffDetailScreen
+import com.klinara.android.features.staff.StaffListScreen
+import com.klinara.android.features.staff.StaffServiceMatrixScreen
 import com.klinara.android.services.ServiceContainer
 import com.klinara.android.services.contracts.Permissions
 
@@ -488,6 +493,55 @@ private fun ManagementTab(
             )
         }
 
+        composable<ShellRoutes.StaffList> {
+            StaffListScreen(
+                session = session,
+                container = container,
+                onBack = { navController.popBackStack() },
+                onOpen = { id -> navController.navigate(ShellRoutes.StaffDetail(id)) },
+                onCreate = { navController.navigate(ShellRoutes.StaffCreate) },
+            )
+        }
+
+        composable<ShellRoutes.StaffCreate> {
+            StaffCreateScreen(
+                session = session,
+                container = container,
+                onBack = { navController.popBackStack() },
+                // Oluşturma ekranı geri yığınında KALMAZ: geri tuşu listeye dönmeli, dolu bir
+                // "yeni personel" formuna değil (ikinci dokunuş 409 alırdı).
+                onCreated = { profile ->
+                    navController.navigate(ShellRoutes.StaffDetail(profile.id)) {
+                        popUpTo<ShellRoutes.StaffCreate> { inclusive = true }
+                    }
+                },
+            )
+        }
+
+        composable<ShellRoutes.StaffDetail> { entry ->
+            val route = entry.toRoute<ShellRoutes.StaffDetail>()
+            StaffDetailScreen(
+                session = session,
+                container = container,
+                staffId = route.staffId,
+                onBack = { navController.popBackStack() },
+                actions =
+                    StaffDetailActions(
+                        onOpenSkills = { navController.navigate(ShellRoutes.StaffServiceMatrix(route.staffId)) },
+                    ),
+            )
+        }
+
+        composable<ShellRoutes.StaffServiceMatrix> { entry ->
+            val route = entry.toRoute<ShellRoutes.StaffServiceMatrix>()
+            StaffServiceMatrixScreen(
+                session = session,
+                container = container,
+                staffId = route.staffId,
+                onBack = { navController.popBackStack() },
+            )
+        }
+
         composable<ShellRoutes.ServiceCategoryList> {
             ServiceCategoryListScreen(
                 session = session,
@@ -630,6 +684,7 @@ private fun ManagementDestination.route(): Any =
     when (this) {
         ManagementDestination.Services -> ShellRoutes.ServiceList
         ManagementDestination.ServiceCategories -> ShellRoutes.ServiceCategoryList
+        ManagementDestination.Staff -> ShellRoutes.StaffList
         ManagementDestination.CustomerTags -> ShellRoutes.CustomerTagList
         ManagementDestination.PackageDefinitions -> ShellRoutes.PackageDefinitionList
         ManagementDestination.PackageReports -> ShellRoutes.PackageReportsHome

@@ -17,6 +17,7 @@ import com.klinara.android.services.contracts.Permissions
 enum class ManagementDestination {
     Services,
     ServiceCategories,
+    Staff,
     CustomerTags,
     PackageDefinitions,
     PackageReports,
@@ -64,6 +65,22 @@ fun managementSections(session: AppSession): List<ManagementSection> =
                                 "Hizmetlerin gruplanması ve sırası",
                             ),
                         ),
+                ),
+            )
+        }
+        if (session.can(Permissions.STAFF_READ)) {
+            add(
+                ManagementSection(
+                    title = "Ekip",
+                    rows =
+                        listOf(
+                            ManagementRow(
+                                ManagementDestination.Staff,
+                                "Personel",
+                                "Profil, uzmanlık ve hizmet yetkinlikleri",
+                            ),
+                        ),
+                    footnote = "Bir personele yetkin olmadığı hizmetten randevu açılamaz.",
                 ),
             )
         }
@@ -148,4 +165,4 @@ fun ManagementHomeScreen(
 }
 
 private const val COMING_SOON =
-    "Ekip ve çalışma saatleri A7 içinde; kasa ve prim Faz A6, mesajlar Faz A8, raporlar Faz A9 ile geliyor."
+    "Çalışma saatleri A7 içinde; kasa ve prim Faz A6, mesajlar Faz A8, raporlar Faz A9 ile geliyor."

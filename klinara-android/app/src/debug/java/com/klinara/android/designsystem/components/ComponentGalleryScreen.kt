@@ -39,6 +39,7 @@ fun ComponentGalleryScreen(modifier: Modifier = Modifier) {
     var priceMinor by remember { mutableStateOf<Long?>(1_250_000L) }
     var transferable by remember { mutableStateOf(true) }
     var picked by remember { mutableStateOf("Lazer epilasyon") }
+    var specialties by remember { mutableStateOf(listOf("Lazer", "Dolgu")) }
 
     AuthScaffold(
         modifier = modifier.fillMaxSize(),
@@ -133,6 +134,12 @@ fun ComponentGalleryScreen(modifier: Modifier = Modifier) {
                 isOn = transferable,
                 onToggle = { transferable = it },
             )
+        }
+
+        // A7.2 — personelin uzmanlıkları.
+        SectionLabel("Etiket alanı")
+        KlinaraCard {
+            KlinaraTagField(label = "Uzmanlıklar", tags = specialties, onTagsChange = { specialties = it })
         }
 
         SectionLabel("Rapor dönemi")

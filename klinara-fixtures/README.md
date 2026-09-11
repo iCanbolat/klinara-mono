@@ -82,3 +82,9 @@ bir satırda açık `"outstandingMinor": null`, diğerinde alan HİÇ yok. İkis
 miras** demek (sıfır değil) ve `isOnlineBookable: false` şubede online'ı kapatıyor.
 `service-category.json` pasif bir kategori; `services-list.json` liste zarfını, açık
 `null` açıklama/rengi ve ileri sürümlü bir alanı (`requiresConsent`) taşıyor.
+
+## `staff/` (A7.2)
+
+`staff-profile.json` aynı hizmet için **iki şube kapsamı** (kiracı geneli + Bodrum, özel
+süre/fiyatlı) ve bir **pasif** yetkinlik taşıyor — matris taslağının kayıpsızlık testi
+bunun üzerinde. `users-list.json` davet bekleyen (`hasPassword: false`) bir kullanıcı.

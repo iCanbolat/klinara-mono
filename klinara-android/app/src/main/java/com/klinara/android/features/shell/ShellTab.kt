@@ -266,6 +266,25 @@ object ShellRoutes {
     @Serializable
     data object ServiceCategoryList
 
+    /** Personel (A7.2). */
+    @Serializable
+    data object StaffList
+
+    /** Yeni personel profili — oluşunca yerini detaya bırakır. */
+    @Serializable
+    data object StaffCreate
+
+    @Serializable
+    data class StaffDetail(
+        val staffId: String,
+    )
+
+    /** Personel–hizmet yetkinlik matrisi. */
+    @Serializable
+    data class StaffServiceMatrix(
+        val staffId: String,
+    )
+
     @Serializable
     data object ProfileHome
 }

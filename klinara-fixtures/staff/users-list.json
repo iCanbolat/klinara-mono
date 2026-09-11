@@ -1,0 +1,24 @@
+{
+  "data": [
+    {
+      "id": "u1000000-0000-4000-8000-000000000003",
+      "email": "elif@demo-klinik.test",
+      "fullName": "Elif Kaya",
+      "locale": "tr-TR",
+      "isActive": true,
+      "phone": null,
+      "phoneVerified": false,
+      "hasPassword": false,
+      "lastLoginAt": null,
+      "createdAt": "2026-05-02T09:30:00.000Z",
+      "memberships": [
+        {
+          "id": "m1000000-0000-4000-8000-000000000003",
+          "branchId": "b1000000-0000-4000-8000-000000000001",
+          "roleKey": "receptionist",
+          "roleName": "Resepsiyon"
+        }
+      ]
+    }
+  ]
+}

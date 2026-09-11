@@ -10,6 +10,7 @@ import com.klinara.android.services.formatting.ClockTime
 import com.klinara.android.services.mock.MockCustomers
 import com.klinara.android.services.networking.SlotConflict
 import com.klinara.android.services.staff.MockStaffService
+import com.klinara.android.services.staff.StaffProfile
 import com.klinara.android.services.networking.SlotSuggestion
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
@@ -45,6 +46,8 @@ class MockBookingService(
      * kataloğu bağlar ki pasife alınan hizmet rezervasyondan düşsün, yenisi görünsün.
      */
     private val catalog: () -> List<ClinicService> = { MockCatalogService.ALL },
+    /** Personel tablosu (A7.2) — pasif personel ve kaldırılan yetkinlik slot adayından düşer. */
+    private val staff: () -> List<StaffProfile> = { MockStaffService.ALL },
 ) : BookingService {
     /** Ağ hatası senaryosunda takvim de düşsün diye. */
     var failing: Boolean = false
@@ -215,7 +218,7 @@ class MockBookingService(
         // sunucu 422 RESOURCE_UNAVAILABLE ile reddeder — mock'ta doğru görünüp canlıda
         // bozulan tam olarak bu sınıftan bir hata.
         val candidates =
-            MockStaffService.ALL
+            staff()
                 .filter { profile -> profile.isActive }
                 .filter { profile -> query.serviceIds.all { profile.isCompetent(it, query.branchId) } }
                 .map { it.id }

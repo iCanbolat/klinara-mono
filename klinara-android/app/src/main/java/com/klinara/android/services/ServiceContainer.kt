@@ -44,7 +44,10 @@ import com.klinara.android.services.networking.OkHttpFactory
 import com.klinara.android.services.networking.SignedUploader
 import com.klinara.android.services.staff.LiveStaffService
 import com.klinara.android.services.staff.MockStaffService
+import com.klinara.android.services.staff.LiveUsersService
+import com.klinara.android.services.staff.MockUsersService
 import com.klinara.android.services.staff.StaffService
+import com.klinara.android.services.staff.UsersService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -89,6 +92,7 @@ class ServiceContainer private constructor(
     val auth: AuthService,
     val booking: BookingService,
     val staff: StaffService,
+    val users: UsersService,
     val customers: CustomerService,
     val notifications: NotificationsService,
     val notes: NotesService,
@@ -139,6 +143,7 @@ class ServiceContainer private constructor(
                 auth = LiveAuthService(client),
                 booking = LiveBookingService(client, BranchClock(null)),
                 staff = LiveStaffService(client),
+                users = LiveUsersService(client),
                 customers = LiveCustomerService(client),
                 notifications = LiveNotificationsService(client),
                 notes = LiveNotesService(client),
@@ -179,11 +184,17 @@ class ServiceContainer private constructor(
             val mockAuth = MockAuthService(scenario)
             val failing = scenario == MockScenario.NetworkError
             val mockCatalog = MockCatalogService().apply { this.failing = failing }
-            // Randevu motoru katalog TABLOSUNU okur (A7.1): pasife alınan hizmet
-            // rezervasyondan düşer, yeni hizmet orada görünür.
+            val mockUsers = MockUsersService().apply { this.failing = failing }
+            val mockStaff =
+                MockStaffService(catalog = mockCatalog::snapshotServices).apply { this.failing = failing }
+            // Randevu motoru katalog ve personel TABLOLARINI okur (A7.1–A7.2): pasife alınan
+            // hizmet ya da personel rezervasyondan düşer, yenisi orada görünür.
             val mockBooking =
-                MockBookingService(data, catalog = mockCatalog::snapshotServices).apply { this.failing = failing }
-            val mockStaff = MockStaffService().apply { this.failing = failing }
+                MockBookingService(
+                    data,
+                    catalog = mockCatalog::snapshotServices,
+                    staff = mockStaff::snapshotProfiles,
+                ).apply { this.failing = failing }
             val mockCustomers = MockCustomerService().apply { this.failing = failing }
             val mockNotifications = MockNotificationsService().apply { this.failing = failing }
             val mockNotes = MockNotesService().apply { this.failing = failing }
@@ -208,6 +219,7 @@ class ServiceContainer private constructor(
                 auth = mockAuth,
                 booking = mockBooking,
                 staff = mockStaff,
+                users = mockUsers,
                 customers = mockCustomers,
                 notifications = mockNotifications,
                 notes = mockNotes,
@@ -237,6 +249,7 @@ class ServiceContainer private constructor(
             mockAuth: MockAuthService? = null,
             booking: BookingService = MockBookingService(latencyEnabled = false),
             staff: StaffService = MockStaffService(latencyEnabled = false),
+            users: UsersService = MockUsersService(latencyEnabled = false),
             customers: CustomerService = MockCustomerService(latencyEnabled = false),
         notifications: NotificationsService = MockNotificationsService(latencyEnabled = false),
         notes: NotesService = MockNotesService(latencyEnabled = false),
@@ -247,6 +260,7 @@ class ServiceContainer private constructor(
             auth = auth,
             booking = booking,
             staff = staff,
+            users = users,
             customers = customers,
             notifications = notifications,
             notes = notes,
