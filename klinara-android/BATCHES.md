@@ -2284,6 +2284,31 @@ bekletiliyor, sekme çizilince bir kez tüketiliyor. `customer:read` yoksa satı
 bir kez düştü; izole üç koşuda geçti. Yük altında zamanlamaya bağlı; ayrı bir iş olarak
 işaretlendi.
 
+**Çözüldü — iki ayrı yarış:**
+
+1. **Testte (düşüşün sebebi).** Yanıtlar sıralı kuyruktaydı (`401 ×3, refresh, ok ×3`);
+   MockWebServer bunları isteklerin *varış* sırasına göre dağıtır. İlk 401'in
+   `POST /auth/refresh`'i üçüncü GET'ten önce varırsa kuyruktaki üçüncü 401'i yenileme
+   alıyor → `expire()` oturumu siliyor → istekler `ApiError.Problem` (401) ile düşüyor.
+   Üçüncü isteği 100 ms geciktirerek her seferinde yeniden üretildi (varış sırası
+   `a, b, refresh, c`). Düzeltme: kuyruk yerine isteğe göre yanıt veren bir `Dispatcher`
+   (yol + bearer), üç bayat isteği birlikte bekleten bir `CountDownLatch` bariyeri (üç
+   401'in eş zamanlılığı artık iddia ediliyor) ve her yolun bir bayat, bir `fresh` ile
+   gittiği kontrolü. "Tam bir `/auth/refresh`" iddiası aynen duruyor; ikinci bir yenileme
+   artık kuyruğu kaydırıp başka yerde kırmıyor, doğrudan bu iddiada yakalanıyor.
+2. **Üretimde (`SessionRefresher`).** Bayat token karşılaştırması mutex'in DIŞINDAYDI:
+   B bayat token'ı okur → A'nın yenilemesi biter, `finally` `inFlight`'ı temizler → B
+   kilidi alır, `inFlight` boş → İKİNCİ rotate (reuse-detection'ın aile iptali). Aynı
+   yoldan, başarısız yenilemeden sonra gelen çağıran `onExpired`'ı ikinci kez
+   tetikliyordu (eski `?.let` boş depoyu "karşılaştırma yok" sayıyordu). Karşılaştırma
+   kilidin içine alındı ve boş depo da "başkası sonuçlandırdı" sayılıyor. Yeni test
+   "Başarısız yenilemeden SONRA gelen bayat 401…" eski kodda kırmızı (`onExpired` 2 kez).
+   **iOS'a da taşınmalı** — `actor` içindeki karşılaştırmanın `await`'ten önce yapıldığı
+   yerde aynı pencere var mı kontrol edilmeli.
+
+Doğrulama: yük altında (`yes` × çekirdek sayısı) `ApiClientTest` 30/30, ardından tam
+`./gradlew check` yeşil.
+
 ### Yeni bağımlılık: YOK
 
 ### Kapsam dışı

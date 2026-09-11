@@ -30,8 +30,8 @@ private data class RefreshBody(val refreshToken: String)
  * 1. **Bayat token karşılaştırması.** iOS paylaşılan task'ı `defer` ile temizlediği
  *    için, başarılı bir yenilemeden mikrosaniyeler sonra gelen bir 401 bekleyecek task
  *    bulamaz ve İKİNCİ kez rotate eder — tam da kaçınılmak istenen kıyım. Burada
- *    çağıran, kendi bayat bearer'ını depodakiyle karşılaştırır; farklıysa başkası
- *    zaten döndürmüştür ve tekrar rotate edilmez.
+ *    çağıran, kendi bayat bearer'ını depodakiyle **kilit altında** karşılaştırır;
+ *    farklıysa başkası zaten döndürmüştür ve tekrar rotate edilmez.
  * 2. **Uygulama ömrüne bağlı kapsam.** Yenileme ilk gelen çağıranın kapsamında
  *    koşsaydı, o çağıranın iptali (ekran kapandı, kullanıcı gezindi) herkesin
  *    yenilemesini iptal ederdi.
@@ -52,13 +52,21 @@ internal class SessionRefresher(
      * @return yeni access token, ya da oturum düştüyse null.
      */
     suspend fun refresh(staleAccessToken: String?): String? {
-        // Biz sıraya girmişken başkası zaten döndürmüş olabilir: onun token'ını kullan.
-        tokens.cachedAccessToken()?.let { current ->
-            if (current != staleAccessToken) return current
-        }
-
         val job =
             mutex.withLock {
+                // Karşılaştırma KİLİDİN İÇİNDE olmalı. Dışarıda yapıldığında şu pencere
+                // açıktı: B bayat token'ı okur → A'nın yenilemesi biter ve `finally`
+                // `inFlight`'ı temizler → B kilidi alır, `inFlight` boş → İKİNCİ rotate.
+                // Kilit altında iki durum kalır: ya uçuşta bir yenileme vardır (ona
+                // katıl), ya da önceki yenileme `tokens`'a çoktan yazmıştır (aşağıda
+                // yakalanır) — `inFlight` ancak `doRefresh` bittikten sonra temizlenir.
+                //
+                // Farklıysa başkası zaten sonuçlandırmıştır: döndürdüyse yeni token,
+                // başarısız olup oturumu sildiyse null. İkincisinde tekrar yenilemek
+                // `onExpired`'ı ikinci kez tetiklerdi.
+                val current = tokens.cachedAccessToken()
+                if (current != staleAccessToken) return current
+
                 inFlight ?: scope.async(start = CoroutineStart.LAZY) { doRefresh() }.also { inFlight = it }
             }
 

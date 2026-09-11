@@ -267,9 +267,36 @@ class ApiClientTest {
     fun concurrentUnauthorisedRequestsRefreshOnce() =
         runTest {
             signIn(access = "stale")
-            repeat(3) { server.enqueue(json(problemJson("TOKEN_EXPIRED", 401), code = 401)) }
-            server.enqueue(json("""{"accessToken":"fresh","refreshToken":"r2","expiresIn":900}"""))
-            repeat(3) { server.enqueue(json("""{"ok":true}""")) }
+
+            // Sıralı kuyruk (`enqueue`) KULLANILMAZ: MockWebServer yanıtları isteklerin
+            // VARIŞ sırasına göre dağıtır. Yük altında ilk 401'in yenilemesi üçüncü GET'ten
+            // önce varırsa kuyruktaki üçüncü 401'i yenileme alır, oturum düşer ve test
+            // yanlış sebeple kırılır. Yanıt, isteğin NE olduğuna göre seçilir.
+            //
+            // Bayat istekler üçü de gelene kadar bekletilir: üç 401'in gerçekten eş zamanlı
+            // olduğu şansa değil bu bariyere dayanır.
+            val staleBarrier = java.util.concurrent.CountDownLatch(3)
+            val barrierMet = java.util.concurrent.atomic.AtomicInteger()
+            server.dispatcher =
+                object : mockwebserver3.Dispatcher() {
+                    override fun dispatch(request: mockwebserver3.RecordedRequest): MockResponse =
+                        when {
+                            request.url.encodedPath.endsWith("/auth/refresh") ->
+                                json("""{"accessToken":"fresh","refreshToken":"r2","expiresIn":900}""")
+
+                            request.headers["Authorization"] == "Bearer stale" -> {
+                                staleBarrier.countDown()
+                                if (staleBarrier.await(5, java.util.concurrent.TimeUnit.SECONDS)) {
+                                    barrierMet.incrementAndGet()
+                                }
+                                json(problemJson("TOKEN_EXPIRED", 401), code = 401)
+                            }
+
+                            request.headers["Authorization"] == "Bearer fresh" -> json("""{"ok":true}""")
+
+                            else -> json(problemJson("UNEXPECTED_REQUEST", 400), code = 400)
+                        }
+                }
 
             val results =
                 listOf("a", "b", "c").map { path ->
@@ -277,11 +304,18 @@ class ApiClientTest {
                 }.awaitAll()
 
             assertTrue(results.all { it.ok })
+            assertEquals(3, barrierMet.get(), "Üç bayat istek aynı anda sunucuda olmalıydı")
 
-            val paths = generateSequence { server.takeRequest(1, java.util.concurrent.TimeUnit.SECONDS) }
-                .map { it.url.encodedPath }
-                .toList()
-            val refreshes = paths.count { it.endsWith("/auth/refresh") }
+            val requests =
+                generateSequence { server.takeRequest(1, java.util.concurrent.TimeUnit.SECONDS) }
+                    .map { it.url.encodedPath to it.headers["Authorization"] }
+                    .toList()
+            val refreshes = requests.count { (path, _) -> path.endsWith("/auth/refresh") }
+            // Her yol tam iki kez: bir bayat (401), bir yeni token'la tekrar.
+            listOf("a", "b", "c").forEach { name ->
+                val bearers = requests.filter { (path, _) -> path.endsWith("/$name") }.map { it.second }
+                assertEquals(listOf("Bearer fresh", "Bearer stale"), bearers.sortedBy { it })
+            }
             assertEquals(
                 1,
                 refreshes,
@@ -363,6 +397,26 @@ class ApiClientTest {
 
             assertNull(tokens.accessToken(), "Yenileme başarısızsa oturum diskte kalmamalı")
             assertEquals(1, expiredCount, "Sona erme tam bir kez haber verilmeli")
+        }
+
+    @Test
+    @DisplayName("Başarısız yenilemeden SONRA gelen bayat 401: ikinci yenileme ve ikinci sona erme YOK")
+    fun lateStaleCallerAfterFailedRefreshDoesNotExpireAgain() =
+        runTest {
+            // Eş zamanlı üç 401'in üçüncüsü, ilk yenileme başarısız olup oturumu sildikten
+            // SONRA yenileyiciye ulaşabilir. Eskiden depo boş diye yeniden yenilemeye
+            // girer, refresh token'ı bulamaz ve `onExpired`'ı ikinci kez tetiklerdi.
+            signIn(access = "stale")
+            server.enqueue(json(problemJson("TOKEN_EXPIRED", 401), code = 401)) // refresh 401
+            val refresher =
+                OkHttpFactory.create(tokens, scope, onExpired = { expiredCount++ }, baseUrl = baseUrl).refresher
+
+            assertNull(refresher.refresh("stale"))
+            assertNull(refresher.refresh("stale"))
+
+            assertEquals(1, expiredCount, "Sona erme tam bir kez haber verilmeli")
+            server.takeRequest() // tek yenileme
+            assertNull(server.takeRequest(200, java.util.concurrent.TimeUnit.MILLISECONDS))
         }
 
     // ------------------------------------------------------------ send çeşitleri
