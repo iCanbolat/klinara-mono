@@ -1,0 +1,56 @@
+{
+  "scope": "all",
+  "period": {
+    "from": "2026-09-07T00:00:00+03:00",
+    "to": "2026-09-14T00:00:00+03:00"
+  },
+  "totals": {
+    "bookedMinutes": 60,
+    "availableMinutes": 3240,
+    "occupancyRate": 1.85
+  },
+  "data": [
+    {
+      "groupId": null,
+      "groupLabel": "2026-09-07",
+      "bookedMinutes": 30,
+      "availableMinutes": 540,
+      "occupancyRate": 5.56
+    },
+    {
+      "groupId": null,
+      "groupLabel": "2026-09-08",
+      "bookedMinutes": 0,
+      "availableMinutes": 540,
+      "occupancyRate": 0
+    },
+    {
+      "groupId": null,
+      "groupLabel": "2026-09-09",
+      "bookedMinutes": 30,
+      "availableMinutes": 540,
+      "occupancyRate": 5.56
+    },
+    {
+      "groupId": null,
+      "groupLabel": "2026-09-10",
+      "bookedMinutes": 0,
+      "availableMinutes": 540,
+      "occupancyRate": 0
+    },
+    {
+      "groupId": null,
+      "groupLabel": "2026-09-11",
+      "bookedMinutes": 0,
+      "availableMinutes": 540,
+      "occupancyRate": 0
+    },
+    {
+      "groupId": null,
+      "groupLabel": "2026-09-12",
+      "bookedMinutes": 0,
+      "availableMinutes": 540,
+      "occupancyRate": 0
+    }
+  ]
+}

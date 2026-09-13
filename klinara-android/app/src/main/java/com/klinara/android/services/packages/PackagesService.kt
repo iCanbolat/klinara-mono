@@ -1,6 +1,7 @@
 package com.klinara.android.services.packages
 
 import com.klinara.android.services.networking.Page
+import com.klinara.android.services.reports.ReportPeriod
 
 /**
  * Paket ve seans hakkı uçları (Faz A5).

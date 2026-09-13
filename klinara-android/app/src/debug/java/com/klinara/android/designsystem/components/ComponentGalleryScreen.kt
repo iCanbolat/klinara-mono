@@ -154,6 +154,20 @@ fun ComponentGalleryScreen(modifier: Modifier = Modifier) {
         SectionLabel("Rapor dönemi")
         ReportPeriodBar(label = "1 Eylül 2026 – 30 Eylül 2026", onShift = {})
 
+        SectionLabel("Grafik")
+        KlinaraCard {
+            KlinaraChart(
+                kind = KlinaraChartKind.Bar,
+                points =
+                    listOf(
+                        KlinaraChartPoint("1", "Derya Aksoy", 62.5),
+                        KlinaraChartPoint("2", "Merve Tunç", 48.15),
+                        KlinaraChartPoint("3", "Onur Bayrak", 12.0),
+                    ),
+                format = { "%${it.toInt()}" },
+            )
+        }
+
         SectionLabel("Seçim listesi")
         KlinaraCard {
             KlinaraSearchablePicker(

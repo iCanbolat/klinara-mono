@@ -110,3 +110,13 @@ gösteriyor, tablo metnini değil.
 
 iOS `NotificationFixtures.swift`'ten. `whatsapp-account-active.json` yalnız **maskeli** token
 taşıyor (`accessToken` anahtarı hiç yok — test bunu da doğruluyor); şablon durumu küçük harf.
+
+## `reports/` (A9)
+
+Yerel API'den (seed, `sahip@demo-klinik.test`) **yakalandı**; iOS'ta rapor fixture'ı yoktu.
+`occupancy.json` ve `no-show.json` `compareTo=previous` ile alındı: `delta`'da `null`
+(kıyaslanamaz — önceki dönem 0) ile `0` (değişim yok) yan yana duruyor ve ikisi ayrı
+çözülmeli. `occupancy-by-day.json` gün kırılımının `groupId: null` hâli; `revenue-by-method.json`
+tahakkuk sütununun yöntem kırılımında 0 olduğunu, `staff-performance-own.json` uygulayıcı
+rolünün `scope: own` yanıtını çiviliyor. Bugünkü sunucu `pageInfo`'yu her yanıtta gönderiyor ama
+bu dosyalarda alan yok: model onu opsiyonel tutuyor, alanı taşımayan yanıt da çözülmeli.

@@ -4,6 +4,7 @@ import com.klinara.android.services.crm.MockCursor
 import com.klinara.android.services.mock.MockErrors
 import com.klinara.android.services.mock.MockIds
 import com.klinara.android.services.networking.PageInfo
+import com.klinara.android.services.reports.ReportPeriod
 import java.time.Instant
 import kotlin.math.abs
 

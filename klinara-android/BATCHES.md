@@ -2553,3 +2553,199 @@ kapatılamıyordu, app secret siliniyordu, token `lastError`'dan sızıyordu); d
 override'ı) iOS kusuru çıktı. Canlı modu tamamen kıran `NetworkOnMainThreadException` fazın en
 değerli bulgusu: A3'ten beri yalnız mock yürüyüş yapılmış olmasının bedeli. Kalan borç: iOS'a
 4 + 4 + 3 fark notu.
+
+---
+
+## A9.1 — Rapor servisi, mock ve durum ✅
+
+**Durum:** `./gradlew check` yeşil. **591 test** (A8.3 sonunda 558), 80 suite. Bu batch ekran
+getirmiyor; servis, mock ve ViewModel A9.2'nin ekranlarının altında hazır.
+
+### Servis — beş rapor + dışa aktarım, yeni uç YOK
+
+`ReportsService` sunucunun `ReportsController` + `ReportExportController`'ının aynası. Paket
+raporları (A5.4) `PackagesService`'te kaldı: sunucuda ayrı controller ve ayrı izin. A5.4'te
+`services/packages` içinde doğan `ReportPeriod` ikinci tüketiciyle `services/reports`'a taşındı.
+
+- `compareTo` yalnız istenince yazılıyor (sunucu varsayılanı `none`); **staff-performance'a hiç
+  gönderilmiyor** (sunucu yok sayıyor, iOS yine de gönderiyordu).
+- Dışa aktarım `POST reports/{kind}/export`, filtre **gövdede** — tarih aralığı ve şube erişim
+  loglarına düşmesin diye sunucunun seçtiği yol. Gövdede `limit`/`cursor`/`compareTo` yok;
+  `null` alan yazılmıyor. Yanıt JSON değil: `ApiClient.sendBytes` eklendi — hata yolu aynı
+  (403 ve "aralığı daraltın" 400'ü `problem+json` olarak çözülüyor).
+- `LiveReportsServiceTest` (MockWebServer) sorgu dizgesini ve dışa aktarım gövdesinin anahtar
+  kümesini çiviliyor; sorgu dizgesinin BOŞ olduğu da ayrıca doğrulanıyor.
+
+### Mock — iOS'unki gibi sabit küme DEĞİL, tohumdan türeyen ziyaretler
+
+iOS mock'u dönemden bağımsız sabit bir rapor döndürüyordu: dönem kaydırıldığında ekran hiç
+değişmiyor, karşılaştırma ve `null` delta sürülemiyor, sayfalama yalnız şekil olarak vardı.
+`MockReportsData` her iş günü için personel başına deterministik ziyaretler üretiyor — ad, süre,
+fiyat ve yetkinlik katalog/personel TOHUMUNDAN; aynı gün her çağrıda aynı sayı. `MockReportBuilders`
+sunucunun toplama kurallarını taklit ediyor (iptal dakikası dolu sayılmaz, gelmeyeninki sayılır;
+toplam oran satır ortalaması değil toplam pay/payda; sıralamalar `order by`'lar). Bu SQL'in ikinci
+bir uygulaması değil, ekranların sürülebilmesi için gereken şekil — istemci hiçbirini hesaplamıyor.
+
+Taklit edilen davranış:
+
+- **İzin kapıları** rol matrisiyle test ediliyor (`permissionMatrix`): owner/manager beşi de;
+  accountant ciro + performans; receptionist doluluk + gelmeme + kazanım; practitioner doluluk +
+  performans. Kapı `RolePermissions.forRole(senaryo.roleKey)`'den — A5.4'ün `canReadRevenue`
+  kancasının genellemesi.
+- **`scope: own`**: ciro izni yok + kendi performans izni var → doluluk ve performans tek satıra
+  kilitleniyor. Mock'ta uygulayıcının profili Derya (oturum kullanıcısının profili yok).
+- **Sayfalama** sunucunun `pageRows`'u: opt-in, imleç hem çıpa hem sıra numarası; `limit=7` ile
+  yürünen sayfalar sayfasız yanıtın aynısı, toplamlar her sayfada aynı.
+- **Karşılaştırma** aynı uzunlukta önceki pencere; klinik 5 Ocak 2026'da "açıldı", açılışı içeren
+  dönemde önceki 0 → delta `null`, ikisi de 0 → `0`.
+- Bodrum'da personel yok: şube değişince boş rapor (hata değil).
+- CSV sunucunun `report-csv.ts` başlıklarıyla birebir: BOM, `;`, `\r\n`, ondalıkta virgül,
+  parada iki sütun.
+
+### Fixture'lar yerel API'den yakalandı
+
+`klinara-fixtures/reports/` — iOS'ta rapor fixture'ı yoktu. `null` delta ile `0` delta aynı
+dosyada yan yana; bilinmeyen `scope` değeri `Unknown`'a düşüyor, çökmüyor.
+
+### `ReportsViewModel` — iOS `ReportsStore` paritesi, üç düzeltmeyle
+
+- **Girdiyi değiştiren metot yükleme başlatmaz**; ekran kendi girdilerine anahtarlı efektle
+  ister. Beş raporu her dönem kaydırmasında çekmek dört boşa istek olurdu.
+- **Rapor başına iptal edilebilir iş**: dönem değişip rapor yeniden yüklenirse yoldaki eski
+  sayfa yeni rapora EKLENMİYOR (`reloadCancelsStalePage`). iOS'ta bu yarış açık.
+- Sayfa hatası satırları düşürmüyor ve düğme yeniden denemeye açık kalıyor (iOS hatayı yutup
+  spinner'ı bırakıyordu — A8.1'deki bulgunun aynısı).
+- Karşılaştırma penceresi etiketi `previousPeriod`'dan: 30 günlük eylülün öncesi "ağustos" değil,
+  **2–31 Ağustos**. Ekran bunu yazacak ki kullanıcı ay kıyasladığını sanmasın.
+
+### detekt bulguları — hepsi düzeltildi
+
+`TooManyFunctions` (nesnede 21/11): delta kurucuları `OccupancyTotals.delta(previous)` gibi
+dosya düzeyi uzantılara, anahtar/oran yardımcıları dosya düzeyi `private` fonksiyonlara indi —
+nesnede yalnız dokuz rapor kurucusu kaldı. `ComplexCondition` (CSV alan kaçışı) bir karakter
+kümesine döndü.
+
+### Yeni bağımlılık: YOK
+
+---
+
+## A9.2 — Rapor ekranları ve grafik ✅
+
+**Durum:** `./gradlew check` yeşil. **595 test** (A9.1 sonunda 591), 81 suite. Emülatörde **mock**
+ile iki rolle sürüldü. **Yönetici** (Nişantaşı): Yönetim → Raporlar → Doluluk %19,09 · 134 sa / 702 sa,
+personel kırılımında üç sütun; karşılaştırma açılınca "Karşılaştırılan: 2 Ağustos 2026 – 31 Ağustos 2026"
+ve "Önceki döneme göre +%2,25"; Gün kırılımında 26 noktalı çizgi ve "1 EYLÜL SALI" kartları. Ciro:
+tahakkuk 96.450,00 ₺ · tahsilat 93.050,00 ₺ (eylül yarım olduğu için −%57,91), altı gruplama çipi.
+Gelmeme: %3,18 · 157 randevu · kaynak kırılımı. Kazanım: kohortlar ve geliş kaynağı.
+**Uygulayıcı**: rapor girişinde yalnız Doluluk + Personel performansı, "Ciro raporu bu rolde
+görüntülenemez"; performansta kapsam rozeti ve tek satır (Derya). Koyu tema ve `fontScale 2.0`
+ayrıca sürüldü.
+
+### `KlinaraChart` — Compose `Canvas`, grafik kütüphanesi YOK
+
+İhtiyaç iki işaret türü (çubuk/çizgi), bir y ekseni ve kırpılan x etiketleri. Vico ya da
+MPAndroidChart bunun için bir bağımlılık, kendi tema sistemi ve kendi erişilebilirlik davranışı
+getirirdi (§7.7). Kararlar:
+
+- **Grafik ekran okuyucudan GİZLİ** (`clearAndSetSemantics`) — iOS `accessibilityHidden` ile aynı
+  gerekçe: aynı satırlar zaten `KlinaraRow` listesinde ve gerçeğin kaynağı o liste.
+- **Eksen "yuvarlak" adıma yükseliyor** (1 · 1,5 · 2 · 2,5 · 3 · 4 · 5 · 6 · 8 × 10ⁿ) ve
+  **sayım verisinde adım en az 1**: iki müşterilik kazanım grafiğinde eksende "0,5 müşteri"
+  yazıyordu — emülatörde görülüp düzeltildi.
+- **Yükseklik çizim alanı + ölçülen etiket yüksekliği**: `fontScale 2.0`'da sabit yükseklikte
+  çubuklar eziliyordu (bu da emülatörde görüldü).
+- Sekiz noktadan fazlasında x ekseninde yalnız ilk/orta/son etiket; kalanlar kırpılır.
+- Tek noktalı çizgi görünmez bir nokta olurdu: o durumda sütun çizilir (iOS kararı).
+
+### Gün kırılımı Türkçe yazılıyor (iOS ham `2026-09-01` gösteriyor)
+
+Sunucu gün kırılımında **yerel günü** `YYYY-MM-DD` olarak ve kimlik olarak veriyor. Ekran kartı
+"1 Eylül Salı", grafik ekseni "1 Eyl" yazıyor; ayrıştırılamayan etiket olduğu gibi kalır. Saat
+dilimi dönüşümü YOK — gün zaten şubenin yerel günü.
+
+### Karşılaştırma anahtarı — iOS'ta hiç açılamıyordu
+
+`ReportsStore.compareToPrevious` iOS'ta var ama hiçbir ekranda anahtarı yok: delta satırları
+ölü kod. Android'de bir `KlinaraToggleRow` ve anahtarın altında **karşılaştırılan pencere**
+yazılı: 30 günlük eylülün öncesi "ağustos" değil, 2–31 Ağustos. Sunucunun `previousPeriod`'u
+"aynı uzunlukta, hemen bitişik"; etiketsiz bir anahtar kullanıcıya ay kıyasladığını sandırırdı.
+Personel performansında anahtar ÇİZİLMEZ: sunucu o uçta `compareTo`'yu yok sayıyor.
+
+### `null` delta ekranda da "kıyaslanamaz"
+
+`ReportFormat.deltaLabel` üç hâli ayırıyor: değişim ("Önceki döneme göre +%12,5"), `null`
+("Önceki dönemde sıfırdı — kıyaslanamaz") ve anahtarın hiç olmaması (satır yok). "%0" yazmak
+"değişim yok" yalanı olurdu.
+
+### Yönetim hub'ı: Raporlar kartı (iOS sırası)
+
+Yeni "Raporlar" kartı en sonda; **paket raporları Paketler kartından buraya taşındı** — iOS'ta
+da orada. Klinik raporları satırı beş rapordan en az biri açılabiliyorsa görünür; hangilerinin
+açıldığı giriş ekranında `ReportAccess` ile ayrıca süzülür ve rol matrisi birim testiyle
+sabitlendi (muhasebe: ciro + performans; resepsiyon: doluluk + gelmeme + kazanım; uygulayıcı:
+doluluk + performans). Derin bağlantıyla gelen izinsiz rol geri çevrilir, sunucuya 403 için gitmez.
+
+### iOS'tan bilinçli farklar (§7.8 — iOS'a bildirilecek)
+
+1. Ciro boş durumu **`hasMovement`**'a bakıyor: satırsız ama tahsilatlı dönemde iOS toplam kartını
+   gizliyor (eski bir borca yapılan tahsilat tam olarak böyle bir dönem üretir).
+2. Ödeme yöntemi kırılımında ham değer (`card`) yerine "Kart"; iOS hamını yazıyor.
+3. Gün kırılımı etiketleri Türkçe tarih.
+4. Karşılaştırma anahtarı (iOS'ta erişilemiyor) ve karşılaştırılan pencerenin yazılması.
+5. Sonraki sayfa **düğme**, sonsuz kaydırma değil (A5.4 kararı; `KlinaraScreen` kaydırılabilir
+   sütun veriyor, görünürlük tetikleyicisi yok).
+6. Ciro gruplaması altı seçenek olduğu için segment seçici yerine **sarmalı çipler**: segmentte
+   "Personel" bile kırpılıyordu.
+
+### Yeni bağımlılık: YOK
+
+---
+
+## A9.3 — CSV dışa aktarım, Faz A9 kapanışı ✅
+
+**Durum:** `./gradlew check` yeşil. **598 test** (A9.2 sonunda 595), 81 suite. Emülatörde mock ile
+sürüldü: Ciro raporunda "CSV olarak dışa aktar" → sistem dosya seçicisi önerilen adla açıldı
+(`ciro-2026-09-01-2026-10-01.csv`) → kaydedildi → ekranda "CSV kaydedildi: …" → dosya cihazdan
+okundu: BOM, `;` ayraç, `\r\n`, "Tahakkuk (kuruş)" sütunu ve `72000,00` biçimi sunucunun
+`report-csv.ts`'i ile birebir.
+
+### Dosya uygulamanın diskine HİÇ yazılmıyor
+
+`ACTION_CREATE_DOCUMENT` (SAF) ile yalnız kullanıcının seçtiği konuma; ara bir önbellek dosyası
+yok. Baytlar sunucudan geldiği andan yazıldığı ana kadar **bellekte** duruyor ve yazma bitince
+durumdan düşürülüyor (`exportIsForgottenAfterSave`), seçici iptal edilirse de düşürülüyor.
+§7.9'un "sağlık verisi diskte artakalmıyor" maddesi rapor dosyası için de böyle korunuyor.
+
+### Dosya adı sunucunun şemasında ama günler ŞUBE saatinde
+
+Sunucu `csvFilename` adı `from`/`to`'nun ilk on karakterinden kuruyor. İstemci sorguyu UTC `Z`
+olarak gönderiyor (A5.4 kararı) ve İstanbul'da ay başı `2026-08-31T21:00Z`; sunucunun üreteceği ad
+bir gün geriden başlardı. Ad istemcide `BranchClock` ile kuruluyor: `doluluk-2026-09-01-2026-10-01.csv`
+— üst sınır yine HARİÇ gün, yani web'in indirdiği dosyayla aynı ad.
+
+### Dışa aktarım sorgusu: sayfasız, karşılaştırmasız
+
+Sunucu `limit`/`cursor`'ı zaten siliyor (eksik bir dosya indiren kullanıcı bunu fark etmezdi) ve
+CSV karşılaştırma taşımıyor; istemci ikisini de hiç göndermiyor. Gruplama gönderiliyor: ekranda
+hangi kırılım açıksa dosya onu taşıyor. 50 bin satır sınırının 400'ü ve rolün 403'ü ekranda
+`ErrorBanner` olarak görünüyor ("Tamam" ile kapanır).
+
+### Boş raporda düğme yok
+
+Başlıktan ibaret bir CSV kimseye lazım değil; düğme yalnız satır varken çiziliyor (boş durum
+ekranında görünmüyor).
+
+---
+
+### Faz A9 kapandı
+
+Üç batch, 598 test (faz başında 558). Çıkış ölçütü — **her rapor mock ve canlı veriyle aynı ekranı
+çiziyor, izin kapıları doğru** — mock tarafında beş rapor iki rolle sürüldü ve rol matrisi hem
+servis hem giriş ekranı düzeyinde birim testiyle sabitlendi; fixture'lar canlı sunucudan
+yakalanmış gövdelerle çözülüyor. **Canlı sunucuyla uçtan uca yürüyüş A9'da yapılmadı** (yerel API
+bu oturumda ayağa kaldırılmadı): kalan borç, A10'un ağ dayanıklılığı geçişinde beş raporun ve CSV
+uçlarının canlı sürülmesi.
+
+Faz boyunca sunucuda kusur bulunmadı; buna karşılık **iOS'ta altı fark** not edildi (A9.2 listesi)
+ve bunların ikisi gerçek kusur: ciro toplam kartının satırsız dönemde gizlenmesi ve karşılaştırma
+anahtarının hiçbir ekranda açılamaması. Kalan borç: iOS'a 6 fark notu (A8'in 11 notuyla birlikte).

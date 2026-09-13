@@ -252,6 +252,19 @@ object ShellRoutes {
         val screen: String,
     )
 
+    /**
+     * Klinik raporları (A9). Giriş hedefi, beş raporun PAYLAŞTIĞI ViewModel'in sahibi (ortak
+     * dönem ve karşılaştırma); rapor hedefleri [Report] ile açılır.
+     */
+    @Serializable
+    data object ReportsHome
+
+    /** [kind] `ReportKind.name` — Occupancy / Revenue / StaffPerformance / NoShow / Retention. */
+    @Serializable
+    data class Report(
+        val kind: String,
+    )
+
     /** Hizmet kataloğu (A7.1). */
     @Serializable
     data object ServiceList

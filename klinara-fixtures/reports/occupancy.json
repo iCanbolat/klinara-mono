@@ -1,0 +1,31 @@
+{
+  "scope": "all",
+  "period": {
+    "from": "2026-09-07T00:00:00+03:00",
+    "to": "2026-09-14T00:00:00+03:00"
+  },
+  "totals": {
+    "bookedMinutes": 60,
+    "availableMinutes": 3240,
+    "occupancyRate": 1.85
+  },
+  "data": [
+    {
+      "groupId": "644f74bd-4a8e-4d12-918d-c68ecf0e0a40",
+      "groupLabel": "Demo Uygulayıcı",
+      "bookedMinutes": 60,
+      "availableMinutes": 3240,
+      "occupancyRate": 1.85
+    }
+  ],
+  "previous": {
+    "bookedMinutes": 0,
+    "availableMinutes": 3240,
+    "occupancyRate": 0
+  },
+  "delta": {
+    "bookedMinutes": null,
+    "availableMinutes": 0,
+    "occupancyRate": null
+  }
+}

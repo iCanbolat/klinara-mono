@@ -6,6 +6,7 @@ import com.klinara.android.services.mock.Fixtures
 import com.klinara.android.services.mock.MockIds
 import com.klinara.android.services.networking.ApiError
 import com.klinara.android.services.networking.KlinaraJson
+import com.klinara.android.services.reports.ReportPeriod
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull

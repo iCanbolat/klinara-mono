@@ -5,6 +5,7 @@ import com.klinara.android.services.networking.ApiRequest
 import com.klinara.android.services.networking.KlinaraJson
 import com.klinara.android.services.networking.Page
 import com.klinara.android.services.networking.RequestBodyPayload
+import com.klinara.android.services.reports.ReportPeriod
 import kotlinx.serialization.json.JsonObject
 import java.time.format.DateTimeFormatter
 
@@ -217,13 +218,6 @@ class LivePackagesService internal constructor(
             ),
         )
 }
-
-/**
- * Sunucu `@IsISO8601({ strict: true })` istiyor; UTC `Z` biçimi geçerli ve şube saatine
- * dönüşüm istemcide yapılmış oluyor (dönem sınırları `BranchClock` ile hesaplanıyor).
- */
-private fun ReportPeriod.wire(): List<Pair<String, String>> =
-    listOf("from" to DateTimeFormatter.ISO_INSTANT.format(from), "to" to DateTimeFormatter.ISO_INSTANT.format(to))
 
 private fun JsonObject.asBody(): RequestBodyPayload =
     RequestBodyPayload(KlinaraJson.encodeToString(JsonObject.serializer(), this))

@@ -66,6 +66,8 @@ import com.klinara.android.features.packages.PackageOperation
 import com.klinara.android.features.packages.PackageOperationHost
 import com.klinara.android.features.packages.PackageReportScreen
 import com.klinara.android.features.packages.PackageReportsHost
+import com.klinara.android.features.reports.ReportsHost
+import com.klinara.android.services.reports.ReportKind
 import com.klinara.android.features.packages.PackageDefinitionEditorScreen
 import com.klinara.android.features.packages.PackageDefinitionListScreen
 import com.klinara.android.features.packages.SellPackageHost
@@ -656,6 +658,32 @@ private fun ManagementTab(
             )
         }
 
+        composable<ShellRoutes.ReportsHome> { entry ->
+            ReportsHost(
+                session = session,
+                container = container,
+                kind = null,
+                owner = entry,
+                onOpen = { navController.navigate(ShellRoutes.Report(it.name)) },
+                onBack = { navController.popBackStack() },
+                trailing = trailing,
+            )
+        }
+
+        composable<ShellRoutes.Report> { entry ->
+            val route = entry.toRoute<ShellRoutes.Report>()
+            // Beş rapor girişin ViewModel'ini paylaşır: dönem ve karşılaştırma raporlar arasında taşınsın.
+            val owner = remember(entry) { navController.getBackStackEntry<ShellRoutes.ReportsHome>() }
+            ReportsHost(
+                session = session,
+                container = container,
+                kind = ReportKind.valueOf(route.kind),
+                owner = owner,
+                onOpen = { navController.navigate(ShellRoutes.Report(it.name)) },
+                onBack = { navController.popBackStack() },
+            )
+        }
+
         composable<ShellRoutes.PackageDefinitionList> {
             PackageDefinitionListScreen(
                 session = session,
@@ -773,6 +801,7 @@ private fun ManagementDestination.route(): Any =
         ManagementDestination.CustomerTags -> ShellRoutes.CustomerTagList
         ManagementDestination.PackageDefinitions -> ShellRoutes.PackageDefinitionList
         ManagementDestination.PackageReports -> ShellRoutes.PackageReportsHome
+        ManagementDestination.Reports -> ShellRoutes.ReportsHome
         ManagementDestination.Inbox -> ShellRoutes.Inbox
         ManagementDestination.MessageLog -> ShellRoutes.MessageLog
         ManagementDestination.ReminderSettings -> ShellRoutes.ReminderSettings

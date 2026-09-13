@@ -11,6 +11,7 @@ import com.klinara.android.designsystem.components.KlinaraCard
 import com.klinara.android.designsystem.components.KlinaraNavigationRow
 import com.klinara.android.designsystem.components.KlinaraScreen
 import com.klinara.android.features.auth.AppSession
+import com.klinara.android.features.reports.ReportAccess
 import com.klinara.android.services.contracts.Permissions
 
 /** Yönetim hub'ından açılan hedefler. Route'a çevirme `AppShell`'in işi. */
@@ -23,6 +24,7 @@ enum class ManagementDestination {
     CustomerTags,
     PackageDefinitions,
     PackageReports,
+    Reports,
     Inbox,
     MessageLog,
     ReminderSettings,
@@ -108,16 +110,49 @@ fun managementSections(session: AppSession): List<ManagementSection> =
                         "Paket tanımları",
                         "Satılabilir seans paketleri ve fiyatları",
                     ),
+                ),
+            )
+        }
+        communicationSection(session)?.let(::add)
+        reportsSection(session)?.let(::add)
+    }
+
+/**
+ * Raporlar kartı (A9) — iOS `reportsCard` paritesi: klinik ve paket raporları TEK kartta, en
+ * sonda. Paket raporları A5.4'te Paketler kartındaydı; iOS'taki yerine taşındı.
+ *
+ * Klinik raporları satırı, beş rapordan EN AZ BİRİ açılabiliyorsa görünür ([ReportAccess]);
+ * hangilerinin açıldığı giriş ekranında ayrıca süzülür. Prim (A6) buraya eklenecek.
+ */
+private fun reportsSection(session: AppSession): ManagementSection? {
+    val rows =
+        buildList {
+            if (ReportAccess.visible(session::can).isNotEmpty()) {
+                add(
+                    row(
+                        ManagementDestination.Reports,
+                        "Klinik raporları",
+                        "Doluluk, ciro, personel performansı, gelmeme ve kazanım",
+                    ),
+                )
+            }
+            if (session.can(Permissions.PACKAGE_READ)) {
+                add(
                     row(
                         ManagementDestination.PackageReports,
                         "Paket raporları",
                         "Yükümlülük, süre dolumu ve dönem kullanımı",
                     ),
-                ),
-            )
+                )
+            }
         }
-        communicationSection(session)?.let(::add)
-    }
+    if (rows.isEmpty()) return null
+    return ManagementSection(
+        title = "Raporlar",
+        rows = rows,
+        footnote = "Dönemler yarı açıktır: bitiş günü dahil değildir; ekranda son gün yazılır.",
+    )
+}
 
 /**
  * İletişim kartı (A8) — iOS `communicationCard` paritesi: `notification:read` ya da `:manage`.
@@ -238,4 +273,4 @@ fun ManagementHomeScreen(
 }
 
 private const val COMING_SOON =
-    "Kasa ve prim Faz A6, raporlar Faz A9 ile geliyor."
+    "Kasa ve prim Faz A6 ile geliyor."

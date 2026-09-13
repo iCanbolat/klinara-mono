@@ -1,0 +1,46 @@
+{
+  "period": {
+    "from": "2026-09-07T00:00:00+03:00",
+    "to": "2026-09-14T00:00:00+03:00"
+  },
+  "totals": {
+    "newCustomers": 1,
+    "returningCustomers": 0,
+    "activeCustomers": 1,
+    "returningRate": 0
+  },
+  "acquisition": [
+    {
+      "source": null,
+      "customers": 1
+    }
+  ],
+  "cohorts": [
+    {
+      "withinDays": 30,
+      "returned": 1,
+      "rate": 100
+    },
+    {
+      "withinDays": 60,
+      "returned": 1,
+      "rate": 100
+    },
+    {
+      "withinDays": 90,
+      "returned": 1,
+      "rate": 100
+    }
+  ],
+  "previous": {
+    "newCustomers": 0,
+    "returningCustomers": 0,
+    "activeCustomers": 0,
+    "returningRate": 0
+  },
+  "delta": {
+    "newCustomers": null,
+    "returningCustomers": 0,
+    "activeCustomers": null
+  }
+}

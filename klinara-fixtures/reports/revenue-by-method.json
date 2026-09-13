@@ -1,0 +1,21 @@
+{
+  "scope": "all",
+  "period": {
+    "from": "2020-01-01T00:00:00+03:00",
+    "to": "2099-01-01T00:00:00+03:00"
+  },
+  "totals": {
+    "accruedMinor": 350000,
+    "collectedMinor": 180000,
+    "refundedMinor": 0,
+    "currency": "TRY"
+  },
+  "data": [
+    {
+      "groupId": null,
+      "groupLabel": "card",
+      "accruedMinor": 0,
+      "collectedMinor": 180000
+    }
+  ]
+}

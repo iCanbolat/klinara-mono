@@ -1,0 +1,51 @@
+{
+  "period": {
+    "from": "2026-09-07T00:00:00+03:00",
+    "to": "2026-09-14T00:00:00+03:00"
+  },
+  "totals": {
+    "total": 3,
+    "completed": 2,
+    "noShow": 1,
+    "cancelled": 0,
+    "noShowRate": 33.33,
+    "cancellationRate": 0
+  },
+  "data": [
+    {
+      "groupId": "644f74bd-4a8e-4d12-918d-c68ecf0e0a40",
+      "groupLabel": "Demo Uygulayıcı",
+      "total": 3,
+      "completed": 2,
+      "noShow": 1,
+      "cancelled": 0,
+      "noShowRate": 33.33,
+      "cancellationRate": 0
+    }
+  ],
+  "byOrigin": [
+    {
+      "origin": "internal",
+      "total": 3,
+      "completed": 2,
+      "noShow": 1,
+      "cancelled": 0,
+      "noShowRate": 33.33,
+      "cancellationRate": 0
+    }
+  ],
+  "previous": {
+    "total": 0,
+    "completed": 0,
+    "noShow": 0,
+    "cancelled": 0,
+    "noShowRate": 0,
+    "cancellationRate": 0
+  },
+  "delta": {
+    "total": null,
+    "noShow": null,
+    "noShowRate": null,
+    "cancellationRate": 0
+  }
+}

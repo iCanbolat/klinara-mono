@@ -41,6 +41,9 @@ import com.klinara.android.services.notifications.NotificationsService
 import com.klinara.android.services.packages.LivePackagesService
 import com.klinara.android.services.packages.MockPackagesService
 import com.klinara.android.services.packages.PackagesService
+import com.klinara.android.services.reports.LiveReportsService
+import com.klinara.android.services.reports.MockReportsService
+import com.klinara.android.services.reports.ReportsService
 import com.klinara.android.services.formatting.BranchClock
 import com.klinara.android.services.mock.MockDataScenario
 import com.klinara.android.services.mock.MockScenario
@@ -79,7 +82,7 @@ import kotlinx.coroutines.flow.SharedFlow
  *
  *     customers A3.4 · notifications(opt-out) A4.2 · notes A4.3 ✓ · files A4.4 ✓ · packages A5.1 ✓
  *     finance A6.1 · commissions A6.4 · catalog/staff/users/scheduling A7 ✓
- *     notifications/messages/whatsapp A8 ✓ · reports A9
+ *     notifications/messages/whatsapp A8 ✓ · reports A9 ✓
  *
  * **A3.1'de iki servis planlanandan ÖNCE geldi** ve `ANDROID_DEVELOPMENT.md` §6 buna
  * göre güncellendi: `booking` A3.4 yerine A3.1'de (takvim onsuz çizilemez; oluşturma
@@ -112,6 +115,7 @@ class ServiceContainer private constructor(
     val thumbnails: ThumbnailCache,
     val catalog: CatalogService,
     val packages: PackagesService,
+    val reports: ReportsService,
     val tokens: TokenStore,
     val sessionExpired: SharedFlow<Unit>,
     /** Yalnız mock modda dolu — geliştirici senaryo menüsü bunu kullanır. */
@@ -168,6 +172,7 @@ class ServiceContainer private constructor(
                 thumbnails = ThumbnailCache(liveFiles, clients.bare),
                 catalog = LiveCatalogService(client),
                 packages = LivePackagesService(client),
+                reports = LiveReportsService(client),
                 tokens = tokens,
                 sessionExpired = client.sessionExpired,
                 mockAuth = null,
@@ -236,6 +241,11 @@ class ServiceContainer private constructor(
                 ).apply { this.failing = failing }
             // Tamamlanma → seans düşme aynı "transaction": hak yetersizse durum da değişmez.
             mockBooking.packageHook = mockPackages
+            // İzin kapıları ve `scope: own` rolden: uygulayıcı yalnız kendi satırını görür.
+            val mockReports =
+                MockReportsService(
+                    permissions = { RolePermissions.forRole(mockAuth.scenario.roleKey) },
+                ).apply { this.failing = failing }
 
             return ServiceContainer(
                 auth = mockAuth,
@@ -252,6 +262,7 @@ class ServiceContainer private constructor(
                 thumbnails = ThumbnailCache(mockFiles, OkHttpClient()),
                 catalog = mockCatalog,
                 packages = mockPackages,
+                reports = mockReports,
                 tokens = tokens,
                 sessionExpired = MutableSharedFlow(extraBufferCapacity = 1),
                 mockAuth = mockAuth,
@@ -284,6 +295,7 @@ class ServiceContainer private constructor(
             files: FilesService = MockFilesService(latencyEnabled = false, thumbnailDelayMillis = 0),
             catalog: CatalogService = MockCatalogService(latencyEnabled = false),
             packages: PackagesService = MockPackagesService(latencyEnabled = false),
+            reports: ReportsService = MockReportsService(latencyEnabled = false),
         ) = ServiceContainer(
             auth = auth,
             booking = booking,
@@ -299,6 +311,7 @@ class ServiceContainer private constructor(
             thumbnails = ThumbnailCache(files, OkHttpClient()),
             catalog = catalog,
             packages = packages,
+            reports = reports,
             tokens = tokens,
             sessionExpired = sessionExpired,
             mockAuth = mockAuth,

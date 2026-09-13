@@ -101,12 +101,3 @@ data class UsageReport(
     val data: List<UsageRow> = emptyList(),
 )
 
-/** `[from, to)` — yarı açık dönem. */
-data class ReportPeriod(
-    val from: Instant,
-    val to: Instant,
-) {
-    init {
-        require(to.isAfter(from)) { "Dönem sonu başlangıçtan sonra olmalı" }
-    }
-}

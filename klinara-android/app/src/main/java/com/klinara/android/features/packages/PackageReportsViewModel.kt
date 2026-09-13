@@ -10,9 +10,9 @@ import com.klinara.android.services.packages.ExpiringReport
 import com.klinara.android.services.packages.OutstandingGrouping
 import com.klinara.android.services.packages.OutstandingReport
 import com.klinara.android.services.packages.PackagesService
-import com.klinara.android.services.packages.ReportPeriod
 import com.klinara.android.services.packages.UsageGrouping
 import com.klinara.android.services.packages.UsageReport
+import com.klinara.android.services.reports.ReportPeriod
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

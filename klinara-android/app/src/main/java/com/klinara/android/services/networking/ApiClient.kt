@@ -82,6 +82,12 @@ class ApiClient internal constructor(
         return decode(bytes)
     }
 
+    /**
+     * JSON olmayan gövde (rapor CSV'si). Hata yolu aynı: 2xx dışı yanıt yine `problem+json`
+     * olarak çözülür — dışa aktarımın 403'ü ve "aralığı daraltın" 400'ü anlamlı mesaj olsun.
+     */
+    suspend fun sendBytes(request: ApiRequest): ByteArray = execute(request)
+
     @PublishedApi
     internal inline fun <reified T> decode(bytes: ByteArray): T =
         try {
