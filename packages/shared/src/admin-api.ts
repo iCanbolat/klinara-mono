@@ -377,6 +377,15 @@ export interface Branch {
   id: string;
   name: string;
   timezone: string;
+  /**
+   * Aşağıdakileri `GET branches` (`BranchResponseDto`) zaten döndürüyor;
+   * panelin karşılama sayfası şube kartında kullanıyor. İSTEĞE BAĞLI, çünkü
+   * editör ve katalog bu tipi yalnız `id`/`name` ile kurulmuş dar listelerle
+   * de besliyor.
+   */
+  phone?: string | null;
+  address?: string | null;
+  isActive?: boolean;
 }
 
 /**

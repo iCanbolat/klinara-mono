@@ -68,7 +68,7 @@ export function Field({ label, hint, error, className, ...props }: FieldProps): 
   return (
     <div className="flex flex-col gap-1.5">
       <Label htmlFor={id}>{label}</Label>
-      <Input id={id} className={cn(className)} aria-invalid={invalid} {...describedBy} {...props} />
+      <Input id={id} className={cn('bg-card ',className)} aria-invalid={invalid} {...describedBy} {...props} />
       {hint !== undefined ? <Hint id={id} hint={hint} /> : null}
       {error !== undefined ? <ErrorText id={id} error={error} /> : null}
     </div>
@@ -90,7 +90,7 @@ export function FieldTextarea({
       <Label htmlFor={id}>{label}</Label>
       <Textarea
         id={id}
-        className={cn(className)}
+        className={cn('bg-card ',className)}
         aria-invalid={invalid}
         {...describedBy}
         {...props}

@@ -70,7 +70,7 @@ export function Topbar(): ReactNode {
               <BreadcrumbPage>{t('app.title')}</BreadcrumbPage>
             ) : (
               <BreadcrumbLink asChild>
-                <Link href="/">{t('app.title')}</Link>
+                <Link href="/dashboard">{t('app.title')}</Link>
               </BreadcrumbLink>
             )}
           </BreadcrumbItem>

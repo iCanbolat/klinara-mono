@@ -71,22 +71,20 @@ describe('müşteri defteri', () => {
     expect(await screen.findByText('Ayşe Yılmaz')).toBeInTheDocument();
   });
 
-  it('"daha fazla" listeye EKLİYOR, değiştirmiyor', async () => {
-    // Cursor sayfalamada "3. sayfaya git" diye bir şey yok; sayfa listeye
-    // eklenir. Değiştirseydi kullanıcı önceki sonuçları kaybederdi.
+  it('"Sonraki" sayfayı DEĞİŞTİRİYOR, "Önceki" cursor yığınıyla geri getiriyor', async () => {
+    // Cursor sayfalamada toplam yok; Önceki / Sonraki var. API geriye doğru
+    // cursor vermediği için "Önceki" bir önceki cursor'ı YENİDEN istiyor.
     const user = userEvent.setup();
-    let call = 0;
     get.mockImplementation((path: string) => {
       if (path.startsWith('customers?')) {
-        call += 1;
-        return call === 1
+        return path.includes('cursor=CUR1')
           ? Promise.resolve({
-              data: [customer('c01', 'Ayşe Yılmaz')],
-              pageInfo: { nextCursor: 'CUR1', hasMore: true },
-            })
-          : Promise.resolve({
               data: [customer('c02', 'Mehmet Demir')],
               pageInfo: { nextCursor: null, hasMore: false },
+            })
+          : Promise.resolve({
+              data: [customer('c01', 'Ayşe Yılmaz')],
+              pageInfo: { nextCursor: 'CUR1', hasMore: true },
             });
       }
       return Promise.resolve({ data: [] });
@@ -94,14 +92,23 @@ describe('müşteri defteri', () => {
 
     render(<CustomersPage />);
     await screen.findByText('Ayşe Yılmaz');
+    expect(screen.getByRole('button', { name: 'Önceki' })).toBeDisabled();
 
-    await user.click(screen.getByRole('button', { name: 'Daha fazla' }));
+    await user.click(screen.getByRole('button', { name: 'Sonraki' }));
 
     expect(await screen.findByText('Mehmet Demir')).toBeInTheDocument();
-    // İlk sayfa HÂLÂ ekranda.
-    expect(screen.getByText('Ayşe Yılmaz')).toBeInTheDocument();
-    // İkinci istek cursor taşıyor.
-    expect(get.mock.calls.some((c) => String(c[0]).includes('cursor=CUR1'))).toBe(true);
+    // Sayfa DEĞİŞTİ, eklenmedi.
+    expect(screen.queryByText('Ayşe Yılmaz')).not.toBeInTheDocument();
+    expect(screen.getByText('Sayfa 2')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sonraki' })).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: 'Önceki' }));
+
+    expect(await screen.findByText('Ayşe Yılmaz')).toBeInTheDocument();
+    expect(screen.queryByText('Mehmet Demir')).not.toBeInTheDocument();
+    // İlk sayfa cursor'SUZ yeniden istendi.
+    const listCalls = get.mock.calls.map((c) => String(c[0])).filter((c) => c.startsWith('customers?'));
+    expect(listCalls.at(-1)).not.toContain('cursor=');
   });
 
   it('ARAMA en az 2 karakterden önce ÇAĞRILMIYOR', async () => {
@@ -139,7 +146,7 @@ describe('müşteri defteri', () => {
 
     expect(await screen.findByText('Zeynep Kaya')).toBeInTheDocument();
     // Arama sayfalanmıyor: "daha fazla" gösterilmiyor.
-    expect(screen.queryByRole('button', { name: 'Daha fazla' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Sonraki' })).not.toBeInTheDocument();
   });
 
   it('`customer:write` YOKKEN yeni müşteri düğmesi yok', async () => {

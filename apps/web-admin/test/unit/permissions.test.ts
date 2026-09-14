@@ -35,7 +35,12 @@ describe('izin kontrolü', () => {
 describe('izne göre navigasyon', () => {
   it('izni olmayan öge DÖNMÜYOR (CSS ile gizlenmiyor)', () => {
     const nav = visibleNav([]);
-    expect(nav.map((item) => item.path)).toEqual(['/hesap']);
+    // Karşılama sayfası ve hesap izin istemiyor; geri kalan her şey istiyor.
+    expect(nav.map((item) => item.path)).toEqual(['/dashboard', '/hesap']);
+  });
+
+  it('karşılama sayfası menünün BAŞINDA', () => {
+    expect(visibleNav([READ])[0]?.path).toBe('/dashboard');
   });
 
   it('booking_page:read olan kullanıcı üç bölümü de görüyor', () => {
@@ -48,7 +53,7 @@ describe('izne göre navigasyon', () => {
   it('yalnız MANAGE taşıyan kullanıcı menüde içerik GÖRMÜYOR', () => {
     // Menü `read` istiyor; yapılandırma hatası olan kullanıcı doğrudan URL ile
     // girip anlaşılır paneli görüyor (bkz. bookingPageAccess).
-    expect(visibleNav([MANAGE]).map((item) => item.path)).toEqual(['/hesap']);
+    expect(visibleNav([MANAGE]).map((item) => item.path)).toEqual(['/dashboard', '/hesap']);
   });
 
   it('doğrudan URL kontrolü alt rotaları da kapsıyor', () => {

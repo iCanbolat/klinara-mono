@@ -62,7 +62,7 @@ export default function InvitePage(): ReactNode {
       });
       if (step.step === 'authenticated') {
         noteSessionExpiry(step.expiresIn);
-        router.replace('/');
+        router.replace('/dashboard');
         router.refresh();
         return;
       }

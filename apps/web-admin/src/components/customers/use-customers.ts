@@ -9,19 +9,19 @@ import { toMessage } from '@/lib/reports/errors';
  * Müşteri defteri — CURSOR sayfalama.
  *
  * ---------------------------------------------------------------------------
- * SAYFA EKLENİYOR, DEĞİŞTİRİLMİYOR
+ * SAYFA DEĞİŞTİRİLİYOR; GERİ DÖNÜŞ CURSOR YIĞINIYLA
  * ---------------------------------------------------------------------------
  * `GET /customers` cursor'lı: `pageInfo.nextCursor` bir SONRAKİ isteğin
- * `cursor`'ı. Offset sayfalama yok, dolayısıyla "3. sayfaya git" diye bir
- * şey de yok — arayüz "daha fazla" düğmesiyle listeye EKLİYOR.
+ * `cursor`'ı. Offset ve toplam sayı yok, dolayısıyla "3. sayfaya git" de yok.
+ * Arayüz Önceki / Sonraki gösteriyor: gidilen her sayfanın cursor'ı bir
+ * yığında tutuluyor (`[null, CUR1, CUR2…]`) ve "Önceki" bir alttakini
+ * yeniden istiyor. API geriye doğru cursor vermediği için başka yolu yok.
  *
- * Süzgeç değişince liste SIFIRLANIYOR ve cursor atılıyor: eski cursor yeni
- * süzgecin sonuç kümesinde anlamsızdır ve sunucuya gönderilirse rastgele bir
- * yerden devam eder.
+ * Süzgeç değişince yığın SIFIRLANIYOR: eski cursor yeni süzgecin sonuç
+ * kümesinde anlamsızdır ve sunucuya gönderilirse rastgele bir yerden devam eder.
  *
- * Arama ayrı bir uç (`customers/search`) ve o SAYFALANMIYOR; bu yüzden arama
- * varken `nextCursor` hep `null` gibi davranıyor — kullanıcıya "daha fazla"
- * gösterilmiyor.
+ * Arama ayrı bir uç (`customers/search`) ve o SAYFALANMIYOR; arama varken
+ * gezinme gösterilmiyor.
  */
 
 interface Filters {
@@ -35,42 +35,54 @@ export interface CustomersState {
   customers: Customer[];
   error: string | null;
   loading: boolean;
-  loadingMore: boolean;
-  hasMore: boolean;
-  loadMore: () => void;
+  /** 0 tabanlı. */
+  pageIndex: number;
+  hasPrev: boolean;
+  hasNext: boolean;
+  next: () => void;
+  prev: () => void;
   reload: () => void;
 }
 
 const MIN_QUERY = 2;
+const PAGE_SIZE = '50';
 
 export function useCustomers(filters: Filters): CustomersState {
   const [customers, setCustomers] = useState<Customer[] | null>(null);
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState(false);
+  /** Gidilen sayfaların cursor'ları; son eleman ekrandaki sayfa. */
+  const [stack, setStack] = useState<(string | null)[]>([null]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [nonce, setNonce] = useState(0);
 
-  const searching = filters.query.trim().length >= MIN_QUERY;
-  const filterKey = `${filters.query.trim()}|${filters.tagId ?? ''}|${filters.source ?? ''}`;
+  const query = filters.query.trim();
+  const searching = query.length >= MIN_QUERY;
+  const filterKey = `${searching ? query : ''}|${filters.tagId ?? ''}|${filters.source ?? ''}`;
 
+  // Süzgeç değişince yığın render sırasında sıfırlanıyor — effect'te yapmak
+  // bir istek boyunca eski cursor'la yeni süzgeci birleştirirdi.
+  const [stackKey, setStackKey] = useState(filterKey);
+  if (stackKey !== filterKey) {
+    setStackKey(filterKey);
+    setStack([null]);
+  }
+
+  const cursor = stack.at(-1) ?? null;
   const reload = useCallback(() => setNonce((value) => value + 1), []);
 
-  // İlk sayfa / süzgeç değişimi.
   useEffect(() => {
     const controller = new AbortController();
 
     void (async () => {
       setCustomers(null);
-      setCursor(null);
-      setHasMore(false);
+      setNextCursor(null);
       setError(null);
       try {
         if (searching) {
           // ⚠️ Arama ucu ÇIPLAK DİZİ dönüyor — `{ data }` zarfı YOK.
           // `.data` beklemek çalışma zamanında `undefined.map` olarak patlar.
           const result = await api.get<Customer[]>(
-            `customers/search?q=${encodeURIComponent(filters.query.trim())}`,
+            `customers/search?q=${encodeURIComponent(query)}`,
             { signal: controller.signal },
           );
           if (controller.signal.aborted) return;
@@ -78,7 +90,8 @@ export function useCustomers(filters: Filters): CustomersState {
           return;
         }
 
-        const params = new URLSearchParams({ limit: '50' });
+        const params = new URLSearchParams({ limit: PAGE_SIZE });
+        if (cursor !== null) params.set('cursor', cursor);
         if (filters.tagId !== null) params.set('tagId', filters.tagId);
         if (filters.source !== null) params.set('source', filters.source);
 
@@ -87,8 +100,7 @@ export function useCustomers(filters: Filters): CustomersState {
         });
         if (controller.signal.aborted) return;
         setCustomers(result.data);
-        setCursor(result.pageInfo.nextCursor);
-        setHasMore(result.pageInfo.hasMore);
+        setNextCursor(result.pageInfo.hasMore ? result.pageInfo.nextCursor : null);
       } catch (caught) {
         if (controller.signal.aborted) return;
         setError(toMessage(caught));
@@ -96,40 +108,27 @@ export function useCustomers(filters: Filters): CustomersState {
     })();
 
     return () => controller.abort();
-  }, [filterKey, searching, filters.query, filters.tagId, filters.source, nonce]);
+  }, [searching, query, cursor, filters.tagId, filters.source, nonce]);
 
-  const loadMore = useCallback(() => {
-    if (cursor === null || loadingMore) return;
+  const next = useCallback(() => {
+    if (nextCursor === null) return;
+    setStack((current) => [...current, nextCursor]);
+  }, [nextCursor]);
 
-    void (async () => {
-      setLoadingMore(true);
-      setError(null);
-      try {
-        const params = new URLSearchParams({ limit: '50', cursor });
-        if (filters.tagId !== null) params.set('tagId', filters.tagId);
-        if (filters.source !== null) params.set('source', filters.source);
-
-        const result = await api.get<Page<Customer>>(`customers?${params.toString()}`);
-        // EKLİYOR, değiştirmiyor.
-        setCustomers((current) => [...(current ?? []), ...result.data]);
-        setCursor(result.pageInfo.nextCursor);
-        setHasMore(result.pageInfo.hasMore);
-      } catch (caught) {
-        setError(toMessage(caught));
-      } finally {
-        setLoadingMore(false);
-      }
-    })();
-  }, [cursor, loadingMore, filters.tagId, filters.source]);
+  const prev = useCallback(() => {
+    setStack((current) => (current.length > 1 ? current.slice(0, -1) : current));
+  }, []);
 
   return {
     customers: customers ?? [],
     error,
     loading: customers === null && error === null,
-    loadingMore,
-    // Arama sayfalanmıyor; "daha fazla" gösterilmiyor.
-    hasMore: !searching && hasMore && cursor !== null,
-    loadMore,
+    pageIndex: searching ? 0 : stack.length - 1,
+    // Arama sayfalanmıyor; gezinme gösterilmiyor.
+    hasPrev: !searching && stack.length > 1,
+    hasNext: !searching && nextCursor !== null,
+    next,
+    prev,
     reload,
   };
 }

@@ -66,6 +66,10 @@ export interface NavItem {
  * bilinçli bir sürtünme.
  */
 export const NAV_ITEMS: readonly NavItem[] = [
+  // Karşılama sayfası izin istemiyor: içindeki her bölüm kendi iznine bakıyor
+  // (`components/dashboard/use-dashboard.ts`) ve izni hiç olmayan bir rol en
+  // azından hızlı erişim kartlarını görüyor.
+  { path: '/dashboard', labelKey: 'nav.dashboard', requires: [] },
   // --- Klinik operasyonu (Faz 12) ---
   // Takvim menünün BAŞINDA: resepsiyonun günlük işi bu, randevu sayfası
   // editörü değil. Sıra kullanım sıklığına göre.

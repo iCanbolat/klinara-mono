@@ -112,6 +112,6 @@ export function LoginForm(): ReactNode {
  * çözülür ve açık yönlendirme açığı olurdu.
  */
 function safeNext(value: string | null): string {
-  if (value === null || !value.startsWith('/') || value.startsWith('//')) return '/';
+  if (value === null || !value.startsWith('/') || value.startsWith('//')) return '/dashboard';
   return value;
 }

@@ -8,6 +8,7 @@ import {
   Clock,
   FileText,
   Globe,
+  LayoutDashboard,
   LayoutPanelTop,
   Scissors,
   Users,
@@ -40,6 +41,7 @@ import {
  * Eşleşmeyen bir rota olursa ikon çizilmiyor — menü yine de çalışıyor.
  */
 const ICONS: Record<string, LucideIcon> = {
+  '/dashboard': LayoutDashboard,
   '/takvim': CalendarDays,
   '/musteriler': Users,
   '/katalog': Scissors,
@@ -67,7 +69,7 @@ export function Sidebar(): ReactNode {
   return (
     <SidebarRoot collapsible="icon">
       <SidebarHeader className="h-16 justify-center border-b border-sidebar-border px-3">
-        <Link href="/" className="flex items-center gap-2.5 overflow-hidden rounded-lg py-1">
+        <Link href="/dashboard" className="flex items-center gap-2.5 overflow-hidden rounded-lg py-1">
           <KlinaraMark size={26} />
           <span className="text-title-m leading-none tracking-[0.28em] text-sidebar-foreground group-data-[collapsible=icon]:hidden">
             KLINARA

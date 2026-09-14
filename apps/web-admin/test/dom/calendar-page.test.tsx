@@ -25,12 +25,14 @@ vi.mock('@/lib/api/client', () => ({
   SessionExpiredError,
 }));
 
+const setBranchId = vi.fn();
 let branchState: {
   branchId: string | null;
   loading: boolean;
-  branches: never[];
+  branches: { id: string; name: string; timezone: string }[];
   canSelectAll: boolean;
-} = { branchId: 'b1', loading: false, branches: [], canSelectAll: true };
+  setBranchId: typeof setBranchId;
+} = { branchId: 'b1', loading: false, branches: [], canSelectAll: true, setBranchId };
 vi.mock('@/components/session/branch-provider', () => ({ useBranch: () => branchState }));
 
 let permissions: string[] = [PERMISSIONS.APPOINTMENT_READ_ALL, PERMISSIONS.APPOINTMENT_WRITE];
@@ -49,7 +51,8 @@ const { todayKey, weekStart } = await import('../../src/lib/calendar/date');
  * değişmeden kırmızıya dönerdi. (10.1'de `availability.test.ts` tam olarak
  * böyle çürümüştü.)
  */
-const THIS_WEEK_MONDAY = weekStart(todayKey('Europe/Istanbul'));
+const TODAY = todayKey('Europe/Istanbul');
+const THIS_WEEK_MONDAY = weekStart(TODAY);
 
 const CALENDAR = {
   branchId: 'b1',
@@ -64,8 +67,8 @@ const CALENDAR = {
       customerName: 'Ayşe Yılmaz',
       customerPhone: null,
       status: 'scheduled',
-      startsAt: '2026-09-07T10:00:00+03:00',
-      endsAt: '2026-09-07T10:30:00+03:00',
+      startsAt: `${TODAY}T10:00:00+03:00`,
+      endsAt: `${TODAY}T10:30:00+03:00`,
       notes: null,
       version: 1,
       totalMinor: 50000,
@@ -76,8 +79,8 @@ const CALENDAR = {
           serviceName: 'Lazer',
           staffProfileId: 'p1',
           sortOrder: 0,
-          startsAt: '2026-09-07T10:00:00+03:00',
-          endsAt: '2026-09-07T10:30:00+03:00',
+          startsAt: `${TODAY}T10:00:00+03:00`,
+          endsAt: `${TODAY}T10:30:00+03:00`,
           priceMinor: 50000,
         },
       ],
@@ -100,15 +103,17 @@ describe('takvim ekranı', () => {
     get.mockReset();
     post.mockReset();
     patch.mockReset();
-    branchState = { branchId: 'b1', loading: false, branches: [], canSelectAll: true };
+    branchState = { branchId: 'b1', loading: false, branches: [], canSelectAll: true, setBranchId };
     permissions = [PERMISSIONS.APPOINTMENT_READ_ALL, PERMISSIONS.APPOINTMENT_WRITE];
+    window.localStorage.clear();
+    setBranchId.mockReset();
     mockRoutes();
   });
 
   it('şube listesi YÜKLENİRKEN takvim isteği atmıyor', async () => {
     // İstek erken atılsaydı, şube çözüldüğünde ikinci bir istek daha giderdi
     // ve ilkinin yanıtı geç gelirse YANLIŞ şubenin takvimi ekrana basılırdı.
-    branchState = { branchId: null, loading: true, branches: [], canSelectAll: true };
+    branchState = { branchId: null, loading: true, branches: [], canSelectAll: true, setBranchId };
     render(<CalendarPage />);
 
     await waitFor(() => {
@@ -121,11 +126,33 @@ describe('takvim ekranı', () => {
   it('şube seçili DEĞİLKEN istek atmıyor, seçim istiyor', () => {
     // `x-branch-id` başlıksız bir çağrı 400 döner ve kullanıcı sebebi
     // anlaşılmayan bir hata görürdü.
-    branchState = { branchId: null, loading: false, branches: [], canSelectAll: true };
+    branchState = { branchId: null, loading: false, branches: [], canSelectAll: true, setBranchId };
     render(<CalendarPage />);
 
-    expect(get.mock.calls.filter((call) => String(call[0]).startsWith('calendar/'))).toHaveLength(0);
-    expect(screen.getByText(/şube seçin/i)).toBeInTheDocument();
+    expect(get.mock.calls.filter((call) => String(call[0]).startsWith('calendar/'))).toHaveLength(
+      0,
+    );
+    expect(screen.getByText(/bir şube seçin/i)).toBeInTheDocument();
+  });
+
+  it('şube seçili değilken takvimin kendi şube seçicisinden seçim yapılabiliyor', async () => {
+    // Kiracı geneli rolün tercihi "Tüm şubeler" (null) iken seçimin yapılabileceği
+    // tek yer rapor süzgeciydi; takvim yalnız "şube seçin" diyordu.
+    const user = (await import('@testing-library/user-event')).default.setup();
+    branchState = {
+      branchId: null,
+      loading: false,
+      branches: [
+        { id: 'b1', name: 'Kadıköy', timezone: 'Europe/Istanbul' },
+        { id: 'b2', name: 'Nişantaşı', timezone: 'Europe/Istanbul' },
+      ],
+      canSelectAll: true,
+      setBranchId,
+    };
+    render(<CalendarPage />);
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Şube' }), 'b2');
+    expect(setBranchId).toHaveBeenCalledWith('b2');
   });
 
   it('şubeyi HEM SORGUDA HEM BAŞLIKTA gönderiyor', async () => {
@@ -164,14 +191,21 @@ describe('takvim ekranı', () => {
     expect(screen.queryByRole('button', { name: /yeni randevu/i })).not.toBeInTheDocument();
   });
 
-  it('gün görünümü VARSAYILAN ve hafta görünümü yoğunluk tablosu çiziyor', async () => {
+  it('gün görünümü VARSAYILAN; hafta ızgarası BLOK ve gün başlığında sayı çiziyor', async () => {
     const user = (await import('@testing-library/user-event')).default.setup();
+    const weekEntry = {
+      ...CALENDAR.appointments[0],
+      id: 'w1',
+      customerName: 'Mehmet Kaya',
+      startsAt: `${THIS_WEEK_MONDAY}T14:00:00+03:00`,
+      endsAt: `${THIS_WEEK_MONDAY}T15:00:00+03:00`,
+    };
     get.mockImplementation((path: string) => {
       if (path.startsWith('calendar/week')) {
         return Promise.resolve({
           ...CALENDAR,
-          appointments: [],
-          density: [{ localDay: THIS_WEEK_MONDAY, localHour: 10, appointmentCount: 3 }],
+          appointments: [weekEntry],
+          density: [{ localDay: THIS_WEEK_MONDAY, localHour: 14, appointmentCount: 3 }],
         });
       }
       if (path.startsWith('calendar/')) return Promise.resolve(CALENDAR);
@@ -186,7 +220,47 @@ describe('takvim ekranı', () => {
     await waitFor(() => {
       expect(get.mock.calls.some((c) => String(c[0]).startsWith('calendar/week'))).toBe(true);
     });
+    // Randevu yoğunluk hücresinin içinde kaybolmuyor, kendi bloğu var.
+    expect(await screen.findByRole('button', { name: /14:00 Mehmet Kaya/ })).toBeInTheDocument();
     // Sayı hem renkte hem METİNDE: yalnız renge dayanmak erişilebilir değil.
-    expect(await screen.findByRole('button', { name: /3 randevu/ })).toBeInTheDocument();
+    const header = screen.getByRole('button', { name: /1 randevu/ });
+    expect(screen.getByText(/en yoğun saatte 3 randevu/)).toBeInTheDocument();
+
+    // Gün başlığı o günün ızgarasına götürüyor.
+    await user.click(header);
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Gün' })).toHaveAttribute('aria-pressed', 'true');
+    });
+  });
+
+  it('ajanda modu aynı veriyi liste olarak çiziyor ve seçim KALICI', async () => {
+    const user = (await import('@testing-library/user-event')).default.setup();
+    render(<CalendarPage />);
+    await screen.findByText('Ayşe Yılmaz');
+
+    await user.click(screen.getByRole('button', { name: /ajanda/i }));
+
+    // Mod yalnız sunum: yeni istek atılmıyor.
+    const calendarCalls = get.mock.calls.filter((c) => String(c[0]).startsWith('calendar/'));
+    expect(calendarCalls).toHaveLength(1);
+    expect(screen.getByText('Lazer')).toBeInTheDocument();
+    expect(screen.getByText('Planlandı')).toBeInTheDocument();
+    expect(window.localStorage.getItem('klinara.admin.calendarMode')).toBe('agenda');
+  });
+
+  it('telefonda seçim yoksa VARSAYILAN ajanda', async () => {
+    const width = window.innerWidth;
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 375 });
+    try {
+      render(<CalendarPage />);
+      await screen.findByText('Ayşe Yılmaz');
+      expect(screen.getByRole('button', { name: /ajanda/i })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+      expect(screen.getByText('Lazer')).toBeInTheDocument();
+    } finally {
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });
+    }
   });
 });

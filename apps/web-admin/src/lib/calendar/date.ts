@@ -258,6 +258,22 @@ export function formatDayLabel(key: DayKey): string {
   }).format(new Date(base));
 }
 
+/**
+ * Dar sütun başlığı: `{ weekday: 'Pzt', day: '7' }`.
+ *
+ * Hafta ızgarasında yedi sütun telefonda ~45px'e düşüyor; `formatDayLabel`in
+ * `'7 Eylül Pazartesi'`si orada kırpılıp okunmaz hâle geliyordu.
+ */
+export function formatDayShort(key: DayKey): { weekday: string; day: string } {
+  const base = parseKey(key);
+  if (Number.isNaN(base)) return { weekday: '', day: '' };
+  const date = new Date(base);
+  return {
+    weekday: new Intl.DateTimeFormat('tr-TR', { timeZone: 'UTC', weekday: 'short' }).format(date),
+    day: new Intl.DateTimeFormat('tr-TR', { timeZone: 'UTC', day: 'numeric' }).format(date),
+  };
+}
+
 /** `'7 – 13 Eylül 2026'` — hafta başlığı. */
 export function formatWeekLabel(start: DayKey): string {
   const from = parseKey(start);

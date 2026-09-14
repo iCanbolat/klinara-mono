@@ -45,7 +45,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   // dolmuş bir token'da bu yönlendirmeyi yapmıyoruz: kullanıcı yeniden giriş
   // yapmak isteyebilir ve onu kapağa geri atmak kilitlenme hissi verir.
   if (isPublic && !isExpired(payload, Date.now()) && !pathname.startsWith('/davet')) {
-    return NextResponse.redirect(new URL('/', request.url));
+    return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
   return NextResponse.next();

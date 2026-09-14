@@ -19,8 +19,8 @@ export function StatCard({
   className,
 }: {
   label: string;
-  value?: string;
-  hint?: string;
+  value?: string | undefined;
+  hint?: string | undefined;
   icon?: LucideIcon;
   loading?: boolean;
   className?: string;

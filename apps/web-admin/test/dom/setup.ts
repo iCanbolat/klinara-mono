@@ -30,3 +30,17 @@ if (typeof window !== 'undefined' && window.matchMedia === undefined) {
     dispatchEvent: () => false,
   }));
 }
+
+/**
+ * jsdom `ResizeObserver` da uygulamıyor. Radix `Switch`/`Checkbox` bir
+ * `<form>` içindeyken gizli yerel girdisinin boyutunu onunla izliyor
+ * (`@radix-ui/react-use-size`); yokluğunda form içeren her dialog patlıyor.
+ * Ölçüm testte anlamsız — boş gözlemci yeterli.
+ */
+if (typeof window !== 'undefined' && window.ResizeObserver === undefined) {
+  window.ResizeObserver = class {
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
+  } as unknown as typeof ResizeObserver;
+}

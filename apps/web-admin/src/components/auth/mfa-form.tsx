@@ -61,7 +61,7 @@ export function MfaForm(): ReactNode {
       const step = await sessionCall<SessionStep>('mfa/verify', { code });
       if (step.step === 'authenticated') {
         noteSessionExpiry(step.expiresIn);
-        router.replace('/');
+        router.replace('/dashboard');
         router.refresh();
         return;
       }

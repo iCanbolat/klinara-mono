@@ -32,7 +32,8 @@ describe('kenar çubuğu', () => {
     sessionState.loading = false;
     renderSidebar();
     expect(screen.queryByRole('link', { name: 'Alan adları' })).not.toBeInTheDocument();
-    // İzin gerektirmeyen "Hesabım" her rolde duruyor.
+    // İzin gerektirmeyen "Genel bakış" ve "Hesabım" her rolde duruyor.
+    expect(screen.getByRole('link', { name: 'Genel bakış' })).toHaveAttribute('href', '/dashboard');
     expect(screen.getByRole('link', { name: 'Hesabım' })).toBeInTheDocument();
   });
 

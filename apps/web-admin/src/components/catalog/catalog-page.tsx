@@ -1,19 +1,21 @@
 'use client';
 
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { PERMISSIONS, type Service, type ServiceCategorySummary } from '@klinara/shared';
 import { t } from '@/i18n/tr';
 import { api } from '@/lib/api/client';
 import { useSession } from '@/components/session/session-provider';
 import { toMessage } from '@/lib/reports/errors';
+import { DataPage } from '@/components/data-page/data-page';
+import { DataTable, type DataColumn } from '@/components/data-page/data-table';
+import { matchesStatus, StatusSelect, type StatusFilter } from '@/components/data-page/status-filter';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { ConfirmButton } from '@/components/ui/confirm-button';
-import { EmptyState } from '@/components/ui/empty-state';
-import { PageHeader } from '@/components/ui/page-header';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Field, FieldSelect } from '@/components/ui/field';
 import { formatMoney } from '@/lib/format/money';
+import { ServiceCard } from './service-card';
 import { ServiceFormDialog } from './service-form';
 
 /**
@@ -29,7 +31,10 @@ import { ServiceFormDialog } from './service-form';
  *
  * `DELETE /services/:id` SİLMİYOR, pasife alıyor (200 + gövde). Arayüz de
  * "sil" demiyor — geçmiş randevular o hizmete bağlı ve silinemez.
+ *
+ * `GET /services` sayfalanmıyor: tüm liste elde, süzme ve sayfalama istemcide.
  */
+
 export function CatalogPage(): ReactNode {
   const { permissions } = useSession();
   const [services, setServices] = useState<Service[] | null>(null);
@@ -39,6 +44,10 @@ export function CatalogPage(): ReactNode {
   const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [nonce, setNonce] = useState(0);
+
+  const [query, setQuery] = useState('');
+  const [categoryId, setCategoryId] = useState('');
+  const [status, setStatus] = useState<StatusFilter>('all');
 
   const canWrite = permissions.includes(PERMISSIONS.SERVICE_WRITE);
   const reload = useCallback(() => setNonce((value) => value + 1), []);
@@ -82,106 +91,148 @@ export function CatalogPage(): ReactNode {
   const categoryName = (id: string): string =>
     categories.find((category) => category.id === id)?.name ?? '—';
 
+  const filtered = useMemo(() => {
+    const needle = query.trim().toLocaleLowerCase('tr');
+    return (services ?? []).filter(
+      (service) =>
+        (needle === '' || service.name.toLocaleLowerCase('tr').includes(needle)) &&
+        (categoryId === '' || service.categoryId === categoryId) &&
+        matchesStatus(status, service.isActive),
+    );
+  }, [services, query, categoryId, status]);
+
+  const isFiltered = query.trim() !== '' || categoryId !== '' || status !== 'all';
+
+  const renderActions = (service: Service): ReactNode =>
+    canWrite ? (
+      <>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          disabled={busy !== null}
+          onClick={() => setEditing(service)}
+        >
+          {t('catalog.edit')}
+        </Button>
+        {service.isActive ? (
+          <ConfirmButton
+            variant="danger"
+            size="sm"
+            disabled={busy !== null}
+            title={t('customers.deactivate')}
+            // "Sil" DEĞİL: geçmiş randevular bu hizmete bağlı ve silinemez.
+            description={service.name}
+            onConfirm={() => void deactivate(service)}
+          >
+            {t('customers.deactivate')}
+          </ConfirmButton>
+        ) : null}
+      </>
+    ) : undefined;
+
+  const columns: DataColumn<Service>[] = [
+    {
+      key: 'name',
+      header: t('catalog.name'),
+      render: (service) => (
+        <>
+          {service.name}
+          {!service.isActive ? (
+            <span className="ml-2 text-xs text-muted-foreground">{t('list.inactive')}</span>
+          ) : null}
+        </>
+      ),
+    },
+    { key: 'category', header: t('catalog.category'), render: (s) => categoryName(s.categoryId) },
+    {
+      key: 'duration',
+      header: t('catalog.duration'),
+      numeric: true,
+      render: (service) => service.durationMinutes,
+    },
+    {
+      key: 'price',
+      header: t('catalog.price'),
+      numeric: true,
+      className: 'whitespace-nowrap',
+      render: (service) => formatMoney(service.priceMinor),
+    },
+    ...(canWrite
+      ? [
+          {
+            key: 'actions',
+            header: <span className="sr-only">{t('list.actions')}</span>,
+            align: 'end' as const,
+            render: (service: Service) => (
+              <span className="flex justify-end gap-2">{renderActions(service)}</span>
+            ),
+          },
+        ]
+      : []),
+  ];
+
   return (
-    <div className="flex flex-col gap-6">
-      <PageHeader
+    <>
+      <DataPage
         title={t('catalog.title')}
-        actions={
-          canWrite ? (
-            <Button type="button" onClick={() => setCreating(true)}>
-              {t('catalog.newService')}
-            </Button>
-          ) : undefined
-        }
-      />
-
-      {!canWrite ? <Alert tone="info">{t('catalog.readOnly')}</Alert> : null}
-
-      {error !== null ? (
-        <Alert tone="danger">
-          <span role="alert">{error}</span>
-        </Alert>
-      ) : null}
-
-      {services === null && error === null ? (
-        <div className="flex flex-col gap-2" aria-busy="true">
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-10 w-full" />
-        </div>
-      ) : null}
-
-      {services !== null && services.length === 0 ? <EmptyState title={t('catalog.empty')} /> : null}
-
-      {services !== null && services.length > 0 ? (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <caption className="sr-only">{t('catalog.title')}</caption>
-            <thead>
-              <tr className="border-b border-border text-left">
-                <th scope="col" className="py-2 pr-3 font-medium">
-                  {t('catalog.name')}
-                </th>
-                <th scope="col" className="py-2 pr-3 font-medium">
-                  {t('catalog.category')}
-                </th>
-                <th scope="col" className="py-2 pr-3 text-right font-medium">
-                  {t('catalog.duration')}
-                </th>
-                <th scope="col" className="py-2 pr-3 text-right font-medium">
-                  {t('catalog.price')}
-                </th>
-                <th scope="col" className="py-2" />
-              </tr>
-            </thead>
-            <tbody>
-              {services.map((service) => (
-                <tr key={service.id} className="border-b border-border/60">
-                  <td className="py-2 pr-3">
-                    {service.name}
-                    {!service.isActive ? (
-                      <span className="ml-2 text-xs text-muted-foreground">pasif</span>
-                    ) : null}
-                  </td>
-                  <td className="py-2 pr-3">{categoryName(service.categoryId)}</td>
-                  <td className="py-2 pr-3 text-right tabular-nums">{service.durationMinutes}</td>
-                  <td className="py-2 pr-3 text-right tabular-nums">
-                    {formatMoney(service.priceMinor)}
-                  </td>
-                  <td className="py-2 text-right">
-                    {canWrite ? (
-                      <span className="flex justify-end gap-2">
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="sm"
-                          disabled={busy !== null}
-                          onClick={() => setEditing(service)}
-                        >
-                          {t('customers.save')}
-                        </Button>
-                        {service.isActive ? (
-                          <ConfirmButton
-                            variant="danger"
-                            size="sm"
-                            disabled={busy !== null}
-                            title={t('customers.deactivate')}
-                            // "Sil" DEĞİL: geçmiş randevular bu hizmete
-                            // bağlı ve silinemez.
-                            description={service.name}
-                            onConfirm={() => void deactivate(service)}
-                          >
-                            {t('customers.deactivate')}
-                          </ConfirmButton>
-                        ) : null}
-                      </span>
-                    ) : null}
-                  </td>
-                </tr>
+        {...(canWrite
+          ? {
+              actions: (
+                <Button type="button" onClick={() => setCreating(true)}>
+                  {t('catalog.newService')}
+                </Button>
+              ),
+            }
+          : {})}
+        {...(!canWrite ? { notice: <Alert tone="info">{t('catalog.readOnly')}</Alert> } : {})}
+        filters={
+          <>
+            <Field
+              label={t('catalog.search')}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+            <FieldSelect
+              label={t('catalog.category')}
+              value={categoryId}
+              onChange={(event) => setCategoryId(event.target.value)}
+            >
+              <option value="">{t('catalog.allCategories')}</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
               ))}
-            </tbody>
-          </table>
-        </div>
-      ) : null}
+            </FieldSelect>
+            <StatusSelect value={status} onChange={setStatus} />
+          </>
+        }
+        rows={filtered}
+        rowKey={(service) => service.id}
+        loading={services === null && error === null}
+        error={error}
+        onRetry={reload}
+        emptyTitle={isFiltered ? t('list.filteredEmpty') : t('catalog.empty')}
+        viewStorageKey="klinara.admin.view.services"
+        pagination={{ mode: 'client' }}
+        resetKey={`${query}|${categoryId}|${status}`}
+        renderTable={(rows) => (
+          <DataTable
+            caption={t('catalog.title')}
+            columns={columns}
+            rows={rows}
+            rowKey={(service) => service.id}
+          />
+        )}
+        renderCard={(service) => (
+          <ServiceCard
+            service={service}
+            categoryName={categoryName(service.categoryId)}
+            {...(canWrite ? { actions: renderActions(service) } : {})}
+          />
+        )}
+      />
 
       <ServiceFormDialog
         open={creating || editing !== null}
@@ -197,6 +248,6 @@ export function CatalogPage(): ReactNode {
           reload();
         }}
       />
-    </div>
+    </>
   );
 }

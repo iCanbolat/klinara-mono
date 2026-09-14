@@ -1,17 +1,20 @@
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Plus } from 'lucide-react';
 import { PERMISSIONS, type Service, type StaffProfile } from '@klinara/shared';
 import { t } from '@/i18n/tr';
 import { api } from '@/lib/api/client';
+import { useBranch } from '@/components/session/branch-provider';
 import { useSession } from '@/components/session/session-provider';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { FieldSelect } from '@/components/ui/field';
 import { PageHeader } from '@/components/ui/page-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
+  daysFrom,
   formatDayLabel,
   formatWeekLabel,
   todayKey,
@@ -19,13 +22,21 @@ import {
   type DayKey,
 } from '@/lib/calendar/date';
 import { CreateAppointmentDialog } from './appointment-form/create-dialog';
+import { AgendaList } from './agenda-list';
 import { AppointmentSheet } from './appointment-sheet';
+import { CalendarToolbar } from './calendar-toolbar';
 import { DayGrid } from './day-grid';
 import { WeekGrid } from './week-grid';
 import { shiftDay, useCalendar, type CalendarView } from './use-calendar';
+import { useCalendarMode } from './use-calendar-mode';
 
 /**
  * Takvim ekranı.
+ *
+ * Görünüm iki eksenli: GÜN/HAFTA (hangi aralık — veri isteğini belirliyor) ×
+ * IZGARA/AJANDA (nasıl çiziliyor — yalnız sunum). İkinci eksen istek atmıyor;
+ * aynı `CalendarResponse` iki biçimde çiziliyor. Mod seçimi ve varsayılanı
+ * `use-calendar-mode.ts`te (telefonda ajanda).
  *
  * ---------------------------------------------------------------------------
  * KAPSAM ROZETİ SUNUCUDAN GELMİYOR — VE BU BİR BORÇ
@@ -42,7 +53,9 @@ import { shiftDay, useCalendar, type CalendarView } from './use-calendar';
  */
 export function CalendarPage(): ReactNode {
   const { permissions } = useSession();
+  const { branches, setBranchId } = useBranch();
   const [view, setView] = useState<CalendarView>('day');
+  const [mode, setMode] = useCalendarMode();
   const [day, setDay] = useState<DayKey>(() => todayKey('Europe/Istanbul'));
   const [staffProfileId, setStaffProfileId] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -82,15 +95,26 @@ export function CalendarPage(): ReactNode {
     return () => controller.abort();
   }, []);
 
+  const staffNames = useMemo(
+    () => new Map(staff.map((profile) => [profile.id, profile.userFullName])),
+    [staff],
+  );
+
   const anchor = view === 'week' ? weekStart(day) : day;
+  const days = useMemo(() => (view === 'week' ? daysFrom(anchor, 7) : [anchor]), [view, anchor]);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4 sm:gap-6">
       <PageHeader
         title={t('calendar.title')}
         actions={
           canWrite && state.branchId !== null ? (
-            <Button type="button" onClick={() => setCreating(true)}>
+            <Button
+              type="button"
+              onClick={() => setCreating(true)}
+              className="max-sm:h-9 max-sm:px-3 max-sm:text-sm"
+            >
+              <Plus aria-hidden="true" />
               {t('calendar.newAppointment')}
             </Button>
           ) : undefined
@@ -99,69 +123,30 @@ export function CalendarPage(): ReactNode {
 
       {ownOnly ? <Alert tone="info">{t('calendar.scopeOwn')}</Alert> : null}
 
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="flex gap-1" role="group" aria-label={t('calendar.title')}>
-          <Button
-            type="button"
-            variant={view === 'day' ? 'primary' : 'secondary'}
-            size="sm"
-            aria-pressed={view === 'day'}
-            onClick={() => setView('day')}
-          >
-            {t('calendar.day')}
-          </Button>
-          <Button
-            type="button"
-            variant={view === 'week' ? 'primary' : 'secondary'}
-            size="sm"
-            aria-pressed={view === 'week'}
-            onClick={() => setView('week')}
-          >
-            {t('calendar.week')}
-          </Button>
-        </div>
-
-        <div className="flex items-center gap-1">
-          <Button type="button" variant="ghost" size="sm" onClick={() => setDay(shiftDay(day, view, -1))}>
-            {t('calendar.prev')}
-          </Button>
-          <Button type="button" variant="ghost" size="sm" onClick={() => setDay(todayKey(timezone))}>
-            {t('calendar.today')}
-          </Button>
-          <Button type="button" variant="ghost" size="sm" onClick={() => setDay(shiftDay(day, view, 1))}>
-            {t('calendar.next')}
-          </Button>
-        </div>
-
-        <span className="text-body-emphasis">
-          {view === 'week' ? formatWeekLabel(anchor) : formatDayLabel(anchor)}
-        </span>
-
-        {/* Uygulayıcı zaten sunucuda kendi randevularına daraltılmış;
-            ona bir personel süzgeci göstermek anlamsız bir kontrol olurdu. */}
-        {!ownOnly ? (
-          <FieldSelect
-            label={t('calendar.allStaff')}
-            className="w-48"
-            value={staffProfileId ?? ''}
-            onChange={(event) =>
-              setStaffProfileId(event.target.value === '' ? null : event.target.value)
-            }
-          >
-            <option value="">{t('calendar.allStaff')}</option>
-            {staff
-              .filter((profile) => profile.isActive)
-              .map((profile) => (
-                <option key={profile.id} value={profile.id}>
-                  {profile.userFullName}
-                </option>
-              ))}
-          </FieldSelect>
-        ) : null}
-      </div>
+      <Card className="p-4 sm:p-5">
+        <CalendarToolbar
+          view={view}
+          mode={mode}
+          label={view === 'week' ? formatWeekLabel(anchor) : formatDayLabel(anchor)}
+          branches={branches}
+          branchId={state.branchId}
+          onBranchChange={setBranchId}
+          staff={staff}
+          staffProfileId={staffProfileId}
+          showStaffFilter={!ownOnly}
+          onViewChange={setView}
+          onModeChange={setMode}
+          onPrev={() => setDay(shiftDay(day, view, -1))}
+          onToday={() => setDay(todayKey(timezone))}
+          onNext={() => setDay(shiftDay(day, view, 1))}
+          onStaffChange={setStaffProfileId}
+        />
+      </Card>
 
       {state.needsBranch ? (
-        <EmptyState title={t('calendar.title')} message="Devam etmek için bir şube seçin." />
+        <Card>
+          <EmptyState title={t('calendar.title')} message={t('calendar.needsBranch')} />
+        </Card>
       ) : null}
 
       {state.error !== null ? (
@@ -180,29 +165,47 @@ export function CalendarPage(): ReactNode {
       ) : null}
 
       {state.loading ? (
-        <div className="flex flex-col gap-2" aria-busy="true">
+        <Card className="flex flex-col gap-2 p-3 sm:p-5" aria-busy="true">
           <Skeleton className="h-8 w-full" />
           <Skeleton className="h-64 w-full" />
-        </div>
+        </Card>
       ) : null}
 
+      {/* İçerik zeminin bir ton açığında, kart üzerinde: ızgara ile sayfa
+          arka planı aynı renkteyken ızgaranın nerede bitip sayfanın nerede
+          başladığı okunmuyordu. */}
       {state.data !== null ? (
-        view === 'day' ? (
-          <DayGrid
-            entries={state.data.appointments}
-            timezone={state.data.timezone}
-            onSelect={(entry) => setSelected(entry.id)}
-          />
-        ) : (
-          <WeekGrid
-            weekStart={anchor}
-            density={state.data.density}
-            onPickDay={(picked) => {
-              setDay(picked);
-              setView('day');
-            }}
-          />
-        )
+        <Card className={mode === 'agenda' ? 'p-3 sm:p-5' : 'p-2 sm:p-4'}>
+          {mode === 'agenda' ? (
+            <AgendaList
+              days={days}
+              entries={state.data.appointments}
+              timezone={state.data.timezone}
+              staffNames={staffNames}
+              onSelect={(entry) => setSelected(entry.id)}
+            />
+          ) : view === 'day' ? (
+            <DayGrid
+              day={anchor}
+              entries={state.data.appointments}
+              timezone={state.data.timezone}
+              onSelect={(entry) => setSelected(entry.id)}
+            />
+          ) : (
+            <WeekGrid
+              weekStart={anchor}
+              entries={state.data.appointments}
+              density={state.data.density}
+              timezone={state.data.timezone}
+              staffFiltered={staffProfileId !== null}
+              onSelect={(entry) => setSelected(entry.id)}
+              onPickDay={(picked) => {
+                setDay(picked);
+                setView('day');
+              }}
+            />
+          )}
+        </Card>
       ) : null}
 
       <AppointmentSheet

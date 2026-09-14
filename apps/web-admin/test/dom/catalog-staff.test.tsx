@@ -139,6 +139,38 @@ describe('katalog', () => {
     expect(screen.queryByRole('button', { name: 'Sil' })).not.toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Pasife al' }).length).toBeGreaterThan(0);
   });
+  it('arama ve kategori süzgeci listeyi daraltıyor', async () => {
+    const user = userEvent.setup();
+    get.mockImplementation((path: string) => {
+      if (path === 'services') {
+        return Promise.resolve({
+          data: [SERVICE, { ...SERVICE_2, categoryId: 'cat2', isActive: false }],
+        });
+      }
+      if (path === 'service-categories') {
+        return Promise.resolve({
+          data: [
+            { id: 'cat1', slug: 'epilasyon', name: 'Epilasyon', sortOrder: 0, isActive: true },
+            { id: 'cat2', slug: 'cilt', name: 'Cilt', sortOrder: 1, isActive: true },
+          ],
+        });
+      }
+      return Promise.resolve({ data: [] });
+    });
+    render(<CatalogPage />);
+    await screen.findByText('Lazer');
+
+    await user.selectOptions(screen.getByLabelText('Kategori'), 'cat2');
+    expect(screen.queryByText('Lazer')).not.toBeInTheDocument();
+    expect(screen.getByText('Cilt bakımı')).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText('Durum'), 'active');
+    expect(screen.getByText('Süzgeçlere uyan kayıt yok.')).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText('Kategori'), '');
+    await user.type(screen.getByLabelText('Ara (hizmet adı)'), 'LAZ');
+    expect(screen.getByText('Lazer')).toBeInTheDocument();
+  });
 });
 
 describe('personel', () => {
@@ -196,6 +228,19 @@ describe('personel', () => {
     await waitFor(() => {
       expect(put).toHaveBeenCalledWith('staff/p1/services', { services: [] });
     });
+  });
+
+  it('arama e-postada da eşleşiyor', async () => {
+    const user = userEvent.setup();
+    render(<StaffPage />);
+    await screen.findByText('Zeynep Kaya');
+
+    await user.type(screen.getByLabelText('Ara (ad veya e-posta)'), 'yok@');
+    expect(screen.queryByText('Zeynep Kaya')).not.toBeInTheDocument();
+
+    await user.clear(screen.getByLabelText('Ara (ad veya e-posta)'));
+    await user.type(screen.getByLabelText('Ara (ad veya e-posta)'), 'z@k');
+    expect(screen.getByText('Zeynep Kaya')).toBeInTheDocument();
   });
 
   it('yazma izni YOKKEN matris açılamıyor', async () => {

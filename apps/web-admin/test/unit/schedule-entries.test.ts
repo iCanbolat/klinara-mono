@@ -1,8 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
+  changedDays,
+  copyDay,
   emptyWeek,
+  formatHours,
   fromEntries,
+  outsideBranchHours,
   parseTime,
+  sameWeek,
+  staffWeekFromBranch,
+  toHm,
+  workingMinutes,
   toBranchHours,
   toStaffSchedule,
   validateWeek,
@@ -176,5 +184,62 @@ describe('sunucudan ızgaraya', () => {
       breakStart: '12:00',
       breakEnd: '13:00',
     });
+  });
+});
+
+describe('haftalık düzenleyici yardımcıları', () => {
+  const open = (dayOfWeek: number, extra: Partial<DayDraft> = {}): Partial<DayDraft> & { dayOfWeek: number } => ({
+    dayOfWeek,
+    closed: false,
+    start: '09:00',
+    end: '18:00',
+    ...extra,
+  });
+
+  it('sunucunun saniyeli saatleri kırpılıyor', () => {
+    const [monday] = fromEntries([
+      { dayOfWeek: 1, isClosed: false, openTime: '09:30:00', closeTime: '18:00:00', breakStartTime: '12:00:00', breakEndTime: '13:00:00' },
+    ]).filter((day) => day.dayOfWeek === 1);
+    expect(monday).toEqual(expect.objectContaining({ start: '09:30', end: '18:00', breakStart: '12:00', breakEnd: '13:00' }));
+    expect(validateWeek(fromEntries([{ dayOfWeek: 1, isClosed: false, openTime: '09:30:00', closeTime: '18:00:00' }]))).toEqual([]);
+    expect(toHm(null)).toBeNull();
+  });
+
+  it('kapalı günün gizli saat farkı DEĞİŞİKLİK sayılmıyor', () => {
+    const saved = emptyWeek();
+    const draft = saved.map((day) => (day.dayOfWeek === 3 ? { ...day, start: '07:00' } : day));
+    expect(sameWeek(draft, saved)).toBe(true);
+    const opened = saved.map((day) => (day.dayOfWeek === 3 ? { ...day, closed: false } : day));
+    expect(changedDays(opened, saved)).toEqual([3]);
+  });
+
+  it('gün kopyalama yalnız hedeflere dokunuyor ve dayOfWeek korunuyor', () => {
+    const days = week(open(1, { breakStart: '12:00', breakEnd: '13:00' }));
+    const copied = copyDay(days, 1, [2, 3, 1]);
+    expect(copied.find((day) => day.dayOfWeek === 2)).toEqual({ ...days[1], dayOfWeek: 2 });
+    expect(copied.find((day) => day.dayOfWeek === 3)?.breakStart).toBe('12:00');
+    expect(copied.find((day) => day.dayOfWeek === 4)?.closed).toBe(true);
+    expect(copied.map((day) => day.dayOfWeek)).toEqual([0, 1, 2, 3, 4, 5, 6]);
+  });
+
+  it('net çalışma süresi molayı düşüyor', () => {
+    const [monday] = week(open(1, { breakStart: '12:00', breakEnd: '13:30' })).filter((day) => day.dayOfWeek === 1);
+    expect(workingMinutes(monday as DayDraft)).toBe(450);
+    expect(formatHours(450)).toBe('7,5 sa');
+    expect(workingMinutes(emptyWeek()[0] as DayDraft)).toBe(0);
+  });
+
+  it('personel planı şube saatleri dışına taşınca UYARI üretiyor', () => {
+    const branch = week(open(1));
+    const staff = emptyWeek().map((day) => {
+      if (day.dayOfWeek === 1) return { ...day, closed: false, start: '08:00', end: '17:00' };
+      if (day.dayOfWeek === 2) return { ...day, closed: false, start: '10:00', end: '16:00' };
+      return day;
+    });
+    expect(outsideBranchHours(staff, branch)).toEqual([
+      { dayOfWeek: 1, message: 'Şube saatleri (09:00–18:00) dışına taşıyor.' },
+      { dayOfWeek: 2, message: 'Şube bu gün kapalı.' },
+    ]);
+    expect(staffWeekFromBranch(week(open(1, { breakStart: '12:00', breakEnd: '13:00' })))[1]?.breakStart).toBe('');
   });
 });
