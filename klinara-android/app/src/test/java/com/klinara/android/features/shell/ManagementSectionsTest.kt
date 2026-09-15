@@ -23,10 +23,18 @@ class ManagementSectionsTest {
     }
 
     @Test
-    @DisplayName("Kart sırası iOS ile aynı: Katalog, Ekip, Takvim kurulumu, Müşteriler, Paketler, İletişim, Raporlar")
+    @DisplayName("Kart sırası iOS ile aynı: Katalog en üstte, Raporlar en sonda")
     fun order() {
         assertEquals(
-            listOf("Katalog", "Ekip", "Takvim kurulumu", "Müşteriler", "Paketler", "İletişim", "Raporlar"),
+            listOf(
+                "Katalog",
+                "Ekip",
+                "Takvim kurulumu",
+                "Müşteriler",
+                "Paketler",
+                "İletişim",
+                "Raporlar",
+            ),
             titles("manager"),
         )
     }

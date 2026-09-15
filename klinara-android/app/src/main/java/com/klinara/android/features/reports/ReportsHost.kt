@@ -40,13 +40,18 @@ fun ReportsHost(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     trailing: @Composable (RowScope.() -> Unit)? = null,
+    /**
+     * Rapor şubesi. Yönetim'den seçili şube; Dashboard'dan `null` — kartı "erişebildiğim tüm
+     * şubeler" üzerinden hesaplandı, "Tümünü gör" aynı kapsamı açmalı ki sayılar tutsun.
+     */
+    branchId: String? = session.activeBranchId,
 ) {
     val clock = remember(session.activeBranch?.timezone) { BranchClock(session.activeBranch?.timezone) }
     val viewModel: ReportsViewModel =
         viewModel(
             viewModelStoreOwner = owner,
-            key = "reports-${session.activeBranchId}",
-            factory = ReportsViewModel.factory(container, clock, session.activeBranchId),
+            key = "reports-$branchId",
+            factory = ReportsViewModel.factory(container, clock, branchId),
         )
     val state by viewModel.state.collectAsStateWithLifecycle()
 

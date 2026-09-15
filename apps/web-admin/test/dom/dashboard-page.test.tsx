@@ -154,9 +154,13 @@ describe('karşılama sayfası', () => {
   it('şubeleri, bugünün toplamını ve aylık göstergeleri birleştiriyor', async () => {
     render(<DashboardPage />);
 
-    expect(await screen.findByRole('heading', { name: 'Kadıköy' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Nişantaşı' })).toBeInTheDocument();
-    expect(screen.getByText('Moda Cd. 1')).toBeInTheDocument();
+    expect(await screen.findByRole('rowheader', { name: 'Kadıköy' })).toBeInTheDocument();
+    expect(screen.getByRole('rowheader', { name: 'Nişantaşı' })).toBeInTheDocument();
+    // Şube grafiğinin erişilebilir tablosu: bugün 2, doluluk %80, rapor satırı olmayan şube %0.
+    expect(screen.getByRole('rowheader', { name: 'Kadıköy' }).closest('tr')).toHaveTextContent(
+      /2.*%80/,
+    );
+    expect(screen.getByRole('button', { name: 'Doluluk' })).toBeInTheDocument();
     expect(screen.getByText('Bugünkü randevu').closest('[data-slot=card]')).toHaveTextContent('2');
     expect(screen.getByText('Bu ay doluluk').closest('[data-slot=card]')).toHaveTextContent('%64');
     expect(screen.getByText(/Geçen aya göre \+12%/)).toBeInTheDocument();
@@ -168,7 +172,7 @@ describe('karşılama sayfası', () => {
     me = { user: { fullName: 'Deniz Ak' }, tenantWide: false, branchIds: ['b1'] };
     render(<DashboardPage />);
 
-    await screen.findByRole('heading', { name: 'Kadıköy' });
+    await screen.findByRole('rowheader', { name: 'Kadıköy' });
     const dayCalls = get.mock.calls
       .map((c) => String(c[0]))
       .filter((p) => p.startsWith('calendar/day'));
@@ -177,7 +181,7 @@ describe('karşılama sayfası', () => {
     expect(get.mock.calls.find((c) => String(c[0]).startsWith('calendar/day'))?.[1]).toMatchObject({
       branchId: 'b1',
     });
-    expect(screen.queryByRole('heading', { name: 'Nişantaşı' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('rowheader', { name: 'Nişantaşı' })).not.toBeInTheDocument();
   });
 
   it('izni olmayan kaynağa istek atmıyor ve kartını çizmiyor', async () => {
@@ -199,7 +203,7 @@ describe('karşılama sayfası', () => {
     render(<DashboardPage />);
 
     expect(await screen.findByText(/aylık özetler alınamadı/i)).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Kadıköy' })).toBeInTheDocument();
+    expect(screen.getByRole('rowheader', { name: 'Kadıköy' })).toBeInTheDocument();
     expect(screen.getByText('Bu ay doluluk').closest('[data-slot=card]')).toHaveTextContent('%64');
   });
 
@@ -229,12 +233,21 @@ describe('karşılama sayfası', () => {
     expect(get.mock.calls.some((c) => String(c[0]).startsWith('reports/revenue'))).toBe(false);
   });
 
-  it('şube kartından takvime giderken şubeyi seçiyor', async () => {
+  it('sıradaki randevular şube grafiğinden ÖNCE geliyor', async () => {
+    render(<DashboardPage />);
+
+    const upcoming = await screen.findByRole('heading', { name: 'Sıradaki randevular' });
+    const branches = await screen.findByRole('heading', { name: 'Şubeler' });
+    expect(
+      upcoming.compareDocumentPosition(branches) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it('sıradaki randevudan takvime giderken şubeyi seçiyor', async () => {
     const user = (await import('@testing-library/user-event')).default.setup();
     render(<DashboardPage />);
 
-    await screen.findByRole('heading', { name: 'Kadıköy' });
-    await user.click(screen.getAllByRole('button', { name: /takvimi aç/i })[0]!);
+    await user.click(await screen.findByRole('button', { name: /Ayşe Yılmaz/ }));
     expect(setBranchId).toHaveBeenCalledWith('b1');
     expect(push).toHaveBeenCalledWith('/takvim');
   });

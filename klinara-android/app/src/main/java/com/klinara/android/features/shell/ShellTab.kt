@@ -3,6 +3,7 @@ package com.klinara.android.features.shell
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -15,7 +16,12 @@ import kotlinx.serialization.Serializable
  *
  * **Sekme kümesi kalıcıdır.** A3–A9 sekme EKLEMEZ, var olanı doldurur; bilgi
  * mimarisini her fazda yeniden kurmak kullanıcının kas hafızasını her sürümde
- * sıfırlamak demektir. iOS `AppShellView` ile birebir aynı dörtlü.
+ * sıfırlamak demektir. iOS `AppShellView` ile birebir aynı beşli.
+ *
+ * **Dashboard bu kuralın bilinçli istisnası** ve AÇILIŞ sekmesi: web panelin açılış
+ * sayfasının karşılığı. Önce Yönetim hub'ının bir satırıydı; günün ilk sorusuna ("bugün
+ * ve bu ay nasıl?") üç dokunuşla ulaşmak açılış ekranı olmasının önüne geçiyordu. Eski
+ * "Bugün" sekmesi aynı anda "Takvim" adını aldı — "bugün"ün cevabı artık Dashboard.
  *
  * Görünürlük **saf bir fonksiyondur** (izin kümesi → sekme kümesi): bu yüzden
  * `ShellTabTest` altı rolün altısını da elle emülatör gezmeden doğrulayabiliyor.
@@ -24,7 +30,8 @@ enum class ShellTab(
     val label: String,
     val icon: ImageVector,
 ) {
-    Today("Bugün", Icons.Filled.DateRange),
+    Dashboard("Dashboard", Icons.Filled.Home),
+    Calendar("Takvim", Icons.Filled.DateRange),
     Customers("Müşteriler", Icons.Filled.Person),
     Management("Yönetim", Icons.Filled.Settings),
     Profile("Profil", Icons.Filled.AccountCircle),
@@ -32,10 +39,10 @@ enum class ShellTab(
 
     fun isVisible(session: AppSession): Boolean =
         when (this) {
-            // Bugün ve Profil HER ZAMAN çizilir. Varsayılan seçili sekmenin bazı
-            // rollerde kaybolması, bilgi mimarisini role göre değiştirmek olurdu;
+            // Dashboard, Takvim ve Profil HER ZAMAN çizilir. Varsayılan seçili sekmenin
+            // bazı rollerde kaybolması, bilgi mimarisini role göre değiştirmek olurdu;
             // izin yoksa sekme durur ama içerik "erişiminiz yok" der.
-            Today, Profile -> true
+            Dashboard, Calendar, Profile -> true
             Customers -> session.can(Permissions.CUSTOMER_READ)
             Management -> session.canAny(MANAGEMENT_PERMISSIONS)
         }
@@ -86,6 +93,10 @@ enum class ShellTab(
  * A3–A9 ekran eklerken kabuk yeniden yazılmasın.
  */
 object ShellRoutes {
+    /** Dashboard sekmesinin kökü — web `/dashboard` paritesi. */
+    @Serializable
+    data object Dashboard
+
     @Serializable
     data object TodayHome
 
@@ -192,6 +203,7 @@ object ShellRoutes {
 
     @Serializable
     data object ManagementHome
+
 
     /** Etiketler KİRACI kapsamlı: Yönetim sekmesinde yaşar, müşteri kartında değil. */
     @Serializable

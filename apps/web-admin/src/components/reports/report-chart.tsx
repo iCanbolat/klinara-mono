@@ -15,10 +15,11 @@ import {
 } from 'recharts';
 
 /**
- * Grafik sarmalayıcısı — `recharts` YALNIZ BU DOSYADAN import ediliyor.
+ * Grafik sarmalayıcısı — `recharts` yalnız buradan, shadcn `ui/chart.tsx`ten
+ * ve onun tek tüketicisi `dashboard/branch-chart.tsx`ten import ediliyor.
  *
  * Kural bir üslup tercihi değil: kütüphaneyi değiştirmek (ya da bir gün elle
- * yazılmış SVG'ye dönmek) tek bir dosyayı değiştirmek olmalı. Sayfalar veri ve
+ * yazılmış SVG'ye dönmek) birkaç bilinen dosyayı değiştirmek olmalı. Sayfalar veri ve
  * eksen tanımı veriyor, çizim biçiminden habersizler.
  *
  * ⚠️ GRAFİK İKİNCİL. Her raporda tablo HER ZAMAN render ediliyor ve gerçeğin

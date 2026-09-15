@@ -9,6 +9,8 @@ import type {
 } from '@klinara/shared';
 import {
   accessibleBranches,
+  availableBranchMetrics,
+  branchChartRows,
   dashboardTotals,
   mergeBranchSummaries,
   summarizeDay,
@@ -124,6 +126,39 @@ describe('şube birleştirme', () => {
       revenueMinor: 150000,
       noShowRate: null,
     });
+  });
+
+  it('grafik satırları günü parçalara ayırıyor, göstergeler yalnız bilinenler', () => {
+    const summaries = mergeBranchSummaries(
+      BRANCHES.slice(0, 2),
+      {
+        day: new Map([
+          [
+            'b1',
+            {
+              entries: [
+                entry('done', 9, 'completed'),
+                entry('soon', 13, 'scheduled'),
+                entry('gone', 10, 'cancelled'),
+                entry('late', 11, 'no_show'),
+              ],
+              timezone: 'Europe/Istanbul',
+            },
+          ],
+        ]),
+        occupancy,
+        revenue,
+        noShow: null,
+      },
+      NOW,
+    );
+
+    const [kadikoy, nisantasi] = branchChartRows(summaries);
+    expect(kadikoy).toMatchObject({ completed: 1, pending: 1, dropped: 2, occupancy: 72 });
+    // Günü alınamayan şube grafikte boş çubuk.
+    expect(nisantasi).toMatchObject({ completed: 0, pending: 0, dropped: 0, revenue: 150000 });
+    expect(availableBranchMetrics(summaries)).toEqual(['today', 'occupancy', 'revenue']);
+    expect(availableBranchMetrics([])).toEqual([]);
   });
 
   it('hiçbir şubenin günü yoksa bugünkü toplam NULL', () => {

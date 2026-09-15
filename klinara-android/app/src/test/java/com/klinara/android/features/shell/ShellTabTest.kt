@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test
  */
 class ShellTabTest {
     @Test
-    @DisplayName("accountant: Yönetim açık, Bugün kilitli — iOS'ta düzeltilen hatanın regresyonu")
+    @DisplayName("accountant: Yönetim açık, Takvim kilitli — iOS'ta düzeltilen hatanın regresyonu")
     fun accountantSeesManagementButNotCalendar() {
         val session = ShellSessions.forRole("accountant")
 
@@ -26,7 +26,8 @@ class ShellTabTest {
                 "finans izinleri sayıldığı için açılıyor. Bu koşul daralırsa Kasa ve Prim " +
                 "ekranlarına hiçbir giriş noktası kalmaz.",
         )
-        assertTrue(ShellTab.Today.isVisible(session), "Bugün sekmesi her rolde çizilir.")
+        assertTrue(ShellTab.Calendar.isVisible(session), "Takvim sekmesi her rolde çizilir.")
+        assertTrue(ShellTab.Dashboard.isVisible(session), "Dashboard açılış sekmesi, her rolde çizilir.")
         assertFalse(
             ShellTab.canSeeCalendar(session),
             "Muhasebede hiç randevu izni yok; içerik 'erişiminiz yok' demeli.",
@@ -35,21 +36,21 @@ class ShellTabTest {
     }
 
     @Test
-    @DisplayName("owner ve manager dört sekmeyi de görür")
+    @DisplayName("owner ve manager beş sekmeyi de görür")
     fun privilegedRolesSeeEveryTab() {
         listOf("owner", "manager").forEach { role ->
             val session = ShellSessions.forRole(role)
             assertEquals(
                 ShellTab.entries.toList(),
                 ShellTab.visibleFor(session),
-                "$role dört sekmeyi de görmeli",
+                "$role beş sekmeyi de görmeli",
             )
             assertTrue(ShellTab.canSeeCalendar(session))
         }
     }
 
     @Test
-    @DisplayName("receptionist dört sekmeyi görür ve takvimi açar")
+    @DisplayName("receptionist beş sekmeyi görür ve takvimi açar")
     fun receptionistSeesEveryTab() {
         val session = ShellSessions.forRole("receptionist")
         assertEquals(ShellTab.entries.toList(), ShellTab.visibleFor(session))
@@ -68,14 +69,14 @@ class ShellTabTest {
     }
 
     @Test
-    @DisplayName("izinsiz rol: yalnız Bugün ve Profil, ikisi de boş durum")
+    @DisplayName("izinsiz rol: yalnız Dashboard, Takvim ve Profil — hepsi boş durum")
     fun roleWithoutPermissionsStillHasAHome() {
         // platform_admin kiracı izinleri taşımıyor (üretilmiş demeti boş) — istemci
         // açısından "hiç izni olmayan kullanıcı" sınır durumunun ta kendisi.
         assertTrue(RolePermissions.forRole("platform_admin").isEmpty())
         val session = ShellSessions.forRole("platform_admin")
 
-        assertEquals(listOf(ShellTab.Today, ShellTab.Profile), ShellTab.visibleFor(session))
+        assertEquals(listOf(ShellTab.Dashboard, ShellTab.Calendar, ShellTab.Profile), ShellTab.visibleFor(session))
         assertFalse(ShellTab.canSeeCalendar(session))
     }
 
@@ -91,6 +92,12 @@ class ShellTabTest {
                 "Tek başına $permission Yönetim sekmesini açmalı",
             )
         }
+    }
+
+    @Test
+    @DisplayName("Sıra: Dashboard açılış sekmesi, ardından Takvim")
+    fun dashboardIsTheIndexTab() {
+        assertEquals(listOf("Dashboard", "Takvim"), ShellTab.entries.take(2).map { it.label })
     }
 
     @Test

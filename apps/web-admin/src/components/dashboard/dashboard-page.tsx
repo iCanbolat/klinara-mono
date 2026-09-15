@@ -8,7 +8,11 @@ import { t } from '@/i18n/tr';
 import { cn } from '@/lib/cn';
 import { formatTime } from '@/lib/calendar/date';
 import { STATUS_LABEL } from '@/lib/calendar/status';
-import { topStaffByRevenue } from '@/lib/dashboard/summary';
+import {
+  availableBranchMetrics,
+  branchChartRows,
+  topStaffByRevenue,
+} from '@/lib/dashboard/summary';
 import { formatDelta, formatMoney, formatNumber, formatPercent } from '@/lib/reports/format';
 import { useSession } from '@/components/session/session-provider';
 import { useBranch } from '@/components/session/branch-provider';
@@ -20,15 +24,15 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { PageHeader } from '@/components/ui/page-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StatCard } from '@/components/ui/stat-card';
-import { BranchCard } from './branch-card';
+import { BranchChart } from './branch-chart';
 import { useDashboard } from './use-dashboard';
 
 /**
  * Karşılama sayfası (`/dashboard`).
  *
- * Sıra "önce şimdi, sonra ay": resepsiyon sabah paneli açtığında ilk sorusu
- * bugünün yükü; yöneticinin sorusu şubelerin ve personelin ay içindeki
- * durumu. Menü kartları eskiden sayfanın TAMAMIYDI; kenar çubuğuyla birebir
+ * Sıra "önce şimdi, sonra karşılaştırma": resepsiyon sabah paneli açtığında
+ * ilk sorusu bugünün yükü ve sıradaki randevu; şube grafiği yöneticinin
+ * "şubeler birbirine göre nerede" sorusu, o yüzden en altta. Menü kartları eskiden sayfanın TAMAMIYDI; kenar çubuğuyla birebir
  * aynı listeyi ikinci kez göstermek yer kaplamaktan öteye geçmediği için
  * kaldırıldı.
  *
@@ -172,8 +176,6 @@ export function DashboardPage(): ReactNode {
         </Alert>
       ) : null}
 
-      <BranchesSection state={state} />
-
       {can.calendar || can.staff ? (
         <div className={cn('grid gap-4', can.calendar && can.staff && 'lg:grid-cols-5')}>
           {can.calendar ? (
@@ -187,6 +189,8 @@ export function DashboardPage(): ReactNode {
           ) : null}
         </div>
       ) : null}
+
+      <BranchesSection state={state} />
     </div>
   );
 }
@@ -200,28 +204,18 @@ type State = ReturnType<typeof useDashboard>;
 
 function BranchesSection({ state }: { state: State }): ReactNode {
   const { loading: branchLoading } = useBranch();
+  const rows = useMemo(() => branchChartRows(state.summaries), [state.summaries]);
+  const metrics = useMemo(() => availableBranchMetrics(state.summaries), [state.summaries]);
 
   return (
-    <section aria-labelledby="dashboard-branches" className="flex flex-col gap-3">
-      <div className="flex items-baseline justify-between gap-2">
-        <h2 id="dashboard-branches" className="text-title-m">
-          {t('dashboard.branches')}
-        </h2>
-        {state.loading ? null : (
-          <span className="text-sm text-muted-foreground">
-            {t('dashboard.branchCount', { count: state.summaries.length })}
-          </span>
-        )}
-      </div>
-
+    <section aria-labelledby="dashboard-branches">
       {state.loading || branchLoading ? (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-busy="true">
-          {[0, 1].map((key) => (
-            <Skeleton key={key} className="h-56 rounded-xl" />
-          ))}
-        </div>
+        <Skeleton className="h-64 rounded-xl" aria-busy="true" />
       ) : state.summaries.length === 0 ? (
         <Card>
+          <h2 id="dashboard-branches" className="sr-only">
+            {t('dashboard.branches')}
+          </h2>
           <EmptyState
             icon={Building2}
             title={t('dashboard.noBranchesTitle')}
@@ -229,11 +223,7 @@ function BranchesSection({ state }: { state: State }): ReactNode {
           />
         </Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {state.summaries.map((summary) => (
-            <BranchCard key={summary.branch.id} summary={summary} showToday={state.can.calendar} />
-          ))}
-        </div>
+        <BranchChart rows={rows} metrics={metrics} currency={state.totals.currency ?? 'TRY'} />
       )}
     </section>
   );
@@ -333,7 +323,7 @@ function UpcomingCard({
 /**
  * Bu ayın personel cirosu — en çoktan aza.
  *
- * Şube kartları "şube ne getirdi"yi zaten söylüyor; buradaki soru "kim
+ * Şube grafiği "şube ne getirdi"yi zaten söylüyor; buradaki soru "kim
  * getirdi". Çubuk, listenin en yükseğine göre ölçekli: sıralamayı göz ucuyla
  * okutmak için, mutlak bir hedefi temsil etmiyor.
  */

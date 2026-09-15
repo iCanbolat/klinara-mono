@@ -174,6 +174,51 @@ export function dashboardTotals(
   };
 }
 
+export type BranchMetric = 'today' | 'occupancy' | 'revenue' | 'noShow';
+
+/** Şube grafiğinin bir satırı; bilinmeyen değer grafikte 0 çiziliyor. */
+export interface BranchChartRow {
+  id: string;
+  name: string;
+  completed: number;
+  /** Slot kaplayan ama henüz tamamlanmamış. */
+  pending: number;
+  /** İptal ve gelmedi. */
+  dropped: number;
+  occupancy: number;
+  revenue: number;
+  noShow: number;
+}
+
+export function branchChartRows(summaries: readonly BranchSummary[]): BranchChartRow[] {
+  return summaries.map((summary) => ({
+    id: summary.branch.id,
+    name: summary.branch.name,
+    completed: summary.today?.completed ?? 0,
+    pending: summary.today === null ? 0 : summary.today.active - summary.today.completed,
+    dropped: summary.today === null ? 0 : summary.today.total - summary.today.active,
+    occupancy: summary.occupancyRate ?? 0,
+    revenue: summary.revenueMinor ?? 0,
+    noShow: summary.noShowRate ?? 0,
+  }));
+}
+
+/**
+ * Grafikte seçilebilir göstergeler — bilinen değeri olanlar, sabit sırayla.
+ * Bir gösterge ya tüm şubelerde bilinir ya hiçbirinde (aynı rapordan geliyor);
+ * bugün ise şube şube düşebildiği için "en az bir şubede" yeterli.
+ */
+export function availableBranchMetrics(summaries: readonly BranchSummary[]): BranchMetric[] {
+  const first = summaries[0];
+  if (first === undefined) return [];
+  const metrics: BranchMetric[] = [];
+  if (summaries.some((summary) => summary.today !== null)) metrics.push('today');
+  if (first.occupancyRate !== null) metrics.push('occupancy');
+  if (first.revenueMinor !== null) metrics.push('revenue');
+  if (first.noShowRate !== null) metrics.push('noShow');
+  return metrics;
+}
+
 /**
  * Personel ciro sıralaması — en çok ciro yapan önce.
  *

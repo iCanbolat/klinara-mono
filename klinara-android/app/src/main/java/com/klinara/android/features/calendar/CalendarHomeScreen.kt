@@ -54,7 +54,7 @@ import androidx.compose.runtime.LaunchedEffect
 import java.time.Instant
 
 /**
- * "Bugün" sekmesinin kökü.
+ * "Takvim" sekmesinin kökü.
  *
  * Üç görünüm arasında geçerken **seçili tarih korunur**: tek doğruluk kaynağı
  * `CalendarUiState.selectedDate` ve mod değişimi ona dokunmaz. Haftada bir güne

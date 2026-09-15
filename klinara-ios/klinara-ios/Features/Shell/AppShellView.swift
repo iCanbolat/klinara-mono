@@ -6,6 +6,11 @@ import SwiftUI
 /// doldurur. Bilgi mimarisini her fazda yeniden kurmak, kullanıcının kas
 /// hafızasını her sürümde sıfırlamak demektir.
 ///
+/// **Dashboard bu kuralın bilinçli istisnası** ve AÇILIŞ sekmesi: web panelin
+/// açılış sayfasının karşılığı. Önce Yönetim hub'ının bir kartıydı; günün ilk
+/// sorusuna üç dokunuşla ulaşmak açılış ekranı olmasının önüne geçiyordu. Eski
+/// "Bugün" sekmesi aynı anda "Takvim" adını aldı.
+///
 /// Sekmeler **izne göre** çizilir. Yetkisi olmayan bir kullanıcıya sekmeyi
 /// gösterip içeride 403 vermek, ona yapamayacağı bir şeyi vaat etmektir.
 struct AppShellView: View {
@@ -13,10 +18,10 @@ struct AppShellView: View {
     @Bindable var authFlow: AuthFlowModel
     let session: AppSession
 
-    @State private var selection = Tabs.today
+    @State private var selection = Tabs.dashboard
 
     private enum Tabs: Hashable {
-        case today, customers, management, profile
+        case dashboard, calendar, customers, management, profile
     }
 
     /// Yönetim sekmesi Faz 2'nin tamamını barındırır; izinlerden herhangi biri
@@ -47,7 +52,13 @@ struct AppShellView: View {
 
     var body: some View {
         TabView(selection: $selection) {
-            Tab("Bugün", systemImage: "calendar", value: Tabs.today) {
+            // Dashboard her rolde çizilir; izin yoksa içerik "erişiminiz yok" der
+            // (Takvim sekmesiyle aynı gerekçe).
+            Tab("Dashboard", systemImage: "square.grid.2x2", value: Tabs.dashboard) {
+                DashboardView(session: session) { selection = .calendar }
+            }
+
+            Tab("Takvim", systemImage: "calendar", value: Tabs.calendar) {
                 if canSeeCalendar {
                     CalendarHomeView(session: session)
                 } else {
@@ -58,7 +69,7 @@ struct AppShellView: View {
                             message: "Rolünüz randevuları görüntülemeyi kapsamıyor."
                         )
                         .background(KlinaraColor.surface)
-                        .navigationTitle("Bugün")
+                        .navigationTitle("Takvim")
                         .navigationBarTitleDisplayMode(.inline)
                     }
                     .tint(KlinaraColor.sage)

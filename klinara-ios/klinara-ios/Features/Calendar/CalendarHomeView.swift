@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// "Bugün" sekmesinin kökü — günün takvimi.
+/// "Takvim" sekmesinin kökü — günün takvimi.
 ///
 /// Şube kapsamlıdır: `X-Branch-Id` olmadan `/calendar/day` `400` döner, bu
 /// yüzden şube seçilmemişse veri hiç istenmez ve ekran bunu söyler.

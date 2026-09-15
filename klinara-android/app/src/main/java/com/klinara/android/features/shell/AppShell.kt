@@ -48,6 +48,7 @@ import com.klinara.android.features.catalog.ServiceCategoryListScreen
 import com.klinara.android.features.catalog.ServiceEditorScreen
 import com.klinara.android.features.catalog.ServiceListScreen
 import com.klinara.android.features.customers.CustomerDetailScreen
+import com.klinara.android.features.dashboard.DashboardHost
 import com.klinara.android.features.customers.CustomerEditorScreen
 import com.klinara.android.features.customers.CustomerListScreen
 import com.klinara.android.features.customers.CustomerMergeScreen
@@ -118,7 +119,7 @@ fun AppShell(
     val branchGeneration by sessionViewModel.branchGeneration.collectAsStateWithLifecycle()
 
     val tabs = ShellTab.visibleFor(session)
-    var selectedName by rememberSaveable { mutableStateOf(ShellTab.Today.name) }
+    var selectedName by rememberSaveable { mutableStateOf(ShellTab.Dashboard.name) }
     // İzinler `reloadProfile` ile daralabilir; seçili sekme kaybolursa ilkine düşülür.
     val selected = tabs.firstOrNull { it.name == selectedName } ?: tabs.first()
 
@@ -132,6 +133,7 @@ fun AppShell(
             selectedName = ShellTab.Customers.name
         }.takeIf { ShellTab.Customers in tabs }
 
+    val dashboardNav = rememberNavController()
     val todayNav = rememberNavController()
     val customersNav = rememberNavController()
     val managementNav = rememberNavController()
@@ -157,7 +159,11 @@ fun AppShell(
             }
 
             when (selected) {
-                ShellTab.Today -> TodayTab(todayNav, session, container, branchGeneration, branchMenu)
+                ShellTab.Dashboard ->
+                    DashboardTab(dashboardNav, session, container, branchMenu) {
+                        selectedName = ShellTab.Calendar.name
+                    }
+                ShellTab.Calendar -> TodayTab(todayNav, session, container, branchGeneration, branchMenu)
                 ShellTab.Customers ->
                     CustomersTab(customersNav, session, container, branchMenu, pendingCustomerId) {
                         pendingCustomerId = null
@@ -173,6 +179,43 @@ fun AppShell(
                         trailing = branchMenu,
                     )
             }
+        }
+    }
+}
+
+@Composable
+private fun DashboardTab(
+    navController: NavHostController,
+    session: AppSession,
+    container: ServiceContainer,
+    trailing: @Composable RowScope.() -> Unit,
+    onOpenCalendar: () -> Unit,
+) {
+    // NavHost: ViewModel geri yığını kaydına bağlanıyor ve sekme değiştirip dönünce veri yeniden
+    // çekilmiyor (diğer sekmelerle aynı davranış); "Tümünü gör" raporu da bu yığına iner.
+    NavHost(navController = navController, startDestination = ShellRoutes.Dashboard) {
+        composable<ShellRoutes.Dashboard> { entry ->
+            DashboardHost(
+                session = session,
+                container = container,
+                owner = entry,
+                onOpenCalendar = onOpenCalendar,
+                onOpenStaffReport = { navController.navigate(ShellRoutes.Report(ReportKind.StaffPerformance.name)) },
+                trailing = trailing,
+            )
+        }
+
+        composable<ShellRoutes.Report> { entry ->
+            val route = entry.toRoute<ShellRoutes.Report>()
+            ReportsHost(
+                session = session,
+                container = container,
+                kind = ReportKind.valueOf(route.kind),
+                owner = entry,
+                onOpen = { navController.navigate(ShellRoutes.Report(it.name)) },
+                onBack = { navController.popBackStack() },
+                branchId = null,
+            )
         }
     }
 }
@@ -207,7 +250,7 @@ private fun TodayTab(
                 // Sekme duruyor ama içerik dürüst: `accountant` rolünde hiç randevu
                 // izni yok ve varsayılan sekmenin role göre kaybolması bilgi
                 // mimarisini role göre değiştirmek olurdu.
-                KlinaraScreen(title = "Bugün", trailing = trailing) {
+                KlinaraScreen(title = "Takvim", trailing = trailing) {
                     EmptyStateView(
                         title = "Takvim erişiminiz yok",
                         message = "Rolünüz randevuları görüntülemeyi kapsamıyor.",
