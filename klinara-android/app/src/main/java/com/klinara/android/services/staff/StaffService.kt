@@ -7,8 +7,12 @@ package com.klinara.android.services.staff
  * alınmıştı; yazma yarısı A7.2'de geldi. Silme yok: pasife almak `update(isActive = false)`.
  */
 interface StaffService {
-    /** `GET staff` — kiracının tüm personeli. Sunucu şubeye göre daraltmıyor. */
-    suspend fun list(): List<StaffProfile>
+    /**
+     * `GET staff` — [branchId] verilmezse kiracının tüm personeli. Verilirse (A7.4–A7.5) yalnız o
+     * şubeye ait olanlar: ana şube VEYA şube üyeliği ([StaffProfile.worksIn]). Erişilemeyen
+     * şube 403 `BRANCH_FORBIDDEN`.
+     */
+    suspend fun list(branchId: String? = null): List<StaffProfile>
 
     /** `GET staff/:id`. */
     suspend fun profile(id: String): StaffProfile

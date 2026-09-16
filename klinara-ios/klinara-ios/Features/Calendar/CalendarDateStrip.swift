@@ -1,11 +1,15 @@
 import SwiftUI
 
-/// Yatay gün seçici — takvimin üstündeki hafta şeridi.
+/// Yatay gün seçici — takvimin üstündeki gün şeridi.
 ///
 /// `DatePicker` yerine şerit olmasının sebebi: klinikte en sık yapılan gezinme
 /// "yarın", "önceki gün" ve "haftanın şu günü". Takvim açıp gün seçtirmek,
-/// tek dokunuşluk bir işi üç dokunuşa çıkarırdı. Uzun tarih atlamaları için
-/// başlıktaki tarih düğmesi hâlâ takvim açar.
+/// tek dokunuşluk bir işi üç dokunuşa çıkarırdı.
+///
+/// Yedi gün değil **beş**, ve seçili gün daima ortada: yedi hücre dar
+/// ekranlarda rakamı sıkıştırıyordu ve pazartesiye sabitli bir hafta, iki
+/// yandaki okların "gün mü hafta mı" kaydırdığını belirsiz bırakıyordu. Ortalı
+/// pencerede ok bir gün kaydırır ve şerit de tam o kadar kayar.
 struct CalendarDateStrip: View {
 
     let clock: BranchClock
@@ -14,7 +18,13 @@ struct CalendarDateStrip: View {
     var counts: [String: Int] = [:]
     let onSelect: (Date) -> Void
 
-    private var days: [Date] { clock.weekDays(of: selected) }
+    static let visibleDays = 5
+
+    private var days: [Date] {
+        let center = clock.startOfDay(selected)
+        let half = Self.visibleDays / 2
+        return (-half...half).map { clock.adding(days: $0, to: center) }
+    }
 
     var body: some View {
         HStack(spacing: KlinaraMetrics.xs) {

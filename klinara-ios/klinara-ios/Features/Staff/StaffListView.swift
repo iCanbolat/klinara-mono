@@ -1,6 +1,11 @@
 import SwiftUI
 
 /// Personel listesi.
+///
+/// Şube süzgeci varsayılan olarak seçili şubede: ana şubesi o şube **veya**
+/// orada rolü olan personel (sunucudaki `GET staff?branchId=` kuralı,
+/// ``StaffProfile/worksIn(branchId:)``). "Tüm şubeler" yalnız kiracı geneli
+/// rollerde. Roller `user:read` varsa satırda gösteriliyor.
 struct StaffListView: View {
 
     let session: AppSession
@@ -8,9 +13,20 @@ struct StaffListView: View {
     @State private var searchText = ""
     @State private var showsInactive = false
     @State private var showsCreate = false
+    @State private var showsInvite = false
+    /// `nil` = oturumun seçili şubesi, `""` = tüm şubeler.
+    @State private var branchFilter: String?
+    @State private var membershipsByUser: [String: [MembershipSummary]] = [:]
 
     private var store: StaffStore { session.staffStore }
     private var canWrite: Bool { session.can(Permissions.staffWrite) }
+    private var canInvite: Bool { session.can(Permissions.userInvite) }
+
+    /// Etkin süzgeç: `nil` = tüm şubeler.
+    private var effectiveBranchId: String? {
+        let value = branchFilter ?? session.selectedBranchId
+        return value == "" ? nil : value
+    }
 
     var body: some View {
         KlinaraScreen(
@@ -25,8 +41,10 @@ struct StaffListView: View {
         ) { profiles in
             let visible = filtered(profiles)
 
+            branchFilterBar
+
             if visible.isEmpty {
-                Text("Aramanızla eşleşen personel yok.")
+                Text(searchText.isEmpty ? "Bu şubede personel yok. Rol ve şube atamasını personelin detayından yapabilirsiniz." : "Aramanızla eşleşen personel yok.")
                     .klinaraText(.bodyM)
                     .foregroundStyle(KlinaraColor.charcoalMuted)
                     .frame(maxWidth: .infinity)
@@ -47,6 +65,13 @@ struct StaffListView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Toggle("Pasifleri göster", isOn: $showsInactive)
+                    if canInvite {
+                        Button {
+                            showsInvite = true
+                        } label: {
+                            Label("Personel davet et", systemImage: "person.badge.plus")
+                        }
+                    }
                     if canWrite {
                         Button {
                             showsCreate = true
@@ -65,10 +90,17 @@ struct StaffListView: View {
             // Yetkinlik matrisi hizmet listesine bakıyor; detaya girildiğinde
             // beklememek için katalogla birlikte yükleniyor.
             await session.catalogStore.load()
+            await loadMemberships()
         }
-        .refreshable { await store.reload() }
+        .refreshable {
+            await store.reload()
+            await loadMemberships()
+        }
         .sheet(isPresented: $showsCreate) {
             StaffCreateView(session: session)
+        }
+        .sheet(isPresented: $showsInvite) {
+            InviteStaffView(session: session) { _ in }
         }
     }
 
@@ -90,6 +122,15 @@ struct StaffListView: View {
                             .klinaraText(.bodyM)
                             .font(.footnote)
                             .foregroundStyle(KlinaraColor.charcoalMuted)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+
+                    if let roles = roleSummary(for: profile) {
+                        Text(roles)
+                            .klinaraText(.bodyM)
+                            .font(.footnote)
+                            .foregroundStyle(KlinaraColor.charcoalMuted)
+                            .lineLimit(2)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
 
@@ -124,8 +165,56 @@ struct StaffListView: View {
         Set(profile.services.filter(\.isActive).map(\.serviceId)).count
     }
 
+    /// Süzgeç satırı — hangi şubeye bakıldığı her an görünür olsun.
+    private var branchFilterBar: some View {
+        Menu {
+            Picker("Şube", selection: Binding(
+                get: { effectiveBranchId ?? "" },
+                set: { branchFilter = $0 }
+            )) {
+                if session.profile.tenantWide {
+                    Text("Tüm şubeler").tag("")
+                }
+                ForEach(session.switchableBranches) { branch in
+                    Text(branch.name).tag(branch.id)
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "line.3.horizontal.decrease.circle")
+                Text(effectiveBranchId.flatMap { id in session.branches.first { $0.id == id }?.name } ?? "Tüm şubeler")
+                    .klinaraText(.bodyEmphasis)
+                Image(systemName: "chevron.down").font(.system(size: 10, weight: .semibold))
+            }
+            .foregroundStyle(KlinaraColor.sageDeep)
+            .padding(.horizontal, KlinaraMetrics.md)
+            .frame(minHeight: 36)
+            .background(KlinaraColor.sageSoft, in: .capsule)
+        }
+        .accessibilityLabel("Şube süzgeci")
+    }
+
+    private func roleSummary(for profile: StaffProfile) -> String? {
+        guard let memberships = membershipsByUser[profile.userId], !memberships.isEmpty else { return nil }
+        return memberships.map { membership in
+            let branch = membership.branchId.map { id in
+                session.branches.first { $0.id == id }?.name ?? "başka şube"
+            } ?? "kurum geneli"
+            return "\(RoleName.turkish(membership.roleKey)) · \(branch)"
+        }
+        .joined(separator: ", ")
+    }
+
+    private func loadMemberships() async {
+        guard session.can(Permissions.userRead),
+              let users = try? await session.services.users.users()
+        else { return }
+        membershipsByUser = Dictionary(uniqueKeysWithValues: users.map { ($0.id, $0.memberships) })
+    }
+
     private func filtered(_ profiles: [StaffProfile]) -> [StaffProfile] {
         profiles
+            .filter { profile in effectiveBranchId.map { profile.worksIn(branchId: $0) } ?? true }
             .filter { showsInactive || $0.isActive }
             .filter { profile in
                 guard !searchText.isEmpty else { return true }

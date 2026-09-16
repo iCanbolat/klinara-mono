@@ -286,6 +286,16 @@ describe('yönetim proxy beyaz listesi', () => {
       expect(isAllowedProxyPath(`users/${UUID}`, 'PATCH')).toBe(true);
     });
 
+    it('şube ekleme/düzenleme açıldı; şube SİLME yok', () => {
+      expect(isAllowedProxyPath('branches', 'POST')).toBe(true);
+      expect(isAllowedProxyPath(`branches/${UUID}`, 'PATCH')).toBe(true);
+      expect(isAllowedProxyPath(`branches/${UUID}`, 'DELETE')).toBe(false);
+      expect(isAllowedProxyPath(`branches/${UUID}`, 'PUT')).toBe(false);
+      expect(isAllowedProxyPath(`users/${UUID}/memberships`, 'PUT')).toBe(true);
+      expect(isAllowedProxyPath('invitations', 'POST')).toBe(true);
+      expect(isAllowedProxyPath(`invitations/${UUID}`, 'DELETE')).toBe(true);
+    });
+
     it('çalışma planı açıldı; istisnada PATCH YOK', () => {
       expect(isAllowedProxyPath(`branches/${UUID}/hours`, 'GET')).toBe(true);
       expect(isAllowedProxyPath(`branches/${UUID}/hours`, 'PUT')).toBe(true);

@@ -77,6 +77,11 @@ import com.klinara.android.features.scheduling.BranchHoursScreen
 import com.klinara.android.features.scheduling.ScheduleExceptionEditorScreen
 import com.klinara.android.features.scheduling.ScheduleExceptionListScreen
 import com.klinara.android.features.scheduling.StaffScheduleScreen
+import com.klinara.android.features.branches.BranchEditorScreen
+import com.klinara.android.features.branches.BranchListScreen
+import com.klinara.android.features.staff.InvitationListScreen
+import com.klinara.android.features.staff.InviteStaffScreen
+import com.klinara.android.features.staff.MembershipEditorScreen
 import com.klinara.android.features.staff.StaffCreateScreen
 import com.klinara.android.features.staff.StaffDetailActions
 import com.klinara.android.features.staff.StaffDetailScreen
@@ -168,7 +173,15 @@ fun AppShell(
                     CustomersTab(customersNav, session, container, branchMenu, pendingCustomerId) {
                         pendingCustomerId = null
                     }
-                ShellTab.Management -> ManagementTab(managementNav, session, container, branchMenu, openCustomer)
+                ShellTab.Management ->
+                    ManagementTab(
+                        managementNav,
+                        session,
+                        container,
+                        branchMenu,
+                        openCustomer,
+                        onBranchesChanged = sessionViewModel::reloadBranches,
+                    )
                 ShellTab.Profile ->
                     ProfileTab(
                         navController = profileNav,
@@ -535,6 +548,7 @@ private fun ManagementTab(
     container: ServiceContainer,
     trailing: @Composable RowScope.() -> Unit,
     openCustomer: ((String) -> Unit)?,
+    onBranchesChanged: () -> Unit,
 ) {
     NavHost(navController = navController, startDestination = ShellRoutes.ManagementHome) {
         composable<ShellRoutes.ManagementHome> {
@@ -573,6 +587,62 @@ private fun ManagementTab(
                 onBack = { navController.popBackStack() },
                 onOpen = { id -> navController.navigate(ShellRoutes.StaffDetail(id)) },
                 onCreate = { navController.navigate(ShellRoutes.StaffCreate) },
+                onInvite = { navController.navigate(ShellRoutes.InviteStaff) },
+            )
+        }
+
+        composable<ShellRoutes.MembershipEditor> { entry ->
+            val route = entry.toRoute<ShellRoutes.MembershipEditor>()
+            MembershipEditorScreen(
+                session = session,
+                container = container,
+                userId = route.userId,
+                userName = route.userName,
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable<ShellRoutes.InvitationList> {
+            InvitationListScreen(
+                session = session,
+                container = container,
+                onBack = { navController.popBackStack() },
+                onInvite = { navController.navigate(ShellRoutes.InviteStaff) },
+            )
+        }
+
+        composable<ShellRoutes.InviteStaff> {
+            InviteStaffScreen(
+                session = session,
+                container = container,
+                onBack = { navController.popBackStack() },
+                // Liste (varsa) dönüşte kendini tazeliyor; form geri yığınında KALMAZ.
+                onSent = { navController.popBackStack() },
+            )
+        }
+
+        composable<ShellRoutes.BranchList> {
+            BranchListScreen(
+                session = session,
+                container = container,
+                onBack = { navController.popBackStack() },
+                onOpen = { id -> navController.navigate(ShellRoutes.BranchEditor(id)) },
+                onCreate = { navController.navigate(ShellRoutes.BranchEditor()) },
+            )
+        }
+
+        composable<ShellRoutes.BranchEditor> { entry ->
+            val route = entry.toRoute<ShellRoutes.BranchEditor>()
+            BranchEditorScreen(
+                container = container,
+                branchId = route.branchId,
+                onBack = { navController.popBackStack() },
+                onSaved = {
+                    // Şube menüsü ve şube kapsamlı ekranlar yeni listeyi hemen görmeli; pasife
+                    // alınan şube seçiliyse oturum ilk aktif şubeye geçer.
+                    onBranchesChanged()
+                    navController.popBackStack()
+                },
             )
         }
 
@@ -601,6 +671,11 @@ private fun ManagementTab(
                 actions =
                     StaffDetailActions(
                         onOpenSkills = { navController.navigate(ShellRoutes.StaffServiceMatrix(route.staffId)) },
+                        // Roller `user:read` ister; yoksa satır HİÇ çizilmez.
+                        onOpenMemberships =
+                            { userId: String, userName: String ->
+                                navController.navigate(ShellRoutes.MembershipEditor(userId, userName))
+                            }.takeIf { session.can(Permissions.USER_READ) },
                         // Program ve istisna satırları `schedule:read` ister (iOS gibi); yoksa HİÇ çizilmez.
                         onOpenSchedule =
                             { navController.navigate(ShellRoutes.StaffSchedule(route.staffId)) }
@@ -839,6 +914,8 @@ private fun ManagementDestination.route(): Any =
         ManagementDestination.Services -> ShellRoutes.ServiceList
         ManagementDestination.ServiceCategories -> ShellRoutes.ServiceCategoryList
         ManagementDestination.Staff -> ShellRoutes.StaffList
+        ManagementDestination.Branches -> ShellRoutes.BranchList
+        ManagementDestination.Invitations -> ShellRoutes.InvitationList
         ManagementDestination.BranchHours -> ShellRoutes.BranchHours
         ManagementDestination.ScheduleExceptions -> ShellRoutes.ScheduleExceptionList()
         ManagementDestination.CustomerTags -> ShellRoutes.CustomerTagList

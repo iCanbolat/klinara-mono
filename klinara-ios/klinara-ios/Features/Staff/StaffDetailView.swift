@@ -136,6 +136,21 @@ struct StaffDetailView: View {
 
     private func linksCard(profile: StaffProfile) -> some View {
         KlinaraCard(title: "Çalışma") {
+            if session.can(Permissions.userRead) {
+                KlinaraNavigationRow(
+                    label: "Roller ve şubeler",
+                    detail: rolesDetail(profile: profile),
+                    icon: "person.2.badge.key"
+                ) {
+                    MembershipEditorView(
+                        session: session,
+                        userId: profile.userId,
+                        userName: profile.userFullName
+                    )
+                }
+                KlinaraDivider()
+            }
+
             KlinaraNavigationRow(
                 label: "Hizmet yetkinlikleri",
                 value: "\(Set(profile.services.filter(\.isActive).map(\.serviceId)).count)",
@@ -164,6 +179,13 @@ struct StaffDetailView: View {
                 }
             }
         }
+    }
+
+    /// Personelin çalıştığı şubeler — ana şube ∪ şube üyelikleri.
+    private func rolesDetail(profile: StaffProfile) -> String {
+        let ids = Set((profile.branchIds ?? []) + [profile.primaryBranchId].compactMap { $0 })
+        let names = session.branches.filter { ids.contains($0.id) }.map(\.name)
+        return names.isEmpty ? "Hangi şubede hangi rolle çalıştığı" : names.joined(separator: ", ")
     }
 
     private func save() async {
@@ -232,15 +254,20 @@ struct StaffProfileDraft: Equatable {
         )
     }
 
+    /// Yalnız DEĞİŞEN alanlar gider; boşaltılan alan `null` ile temizlenir.
     func updateInput() -> UpdateStaffProfileInput {
-        UpdateStaffProfileInput(
-            primaryBranchId: primaryBranchId,
-            title: title.isEmpty ? nil : title,
-            specialties: specialties,
-            calendarColor: calendarColor,
-            bio: bio.isEmpty ? nil : bio,
-            isVisibleOnline: isVisibleOnline,
-            isActive: isActive
-        )
+        var input = UpdateStaffProfileInput()
+        if title != original.title { input.title = .text(title) }
+        if bio != original.bio { input.bio = .text(bio) }
+        if specialties != original.specialties { input.specialties = specialties }
+        if calendarColor != original.calendarColor {
+            input.calendarColor = calendarColor.map { .set($0) } ?? .clear
+        }
+        if primaryBranchId != original.primaryBranchId {
+            input.primaryBranchId = primaryBranchId.map { .set($0) } ?? .clear
+        }
+        if isVisibleOnline != original.isVisibleOnline { input.isVisibleOnline = isVisibleOnline }
+        if isActive != original.isActive { input.isActive = isActive }
+        return input
     }
 }

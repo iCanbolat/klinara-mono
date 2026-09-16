@@ -38,12 +38,13 @@ import com.klinara.android.services.formatting.BranchClock
 import java.time.Instant
 
 /**
- * Haftanın yedi günü. **Kaydırılmaz** ve her zaman seçili günün haftasını gösterir.
+ * Seçili günü ORTALAYAN beş gün. **Kaydırılmaz**; iki yanındaki oklar bir gün ilerletir
+ * ve şerit de tam bir hücre kayar.
  *
- * Kaydırmalı sonsuz bir şerit iOS'ta da yok ve olmamasının bir sebebi var: ileri/geri
- * okları zaten gün gün ilerliyor ve şerit Pazartesi/Pazar sınırını geçince kendiliğinden
- * kayıyor. İki ayrı gezinme deyimi (kaydır + ok) aynı işi yapınca kullanıcı hangisinin
- * ne yaptığını denemek zorunda kalır.
+ * Yedi günlük, Pazartesi'ye sabitli hafta dar ekranda rakamları sıkıştırıyordu ve oklar
+ * gün gün ilerlerken şerit yalnız hafta sınırında kayınca okun ne kaydırdığı belirsiz
+ * kalıyordu. Kaydırmalı sonsuz bir şerit de yok: iki ayrı gezinme deyimi (kaydır + ok)
+ * aynı işi yapınca kullanıcı hangisinin ne yaptığını denemek zorunda kalır.
  */
 @Composable
 fun CalendarDateStrip(
@@ -64,14 +65,15 @@ fun CalendarDateStrip(
     now: Instant = Instant.now(),
 ) {
     // `IntrinsicSize.Max` + hücrede `fillMaxHeight`: şeridin yüksekliği en uzun
-    // hücreye göre büyür ve yedi hücre yine EŞİT kalır. Sabit bir yükseklik
+    // hücreye göre büyür ve hücreler yine EŞİT kalır. Sabit bir yükseklik
     // `fontScale 2.0`'da gün rakamını ortadan kesiyordu (emülatörde yakalandı) —
     // ve kesilen bir tarih, okunamayan bir tarihtir.
     Row(
         modifier = modifier.fillMaxWidth().height(IntrinsicSize.Max),
         horizontalArrangement = Arrangement.spacedBy(KlinaraMetrics.xs),
     ) {
-        clock.weekDays(selected).forEach { day ->
+        val center = clock.startOfDay(selected)
+        (-VISIBLE_DAYS / 2..VISIBLE_DAYS / 2).map { clock.adding(it.toLong(), center) }.forEach { day ->
             DayCell(
                 clock = clock,
                 day = day,
@@ -186,3 +188,6 @@ internal val TrLocaleTag: java.util.Locale = java.util.Locale.forLanguageTag("tr
 /** Taban yükseklik; yazı ölçeği büyüdükçe hücre BÜYÜR, kırpmaz. */
 private val CELL_HEIGHT = 60.dp
 private val DOT_SIZE = 4.dp
+
+/** Tek sayı olmalı: seçili gün ortadaki hücre. */
+private const val VISIBLE_DAYS = 5

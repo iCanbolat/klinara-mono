@@ -35,6 +35,9 @@ nonisolated struct StaffProfile: Codable, Sendable, Identifiable, Equatable {
     let userFullName: String
     let userEmail: String
     let primaryBranchId: String?
+    /// Aktif **şube** üyeliklerinin şubeleri (kiracı kapsamlı roller hariç).
+    /// Şube ve Personel güncellemesinden önceki sunucu göndermiyordu; yoksa boş sayılır.
+    var branchIds: [String]? = nil
     let title: String?
     let specialties: [String]
     let calendarColor: String?
@@ -43,6 +46,13 @@ nonisolated struct StaffProfile: Codable, Sendable, Identifiable, Equatable {
     let isActive: Bool
     let createdAt: Date
     let services: [StaffServiceSkill]
+
+    /// Personel bu şubeye ait mi — ana şubesi o şube **veya** orada rolü var.
+    /// Sunucudaki `GET staff?branchId=` süzgeciyle aynı kural; Çalışma
+    /// saatleri ve personel listesi bunu kullanıyor.
+    func worksIn(branchId: String) -> Bool {
+        primaryBranchId == branchId || (branchIds ?? []).contains(branchId)
+    }
 
     /// Bir hizmetin bu personelde **o şubede** geçerli yetkinliği.
     /// Şube özel kaydı yoksa kiracı geneli kayda düşer — sunucudaki kuralın aynısı.
@@ -66,14 +76,44 @@ nonisolated struct CreateStaffProfileInput: Encodable, Sendable {
 }
 
 /// `UpdateStaffProfileDto`.
-nonisolated struct UpdateStaffProfileInput: Encodable, Sendable {
-    var primaryBranchId: String?
-    var title: String?
+///
+/// Temizlenebilen alanlar ``Nullable``: `String?` ile "alanı boşalt" ve
+/// "alana dokunma" aynı `nil` oluyordu ve iOS ana şubeyi, unvanı, rengi ve
+/// tanıtımı **temizleyemiyordu** (Android A7.2'de bildirilen fark).
+nonisolated struct UpdateStaffProfileInput: Encodable, Sendable, Equatable {
+    var primaryBranchId: Nullable<String> = .unchanged
+    var title: Nullable<String> = .unchanged
     var specialties: [String]?
-    var calendarColor: String?
-    var bio: String?
+    var calendarColor: Nullable<String> = .unchanged
+    var bio: Nullable<String> = .unchanged
     var isVisibleOnline: Bool?
     var isActive: Bool?
+
+    private enum CodingKeys: String, CodingKey {
+        case primaryBranchId, title, specialties, calendarColor, bio, isVisibleOnline, isActive
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(primaryBranchId, forKey: .primaryBranchId)
+        try container.encode(title, forKey: .title)
+        try container.encodeIfPresent(specialties, forKey: .specialties)
+        try container.encode(calendarColor, forKey: .calendarColor)
+        try container.encode(bio, forKey: .bio)
+        try container.encodeIfPresent(isVisibleOnline, forKey: .isVisibleOnline)
+        try container.encodeIfPresent(isActive, forKey: .isActive)
+    }
+}
+
+extension Nullable {
+    /// Mock'ların PATCH'i uygulaması için: `.unchanged` eski değeri korur.
+    func applied(to old: Value?) -> Value? {
+        switch self {
+        case .unchanged: old
+        case .clear: nil
+        case .set(let value): value
+        }
+    }
 }
 
 /// `ReplaceStaffServicesDto` — listenin **tamamını** değiştirir.

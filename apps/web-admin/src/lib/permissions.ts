@@ -86,6 +86,9 @@ export const NAV_ITEMS: readonly NavItem[] = [
   },
   { path: '/musteriler', labelKey: 'nav.customers', requires: [PERMISSIONS.CUSTOMER_READ] },
   { path: '/katalog', labelKey: 'nav.catalog', requires: [PERMISSIONS.SERVICE_READ] },
+  // "Şube ve Personel". Kapı `staff:read`: `branch:read` HER rolde var ve
+  // kapı olsaydı muhasebeci yalnız şube listesinden ibaret bir ekran görürdü.
+  // Sekmeler kendi içinde ayrıca süzülüyor (`branch:write`, `user:invite`).
   { path: '/personel', labelKey: 'nav.staff', requires: [PERMISSIONS.STAFF_READ] },
   {
     path: '/calisma-saatleri',

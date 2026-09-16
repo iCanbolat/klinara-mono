@@ -39,6 +39,11 @@ interface BranchState {
   /** Kiracı geneli bir rol mü — "Tüm şubeler" seçeneği buna bağlı. */
   canSelectAll: boolean;
   loading: boolean;
+  /**
+   * Listeyi yeniden okur — şube eklendikten/düzenlendikten sonra. Seçili şube
+   * artık pasifse seçim, ilk yüklemedeki kuralla yeniden kuruluyor.
+   */
+  reload: () => void;
 }
 
 const BranchContext = createContext<BranchState | null>(null);
@@ -53,6 +58,8 @@ export function BranchProvider({ children }: { children: ReactNode }): ReactNode
   const { me, loading: sessionLoading } = useSession();
   const [branches, setBranches] = useState<Branch[] | null>(null);
   const [branchId, setBranchIdState] = useState<string | null>(null);
+  const [nonce, setNonce] = useState(0);
+  const reload = useCallback(() => setNonce((value) => value + 1), []);
 
   const canSelectAll = me?.tenantWide ?? false;
 
@@ -80,10 +87,14 @@ export function BranchProvider({ children }: { children: ReactNode }): ReactNode
 
         const stored = readStored();
         // Saklanan şube hâlâ erişilebilir mi? Rolü değişmiş bir kullanıcının
-        // eski seçimiyle 403 yemesi, "rapor bozuk" diye okunurdu.
-        const usable = stored !== null && list.some((branch) => branch.id === stored);
+        // eski seçimiyle 403 yemesi, "rapor bozuk" diye okunurdu. Pasife
+        // alınmış şube de seçili kalmıyor: orada yeni iş yapılamaz.
+        const usable =
+          stored !== null &&
+          list.some((branch) => branch.id === stored && branch.isActive !== false);
+        const firstActive = list.find((branch) => branch.isActive !== false) ?? list[0];
         if (usable) setBranchIdState(stored);
-        else if (!canSelectAll) setBranchIdState(list[0]?.id ?? null);
+        else if (!canSelectAll) setBranchIdState(firstActive?.id ?? null);
         else setBranchIdState(null);
       } catch (caught) {
         if (caught instanceof SessionExpiredError) return;
@@ -92,7 +103,7 @@ export function BranchProvider({ children }: { children: ReactNode }): ReactNode
         setBranches([]);
       }
     })();
-  }, [sessionLoading, me, canSelectAll]);
+  }, [sessionLoading, me, canSelectAll, nonce]);
 
   const value = useMemo<BranchState>(
     () => ({
@@ -101,8 +112,9 @@ export function BranchProvider({ children }: { children: ReactNode }): ReactNode
       setBranchId,
       canSelectAll,
       loading: branches === null,
+      reload,
     }),
-    [branches, branchId, setBranchId, canSelectAll],
+    [branches, branchId, setBranchId, canSelectAll, reload],
   );
 
   return <BranchContext.Provider value={value}>{children}</BranchContext.Provider>;

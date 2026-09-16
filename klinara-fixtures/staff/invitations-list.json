@@ -1,0 +1,24 @@
+{
+  "data": [
+    {
+      "id": "a1000000-0000-4000-8000-000000000001",
+      "email": "yeni@demo-klinik.test",
+      "roleKey": "practitioner",
+      "branchId": "b1000000-0000-4000-8000-000000000002",
+      "expiresAt": "2026-09-23T10:00:00.000Z",
+      "createdAt": "2026-09-16T10:00:00.000Z",
+      "acceptedAt": null,
+      "revokedAt": null
+    },
+    {
+      "id": "a1000000-0000-4000-8000-000000000002",
+      "email": "muhasebe@demo-klinik.test",
+      "roleKey": "accountant",
+      "branchId": null,
+      "expiresAt": "2026-09-20T10:00:00.000Z",
+      "createdAt": "2026-09-13T10:00:00.000Z",
+      "acceptedAt": null,
+      "revokedAt": null
+    }
+  ]
+}

@@ -14,6 +14,8 @@ interface StaffBody {
   id: string;
   userId: string;
   userFullName: string;
+  primaryBranchId: string | null;
+  branchIds: string[];
   title: string | null;
   specialties: string[];
   isActive: boolean;
@@ -200,5 +202,110 @@ describe('personel profili ve yetkinlik', () => {
 
     expect(res.status).toBe(200);
     expect((res.body as StaffBody).title).toBe('Lazer Uzmanı');
+  });
+  // -------------------------------------------------------------------------
+  describe('şube süzgeci', () => {
+    async function withSecondBranch() {
+      const clinic = await setupClinic(app);
+      const ownerAuth = auth(clinic.owner.tokens);
+      const created = await http(app)
+        .post('/api/v1/branches')
+        .set(ownerAuth)
+        .send({ slug: 'bodrum', name: 'Bodrum' });
+      expect(created.status).toBe(201);
+      const second = created.body as { id: string };
+
+      const reception = await inviteMember(app, clinic.owner.tokens, {
+        email: 'resepsiyon@demo-klinik.test',
+        roleKey: 'receptionist',
+        branchId: second.id,
+        fullName: 'Bodrum Resepsiyon',
+      });
+      const profile = await http(app)
+        .post('/api/v1/staff')
+        .set(ownerAuth)
+        .send({ userId: reception.userId });
+      expect(profile.status).toBe(201);
+
+      return { clinic, ownerAuth, second, reception };
+    }
+
+    async function listIds(ownerAuth: Record<string, string>, branchId: string) {
+      const res = await http(app).get(`/api/v1/staff?branchId=${branchId}`).set(ownerAuth);
+      expect(res.status).toBe(200);
+      return (res.body as { data: StaffBody[] }).data;
+    }
+
+    it('ana şube VEYA şube üyeliğiyle eşleşen personeli döner', async () => {
+      const { clinic, ownerAuth, second, reception } = await withSecondBranch();
+
+      const first = await listIds(ownerAuth, clinic.branch.id);
+      expect(first.map((row) => row.userId)).toEqual([clinic.practitioner.userId]);
+
+      const other = await listIds(ownerAuth, second.id);
+      expect(other.map((row) => row.userId)).toEqual([reception.userId]);
+      expect(other[0]?.primaryBranchId).toBeNull();
+      expect(other[0]?.branchIds).toEqual([second.id]);
+
+      const all = await http(app).get('/api/v1/staff').set(ownerAuth);
+      expect((all.body as { data: StaffBody[] }).data).toHaveLength(2);
+    });
+
+    it('iki şubede çalışan personel her iki listede TEK kez görünür', async () => {
+      const { clinic, ownerAuth, second } = await withSecondBranch();
+
+      const put = await http(app)
+        .put(`/api/v1/users/${clinic.practitioner.userId}/memberships`)
+        .set(ownerAuth)
+        .send({
+          memberships: [
+            { roleKey: 'practitioner', branchId: clinic.branch.id },
+            { roleKey: 'practitioner', branchId: second.id },
+            { roleKey: 'receptionist', branchId: second.id },
+          ],
+        });
+      expect(put.status).toBe(200);
+
+      const other = await listIds(ownerAuth, second.id);
+      const practitioner = other.filter((row) => row.userId === clinic.practitioner.userId);
+      expect(practitioner).toHaveLength(1);
+      expect([...(practitioner[0]?.branchIds ?? [])].sort()).toEqual(
+        [clinic.branch.id, second.id].sort(),
+      );
+      expect(await listIds(ownerAuth, clinic.branch.id)).toHaveLength(1);
+    });
+
+    it('erişilemeyen şube ne süzülebilir ne ana şube yapılabilir', async () => {
+      const { clinic, second } = await withSecondBranch();
+      const manager = await inviteMember(app, clinic.owner.tokens, {
+        email: 'mudur@demo-klinik.test',
+        roleKey: 'manager',
+        branchId: clinic.branch.id,
+      });
+      const managerAuth = auth(manager.tokens);
+
+      const list = await http(app).get(`/api/v1/staff?branchId=${second.id}`).set(managerAuth);
+      expect(list.status).toBe(403);
+      expect((list.body as Problem).code).toBe('BRANCH_FORBIDDEN');
+
+      const move = await http(app)
+        .patch(`/api/v1/staff/${clinic.practitioner.staffProfileId}`)
+        .set(managerAuth)
+        .send({ primaryBranchId: second.id });
+      expect(move.status).toBe(403);
+      expect((move.body as Problem).code).toBe('BRANCH_FORBIDDEN');
+
+      const own = await http(app)
+        .patch(`/api/v1/staff/${clinic.practitioner.staffProfileId}`)
+        .set(managerAuth)
+        .send({ primaryBranchId: clinic.branch.id });
+      expect(own.status).toBe(200);
+    });
+
+    it('geçersiz branchId 400 döner', async () => {
+      const clinic = await setupClinic(app);
+      const res = await http(app).get('/api/v1/staff?branchId=abc').set(auth(clinic.owner.tokens));
+      expect(res.status).toBe(400);
+    });
   });
 });

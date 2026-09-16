@@ -118,7 +118,10 @@ private fun StaffCard(
                 ErrorBanner(message = staff.message, onRetry = if (staff.isRetryable) viewModel::load else null)
             is Loadable.Loaded ->
                 if (staff.value.isEmpty()) {
-                    KlinaraRow(label = "Aktif personel yok")
+                    KlinaraRow(
+                        label = "Bu şubede aktif personel yok",
+                        detail = "Personeli şubeye Yönetim → Şube ve Personel'den atayın.",
+                    )
                 } else {
                     staff.value.forEachIndexed { index, profile ->
                         if (index > 0) KlinaraDivider()

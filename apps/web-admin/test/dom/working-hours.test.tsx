@@ -68,7 +68,7 @@ function mockRoutes(): void {
         ],
       });
     }
-    if (path === 'staff') return Promise.resolve({ data: STAFF });
+    if (path === 'staff?branchId=b1') return Promise.resolve({ data: STAFF });
     if (path.startsWith('staff/p1/schedule')) {
       return Promise.resolve({
         staffProfileId: 'p1',
@@ -303,6 +303,29 @@ describe('çalışma saatleri — personel', () => {
     await user.selectOptions(await screen.findByLabelText('Personel seçin'), id);
   }
 
+  it('personel listesi SEÇİLİ ŞUBEYE göre isteniyor, süzgeçsiz liste hiç istenmiyor', async () => {
+    render(<WorkingHoursPage />);
+    await screen.findAllByLabelText('Açılış');
+
+    const paths = get.mock.calls.map((call) => String(call[0]));
+    expect(paths).toContain('staff?branchId=b1');
+    expect(paths).not.toContain('staff');
+  });
+
+  it('şubede personel yoksa Şube ve Personel ekranına yönlendiriyor', async () => {
+    const base = get.getMockImplementation();
+    get.mockImplementation((path: string) =>
+      path === 'staff?branchId=b1' ? Promise.resolve({ data: [] }) : (base?.(path) as Promise<unknown>),
+    );
+    const user = userEvent.setup();
+    render(<WorkingHoursPage />);
+    await screen.findAllByLabelText('Açılış');
+    await user.click(screen.getByRole('tab', { name: /Personel planı/ }));
+
+    expect(await screen.findByText('Bu şubede aktif personel yok.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Şube ve Personel/ })).toHaveAttribute('href', '/personel');
+  });
+
   it('şube saatleri DIŞINA taşan gün uyarı veriyor ama kaydı engellemiyor', async () => {
     const user = userEvent.setup();
     await openStaff(user);
@@ -462,7 +485,7 @@ describe('çalışma saatleri — izinler', () => {
           ],
         });
       }
-      if (path === 'staff') return Promise.resolve({ data: STAFF });
+      if (path === 'staff?branchId=b1') return Promise.resolve({ data: STAFF });
       if (path.startsWith('branches/')) return Promise.resolve({ branchId: 'b1', entries: [] });
       return Promise.resolve({ data: [] });
     });
@@ -515,7 +538,7 @@ describe('çalışma saatleri — tatiller', () => {
     };
     get.mockImplementation((path: string) => {
       if (path.startsWith('holidays')) return Promise.resolve({ data: HOLIDAYS });
-      if (path === 'staff') return Promise.resolve({ data: STAFF });
+      if (path === 'staff?branchId=b1') return Promise.resolve({ data: STAFF });
       if (path.startsWith('branches/')) return Promise.resolve({ branchId: 'b1', entries: [] });
       return Promise.resolve({ data: [] });
     });

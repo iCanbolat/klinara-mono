@@ -310,6 +310,31 @@ object ShellRoutes {
         val staffId: String,
     )
 
+    /** Personelin rolleri ve şubeleri (A7.5). [userName] başlık için; kayıt yeniden çekilir. */
+    @Serializable
+    data class MembershipEditor(
+        val userId: String,
+        val userName: String,
+    )
+
+    /** Bekleyen davetler (A7.5). */
+    @Serializable
+    data object InvitationList
+
+    /** Personel davet formu (A7.5). */
+    @Serializable
+    data object InviteStaff
+
+    /** Şubeler (A7.4). */
+    @Serializable
+    data object BranchList
+
+    /** Şube formu. [branchId] null → yeni şube. */
+    @Serializable
+    data class BranchEditor(
+        val branchId: String? = null,
+    )
+
     /** Şube çalışma saatleri (A7.3) — SEÇİLİ şubenin. */
     @Serializable
     data object BranchHours

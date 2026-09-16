@@ -5,6 +5,7 @@
   "userFullName": "Mehmet Demir",
   "userEmail": "mehmet@demo-klinik.test",
   "primaryBranchId": "b1000000-0000-4000-8000-000000000002",
+  "branchIds": ["b1000000-0000-4000-8000-000000000001", "b1000000-0000-4000-8000-000000000002"],
   "title": "Lazer Uygulayıcısı",
   "specialties": ["Lazer epilasyon"],
   "calendarColor": "#5E7856",

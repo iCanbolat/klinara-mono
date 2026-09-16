@@ -53,7 +53,12 @@ export type DataPagePagination =
     };
 
 export interface DataPageProps<Row> {
-  title: string;
+  /**
+   * Verilmezse sayfa başlığı ÇİZİLMEZ — liste bir sekmenin içindeyse başlık
+   * sayfanın kendisinde durur. `actions` o durumda süzgeç satırının üstünde,
+   * sağa yaslı çiziliyor.
+   */
+  title?: string;
   description?: string;
   /** CTA düğmeleri — başlığın sağında, dar ekranda altında. */
   actions?: ReactNode;
@@ -122,12 +127,18 @@ export function DataPage<Row>({
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader
-        title={title}
-        className="mb-0"
-        {...(description === undefined ? {} : { description })}
-        {...(actions === undefined ? {} : { actions })}
-      />
+      {title === undefined ? (
+        actions === undefined ? null : (
+          <div className="flex flex-wrap items-center justify-end gap-2">{actions}</div>
+        )
+      ) : (
+        <PageHeader
+          title={title}
+          className="mb-0"
+          {...(description === undefined ? {} : { description })}
+          {...(actions === undefined ? {} : { actions })}
+        />
+      )}
 
       {notice}
 

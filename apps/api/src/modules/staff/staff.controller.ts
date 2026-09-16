@@ -9,6 +9,7 @@ import {
   Patch,
   Post,
   Put,
+  Query,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -19,9 +20,12 @@ import {
 } from '@nestjs/swagger';
 import { PERMISSIONS } from '@klinara/shared';
 import { RequirePermission } from '../../common/decorators/auth.decorators';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import type { Principal } from '../identity/principal';
 import { StaffService } from './staff.service';
 import {
   CreateStaffProfileDto,
+  ListStaffQueryDto,
   ReplaceStaffServicesDto,
   StaffListResponseDto,
   StaffProfileResponseDto,
@@ -38,8 +42,11 @@ export class StaffController {
   @RequirePermission(PERMISSIONS.STAFF_READ)
   @ApiOperation({ summary: 'Personel listesi' })
   @ApiOkResponse({ type: StaffListResponseDto })
-  async list(): Promise<StaffListResponseDto> {
-    return { data: await this.staff.listStaffProfiles() };
+  async list(
+    @CurrentUser() principal: Principal,
+    @Query() query: ListStaffQueryDto,
+  ): Promise<StaffListResponseDto> {
+    return { data: await this.staff.listStaffProfiles(principal, query.branchId) };
   }
 
   @Post('staff')
@@ -47,8 +54,11 @@ export class StaffController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Personel profili oluştur' })
   @ApiCreatedResponse({ type: StaffProfileResponseDto })
-  create(@Body() body: CreateStaffProfileDto): Promise<StaffProfileResponseDto> {
-    return this.staff.createStaffProfile(body);
+  create(
+    @CurrentUser() principal: Principal,
+    @Body() body: CreateStaffProfileDto,
+  ): Promise<StaffProfileResponseDto> {
+    return this.staff.createStaffProfile(principal, body);
   }
 
   @Get('staff/:id')
@@ -64,10 +74,11 @@ export class StaffController {
   @ApiOperation({ summary: 'Personel profili güncelle' })
   @ApiOkResponse({ type: StaffProfileResponseDto })
   update(
+    @CurrentUser() principal: Principal,
     @Param('id', new ParseUUIDPipe()) id: string,
     @Body() body: UpdateStaffProfileDto,
   ): Promise<StaffProfileResponseDto> {
-    return this.staff.updateStaffProfile(id, body);
+    return this.staff.updateStaffProfile(principal, id, body);
   }
 
   @Put('staff/:id/services')

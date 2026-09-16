@@ -38,6 +38,7 @@ import com.klinara.android.designsystem.components.KlinaraTextField
 import com.klinara.android.designsystem.components.KlinaraToggleRow
 import com.klinara.android.features.auth.AppSession
 import com.klinara.android.features.calendar.accentColor
+import com.klinara.android.features.customers.SelectableChip
 import com.klinara.android.services.ServiceContainer
 import com.klinara.android.services.contracts.Permissions
 import com.klinara.android.services.networking.Loadable
@@ -59,6 +60,7 @@ fun StaffListScreen(
     onOpen: (staffId: String) -> Unit,
     onCreate: () -> Unit,
     modifier: Modifier = Modifier,
+    onInvite: (() -> Unit)? = null,
     trailing: @Composable (RowScope.() -> Unit)? = null,
 ) {
     val viewModel: StaffListViewModel = viewModel(key = "staff-list", factory = StaffListViewModel.factory(container))
@@ -87,10 +89,18 @@ fun StaffListScreen(
                         icon = Icons.Filled.Person,
                     )
                 } else {
-                    StaffBody(profiles = profiles.value, onOpen = onOpen)
+                    StaffBody(session = session, profiles = profiles.value, onOpen = onOpen)
                 }
         }
 
+        if (onInvite != null && session.can(Permissions.USER_INVITE)) {
+            KlinaraButton(
+                title = "Personel davet et",
+                onClick = onInvite,
+                kind = KlinaraButtonKind.Secondary,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
         if (canCreate) {
             KlinaraButton(
                 title = "Yeni personel",
@@ -106,20 +116,48 @@ fun StaffListScreen(
 internal fun canCreateStaff(session: AppSession): Boolean =
     session.can(Permissions.STAFF_WRITE) && session.can(Permissions.USER_READ)
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun StaffBody(
+    session: AppSession,
     profiles: List<StaffProfile>,
     onOpen: (String) -> Unit,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     var showsInactive by rememberSaveable { mutableStateOf(false) }
+    // null → oturumun seçili şubesi; "" → tüm şubeler (yalnız kiracı geneli rollerde).
+    var branchFilter by rememberSaveable { mutableStateOf<String?>(null) }
+    val effectiveBranch = (branchFilter ?: session.activeBranchId).takeUnless { it.isNullOrEmpty() }
 
     KlinaraTextField(label = "Personel ara", value = query, onValueChange = { query = it })
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(KlinaraMetrics.xs),
+        verticalArrangement = Arrangement.spacedBy(KlinaraMetrics.xs),
+    ) {
+        if (session.profile.tenantWide) {
+            SelectableChip(label = "Tüm şubeler", isSelected = effectiveBranch == null, onClick = { branchFilter = "" })
+        }
+        session.switchableBranches.forEach { branch ->
+            SelectableChip(
+                label = branch.name,
+                isSelected = effectiveBranch == branch.id,
+                onClick = { branchFilter = branch.id },
+            )
+        }
+    }
     KlinaraToggleRow(label = "Pasifleri göster", isOn = showsInactive, onToggle = { showsInactive = it })
 
-    val visible = filteredStaff(profiles, query, showsInactive)
+    val visible = filteredStaff(profiles, query, showsInactive, effectiveBranch)
     if (visible.isEmpty()) {
-        Text("Aramanızla eşleşen personel yok.", style = KlinaraType.bodyM, color = KlinaraTheme.colors.charcoalMuted)
+        Text(
+            if (query.isBlank()) {
+                "Bu şubede personel yok. Rol ve şube atamasını personelin detayından yapabilirsiniz."
+            } else {
+                "Aramanızla eşleşen personel yok."
+            },
+            style = KlinaraType.bodyM,
+            color = KlinaraTheme.colors.charcoalMuted,
+        )
         return
     }
     KlinaraCard {

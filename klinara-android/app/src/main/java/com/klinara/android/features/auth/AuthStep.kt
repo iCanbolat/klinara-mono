@@ -79,8 +79,15 @@ data class AppSession(
 
     fun canAny(vararg permissions: String): Boolean = permissions.any(::can)
 
+    /**
+     * Şube menüsünün seçenekleri (A7.4): pasif şube menüde görünmez — orada yeni iş
+     * yapılamaz — ancak hâlâ seçiliyse kalır, seçim kaybolmasın.
+     */
+    val switchableBranches: List<BranchSummary>
+        get() = branches.filter { it.isActive || it.id == activeBranchId }
+
     /** Şube değiştirme menüsü yalnız seçenek varken anlamlı. */
-    val canSwitchBranch: Boolean get() = branches.size > 1
+    val canSwitchBranch: Boolean get() = switchableBranches.size > 1
 }
 
 /** Kullanıcı tanımlayıcı olarak telefonu mu e-postayı mı veriyor. */

@@ -19,6 +19,8 @@ enum class ManagementDestination {
     Services,
     ServiceCategories,
     Staff,
+    Branches,
+    Invitations,
     BranchHours,
     ScheduleExceptions,
     CustomerTags,
@@ -67,15 +69,7 @@ fun managementSections(session: AppSession): List<ManagementSection> =
                 ),
             )
         }
-        if (session.can(Permissions.STAFF_READ)) {
-            add(
-                section(
-                    "Ekip",
-                    row(ManagementDestination.Staff, "Personel", "Profil, uzmanlık ve hizmet yetkinlikleri"),
-                    footnote = "Bir personele yetkin olmadığı hizmetten randevu açılamaz.",
-                ),
-            )
-        }
+        teamSection(session)?.let(::add)
         if (session.can(Permissions.SCHEDULE_READ)) {
             add(
                 section(
@@ -116,6 +110,40 @@ fun managementSections(session: AppSession): List<ManagementSection> =
         communicationSection(session)?.let(::add)
         reportsSection(session)?.let(::add)
     }
+
+/**
+ * "Şube ve Personel" (A7.4–A7.5) — web panelindeki ekranın ve iOS `teamCard`ın karşılığı. Kapı
+ * `staff:read`: `branch:read` HER rolde var ve kapı olsaydı muhasebeci yalnız şube listesinden
+ * ibaret bir kart görürdü. Şubeler `branch:read`, davetler `user:invite` ile satır olarak eklenir.
+ */
+private fun teamSection(session: AppSession): ManagementSection? {
+    if (!session.can(Permissions.STAFF_READ)) return null
+    val rows =
+        buildList {
+            add(row(ManagementDestination.Staff, "Personel", "Profil, roller, şubeler ve hizmet yetkinlikleri"))
+            if (session.can(Permissions.BRANCH_READ)) {
+                add(
+                    row(
+                        ManagementDestination.Branches,
+                        "Şubeler",
+                        if (session.can(Permissions.BRANCH_WRITE)) {
+                            "Şube ekleme, iletişim ve pasife alma"
+                        } else {
+                            "Kliniğin şubeleri"
+                        },
+                    ),
+                )
+            }
+            if (session.can(Permissions.USER_INVITE)) {
+                add(row(ManagementDestination.Invitations, "Davetler", "Yeni personel davet et, bekleyenleri iptal et"))
+            }
+        }
+    return ManagementSection(
+        title = "Şube ve Personel",
+        rows = rows,
+        footnote = "Bir personele yetkin olmadığı hizmetten randevu açılamaz.",
+    )
+}
 
 /**
  * Raporlar kartı (A9) — iOS `reportsCard` paritesi: klinik ve paket raporları TEK kartta, en

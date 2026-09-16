@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useMemo, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import type { StaffProfile } from '@klinara/shared';
@@ -37,6 +38,7 @@ import { WeekEditor } from './week-editor';
 export function StaffScheduleTab({
   branchId,
   staff,
+  staffLoading = false,
   staffProfileId,
   onStaffChange,
   week,
@@ -46,6 +48,8 @@ export function StaffScheduleTab({
 }: {
   branchId: string;
   staff: readonly StaffProfile[];
+  /** Şubenin personel listesi henüz gelmedi — "personel yok" demek erken. */
+  staffLoading?: boolean;
   staffProfileId: string | null;
   onStaffChange: (staffProfileId: string | null) => void;
   week: WeekDraft;
@@ -106,8 +110,18 @@ export function StaffScheduleTab({
 
       {shownError !== null ? <Alert tone="danger">{shownError}</Alert> : null}
 
-      {staff.length === 0 ? (
-        <EmptyState title={t('schedule.noStaff')} />
+      {staffLoading ? (
+        <Skeleton className="h-48 w-full rounded-xl" />
+      ) : staff.length === 0 ? (
+        <EmptyState
+          title={t('schedule.noStaff')}
+          message={t('schedule.noStaffHint')}
+          footer={
+            <Link href="/personel" className="text-sm font-semibold text-primary underline underline-offset-4">
+              {t('schedule.goToStaff')}
+            </Link>
+          }
+        />
       ) : staffProfileId === null ? (
         <EmptyState title={t('schedule.pickStaff')} message={t('schedule.pickStaffHint')} />
       ) : !week.loaded ? (

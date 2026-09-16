@@ -81,6 +81,34 @@ object RoleNames {
     fun turkish(roleKeys: List<String>): String = roleKeys.joinToString(", ", transform = ::turkish)
 }
 
+enum class RoleScope { Platform, Tenant, Branch }
+
+data class RoleDefinition(
+    val key: String,
+    /** Yetki genişliği: kimse kendinden yüksek rank'li bir rolü atayamaz/kaldıramaz. */
+    val rank: Int,
+    /** Tenant → şube ALMAZ; Branch → şube İSTER. */
+    val scope: RoleScope,
+)
+
+/**
+ * Rol tanımları — rank ve kapsam. Rol/şube düzenleyicisi (A7.5) sunucunun
+ * `assertNoEscalation` ve `assertRoleScope` kurallarını bunlarla yansıtıyor.
+ */
+object RoleDefinitions {
+    val all: List<RoleDefinition> =
+        listOf(
+            RoleDefinition("platform_admin", rank = 100, scope = RoleScope.Platform),
+            RoleDefinition("owner", rank = 80, scope = RoleScope.Tenant),
+            RoleDefinition("manager", rank = 60, scope = RoleScope.Branch),
+            RoleDefinition("accountant", rank = 40, scope = RoleScope.Tenant),
+            RoleDefinition("receptionist", rank = 30, scope = RoleScope.Branch),
+            RoleDefinition("practitioner", rank = 20, scope = RoleScope.Branch),
+        )
+
+    fun of(roleKey: String): RoleDefinition? = all.firstOrNull { it.key == roleKey }
+}
+
 /**
  * Rol → izin demetleri.
  *

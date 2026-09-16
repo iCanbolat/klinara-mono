@@ -93,6 +93,10 @@ export class StaffProfileResponseDto {
   @ApiProperty({ format: 'uuid', nullable: true, type: String })
   primaryBranchId: string | null;
 
+  /** Kullanıcının aktif ŞUBE üyeliklerinin şubeleri (kiracı kapsamlı roller hariç). */
+  @ApiProperty({ type: [String], format: 'uuid' })
+  branchIds: string[];
+
   @ApiProperty({ nullable: true, type: String })
   title: string | null;
 
@@ -116,6 +120,14 @@ export class StaffProfileResponseDto {
 
   @ApiProperty({ type: [StaffServiceResponseDto] })
   services: StaffServiceResponseDto[];
+}
+
+export class ListStaffQueryDto {
+  /** Verilirse yalnız o şubeye ait personel (ana şube VEYA şube üyeliği). */
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  branchId?: string;
 }
 
 export class StaffListResponseDto {

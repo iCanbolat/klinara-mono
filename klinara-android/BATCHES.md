@@ -2749,3 +2749,84 @@ uçlarının canlı sürülmesi.
 Faz boyunca sunucuda kusur bulunmadı; buna karşılık **iOS'ta altı fark** not edildi (A9.2 listesi)
 ve bunların ikisi gerçek kusur: ciro toplam kartının satırsız dönemde gizlenmesi ve karşılaştırma
 anahtarının hiçbir ekranda açılamaması. Kalan borç: iOS'a 6 fark notu (A8'in 11 notuyla birlikte).
+
+---
+
+## A7.4 — Şube yönetimi (Şube ve Personel) ✅ [S]
+
+**Durum:** `./gradlew check`: testler yeşil, **625 test**, 85 suite. ktlint temiz. Detekt ve Android
+lint bu işten gelmeyen iki bulgu yüzünden kırmızı: `CalendarDateStrip.kt:76` `ForEachOnRange`
+(commit'lenmemiş takvim değişikliği) ve `DashboardScreen.kt:484` `ModifierParameter` (HEAD'de zaten
+var). Emülatörde sürülmedi; mock grafiği birim testleriyle sınandı.
+
+Web panelindeki `/personel` → **"Şube ve Personel"** ekranının mobil karşılığı. Yönetim hub'ında
+"Ekip" kartı "Şube ve Personel" oldu: Personel, Şubeler (`branch:read`), Davetler (`user:invite`).
+
+### Sunucu [S]
+
+- `GET staff?branchId=`: yalnız o şubeye AİT personel, yani **ana şube VEYA aktif şube üyeliği**.
+  Birden çok şubede çalışan her listede bir kez görünür. Erişilemeyen şube 403 `BRANCH_FORBIDDEN`.
+- `StaffProfileResponseDto.branchIds`: aktif şube üyeliklerinin şubeleri. Kiracı kapsamlı roller
+  burada yok.
+- **Güvenlik açığı kapandı:** `POST/PATCH staff`'ta `primaryBranchId` erişim kontrolünden
+  geçmiyordu. Şube yöneticisi personeli erişemediği bir şubeye "taşıyabiliyordu"; artık 403.
+
+### Şubeler
+
+- `BranchesService` (`list/create/update`) eklendi; silme ucu yok, pasife alma `isActive = false`.
+- Liste: aktifler önce, pasifler rozetle; satır yalnız `branch:write` ile tıklanabilir.
+- Form: kod addan önerilir (`BranchSlug.suggest`), alana dokununca öneri durur; düzenlemede kod
+  salt okunur.
+- `PATCH` yalnız değişen alanı taşır; boş telefon/adres `Patch.Clear`.
+- **Pasife alma ayrıca onaylanır.** Kayıttan sonra `SessionViewModel.reloadBranches()` çalışır:
+  seçili şube pasifse ilk aktif şubeye geçilir, token deposu da güncellenir.
+- `AppSession.switchableBranches`: pasif şube menüde görünmez, yalnız hâlâ seçiliyse kalır.
+
+### Plandan sapmalar
+
+- Saat dilimi seçicisi kısa bir liste (İstanbul başta, mevcut değer korunuyor). 400 dilimlik bir
+  liste mobilde kullanılamazdı.
+
+---
+
+## A7.5 — Roller ve şubeler, davetler, şube süzgeci ✅
+
+### Rol/şube düzenleyici (`PUT users/:id/memberships`)
+
+- Kurallar saf `MembershipRules`'ta ve web ile iOS'la aynı vakalarla test edildi:
+  - kendi rolüne dokunamama
+  - rütbe kilidi (satır görünür, olduğu gibi geri gider)
+  - erişilemeyen şube satırı **tüm düzenleyiciyi** kilitler (tam değiştirme + her şube `assertInput`'tan geçiyor)
+  - şube kapsamı ve tekrar yasağı
+- Tüm rolleri kaldırmak ayrıca onaylanır. Kirli taslakla geri dönüş `rememberUnsavedChangesGuard`
+  ile korunur.
+- Rank ve kapsam **üretilmiş** `RoleDefinitions`'tan geliyor: `gen-client-contracts.mjs` artık rank
+  ve scope da yazıyor. Elle kopya yok.
+
+### Davetler
+
+- Bekleyen davetler listelenir; süresi dolan rozetle kalır. İptal onaylıdır.
+- Form yalnız atanabilir rolleri ve erişilebilir aktif şubeleri sunar; kiracı rolünde şube alanı
+  yok.
+
+### Şube süzgeci
+
+- Personel listesinde şube çipleri var: varsayılan seçili şube, "Tüm şubeler" yalnız kiracı geneli
+  rolde.
+- İzin editörünün personel seçicisi `staff.list(branchId)` ile sunucuda süzülüyor.
+
+### iOS'a geri bildirilecek farklar (§7.8)
+
+1. iOS rank/scope'u `MembershipRules.assignable`'da **elle** tutuyor; Android üretilmişi kullanıyor.
+   iOS için de üretici hedef açılmalı.
+2. iOS personel listesi ve izin editörü şubeyi **istemcide** süzüyor (`worksIn`, sunucunun döndüğü
+   `branchIds` ile). Android izin editöründe sunucu süzgecini kullanıyor. Kural aynı, istek farklı.
+3. A7.2'de bildirilen "iOS unvan/ana şube/renk/tanıtımı temizleyemiyor" farkı **bu işle kapandı**
+   (`UpdateStaffProfileInput` artık `Nullable`).
+
+### Yeni bağımlılık: YOK
+
+### Kapsam dışı
+
+- Davet bağlantısını (geliştirme ortamında dönen `link`) mobilde gösterme.
+- Kullanıcı adı/aktiflik düzenleme (`PATCH users/:id`).

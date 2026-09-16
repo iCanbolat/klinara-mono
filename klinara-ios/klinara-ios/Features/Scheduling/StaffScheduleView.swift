@@ -77,6 +77,20 @@ struct StaffScheduleView: View {
                         .foregroundStyle(KlinaraColor.charcoalMuted)
                         .fixedSize(horizontal: false, vertical: true)
 
+                    if let branch = session.selectedBranch,
+                       let profile = session.staffStore.profile(id: staffProfileId),
+                       !profile.worksIn(branchId: branch.id) {
+                        // Plan kurulabilir ama bu şubenin personel listelerinde
+                        // görünmez; sebebini kaydetmeden önce söylüyoruz.
+                        Label(
+                            "\(profile.userFullName) \(branch.name) şubesine atanmamış; bu şubenin personel listelerinde görünmez. Roller ve şubeler'den bu şubede bir rol verebilirsiniz.",
+                            systemImage: "exclamationmark.triangle"
+                        )
+                        .klinaraText(.bodyM)
+                        .foregroundStyle(KlinaraColor.danger)
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+
                     KlinaraCard {
                         ForEach(Array(Weekday.displayOrder.enumerated()), id: \.element.id) { index, weekday in
                             if index > 0 { KlinaraDivider() }

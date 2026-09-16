@@ -23,7 +23,21 @@ import {
   type PresignAssetResponse,
   type RevisionSummary,
   type UpdateBookingPageInput,
+  type BranchDetail,
+  type CreateBranchInput,
+  type CreateInvitationInput,
+  type Invitation,
+  type UpdateBranchInput,
 } from '@klinara/shared';
+import {
+  BranchResponseDto,
+  CreateBranchDto,
+  UpdateBranchDto,
+} from '../../src/modules/tenancy/dto/tenant.dto';
+import {
+  CreateInvitationDto,
+  InvitationResponseDto,
+} from '../../src/modules/identity/dto/invitation.dto';
 import {
   BookingPageDto,
   BookingSiteSettingsDto,
@@ -93,6 +107,13 @@ const _keysConfirm: SameKeys<ConfirmAssetDto, ConfirmAssetInput> = true;
 const _keysDomain: SameKeys<DomainDto, Domain> = true;
 const _keysDns: SameKeys<DnsInstructionsDto, DnsInstructions> = true;
 const _keysCreateDomain: SameKeys<CreateDomainDto, CreateDomainInput> = true;
+const _keysBranchDetail: SameKeys<BranchResponseDto, BranchDetail> = true;
+const _keysCreateBranch: SameKeys<CreateBranchDto, CreateBranchInput> = true;
+const _keysUpdateBranch: SameKeys<UpdateBranchDto, UpdateBranchInput> = true;
+const _keysInvitation: SameKeys<InvitationResponseDto, Invitation> = true;
+const _keysCreateInvitation: SameKeys<CreateInvitationDto, CreateInvitationInput> = true;
+const _branchDetailToShared: BranchDetail = new BranchResponseDto();
+const _invitationToShared: Invitation = new InvitationResponseDto();
 
 /** Değer düzeyinde atanabilirlik — alan TİPLERİ de uyuşmalı, yalnız adlar değil. */
 const _bookingPageToShared: BookingPage = new BookingPageDto() as BookingPageDto & {
@@ -133,6 +154,13 @@ void [
   _keysDomain,
   _keysDns,
   _keysCreateDomain,
+  _keysBranchDetail,
+  _keysCreateBranch,
+  _keysUpdateBranch,
+  _keysInvitation,
+  _keysCreateInvitation,
+  _branchDetailToShared,
+  _invitationToShared,
   _bookingPageToShared,
   _revisionToShared,
   _assetToShared,

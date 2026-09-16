@@ -189,7 +189,9 @@ class ScheduleExceptionEditorViewModel(
             return
         }
         viewModelScope.launch {
-            val result = Loadable.of { staffService.list().filter { it.isActive } }
+            // Yalnız bu şubeye ait personel (A7.4–A7.5): başka şubenin personeline burada izin açmak,
+            // bu şubenin takvimini hiç etkilemeyen bir kayıttır.
+            val result = Loadable.of { staffService.list(branchId).filter { it.isActive } }
             _state.update { it.copy(staff = result) }
         }
     }

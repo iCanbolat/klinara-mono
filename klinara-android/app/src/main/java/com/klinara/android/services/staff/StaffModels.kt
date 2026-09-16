@@ -33,6 +33,11 @@ data class StaffProfile(
     val userFullName: String,
     val userEmail: String = "",
     val primaryBranchId: String? = null,
+    /**
+     * Aktif **şube** üyeliklerinin şubeleri (A7.4–A7.5) — kiracı kapsamlı roller hariç. Eski sunucu
+     * göndermiyordu; varsayılan boş.
+     */
+    val branchIds: List<String> = emptyList(),
     val title: String? = null,
     val specialties: List<String> = emptyList(),
     /** `#1A6A7A` — sunucu null gönderebilir; ekran token'lı bir varsayılana düşer. */
@@ -52,6 +57,12 @@ data class StaffProfile(
         services.any {
             it.isActive && it.serviceId == serviceId && (it.branchId == null || it.branchId == branchId)
         }
+
+    /**
+     * Bu şubeye ait mi — ana şube **veya** şube üyeliği. Sunucunun `GET staff?branchId=`
+     * süzgeciyle AYNI kural; mock ve liste süzgeci bunu kullanıyor.
+     */
+    fun worksIn(branchId: String): Boolean = primaryBranchId == branchId || branchId in branchIds
 
     /** Listedeki "N hizmet" — AKTİF yetkinliklerin FARKLI hizmet sayısı (iki şube kapsamı tek hizmet). */
     val activeServiceCount: Int get() = services.filter { it.isActive }.map { it.serviceId }.toSet().size
@@ -168,5 +179,66 @@ data class ReplaceStaffServicesInput(
                     }
                 }
             }
+        }
+}
+
+// --- Rol/şube ve davet (A7.5) — `apps/api/src/modules/identity/dto` ---
+
+/** `MembershipInputDto`. Kiracı kapsamlı rolde [branchId] GÖNDERİLMEZ (sunucu 400). */
+data class MembershipInput(
+    val roleKey: String,
+    val branchId: String? = null,
+)
+
+/** `PutMembershipsDto` — rol kümesi TAMAMEN bununla değiştirilir; boş liste klinikten çıkarır. */
+internal fun membershipsBody(memberships: List<MembershipInput>): JsonObject =
+    buildJsonObject {
+        putJsonArray("memberships") {
+            memberships.forEach { membership ->
+                addJsonObject {
+                    put("roleKey", membership.roleKey)
+                    membership.branchId?.let { put("branchId", it) }
+                }
+            }
+        }
+    }
+
+/** `InvitationResponseDto`. */
+@Serializable
+data class Invitation(
+    val id: String,
+    val email: String,
+    val roleKey: String,
+    /** null → kiracı kapsamlı rol. */
+    val branchId: String? = null,
+    @Serializable(with = InstantSerializer::class)
+    val expiresAt: Instant,
+    @Serializable(with = InstantSerializer::class)
+    val createdAt: Instant? = null,
+    @Serializable(with = InstantSerializer::class)
+    val acceptedAt: Instant? = null,
+    @Serializable(with = InstantSerializer::class)
+    val revokedAt: Instant? = null,
+    /** Yalnız üretim dışında döner. */
+    val link: String? = null,
+) {
+    val isPending: Boolean get() = acceptedAt == null && revokedAt == null
+
+    fun isExpired(now: Instant): Boolean = expiresAt < now
+}
+
+/** `CreateInvitationDto`. */
+data class CreateInvitationInput(
+    val email: String,
+    val roleKey: String,
+    val branchId: String? = null,
+    val fullName: String? = null,
+) {
+    fun toJson(): JsonObject =
+        buildJsonObject {
+            put("email", email)
+            put("roleKey", roleKey)
+            branchId?.let { put("branchId", it) }
+            fullName?.let { put("fullName", it) }
         }
 }

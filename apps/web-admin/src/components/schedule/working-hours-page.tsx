@@ -17,6 +17,7 @@ import { toMessage } from '@/lib/reports/errors';
 import { fromEntries, toBranchHours, type DayDraft } from '@/lib/schedule/entries';
 import { Alert } from '@/components/ui/alert';
 import { EmptyState } from '@/components/ui/empty-state';
+import { FieldSelect } from '@/components/ui/field';
 import { PageHeader } from '@/components/ui/page-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -45,6 +46,18 @@ import { WeekEditor } from './week-editor';
  * ---------------------------------------------------------------------------
  * ŞUBE SAAT DİLİMİ
  * ---------------------------------------------------------------------------
+ * ---------------------------------------------------------------------------
+ * PERSONEL ŞUBEYE GÖRE SÜZÜLÜYOR
+ * ---------------------------------------------------------------------------
+ * `GET staff?branchId=` yalnız o şubeye ait personeli döner (ana şube VEYA
+ * şube üyeliği). Personel planı, izin formu ve izin listesi bu listeyi
+ * kullanıyor: başka şubenin personeline bu şubede plan kurmak, randevu
+ * alınamayan bir takvim üretirdi. Şube değişince seçili personel yeni
+ * listede yoksa seçim düşüyor.
+ *
+ * Şube seçici başlıkta: sayfanın bütün sekmeleri tek şubeye bağlı ve
+ * kaydedilmemiş taslak varken şube değiştirmek onay istiyor.
+ *
  * İzin saatleri ŞUBENİN saat diliminde kuruluyor. Şube listesi henüz yoksa
  * (ya da testte boşsa) `Europe/Istanbul` — takvim sayfasıyla aynı varsayım.
  */
@@ -55,12 +68,12 @@ const FALLBACK_TIMEZONE = 'Europe/Istanbul';
 
 export function WorkingHoursPage(): ReactNode {
   const { permissions } = useSession();
-  const { branchId, branches, canSelectAll } = useBranch();
+  const { branchId, branches, canSelectAll, setBranchId } = useBranch();
   const canWrite = permissions.includes(PERMISSIONS.SCHEDULE_WRITE);
   const timeZone = branches.find((branch) => branch.id === branchId)?.timezone ?? FALLBACK_TIMEZONE;
 
   const [tab, setTab] = useState<TabValue>('branch');
-  const [staff, setStaff] = useState<StaffProfile[]>([]);
+  const [staff, setStaff] = useState<StaffProfile[] | null>(null);
   const [staffProfileId, setStaffProfileId] = useState<string | null>(null);
   const [savedBranchDays, setSavedBranchDays] = useState<DayDraft[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -84,6 +97,7 @@ export function WorkingHoursPage(): ReactNode {
     setBranchKey(branchId);
     clearBranch();
     setSavedBranchDays(null);
+    setStaff(null);
   }
   const staffKey = `${branchId ?? ''}|${staffProfileId ?? ''}`;
   const [loadedStaffKey, setLoadedStaffKey] = useState(staffKey);
@@ -106,13 +120,20 @@ export function WorkingHoursPage(): ReactNode {
             signal: controller.signal,
             branchId,
           }),
-          api.get<{ data: StaffProfile[] }>('staff', { signal: controller.signal }),
+          api.get<{ data: StaffProfile[] }>(`staff?branchId=${encodeURIComponent(branchId)}`, {
+            signal: controller.signal,
+          }),
         ]);
         if (controller.signal.aborted) return;
         const days = fromEntries(hours.entries);
         loadBranch(days);
         setSavedBranchDays(days);
-        setStaff(staffList.data.filter((profile) => profile.isActive));
+        const active = staffList.data.filter((profile) => profile.isActive);
+        setStaff(active);
+        // Önceki şubede seçilen personel bu şubede yoksa seçim düşüyor.
+        setStaffProfileId((current) =>
+          current !== null && active.some((profile) => profile.id === current) ? current : null,
+        );
       } catch (caught) {
         if (controller.signal.aborted) return;
         setError(toMessage(caught));
@@ -164,20 +185,45 @@ export function WorkingHoursPage(): ReactNode {
     }
   }
 
+  const branchPicker = (
+    <FieldSelect
+      label={t('schedule.branch')}
+      className="w-full sm:w-64"
+      value={branchId ?? ''}
+      disabled={branches.length === 0}
+      onChange={(event) => {
+        const next = event.target.value === '' ? null : event.target.value;
+        guard(() => setBranchId(next));
+      }}
+    >
+      {branchId === null ? <option value="">—</option> : null}
+      {branches
+        .filter((branch) => branch.isActive !== false || branch.id === branchId)
+        .map((branch) => (
+          <option key={branch.id} value={branch.id}>
+            {branch.name}
+          </option>
+        ))}
+    </FieldSelect>
+  );
+
   if (branchId === null) {
     return (
       <div className="flex flex-col gap-6">
-        <PageHeader title={t('schedule.title')} className="mb-0" />
+        <PageHeader title={t('schedule.title')} actions={branchPicker} className="mb-0" />
         <EmptyState title={t('schedule.title')} message={t('schedule.pickBranch')} />
       </div>
     );
   }
+
+  const staffList = staff ?? [];
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title={t('schedule.title')}
         description={t('schedule.description')}
+        actions={branchPicker}
         className="mb-0"
       />
 
@@ -230,7 +276,8 @@ export function WorkingHoursPage(): ReactNode {
         <TabsContent value="staff">
           <StaffScheduleTab
             branchId={branchId}
-            staff={staff}
+            staff={staffList}
+            staffLoading={staff === null && error === null}
             staffProfileId={staffProfileId}
             onStaffChange={(next) => guard(() => setStaffProfileId(next))}
             week={staffWeek}
@@ -244,7 +291,7 @@ export function WorkingHoursPage(): ReactNode {
           <ExceptionsPanel
             branchId={branchId}
             timeZone={timeZone}
-            staff={staff}
+            staff={staffList}
             canWrite={canWrite}
           />
         </TabsContent>

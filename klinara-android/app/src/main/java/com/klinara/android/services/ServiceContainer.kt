@@ -11,6 +11,9 @@ import com.klinara.android.services.auth.MockAuthService
 import com.klinara.android.services.auth.KeystoreSessionCipher
 import com.klinara.android.services.auth.TokenStore
 import com.klinara.android.services.booking.BookingService
+import com.klinara.android.services.branches.BranchesService
+import com.klinara.android.services.branches.LiveBranchesService
+import com.klinara.android.services.branches.MockBranchesService
 import com.klinara.android.services.booking.LiveBookingService
 import com.klinara.android.services.booking.MockBookingService
 import com.klinara.android.services.catalog.CatalogService
@@ -105,6 +108,7 @@ class ServiceContainer private constructor(
     val booking: BookingService,
     val staff: StaffService,
     val users: UsersService,
+    val branches: BranchesService,
     val scheduling: SchedulingService,
     val customers: CustomerService,
     val notifications: NotificationsService,
@@ -160,6 +164,7 @@ class ServiceContainer private constructor(
                 booking = LiveBookingService(client, BranchClock(null)),
                 staff = LiveStaffService(client),
                 users = LiveUsersService(client),
+                branches = LiveBranchesService(client),
                 scheduling = LiveSchedulingService(client),
                 customers = LiveCustomerService(client),
                 notifications = LiveNotificationsService(client),
@@ -252,6 +257,7 @@ class ServiceContainer private constructor(
                 booking = mockBooking,
                 staff = mockStaff,
                 users = mockUsers,
+                branches = MockBranchesService(failing = failing),
                 scheduling = mockScheduling,
                 customers = mockCustomers,
                 notifications = mockNotifications,
@@ -296,11 +302,13 @@ class ServiceContainer private constructor(
             catalog: CatalogService = MockCatalogService(latencyEnabled = false),
             packages: PackagesService = MockPackagesService(latencyEnabled = false),
             reports: ReportsService = MockReportsService(latencyEnabled = false),
+            branches: BranchesService = MockBranchesService(latencyEnabled = false),
         ) = ServiceContainer(
             auth = auth,
             booking = booking,
             staff = staff,
             users = users,
+            branches = branches,
             scheduling = scheduling,
             customers = customers,
             notifications = notifications,

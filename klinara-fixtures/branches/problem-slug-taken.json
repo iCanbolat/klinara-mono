@@ -1,0 +1,9 @@
+{
+  "type": "https://errors.klinara.app/conflict",
+  "title": "Bu şube kodu zaten kullanımda",
+  "status": 409,
+  "code": "CONFLICT",
+  "instance": "/api/v1/branches",
+  "requestId": "4b8e1f0a-2d3c-4e5f-8a9b-0c1d2e3f4a5b",
+  "detail": "\"bodrum\" bu klinikte başka bir şubeye ait."
+}

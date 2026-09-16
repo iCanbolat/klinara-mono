@@ -107,6 +107,10 @@ const RULES: readonly Rule[] = [
   // --- Kimlik: yalnız oturum AÇILDIKTAN sonraki, token üretmeyen uçlar ---
   { methods: ['GET', 'PATCH'], pattern: /^me$/ },
   { methods: ['GET'], pattern: /^branches$/ },
+  // Şube yönetimi ("Şube ve Personel"). Yalnız `branch:write` (owner); SİLME
+  // UCU YOK — pasife alma `PATCH { isActive: false }`.
+  { methods: ['POST'], pattern: /^branches$/ },
+  { methods: ['PATCH'], pattern: new RegExp(`^branches/${UUID}$`) },
   { methods: ['GET'], pattern: /^auth\/sessions$/ },
   { methods: ['DELETE'], pattern: new RegExp(`^auth/sessions/${UUID}$`) },
   { methods: ['POST'], pattern: /^auth\/logout-all$/ },

@@ -127,20 +127,9 @@ struct CalendarHomeView: View {
 
     private var header: some View {
         VStack(spacing: KlinaraMetrics.md) {
-            // Hafta modunda şerit ızgaranın kendi gün başlığını tekrar ederdi;
-            // ekranın dikeyi zaten ızgaraya lazım.
-            if store.mode != .week {
-                CalendarDateStrip(
-                    clock: clock,
-                    selected: store.selectedDate,
-                    counts: dayCounts,
-                    onSelect: { store.select($0) }
-                )
-            }
-
+            // Mod seçici ilk satırda ve tek başına: altındaki gezinme satırının
+            // ne kaydırdığı (gün mü hafta mı) önce burada belirleniyor.
             HStack(spacing: KlinaraMetrics.sm) {
-                stepButton(-1, icon: "chevron.left", label: previousLabel)
-
                 KlinaraSegmentedPicker(
                     options: CalendarStore.Mode.allCases,
                     selection: Binding(get: { store.mode }, set: { store.mode = $0 }),
@@ -148,14 +137,39 @@ struct CalendarHomeView: View {
                     icon: \.icon
                 )
 
-                stepButton(1, icon: "chevron.right", label: nextLabel)
-
+                // "Bugün" yalnız bugünde DEĞİLKEN görünür; seçici yer açmak için
+                // animasyonla daralır, gezinme satırının genişliği hiç değişmez.
                 if !clock.isToday(store.selectedDate) {
                     Button("Bugün") { store.goToToday() }
                         .klinaraText(.button)
                         .foregroundStyle(KlinaraColor.sageDeep)
                         .frame(height: 44)
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
+            }
+            .animation(KlinaraMetrics.feedback, value: clock.isToday(store.selectedDate))
+
+            // Oklar kaydırdıkları şeyin iki yanında: gün modlarında şeridin,
+            // hafta modunda hafta aralığının.
+            HStack(spacing: KlinaraMetrics.xs) {
+                stepButton(-1, icon: "chevron.left", label: previousLabel)
+
+                if store.mode == .week {
+                    Text(title)
+                        .klinaraText(.button)
+                        .foregroundStyle(KlinaraColor.charcoal)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .accessibilityAddTraits(.isHeader)
+                } else {
+                    CalendarDateStrip(
+                        clock: clock,
+                        selected: store.selectedDate,
+                        counts: dayCounts,
+                        onSelect: { store.select($0) }
+                    )
+                }
+
+                stepButton(1, icon: "chevron.right", label: nextLabel)
             }
 
             if !session.staffStore.profiles.isEmpty {
@@ -167,9 +181,9 @@ struct CalendarHomeView: View {
         .background(KlinaraColor.surface)
     }
 
-    /// İleri/geri. Şerit **daima** seçili günün haftasını çiziyor ve başka
-    /// bir haftaya geçmenin yolu yoktu; hafta ızgarası bunu görünür bir eksiğe
-    /// çevirdi — kaydırılamayan bir hafta görünümü planlamaya yaramaz.
+    /// İleri/geri. Şerit seçili günü ortalıyor; ok bir gün kaydırınca şerit de
+    /// tam bir hücre kayıyor. Hafta ızgarasında da kaydırılamayan bir hafta
+    /// planlamaya yaramazdı.
     ///
     /// Adım modun kendi adımı: hafta görünümünde bir gün ilerlemek çoğu zaman
     /// aynı haftada kalıp hiçbir şeyi değiştirmezdi.

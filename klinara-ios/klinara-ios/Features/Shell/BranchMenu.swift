@@ -13,7 +13,7 @@ struct BranchMenu: View {
     var body: some View {
         if session.canSwitchBranch {
             Menu {
-                ForEach(session.branches) { branch in
+                ForEach(session.switchableBranches) { branch in
                     Button {
                         session.switchBranch(to: branch)
                     } label: {

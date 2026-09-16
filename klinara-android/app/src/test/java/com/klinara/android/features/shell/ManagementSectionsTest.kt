@@ -28,7 +28,7 @@ class ManagementSectionsTest {
         assertEquals(
             listOf(
                 "Katalog",
-                "Ekip",
+                "Şube ve Personel",
                 "Takvim kurulumu",
                 "Müşteriler",
                 "Paketler",
@@ -65,5 +65,27 @@ class ManagementSectionsTest {
         listOf("owner", "manager", "receptionist", "practitioner", "accountant").forEach { role ->
             managementSections(ShellSessions.forRole(role)).forEach { assertEquals(true, it.rows.isNotEmpty()) }
         }
+    }
+
+    @Test
+    @DisplayName("Şube ve Personel (A7.4–A7.5): şubeler `branch:read`, davetler `user:invite` ile; muhasebe kartı görmez")
+    fun teamRows() {
+        fun rows(role: String) =
+            managementSections(ShellSessions.forRole(role))
+                .firstOrNull { it.title == "Şube ve Personel" }
+                ?.rows
+                ?.map { it.destination }
+
+        assertEquals(
+            listOf(ManagementDestination.Staff, ManagementDestination.Branches, ManagementDestination.Invitations),
+            rows("owner"),
+        )
+        assertEquals(
+            listOf(ManagementDestination.Staff, ManagementDestination.Branches, ManagementDestination.Invitations),
+            rows("manager"),
+        )
+        assertEquals(listOf(ManagementDestination.Staff, ManagementDestination.Branches), rows("receptionist"))
+        assertEquals(listOf(ManagementDestination.Staff, ManagementDestination.Branches), rows("practitioner"))
+        assertEquals(null, rows("accountant"))
     }
 }

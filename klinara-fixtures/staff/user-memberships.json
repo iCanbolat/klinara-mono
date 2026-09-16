@@ -1,0 +1,22 @@
+{
+  "data": [
+    {
+      "id": "m1000000-0000-4000-8000-000000000010",
+      "branchId": "b1000000-0000-4000-8000-000000000001",
+      "roleKey": "receptionist",
+      "roleName": "Resepsiyon"
+    },
+    {
+      "id": "m1000000-0000-4000-8000-000000000011",
+      "branchId": "b1000000-0000-4000-8000-000000000002",
+      "roleKey": "practitioner",
+      "roleName": "Uygulayıcı"
+    },
+    {
+      "id": "m1000000-0000-4000-8000-000000000012",
+      "branchId": null,
+      "roleKey": "accountant",
+      "roleName": "Muhasebe"
+    }
+  ]
+}

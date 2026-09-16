@@ -1,5 +1,10 @@
 package com.klinara.android.features.calendar
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
@@ -11,6 +16,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -30,6 +36,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -204,16 +211,35 @@ private fun CalendarHeader(
     now: Instant,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(KlinaraMetrics.sm)) {
-        if (state.mode != CalendarMode.Week) {
-            CalendarDateStrip(
-                clock = clock,
-                selected = state.selectedDate,
-                dayCounts = state.densityByDay.mapValues { (_, hours) -> hours.values.sum() },
-                onSelect = viewModel::select,
-                now = now,
+        // Mod seçici ilk satırda: altındaki gezinme satırının ne kaydırdığı (gün mü
+        // hafta mı) önce burada belirleniyor.
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(KlinaraMetrics.sm),
+        ) {
+            KlinaraSegmentedPicker(
+                options = CalendarMode.entries,
+                selected = state.mode,
+                onSelect = viewModel::setMode,
+                title = { it.turkishName },
+                modifier = Modifier.weight(1f),
             )
+
+            // "Bugün" yalnız bugünde DEĞİLKEN görünür: her zaman duran bir düğme,
+            // basıldığında hiçbir şey olmayan bir düğme olurdu. Seçicinin yanında
+            // durur ki gezinme satırının genişliği hiç değişmesin.
+            AnimatedVisibility(
+                visible = !clock.isToday(state.selectedDate, now),
+                enter = fadeIn() + expandHorizontally(expandFrom = Alignment.Start),
+                exit = fadeOut() + shrinkHorizontally(shrinkTowards = Alignment.Start),
+            ) {
+                TodayButton(onClick = { viewModel.goToToday(now) })
+            }
         }
 
+        // Oklar kaydırdıkları şeyin iki yanında: gün modlarında şeridin, hafta
+        // modunda hafta aralığının.
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -225,25 +251,31 @@ private fun CalendarHeader(
                 onClick = { viewModel.step(-1) },
             )
 
-            KlinaraSegmentedPicker(
-                options = CalendarMode.entries,
-                selected = state.mode,
-                onSelect = viewModel::setMode,
-                title = { it.turkishName },
-                modifier = Modifier.weight(1f),
-            )
+            if (state.mode == CalendarMode.Week) {
+                val days = clock.weekDays(state.selectedDate)
+                Text(
+                    text = "${clock.dayNumber(days.first())} – ${clock.formatDate(days.last())}",
+                    style = KlinaraType.bodyEmphasis,
+                    color = KlinaraTheme.colors.charcoal,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.weight(1f),
+                )
+            } else {
+                CalendarDateStrip(
+                    clock = clock,
+                    selected = state.selectedDate,
+                    dayCounts = state.densityByDay.mapValues { (_, hours) -> hours.values.sum() },
+                    onSelect = viewModel::select,
+                    modifier = Modifier.weight(1f),
+                    now = now,
+                )
+            }
 
             StepButton(
                 icon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 label = state.mode.nextLabel,
                 onClick = { viewModel.step(1) },
             )
-        }
-
-        // "Bugün" yalnız bugünde DEĞİLKEN görünür: her zaman duran bir düğme,
-        // basıldığında hiçbir şey olmayan bir düğme olurdu.
-        if (!clock.isToday(state.selectedDate, now)) {
-            TodayButton(onClick = { viewModel.goToToday(now) })
         }
 
         StaffFilterRow(state = state, onToggle = viewModel::toggleStaffFilter)
@@ -346,19 +378,23 @@ private fun StepButton(
 private fun TodayButton(onClick: () -> Unit) {
     val colors = KlinaraTheme.colors
     val interaction = remember { MutableInteractionSource() }
-    Text(
-        text = "Bugüne dön",
-        style = KlinaraType.bodyEmphasis,
-        color = colors.sageDeep,
+    Box(
         modifier =
             Modifier
+                .heightIn(min = KlinaraMetrics.minTouchTarget)
                 .klinaraClickable(
                     enabled = true,
                     role = Role.Button,
                     interactionSource = interaction,
                     onClick = onClick,
-                ).padding(vertical = KlinaraMetrics.xs),
-    )
+                ).clearAndSetSemantics {
+                    contentDescription = "Bugüne dön"
+                    role = Role.Button
+                }.padding(horizontal = KlinaraMetrics.xs),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text = "Bugün", style = KlinaraType.bodyEmphasis, color = colors.sageDeep, maxLines = 1)
+    }
 }
 
 @Composable

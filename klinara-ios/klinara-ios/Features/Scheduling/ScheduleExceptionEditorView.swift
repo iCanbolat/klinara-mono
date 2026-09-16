@@ -65,9 +65,17 @@ struct ScheduleExceptionEditorView: View {
     private var staffSection: some View {
         if presetStaffProfileId == nil {
             KlinaraFormSection(title: "Personel") {
-                let profiles = session.staffStore.profiles.filter(\.isActive)
+                // Yalnız bu şubeye ait personel: başka şubenin personeline burada
+                // izin açmak, bu şubenin takvimini hiç etkilemeyen bir kayıttır.
+                let profiles = session.staffStore.profiles.filter { profile in
+                    profile.isActive
+                        && (session.selectedBranchId.map { profile.worksIn(branchId: $0) } ?? true)
+                }
                 if profiles.isEmpty {
-                    KlinaraRow(label: "Aktif personel yok")
+                    KlinaraRow(
+                        label: "Bu şubede aktif personel yok",
+                        detail: "Personeli şubeye Yönetim → Şube ve Personel'den atayın."
+                    )
                 } else {
                     ForEach(Array(profiles.enumerated()), id: \.element.id) { index, profile in
                         if index > 0 { KlinaraDivider() }

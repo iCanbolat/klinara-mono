@@ -59,6 +59,7 @@ const STAFF = [
     userFullName: 'Zeynep Kaya',
     userEmail: 'z@k.test',
     primaryBranchId: 'b1',
+    branchIds: ['b1'],
     title: 'Uzman',
     specialties: [],
     calendarColor: null,

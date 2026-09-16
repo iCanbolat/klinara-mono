@@ -83,7 +83,7 @@ fun BranchMenu(
             onDismissRequest = { expanded = false },
             containerColor = KlinaraTheme.colors.surfaceRaised,
         ) {
-            session.branches.forEach { branch ->
+            session.switchableBranches.forEach { branch ->
                 val isActive = branch.id == session.activeBranchId
                 DropdownMenuItem(
                     text = {

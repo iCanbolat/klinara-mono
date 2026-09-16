@@ -5,6 +5,10 @@ import com.klinara.android.services.auth.AuthTokens
 import com.klinara.android.services.auth.InMemorySessionCipher
 import com.klinara.android.services.auth.MockAuthService
 import com.klinara.android.services.auth.TokenStore
+import com.klinara.android.services.branches.BranchDetail
+import com.klinara.android.services.branches.BranchesService
+import com.klinara.android.services.branches.CreateBranchInput
+import com.klinara.android.services.branches.UpdateBranchInput
 import com.klinara.android.services.mock.MockScenario
 import com.klinara.android.services.networking.FakePreferencesDataStore
 import kotlinx.coroutines.Dispatchers
@@ -24,6 +28,18 @@ import org.junit.jupiter.api.Test
 class SessionViewModelTest {
     private val dispatcher = StandardTestDispatcher()
     private lateinit var tokens: TokenStore
+    private var branchList: List<BranchDetail> = emptyList()
+    private val branches =
+        object : BranchesService {
+            override suspend fun list() = branchList
+
+            override suspend fun create(input: CreateBranchInput) = error("kullanılmıyor")
+
+            override suspend fun update(
+                id: String,
+                input: UpdateBranchInput,
+            ) = error("kullanılmıyor")
+        }
 
     @BeforeEach
     fun setUp() {
@@ -43,6 +59,7 @@ class SessionViewModelTest {
                 ShellSessions.forRole("manager", listOf(ShellSessions.nisantasi, ShellSessions.bodrum)),
             auth = MockAuthService(scenario, latencyEnabled = false),
             tokens = tokens,
+            branches = branches,
         )
     }
 
@@ -114,5 +131,33 @@ class SessionViewModelTest {
             advanceUntilIdle()
 
             assertEquals(listOf("practitioner"), model.session.value.profile.roles)
+        }
+
+    @Test
+    @DisplayName("Şube listesi tazelenir; seçili şube PASİFE alındıysa ilk aktif şubeye ve token deposuna geçilir")
+    fun reloadBranchesLeavesDeactivatedBranch() =
+        runTest {
+            val model = viewModel()
+            branchList =
+                listOf(
+                    BranchDetail(
+                        id = ShellSessions.nisantasi.id,
+                        slug = "nisantasi",
+                        name = "Nişantaşı",
+                        isActive = false,
+                    ),
+                    BranchDetail(id = ShellSessions.bodrum.id, slug = "bodrum", name = "Bodrum"),
+                    BranchDetail(id = "b-izmir", slug = "izmir", name = "İzmir"),
+                )
+
+            model.reloadBranches()
+            advanceUntilIdle()
+
+            val session = model.session.value
+            assertEquals(3, session.branches.size)
+            assertEquals(ShellSessions.bodrum.id, session.activeBranchId)
+            assertEquals(ShellSessions.bodrum.id, tokens.branchId())
+            // Pasif şube menüde yok; iki aktif şube kaldığı için menü açılır.
+            assertEquals(listOf(ShellSessions.bodrum.id, "b-izmir"), session.switchableBranches.map { it.id })
         }
 }

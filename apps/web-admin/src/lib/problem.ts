@@ -40,6 +40,7 @@ const MESSAGE_BY_CODE: Partial<Record<string, MessageKey>> = {
   [ERROR_CODES.INVALID_STATUS_TRANSITION]: 'error.invalidStatusTransition',
   [ERROR_CODES.VERSION_CONFLICT]: 'error.versionConflict',
   [ERROR_CODES.BRANCH_FORBIDDEN]: 'error.branchForbidden',
+  [ERROR_CODES.ROLE_ESCALATION]: 'error.roleEscalation',
   [ERROR_CODES.IDEMPOTENCY_CONFLICT]: 'error.idempotencyConflict',
 };
 

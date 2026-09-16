@@ -389,6 +389,73 @@ export interface Branch {
 }
 
 /**
+ * `GET/POST/PATCH branches` yanıtının TAM şekli — "Şube ve Personel"
+ * ekranının şube sekmesi bunu kullanıyor. Dar `Branch` bundan türetilebilir.
+ *
+ * Şube SİLİNMEZ: `isActive: false` pasife alır (yeni randevu alınmaz, geçmiş
+ * kayıtlar korunur). `slug` oluşturulduktan sonra değişmez.
+ */
+export interface BranchDetail {
+  id: string;
+  tenantId: string;
+  slug: string;
+  name: string;
+  timezone: string;
+  phone: string | null;
+  address: string | null;
+  isActive: boolean;
+  createdAt: string;
+}
+
+/** `POST branches` — yalnız `branch:write` (owner). */
+export interface CreateBranchInput {
+  /** 3–50 karakter, küçük harf/rakam/tire. */
+  slug: string;
+  name: string;
+  /** IANA saat dilimi; gönderilmezse sunucu `Europe/Istanbul` kullanır. */
+  timezone?: string;
+  phone?: string;
+  address?: string;
+}
+
+/** `PATCH branches/:id` — `null` alanı TEMİZLER, eksik alan dokunulmaz. */
+export interface UpdateBranchInput {
+  name?: string;
+  timezone?: string;
+  phone?: string | null;
+  address?: string | null;
+  isActive?: boolean;
+}
+
+/** `GET users` / `GET users/:id` — `me.user` ile aynı şekil. */
+export type AdminUser = MeUser;
+
+/** `GET invitations` satırı. */
+export interface Invitation {
+  id: string;
+  email: string;
+  roleKey: string;
+  /** `null` = kiracı kapsamlı rol. */
+  branchId: string | null;
+  expiresAt: string;
+  createdAt: string;
+  acceptedAt?: string | null;
+  revokedAt?: string | null;
+  /** Yalnız üretim dışında döner (e-posta gönderimi loga yazarken). */
+  token?: string;
+  link?: string;
+}
+
+/** `POST invitations` — `user:invite`. */
+export interface CreateInvitationInput {
+  email: string;
+  roleKey: string;
+  /** Şube kapsamlı roller için ZORUNLU. */
+  branchId?: string;
+  fullName?: string;
+}
+
+/**
  * Hizmet kategorisi — `serviceList` bloğunun süzgeç seçenekleri.
  *
  * `Branch` gibi bu da katalog DTO'sunun DAR bir dilimi (`tenantId`,

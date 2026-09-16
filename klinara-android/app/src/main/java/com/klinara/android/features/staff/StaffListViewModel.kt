@@ -63,14 +63,17 @@ class StaffListViewModel(
 
 /**
  * Liste süzgeci: pasifler istenmedikçe gizli; arama ad, unvan ve uzmanlıklarda Türkçe
- * duyarlı; sıra ada göre (iOS `StaffListView.filtered`).
+ * duyarlı; sıra ada göre (iOS `StaffListView.filtered`). [branchId] verilirse yalnız o
+ * şubeye ait personel (A7.4–A7.5 — ana şube VEYA şube üyeliği, [StaffProfile.worksIn]).
  */
 internal fun filteredStaff(
     profiles: List<StaffProfile>,
     query: String,
     showsInactive: Boolean,
+    branchId: String? = null,
 ): List<StaffProfile> =
     profiles
+        .filter { branchId == null || it.worksIn(branchId) }
         .filter { showsInactive || it.isActive }
         .filter { profile ->
             SearchText.matches(profile.userFullName, query) ||

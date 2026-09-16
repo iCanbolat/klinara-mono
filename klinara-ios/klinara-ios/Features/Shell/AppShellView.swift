@@ -123,7 +123,13 @@ enum Permissions {
     /// `completed`tan çıkış izni. `owner` ve `manager`da var, `receptionist`te yok.
     static let appointmentReopen = "appointment:reopen"
     static let branchRead = "branch:read"
+    /// Şube ekleme/düzenleme/pasife alma — yalnız `owner`.
+    static let branchWrite = "branch:write"
     static let userRead = "user:read"
+    /// Rol değiştirme `user:write` VEYA `user:invite` ile açık (sunucu
+    /// `RequireAnyPermission`); şube yöneticisi yalnız `invite` taşıyor.
+    static let userWrite = "user:write"
+    static let userInvite = "user:invite"
     static let packageRead = "package:read"
     static let packageWrite = "package:write"
     /// İade ve devir `package:write` üzerine **binmez**. Gerekçe `customer:merge`

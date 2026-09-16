@@ -1,9 +1,8 @@
-import { and, eq, inArray, isNull } from 'drizzle-orm';
-import { staffProfiles, staffServices, users } from '../../database/schema';
+import { and, eq, exists, inArray, isNotNull, isNull, or } from 'drizzle-orm';
+import { memberships, staffProfiles, staffServices, users } from '../../database/schema';
 import type { Tx } from '../../database/tenant-tx';
 import { definedValues, hasUpdates, type Updatable } from '../../database/updates';
 import type { StaffServiceInputDto } from './dto/staff.dto';
-
 
 export type StaffProfileRow = typeof staffProfiles.$inferSelect;
 export type StaffServiceRow = typeof staffServices.$inferSelect;
@@ -24,7 +23,36 @@ export interface StaffProfileWithUser {
   createdAt: Date;
 }
 
-export async function listStaffProfiles(tx: Tx): Promise<StaffProfileWithUser[]> {
+/**
+ * `branchId` verilirse yalnız o şubeye AİT personel döner: ana şubesi o şube
+ * olanlar VEYA o şubede aktif bir üyeliği (rolü) olanlar. Birden çok şubede
+ * çalışan personel her şubenin listesinde görünür; kiracı kapsamlı roller
+ * (owner, accountant) yalnız ana şubeleri eşleşirse listelenir.
+ */
+export async function listStaffProfiles(
+  tx: Tx,
+  branchId?: string,
+): Promise<StaffProfileWithUser[]> {
+  const inBranch =
+    branchId === undefined
+      ? undefined
+      : or(
+          eq(staffProfiles.primaryBranchId, branchId),
+          exists(
+            tx
+              .select({ id: memberships.id })
+              .from(memberships)
+              .where(
+                and(
+                  eq(memberships.userId, staffProfiles.userId),
+                  eq(memberships.branchId, branchId),
+                  eq(memberships.isActive, true),
+                  isNull(memberships.deletedAt),
+                ),
+              ),
+          ),
+        );
+
   return tx
     .select({
       id: staffProfiles.id,
@@ -43,8 +71,30 @@ export async function listStaffProfiles(tx: Tx): Promise<StaffProfileWithUser[]>
     })
     .from(staffProfiles)
     .innerJoin(users, eq(users.id, staffProfiles.userId))
-    .where(and(isNull(staffProfiles.deletedAt), isNull(users.deletedAt)))
+    .where(and(isNull(staffProfiles.deletedAt), isNull(users.deletedAt), inBranch))
     .orderBy(users.fullName);
+}
+
+/** Kullanıcıların aktif üyeliklerinin şubeleri (kiracı kapsamlı satırlar hariç). */
+export async function listMembershipBranches(
+  tx: Tx,
+  userIds: string[],
+): Promise<{ userId: string; branchId: string }[]> {
+  if (userIds.length === 0) return [];
+  const rows = await tx
+    .selectDistinct({ userId: memberships.userId, branchId: memberships.branchId })
+    .from(memberships)
+    .where(
+      and(
+        inArray(memberships.userId, userIds),
+        isNotNull(memberships.branchId),
+        eq(memberships.isActive, true),
+        isNull(memberships.deletedAt),
+      ),
+    );
+  return rows.flatMap((row) =>
+    row.branchId === null ? [] : [{ userId: row.userId, branchId: row.branchId }],
+  );
 }
 
 export async function findStaffProfileById(
@@ -99,7 +149,13 @@ export async function updateStaffProfile(
   values: Updatable<
     Pick<
       StaffProfileRow,
-      'primaryBranchId' | 'title' | 'specialties' | 'calendarColor' | 'bio' | 'isVisibleOnline' | 'isActive'
+      | 'primaryBranchId'
+      | 'title'
+      | 'specialties'
+      | 'calendarColor'
+      | 'bio'
+      | 'isVisibleOnline'
+      | 'isActive'
     >
   >,
 ): Promise<StaffProfileRow | undefined> {
@@ -113,7 +169,11 @@ export async function updateStaffProfile(
     return row;
   }
 
-  const [row] = await tx.update(staffProfiles).set(patch).where(eq(staffProfiles.id, id)).returning();
+  const [row] = await tx
+    .update(staffProfiles)
+    .set(patch)
+    .where(eq(staffProfiles.id, id))
+    .returning();
   return row;
 }
 
@@ -124,9 +184,7 @@ export async function listStaffServicesForProfile(
   return tx
     .select()
     .from(staffServices)
-    .where(
-      and(eq(staffServices.staffProfileId, staffProfileId), isNull(staffServices.deletedAt)),
-    )
+    .where(and(eq(staffServices.staffProfileId, staffProfileId), isNull(staffServices.deletedAt)))
     .orderBy(staffServices.createdAt);
 }
 
@@ -139,9 +197,7 @@ export async function listStaffServicesForProfiles(
   return tx
     .select()
     .from(staffServices)
-    .where(
-      and(inArray(staffServices.staffProfileId, profileIds), isNull(staffServices.deletedAt)),
-    );
+    .where(and(inArray(staffServices.staffProfileId, profileIds), isNull(staffServices.deletedAt)));
 }
 
 export async function replaceStaffServices(

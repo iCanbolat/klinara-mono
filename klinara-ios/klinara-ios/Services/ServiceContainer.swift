@@ -12,6 +12,7 @@ final class ServiceContainer {
     let staff: any StaffService
     let scheduling: any SchedulingService
     let users: any UsersService
+    let branches: any BranchesService
     let booking: any BookingService
     let customers: any CustomerService
     let notes: any NotesService
@@ -35,6 +36,7 @@ final class ServiceContainer {
         staff: any StaffService,
         scheduling: any SchedulingService,
         users: any UsersService,
+        branches: any BranchesService,
         booking: any BookingService,
         customers: any CustomerService,
         notes: any NotesService,
@@ -54,6 +56,7 @@ final class ServiceContainer {
         self.staff = staff
         self.scheduling = scheduling
         self.users = users
+        self.branches = branches
         self.booking = booking
         self.customers = customers
         self.notes = notes
@@ -78,6 +81,7 @@ final class ServiceContainer {
             staff: LiveStaffService(client: client),
             scheduling: LiveSchedulingService(client: client),
             users: LiveUsersService(client: client),
+            branches: LiveBranchesService(client: client),
             booking: LiveBookingService(client: client),
             customers: LiveCustomerService(client: client),
             notes: LiveNotesService(client: client),
@@ -138,6 +142,7 @@ final class ServiceContainer {
             staff: staff,
             scheduling: scheduling,
             users: MockUsersService(),
+            branches: MockBranchesService(),
             booking: booking,
             customers: customers,
             notes: MockNotesService(booking: booking),

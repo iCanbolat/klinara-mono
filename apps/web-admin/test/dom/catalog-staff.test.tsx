@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { PERMISSIONS } from '@klinara/shared';
 
@@ -29,12 +29,23 @@ vi.mock('@/lib/api/client', () => ({
 }));
 
 vi.mock('@/components/session/branch-provider', () => ({
-  useBranch: () => ({ branchId: 'b1', loading: false, branches: [], canSelectAll: true }),
+  useBranch: () => ({
+    branchId: 'b1',
+    loading: false,
+    branches: [
+      { id: 'b1', name: 'Nişantaşı', timezone: 'Europe/Istanbul', isActive: true },
+      { id: 'b2', name: 'Bodrum', timezone: 'Europe/Istanbul', isActive: true },
+    ],
+    canSelectAll: true,
+    setBranchId: vi.fn(),
+    reload: vi.fn(),
+  }),
 }));
 
 let permissions: string[] = [];
+let me: unknown = null;
 vi.mock('@/components/session/session-provider', () => ({
-  useSession: () => ({ permissions, me: null, loading: false }),
+  useSession: () => ({ permissions, me, loading: false }),
 }));
 
 const { CatalogPage } = await import('../../src/components/catalog/catalog-page');
@@ -68,6 +79,7 @@ const STAFF = {
   userFullName: 'Zeynep Kaya',
   userEmail: 'z@k.test',
   primaryBranchId: 'b1',
+  branchIds: ['b1'],
   title: 'Uzman',
   specialties: [],
   calendarColor: null,
@@ -90,6 +102,9 @@ const STAFF = {
   ],
 };
 
+const PRACTITIONER_B1 = { id: 'm1', branchId: 'b1', roleKey: 'practitioner', roleName: 'Uygulayıcı' };
+let memberships: unknown[] = [PRACTITIONER_B1];
+
 function mockRoutes(): void {
   get.mockImplementation((path: string) => {
     if (path === 'services') return Promise.resolve({ data: [SERVICE, SERVICE_2] });
@@ -98,7 +113,12 @@ function mockRoutes(): void {
         data: [{ id: 'cat1', slug: 'epilasyon', name: 'Epilasyon', sortOrder: 0, isActive: true }],
       });
     }
-    if (path === 'staff') return Promise.resolve({ data: [STAFF] });
+    if (path === 'staff' || path === 'staff?branchId=b1') return Promise.resolve({ data: [STAFF] });
+    if (path === 'staff?branchId=b2') return Promise.resolve({ data: [] });
+    if (path === 'users') {
+      return Promise.resolve({ data: [{ id: 'u1', memberships: memberships }] });
+    }
+    if (path === 'users/u1/memberships') return Promise.resolve({ data: memberships });
     return Promise.resolve({ data: [] });
   });
 }
@@ -180,14 +200,22 @@ describe('personel', () => {
     mockRoutes();
     put.mockResolvedValue({});
     permissions = [PERMISSIONS.STAFF_READ, PERMISSIONS.STAFF_WRITE];
+    me = null;
+    memberships = [PRACTITIONER_B1];
   });
 
-  it('ROL DEĞİŞTİRİLEMEZ ve sebebi yazılı', async () => {
-    // API'de üyelik/rol değiştiren bir uç YOK; sahte bir rol seçici koymak
-    // olmayan bir yetenek vaat etmek olurdu.
+  it('liste SEÇİLİ ŞUBEYLE isteniyor; "Tüm şubeler" süzgeçsiz istiyor', async () => {
+    const user = userEvent.setup();
     render(<StaffPage />);
-    expect(await screen.findByText(/pasife alıp yeniden davet edin/i)).toBeInTheDocument();
-    expect(screen.queryByLabelText('Rol')).not.toBeInTheDocument();
+    await screen.findByText('Zeynep Kaya');
+    expect(get).toHaveBeenCalledWith('staff?branchId=b1', expect.anything());
+
+    await user.selectOptions(screen.getByLabelText('Şube'), 'b2');
+    expect(await screen.findByText('Personel yok.')).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText('Şube'), '');
+    expect(await screen.findByText('Zeynep Kaya')).toBeInTheDocument();
+    expect(get).toHaveBeenCalledWith('staff', expect.anything());
   });
 
   it('yetkinlik matrisi MEVCUT seçimle açılıyor', async () => {
@@ -249,5 +277,144 @@ describe('personel', () => {
 
     await screen.findByText('Zeynep Kaya');
     expect(screen.queryByRole('button', { name: 'Hizmet yetkinlikleri' })).not.toBeInTheDocument();
+  });
+});
+
+describe('personel — roller ve şubeler', () => {
+  const OWNER = {
+    user: { id: 'owner-1' },
+    roles: ['owner'],
+    permissions: [],
+    branchIds: [],
+    tenantWide: true,
+  };
+  const MANAGER_B1 = {
+    user: { id: 'manager-1' },
+    roles: ['manager'],
+    permissions: [],
+    branchIds: ['b1'],
+    tenantWide: false,
+  };
+
+  beforeEach(() => {
+    get.mockReset();
+    put.mockReset();
+    mockRoutes();
+    permissions = [
+      PERMISSIONS.STAFF_READ,
+      PERMISSIONS.STAFF_WRITE,
+      PERMISSIONS.USER_READ,
+      PERMISSIONS.USER_WRITE,
+    ];
+    memberships = [PRACTITIONER_B1];
+    me = OWNER;
+  });
+
+  async function openEditor(user: ReturnType<typeof userEvent.setup>): Promise<HTMLElement> {
+    render(<StaffPage />);
+    await user.click(await screen.findByRole('button', { name: 'Düzenle' }));
+    const sheet = await screen.findByRole('dialog');
+    await within(sheet).findByText('Roller ve şubeler');
+    return sheet;
+  }
+
+  it('rol kolonu şube adıyla görünüyor', async () => {
+    render(<StaffPage />);
+    expect(await screen.findByText('Uygulayıcı')).toBeInTheDocument();
+    expect(screen.getByText('· Nişantaşı')).toBeInTheDocument();
+  });
+
+  it('ikinci şubede rol eklemek TAM LİSTEYİ gönderiyor', async () => {
+    put.mockResolvedValue({
+      data: [PRACTITIONER_B1, { id: 'm2', branchId: 'b2', roleKey: 'receptionist', roleName: 'Resepsiyon' }],
+    });
+    const user = userEvent.setup();
+    const sheet = await openEditor(user);
+
+    await user.click(within(sheet).getByRole('button', { name: 'Rol ekle' }));
+    const roles = within(sheet).getAllByLabelText('Rol');
+    const branches = within(sheet).getAllByLabelText('Şube');
+    await user.selectOptions(roles[1]!, 'receptionist');
+    await user.selectOptions(branches[1]!, 'b2');
+    await user.click(within(sheet).getByRole('button', { name: 'Rolleri kaydet' }));
+
+    await waitFor(() => {
+      expect(put).toHaveBeenCalledWith('users/u1/memberships', {
+        memberships: [
+          { roleKey: 'practitioner', branchId: 'b1' },
+          { roleKey: 'receptionist', branchId: 'b2' },
+        ],
+      });
+    });
+  });
+
+  it('aynı rol+şube iki kez eklenemiyor', async () => {
+    const user = userEvent.setup();
+    const sheet = await openEditor(user);
+
+    await user.click(within(sheet).getByRole('button', { name: 'Rol ekle' }));
+    await user.selectOptions(within(sheet).getAllByLabelText('Rol')[1]!, 'practitioner');
+    await user.selectOptions(within(sheet).getAllByLabelText('Şube')[1]!, 'b1');
+
+    expect(within(sheet).getByText('Bu rol bu şubede zaten var.')).toBeInTheDocument();
+    expect(within(sheet).getByRole('button', { name: 'Rolleri kaydet' })).toBeDisabled();
+  });
+
+  it('şube yöneticisi, ERİŞEMEDİĞİ şubede de rolü olan kişiyi düzenleyemiyor', async () => {
+    // PUT tam değiştirme ve gönderilen her şube erişim kontrolünden geçiyor:
+    // Bodrum satırını "dokunmadan" geri göndermek bile 403 olurdu.
+    me = MANAGER_B1;
+    memberships = [
+      PRACTITIONER_B1,
+      { id: 'm2', branchId: 'b2', roleKey: 'practitioner', roleName: 'Uygulayıcı' },
+    ];
+    const user = userEvent.setup();
+    const sheet = await openEditor(user);
+
+    expect(await within(sheet).findByText(/erişiminiz olmayan bir şubede de rolü var/)).toBeInTheDocument();
+    expect(within(sheet).queryByRole('button', { name: 'Rolleri kaydet' })).not.toBeInTheDocument();
+    expect(within(sheet).queryByRole('button', { name: 'Rol ekle' })).not.toBeInTheDocument();
+  });
+
+  it('sizden yetkili rol kilitli gösteriliyor ve olduğu gibi geri gönderiliyor', async () => {
+    me = { ...MANAGER_B1, tenantWide: true };
+    memberships = [
+      { id: 'm0', branchId: null, roleKey: 'accountant', roleName: 'Muhasebe' },
+      { id: 'm9', branchId: null, roleKey: 'owner', roleName: 'İşletme Sahibi' },
+    ];
+    put.mockResolvedValue({ data: memberships });
+    const user = userEvent.setup();
+    const sheet = await openEditor(user);
+
+    expect(await within(sheet).findAllByText('Sizden yetkili bir rol — değiştirilemez.')).not.toHaveLength(0);
+    await user.click(within(sheet).getByRole('button', { name: 'Rolü kaldır: Muhasebe' }));
+    await user.click(within(sheet).getByRole('button', { name: 'Rolleri kaydet' }));
+
+    await waitFor(() => {
+      expect(put).toHaveBeenCalledWith('users/u1/memberships', {
+        memberships: [{ roleKey: 'owner' }],
+      });
+    });
+  });
+
+  it('kendi rollerini düzenleyemiyor', async () => {
+    me = { ...OWNER, user: { id: 'u1' } };
+    const user = userEvent.setup();
+    const sheet = await openEditor(user);
+    expect(await within(sheet).findByText(/Kendi rollerinizi değiştiremezsiniz/)).toBeInTheDocument();
+  });
+
+  it('tüm rolleri kaldırmak ayrıca onay istiyor', async () => {
+    put.mockResolvedValue({ data: [] });
+    const user = userEvent.setup();
+    const sheet = await openEditor(user);
+
+    await user.click(within(sheet).getByRole('button', { name: 'Rolü kaldır: Uygulayıcı' }));
+    await user.click(within(sheet).getByRole('button', { name: 'Rolleri kaydet' }));
+    expect(put).not.toHaveBeenCalled();
+
+    const confirm = await screen.findByRole('alertdialog');
+    await user.click(within(confirm).getByRole('button', { name: 'Rolleri kaldır' }));
+    await waitFor(() => expect(put).toHaveBeenCalledWith('users/u1/memberships', { memberships: [] }));
   });
 });

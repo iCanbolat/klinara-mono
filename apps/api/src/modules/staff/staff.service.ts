@@ -4,6 +4,8 @@ import { AppError } from '../../common/errors/app-error';
 import { isPgError, PG_ERROR } from '../../common/errors/db-errors';
 import { TenantTxService } from '../../database/tenant-tx.service';
 import { AvailabilityCacheService } from '../booking/availability-cache.service';
+import type { Principal } from '../identity/principal';
+import { BranchAccessService } from '../tenancy/branch-access.service';
 import * as repo from './staff.repository';
 import type {
   CreateStaffProfileDto,
@@ -19,6 +21,7 @@ export class StaffService {
   constructor(
     private readonly tx: TenantTxService,
     private readonly availabilityCache: AvailabilityCacheService,
+    private readonly branchAccess: BranchAccessService,
   ) {}
 
   /** Uygunluğu etkileyen her yazımdan sonra kiracının cache'i düşürülür. */
@@ -26,15 +29,26 @@ export class StaffService {
     this.availabilityCache.invalidateTenant(this.tx.tenantId);
   }
 
-  async listStaffProfiles(): Promise<StaffProfileResponseDto[]> {
+  async listStaffProfiles(
+    principal: Principal,
+    branchId?: string,
+  ): Promise<StaffProfileResponseDto[]> {
+    if (branchId !== undefined) await this.branchAccess.assertInput(principal, branchId);
+
     const payload = await this.tx.run(async (tx) => {
-      const profiles = await repo.listStaffProfiles(tx);
+      const profiles = await repo.listStaffProfiles(tx, branchId);
       const services = await repo.listStaffServicesForProfiles(
         tx,
         profiles.map((profile) => profile.id),
       );
-      return { profiles, services };
+      const branches = await repo.listMembershipBranches(
+        tx,
+        profiles.map((profile) => profile.userId),
+      );
+      return { profiles, services, branches };
     });
+
+    const branchesByUser = StaffService.groupBranches(payload.branches);
 
     const byProfile = new Map<string, repo.StaffServiceRow[]>();
     for (const competency of payload.services) {
@@ -44,7 +58,11 @@ export class StaffService {
     }
 
     return payload.profiles.map((profile) =>
-      StaffService.toProfileResponse(profile, byProfile.get(profile.id) ?? []),
+      StaffService.toProfileResponse(
+        profile,
+        byProfile.get(profile.id) ?? [],
+        branchesByUser.get(profile.userId) ?? [],
+      ),
     );
   }
 
@@ -53,15 +71,28 @@ export class StaffService {
       const profile = await repo.findStaffProfileById(tx, id);
       if (profile === undefined) return undefined;
       const services = await repo.listStaffServicesForProfile(tx, id);
-      return { profile, services };
+      const branches = await repo.listMembershipBranches(tx, [profile.userId]);
+      return { profile, services, branches };
     });
 
     if (payload === undefined) throw AppError.notFound('Personel profili bulunamadı');
-    return StaffService.toProfileResponse(payload.profile, payload.services);
+    return StaffService.toProfileResponse(
+      payload.profile,
+      payload.services,
+      payload.branches.map((row) => row.branchId),
+    );
   }
 
-  async createStaffProfile(input: CreateStaffProfileDto): Promise<StaffProfileResponseDto> {
+  async createStaffProfile(
+    principal: Principal,
+    input: CreateStaffProfileDto,
+  ): Promise<StaffProfileResponseDto> {
     StaffService.assertNoDuplicateServices(input.services ?? []);
+    // Erişilemeyen bir şube ana şube yapılamaz: şube yöneticisi personeli
+    // başka bir şubeye "taşıyıp" kendi listesinden kaybedemez.
+    if (input.primaryBranchId !== undefined) {
+      await this.branchAccess.assertInput(principal, input.primaryBranchId);
+    }
 
     const payload = await this.tx
       .run(async (tx) => {
@@ -83,11 +114,15 @@ export class StaffService {
         const hydrated = await repo.findStaffProfileById(tx, profile.id);
         if (hydrated === undefined) throw AppError.notFound('Personel profili bulunamadı');
         const competencies = await repo.listStaffServicesForProfile(tx, profile.id);
-        return { profile: hydrated, services: competencies };
+        const branches = await repo.listMembershipBranches(tx, [hydrated.userId]);
+        return { profile: hydrated, services: competencies, branches };
       })
       .catch((error: unknown) => {
         if (isPgError(error, PG_ERROR.UNIQUE_VIOLATION)) {
-          throw AppError.conflict(ERROR_CODES.CONFLICT, 'Bu kullanıcı için personel profili zaten var');
+          throw AppError.conflict(
+            ERROR_CODES.CONFLICT,
+            'Bu kullanıcı için personel profili zaten var',
+          );
         }
         if (isPgError(error, PG_ERROR.FOREIGN_KEY_VIOLATION)) {
           throw AppError.notFound('Kullanıcı, şube veya hizmet bulunamadı');
@@ -111,10 +146,21 @@ export class StaffService {
       });
 
     this.invalidateAvailability();
-    return StaffService.toProfileResponse(payload.profile, payload.services);
+    return StaffService.toProfileResponse(
+      payload.profile,
+      payload.services,
+      payload.branches.map((row) => row.branchId),
+    );
   }
 
-  async updateStaffProfile(id: string, input: UpdateStaffProfileDto): Promise<StaffProfileResponseDto> {
+  async updateStaffProfile(
+    principal: Principal,
+    id: string,
+    input: UpdateStaffProfileDto,
+  ): Promise<StaffProfileResponseDto> {
+    if (input.primaryBranchId !== undefined && input.primaryBranchId !== null) {
+      await this.branchAccess.assertInput(principal, input.primaryBranchId);
+    }
     const payload = await this.tx
       .run(async (tx) => {
         const updated = await repo.updateStaffProfile(tx, id, {
@@ -132,7 +178,8 @@ export class StaffService {
         const profile = await repo.findStaffProfileById(tx, id);
         if (profile === undefined) return undefined;
         const services = await repo.listStaffServicesForProfile(tx, id);
-        return { profile, services };
+        const branches = await repo.listMembershipBranches(tx, [profile.userId]);
+        return { profile, services, branches };
       })
       .catch((error: unknown) => {
         if (isPgError(error, PG_ERROR.FOREIGN_KEY_VIOLATION)) {
@@ -146,7 +193,11 @@ export class StaffService {
 
     if (payload === undefined) throw AppError.notFound('Personel profili bulunamadı');
     this.invalidateAvailability();
-    return StaffService.toProfileResponse(payload.profile, payload.services);
+    return StaffService.toProfileResponse(
+      payload.profile,
+      payload.services,
+      payload.branches.map((row) => row.branchId),
+    );
   }
 
   async replaceStaffServices(
@@ -162,7 +213,8 @@ export class StaffService {
 
         await repo.replaceStaffServices(tx, this.tx.tenantId, id, input.services);
         const services = await repo.listStaffServicesForProfile(tx, id);
-        return { profile, services };
+        const branches = await repo.listMembershipBranches(tx, [profile.userId]);
+        return { profile, services, branches };
       })
       .catch((error: unknown) => {
         if (isPgError(error, PG_ERROR.FOREIGN_KEY_VIOLATION)) {
@@ -185,7 +237,23 @@ export class StaffService {
 
     if (payload === undefined) throw AppError.notFound('Personel profili bulunamadı');
     this.invalidateAvailability();
-    return StaffService.toProfileResponse(payload.profile, payload.services);
+    return StaffService.toProfileResponse(
+      payload.profile,
+      payload.services,
+      payload.branches.map((row) => row.branchId),
+    );
+  }
+
+  private static groupBranches(
+    rows: { userId: string; branchId: string }[],
+  ): Map<string, string[]> {
+    const byUser = new Map<string, string[]>();
+    for (const row of rows) {
+      const ids = byUser.get(row.userId) ?? [];
+      ids.push(row.branchId);
+      byUser.set(row.userId, ids);
+    }
+    return byUser;
   }
 
   private static assertNoDuplicateServices(services: StaffServiceInputDto[]): void {
@@ -220,6 +288,7 @@ export class StaffService {
   private static toProfileResponse(
     profile: repo.StaffProfileWithUser,
     services: repo.StaffServiceRow[],
+    branchIds: string[],
   ): StaffProfileResponseDto {
     return {
       id: profile.id,
@@ -228,6 +297,7 @@ export class StaffService {
       userFullName: profile.userFullName,
       userEmail: profile.userEmail,
       primaryBranchId: profile.primaryBranchId,
+      branchIds,
       title: profile.title,
       specialties: profile.specialties,
       calendarColor: profile.calendarColor,

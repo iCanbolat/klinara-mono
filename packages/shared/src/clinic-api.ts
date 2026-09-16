@@ -445,6 +445,12 @@ export interface StaffProfile {
   userFullName: string;
   userEmail: string;
   primaryBranchId: string | null;
+  /**
+   * Aktif ŞUBE üyeliklerinin şubeleri; kiracı kapsamlı roller (owner,
+   * accountant) burada görünmez. `GET staff?branchId=` süzgeci bu küme VEYA
+   * `primaryBranchId` ile eşleşir.
+   */
+  branchIds: string[];
   title: string | null;
   specialties: string[];
   calendarColor: string | null;

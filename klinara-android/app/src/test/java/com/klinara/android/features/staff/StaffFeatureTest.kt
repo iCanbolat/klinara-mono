@@ -155,6 +155,26 @@ class StaffFeatureTest {
     }
 
     @Test
+    @DisplayName("Şube süzgeci (A7.4–A7.5): ana şube VEYA şube üyeliği; birden çok şubedeki personel iki şubede de görünür")
+    fun branchFilter() {
+        val profiles =
+            listOf(
+                MockStaffService.ALL[0].copy(primaryBranchId = MockIds.BRANCH_NISANTASI, branchIds = emptyList()),
+                MockStaffService.ALL[1].copy(primaryBranchId = null, branchIds = listOf(MockIds.BRANCH_BODRUM)),
+                MockStaffService.ALL[2].copy(
+                    primaryBranchId = MockIds.BRANCH_NISANTASI,
+                    branchIds = listOf(MockIds.BRANCH_NISANTASI, MockIds.BRANCH_BODRUM),
+                ),
+            )
+        fun ids(branch: String?) =
+            filteredStaff(profiles, "", showsInactive = true, branchId = branch).map { it.id }.toSet()
+
+        assertEquals(setOf(profiles[0].id, profiles[2].id), ids(MockIds.BRANCH_NISANTASI))
+        assertEquals(setOf(profiles[1].id, profiles[2].id), ids(MockIds.BRANCH_BODRUM))
+        assertEquals(3, ids(null).size)
+    }
+
+    @Test
     @DisplayName("Detay kaydı taslağı sunucunun yanıtından yeniden kuruyor; matristen dönüş kirli taslağı ezmiyor")
     fun detailSaveAndReload() =
         runTest {
@@ -197,10 +217,13 @@ class StaffFeatureTest {
     // --- İzin matrisi ---
 
     @Test
-    @DisplayName("Ekip kartı `staff:read` ile; oluşturma `staff:write` + `user:read` — yalnız owner ve manager")
+    @DisplayName("Şube ve Personel kartı `staff:read` ile; oluşturma `staff:write` + `user:read` — owner, manager")
     fun permissions() {
         val roles = listOf("owner", "manager", "receptionist", "practitioner", "accountant")
-        val sees = roles.filter { role -> managementSections(ShellSessions.forRole(role)).any { it.title == "Ekip" } }
+        val sees =
+            roles.filter { role ->
+                managementSections(ShellSessions.forRole(role)).any { it.title == "Şube ve Personel" }
+            }
         assertEquals(listOf("owner", "manager", "receptionist", "practitioner"), sees)
 
         val creates = roles.filter { canCreateStaff(ShellSessions.forRole(it)) }

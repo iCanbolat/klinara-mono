@@ -32,6 +32,8 @@ import com.klinara.android.services.staff.StaffProfile
 /** Detaydan açılan alt hedefler — route'a çevirme `AppShell`'in işi. */
 data class StaffDetailActions(
     val onOpenSkills: () -> Unit,
+    /** Roller ve şubeler (A7.5) — `null` → satır çizilmez (`user:read` yok). */
+    val onOpenMemberships: ((userId: String, userName: String) -> Unit)? = null,
     /** `null` → satır çizilmez (izin yok ya da henüz gelmedi). */
     val onOpenSchedule: (() -> Unit)? = null,
     val onOpenExceptions: (() -> Unit)? = null,
@@ -171,6 +173,15 @@ private fun WorkCard(
     actions: StaffDetailActions,
 ) {
     KlinaraCard(title = "Çalışma") {
+        actions.onOpenMemberships?.let { open ->
+            val ids = (profile.branchIds + listOfNotNull(profile.primaryBranchId)).toSet()
+            val names = session.branches.filter { it.id in ids }.joinToString(", ") { it.name }
+            KlinaraNavigationRow(
+                label = "Roller ve şubeler",
+                detail = names.ifEmpty { "Hangi şubede hangi rolle çalıştığı" },
+                onClick = { open(profile.userId, profile.userFullName) },
+            )
+        }
         KlinaraNavigationRow(
             label = "Hizmet yetkinlikleri",
             value = "${profile.activeServiceCount}",

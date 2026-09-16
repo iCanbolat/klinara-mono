@@ -8,10 +8,12 @@ import { Card } from '@/components/ui/card';
 export function StaffCard({
   profile,
   serviceNames,
+  roles,
   actions,
 }: {
   profile: StaffProfile;
   serviceNames: string;
+  roles?: ReactNode;
   actions?: ReactNode;
 }): ReactNode {
   return (
@@ -29,6 +31,8 @@ export function StaffCard({
           </Badge>
         ) : null}
       </div>
+
+      {roles}
 
       <p className="line-clamp-2 text-xs text-muted-foreground">{serviceNames}</p>
 

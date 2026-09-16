@@ -97,7 +97,13 @@ final class AppSession {
     /// saatine düşer — cihaz saatine **değil** (bkz. ``BranchClock``).
     var clock: BranchClock { BranchClock(branch: selectedBranch) }
 
-    var canSwitchBranch: Bool { branches.count > 1 }
+    /// Şube menüsünün seçenekleri: pasif şubeler menüde görünmez (orada yeni
+    /// iş yapılamaz), yalnız hâlâ seçiliyse — seçim kaybolmasın diye.
+    var switchableBranches: [BranchSummary] {
+        branches.filter { $0.isActive || $0.id == selectedBranchId }
+    }
+
+    var canSwitchBranch: Bool { switchableBranches.count > 1 }
 
     func switchBranch(to branch: BranchSummary) {
         guard branch.id != selectedBranchId else { return }
@@ -106,6 +112,19 @@ final class AppSession {
         // yapılan bir istek hâlâ eski şubeye gider.
         tokens.setBranch(branch.id)
         branchGeneration += 1
+    }
+
+    /// Şube eklendikten ya da düzenlendikten sonra. Seçili şube pasife
+    /// alındıysa ilk aktif şubeye geçilir: pasif şubede yeni iş yapılamaz ve
+    /// şube menüsü onu artık göstermiyor.
+    func reloadBranches() async {
+        guard let fresh = try? await services.branches.branches() else { return }
+        branches = fresh.map(\.summary)
+        let current = branches.first { $0.id == selectedBranchId }
+        if current == nil || current?.isActive == false,
+           let fallback = branches.first(where: \.isActive) {
+            switchBranch(to: fallback)
+        }
     }
 
     // MARK: Profil tazeleme

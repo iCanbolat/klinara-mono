@@ -127,17 +127,42 @@ struct ManagementHomeView: View {
         }
     }
 
+    /// "Şube ve Personel": web panelindeki ekranın karşılığı. Şubeler ve
+    /// davetler personelin yanında, çünkü "kim, nerede, hangi rolle" tek soru.
     private var teamCard: some View {
         KlinaraCard(
-            title: "Ekip",
+            title: "Şube ve Personel",
             footnote: "Bir personele yetkin olmadığı hizmetten randevu açılamaz."
         ) {
             KlinaraNavigationRow(
                 label: "Personel",
-                detail: "Profil, uzmanlık ve hizmet yetkinlikleri",
+                detail: "Profil, roller, şubeler ve hizmet yetkinlikleri",
                 icon: "person.text.rectangle"
             ) {
                 StaffListView(session: session)
+            }
+            if session.can(Permissions.branchRead) {
+                KlinaraDivider()
+                KlinaraNavigationRow(
+                    label: "Şubeler",
+                    value: "\(session.switchableBranches.filter(\.isActive).count)",
+                    detail: session.can(Permissions.branchWrite)
+                        ? "Şube ekleme, iletişim ve pasife alma"
+                        : "Kliniğin şubeleri",
+                    icon: "building.2"
+                ) {
+                    BranchListView(session: session)
+                }
+            }
+            if session.can(Permissions.userInvite) {
+                KlinaraDivider()
+                KlinaraNavigationRow(
+                    label: "Davetler",
+                    detail: "Yeni personel davet et, bekleyenleri iptal et",
+                    icon: "envelope.badge"
+                ) {
+                    InvitationListView(session: session)
+                }
             }
         }
     }

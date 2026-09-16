@@ -110,6 +110,10 @@ function renderPermissions() {
     (r) => `        "${r.key}" to "${r.name}",`,
   ).join('\n');
 
+  const ranks = ROLE_DEFINITIONS.map(
+    (r) => `            RoleDefinition("${r.key}", rank = ${r.rank}, scope = RoleScope.${r.scope[0].toUpperCase()}${r.scope.slice(1)}),`,
+  ).join('\n');
+
   const bundles = ROLE_DEFINITIONS.map((r) => {
     const perms = r.permissions.map((p) => `                    "${p}",`).join('\n');
     return `            "${r.key}" to\n                listOf(\n${perms}\n                ),`;
@@ -143,6 +147,29 @@ ${roles}
     fun turkish(roleKey: String): String = byKey[roleKey] ?: roleKey
 
     fun turkish(roleKeys: List<String>): String = roleKeys.joinToString(", ", transform = ::turkish)
+}
+
+enum class RoleScope { Platform, Tenant, Branch }
+
+data class RoleDefinition(
+    val key: String,
+    /** Yetki genişliği: kimse kendinden yüksek rank'li bir rolü atayamaz/kaldıramaz. */
+    val rank: Int,
+    /** Tenant → şube ALMAZ; Branch → şube İSTER. */
+    val scope: RoleScope,
+)
+
+/**
+ * Rol tanımları — rank ve kapsam. Rol/şube düzenleyicisi (A7.5) sunucunun
+ * \`assertNoEscalation\` ve \`assertRoleScope\` kurallarını bunlarla yansıtıyor.
+ */
+object RoleDefinitions {
+    val all: List<RoleDefinition> =
+        listOf(
+${ranks}
+        )
+
+    fun of(roleKey: String): RoleDefinition? = all.firstOrNull { it.key == roleKey }
 }
 
 /**

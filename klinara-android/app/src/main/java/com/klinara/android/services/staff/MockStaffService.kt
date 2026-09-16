@@ -42,9 +42,9 @@ class MockStaffService(
     /** Diğer mock'lar için askıya almadan okunur kopya. */
     fun snapshotProfiles(): List<StaffProfile> = records.toList()
 
-    override suspend fun list(): List<StaffProfile> {
+    override suspend fun list(branchId: String?): List<StaffProfile> {
         settle()
-        return records.sortedBy { it.userFullName }
+        return records.filter { branchId == null || it.worksIn(branchId) }.sortedBy { it.userFullName }
     }
 
     override suspend fun profile(id: String): StaffProfile {

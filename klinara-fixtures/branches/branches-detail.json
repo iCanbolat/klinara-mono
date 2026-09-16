@@ -1,0 +1,37 @@
+{
+  "data": [
+    {
+      "id": "b1000000-0000-4000-8000-000000000001",
+      "tenantId": "7f3d1a20-0000-4000-8000-000000000001",
+      "slug": "nisantasi",
+      "name": "Nişantaşı",
+      "timezone": "Europe/Istanbul",
+      "phone": "+902122345678",
+      "address": "Teşvikiye Cad. No: 12, Şişli",
+      "isActive": true,
+      "createdAt": "2026-04-01T08:00:00.000Z"
+    },
+    {
+      "id": "b1000000-0000-4000-8000-000000000002",
+      "tenantId": "7f3d1a20-0000-4000-8000-000000000001",
+      "slug": "bodrum",
+      "name": "Bodrum",
+      "timezone": "Europe/Istanbul",
+      "phone": null,
+      "address": "Neyzen Tevfik Cad. No: 44, Bodrum",
+      "isActive": true,
+      "createdAt": "2026-04-15T08:00:00.000Z"
+    },
+    {
+      "id": "b1000000-0000-4000-8000-000000000003",
+      "tenantId": "7f3d1a20-0000-4000-8000-000000000001",
+      "slug": "kadikoy",
+      "name": "Kadıköy",
+      "timezone": "Europe/Istanbul",
+      "phone": null,
+      "address": null,
+      "isActive": false,
+      "createdAt": "2026-05-10T08:00:00.000Z"
+    }
+  ]
+}

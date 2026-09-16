@@ -10,8 +10,11 @@ import kotlinx.serialization.json.JsonObject
 class LiveStaffService internal constructor(
     private val client: ApiClient,
 ) : StaffService {
-    override suspend fun list(): List<StaffProfile> =
-        client.send<ListEnvelope<StaffProfile>>(ApiRequest.get("staff")).data
+    override suspend fun list(branchId: String?): List<StaffProfile> =
+        client
+            .send<ListEnvelope<StaffProfile>>(
+                ApiRequest.get("staff", query = listOfNotNull(branchId?.let { "branchId" to it })),
+            ).data
 
     override suspend fun profile(id: String): StaffProfile = client.send(ApiRequest.get("staff/$id"))
 

@@ -8,6 +8,7 @@ import com.klinara.android.services.ServiceContainer
 import com.klinara.android.services.auth.AuthService
 import com.klinara.android.services.auth.BranchSummary
 import com.klinara.android.services.auth.TokenStore
+import com.klinara.android.services.branches.BranchesService
 import com.klinara.android.services.networking.ApiError
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -35,6 +36,7 @@ class SessionViewModel(
     initial: AppSession,
     private val auth: AuthService,
     private val tokens: TokenStore,
+    private val branches: BranchesService,
 ) : ViewModel() {
     private val _session = MutableStateFlow(initial)
     val session: StateFlow<AppSession> = _session.asStateFlow()
@@ -62,6 +64,26 @@ class SessionViewModel(
             tokens.setBranch(branch.id)
             _session.update { it.copy(activeBranchId = branch.id) }
             _branchGeneration.update { it + 1 }
+        }
+    }
+
+    /**
+     * Şube listesini tazeler (A7.4) — şube eklendikten/düzenlendikten sonra. Seçili şube
+     * pasife alındıysa ilk aktif şubeye geçilir. Hata [reloadProfile] gibi yutulur.
+     */
+    fun reloadBranches() {
+        viewModelScope.launch {
+            val fresh =
+                try {
+                    branches.list().map { it.toSummary() }
+                } catch (_: ApiError) {
+                    return@launch
+                }
+            _session.update { it.copy(branches = fresh) }
+            val active = fresh.firstOrNull { it.id == _session.value.activeBranchId }
+            if (active == null || !active.isActive) {
+                fresh.firstOrNull { it.isActive }?.let(::switchBranch)
+            }
         }
     }
 
@@ -98,7 +120,7 @@ class SessionViewModel(
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                    SessionViewModel(initial, container.auth, container.tokens) as T
+                    SessionViewModel(initial, container.auth, container.tokens, container.branches) as T
             }
     }
 }

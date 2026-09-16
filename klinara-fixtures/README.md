@@ -89,6 +89,23 @@ miras** demek (sıfır değil) ve `isOnlineBookable: false` şubede online'ı ka
 süre/fiyatlı) ve bir **pasif** yetkinlik taşıyor — matris taslağının kayıpsızlık testi
 bunun üzerinde. `users-list.json` davet bekleyen (`hasPassword: false`) bir kullanıcı.
 
+`staff-profile.json` ayrıca `branchIds` taşıyor (A7.4–A7.5): kişinin **aktif şube üyeliklerinin**
+şubeleri — ana şube (Bodrum) ile üyelik şubeleri (Nişantaşı + Bodrum) bilerek örtüşüyor.
+`GET staff?branchId=` bu küme VEYA `primaryBranchId` ile süzer.
+
+`user-memberships.json` (`GET users/:id/memberships`) iki farklı şubede iki şube rolü ve
+bir **kiracı kapsamlı** rol (`branchId: null`) — editör kiracı kapsamlı satırda şube
+seçicisi göstermemeli. `invitations-list.json` biri şube, biri kiracı kapsamlı iki bekleyen
+davet. `problem-role-escalation.json` rütbe ihlalinin `403`'ü; ekran `title`ı gösterir.
+
+## `branches/` (A7.4)
+
+`branches-detail.json` `GET branches`in **tam** şekli (`slug`, `phone`, `createdAt`) ve
+bir **pasif** şube (Kadıköy) — liste pasif şubeyi rozetle göstermeli, şube menüsü
+göstermemeli. `branch-created.json` `POST branches` `201` gövdesi,
+`problem-slug-taken.json` aynı kodla ikinci şubenin `409`'u (alan hatası DEĞİL; ekran
+slug alanının altına taşır).
+
 ## `scheduling/` (A7.3)
 
 `branch-hours.json` sunucunun **`HH:mm:ss`** biçimini (istemci `HH:mm` gönderir), kapalı
