@@ -70,8 +70,8 @@ describe('izne göre navigasyon', () => {
     const OWN = PERMISSIONS.REPORT_PERFORMANCE_READ_OWN;
 
     it('`requiresAny` VEYA olarak çalışıyor', () => {
-      // Muhasebecide takvim izni yok, resepsiyonda ciro izni yok; ikisi de
-      // raporlar menüsünü GÖRMELİ. Yalnız VE ile ifade etseydik ikisi de
+      // Yalnız ciro izni olan, yalnız takvim izni olan (resepsiyon) ve yalnız
+      // kendi performansını gören (uygulayıcı) raporlar menüsünü GÖRMELİ. Yalnız VE ile ifade etseydik ikisi de
       // menüden düşerdi.
       expect(visibleNav([REVENUE]).map((item) => item.path)).toContain('/raporlar');
       expect(visibleNav([CALENDAR]).map((item) => item.path)).toContain('/raporlar');
@@ -99,25 +99,23 @@ describe('izne göre navigasyon', () => {
       return [...role.permissions];
     };
 
-    it('MUHASEBECİ dört klinik ekranını da GÖRMÜYOR', () => {
-      // En önemli vaka: `accountant` `appointment:*`, `service:read`,
-      // `staff:read`, `schedule:read` izinlerinin HİÇBİRİNİ taşımıyor.
-      // Takvimi menüde göstermek ona boş bir ızgara açardı — yani
-      // "bugün randevu yok" demek olurdu. Yanlış bilgi.
-      const accountant = roleOf('accountant');
-      const paths = visibleNav(accountant).map((item) => item.path);
+    it('randevu izni olmayan rol dört klinik ekranını da GÖRMÜYOR', () => {
+      // Yalnız müşteri okuyabilen bir rol: takvimi menüde göstermek ona boş
+      // bir ızgara açardı — yani "bugün randevu yok" demek olurdu.
+      const customerOnly = [PERMISSIONS.CUSTOMER_READ];
+      const paths = visibleNav(customerOnly).map((item) => item.path);
 
       expect(paths).not.toContain('/takvim');
       expect(paths).not.toContain('/katalog');
       expect(paths).not.toContain('/personel');
       expect(paths).not.toContain('/calisma-saatleri');
-      // Müşteri defteri `customer:read` ile açık.
       expect(paths).toContain('/musteriler');
+      expect(canOpenPath(customerOnly, '/takvim')).toBe(false);
+      expect(canOpenPath(customerOnly, '/katalog')).toBe(false);
     });
 
-    it('MUHASEBECİ takvimi doğrudan URL ile de açamıyor', () => {
-      expect(canOpenPath(roleOf('accountant'), '/takvim')).toBe(false);
-      expect(canOpenPath(roleOf('accountant'), '/katalog')).toBe(false);
+    it('rol listesinde muhasebe rolü YOK (kapsam dışı)', () => {
+      expect(ROLE_DEFINITIONS.map((role) => role.key)).not.toContain('accountant');
     });
 
     it('UYGULAYICI takvimi görüyor — `read.own` yeterli', () => {

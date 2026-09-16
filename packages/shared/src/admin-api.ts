@@ -289,7 +289,7 @@ export const DOMAIN_LIMITS = { host: 253 } as const;
  *      sahibini klinikten atabilirdi.
  *   2. Kimse KENDİ rollerine dokunamaz (`403 FORBIDDEN`).
  *   3. Şube kapsamlı rol (`manager`, `receptionist`, `practitioner`) için
- *      `branchId` ZORUNLU; kiracı kapsamlı rol (`owner`, `accountant`) için
+ *      `branchId` ZORUNLU; kiracı kapsamlı rol (`owner`) için
  *      gönderilmemeli (`400 VALIDATION_FAILED`).
  *   4. Kliniğin son `owner` üyeliği kaldırılamaz (`409 CONFLICT`).
  *

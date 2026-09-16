@@ -77,7 +77,7 @@ export const memberships = pgTable(
     userId: uuid('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    /** Kiracı kapsamlı roller (owner, accountant) için `null`. */
+    /** Kiracı kapsamlı roller (owner) için `null`. */
     branchId: uuid('branch_id').references(() => branches.id, { onDelete: 'cascade' }),
     roleKey: text('role_key')
       .notNull()

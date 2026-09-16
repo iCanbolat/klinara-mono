@@ -46,11 +46,6 @@ object Permissions {
     const val PACKAGE_WRITE = "package:write"
     const val PACKAGE_REFUND = "package:refund"
     const val PACKAGE_TRANSFER = "package:transfer"
-    const val FINANCE_PAYMENT_READ = "finance.payment:read"
-    const val FINANCE_PAYMENT_WRITE = "finance.payment:write"
-    const val FINANCE_PRICE_OVERRIDE = "finance.price:override"
-    const val FINANCE_COMMISSION_READ = "finance.commission:read"
-    const val FINANCE_COMMISSION_WRITE = "finance.commission:write"
     const val REPORT_REVENUE_READ = "report.revenue:read"
     const val REPORT_PERFORMANCE_READ_OWN = "report.performance:read.own"
     const val CONSENT_READ = "consent:read"
@@ -70,7 +65,6 @@ object RoleNames {
         "platform_admin" to "Platform Yöneticisi",
         "owner" to "İşletme Sahibi",
         "manager" to "Şube Yöneticisi",
-        "accountant" to "Muhasebe",
         "receptionist" to "Resepsiyon",
         "practitioner" to "Uygulayıcı",
         )
@@ -101,7 +95,6 @@ object RoleDefinitions {
             RoleDefinition("platform_admin", rank = 100, scope = RoleScope.Platform),
             RoleDefinition("owner", rank = 80, scope = RoleScope.Tenant),
             RoleDefinition("manager", rank = 60, scope = RoleScope.Branch),
-            RoleDefinition("accountant", rank = 40, scope = RoleScope.Tenant),
             RoleDefinition("receptionist", rank = 30, scope = RoleScope.Branch),
             RoleDefinition("practitioner", rank = 20, scope = RoleScope.Branch),
         )
@@ -116,7 +109,7 @@ object RoleDefinitions {
  * tek doğruluk kaynağı odur.
  *
  * Buranın ÜRETİLMİŞ olması bir hata sınıfını kapatıyor: iOS aynı listeyi elle tutuyordu
- * ve Faz 6'nın finans izinleri hiç eklenmediği için mock modda kasa, prim ve cari hesap
+ * ve yeni fazların izinleri eksik kaldığı için mock modda bazı yönetim
  * ekranlarına ulaşılamıyordu — testin yakalayamadığı, yalnız elle gezerken görülen bir
  * kayıp. Artık `permissions.ts` değiştiğinde bu dosya da değişir ve CI bayat kalmasına
  * izin vermez.
@@ -157,11 +150,6 @@ object RolePermissions {
                     "package:write",
                     "package:refund",
                     "package:transfer",
-                    "finance.payment:read",
-                    "finance.payment:write",
-                    "finance.price:override",
-                    "finance.commission:read",
-                    "finance.commission:write",
                     "report.revenue:read",
                     "report.performance:read.own",
                     "consent:read",
@@ -198,11 +186,6 @@ object RolePermissions {
                     "package:write",
                     "package:refund",
                     "package:transfer",
-                    "finance.payment:read",
-                    "finance.payment:write",
-                    "finance.price:override",
-                    "finance.commission:read",
-                    "finance.commission:write",
                     "report.revenue:read",
                     "consent:manage",
                     "notification:send",
@@ -210,18 +193,6 @@ object RolePermissions {
                     "booking_page:read",
                     "booking_page:manage",
                     "audit:read",
-                ),
-            "accountant" to
-                listOf(
-                    "tenant:read",
-                    "branch:read",
-                    "customer:read",
-                    "package:read",
-                    "package:refund",
-                    "finance.payment:read",
-                    "finance.payment:write",
-                    "finance.commission:read",
-                    "report.revenue:read",
                 ),
             "receptionist" to
                 listOf(
@@ -237,8 +208,6 @@ object RolePermissions {
                     "consent:read",
                     "notification:read",
                     "package:write",
-                    "finance.payment:read",
-                    "finance.payment:write",
                     "consent:manage",
                     "notification:send",
                     "booking_page:read",

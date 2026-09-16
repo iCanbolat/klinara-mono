@@ -139,9 +139,6 @@ export class OccupancyReportDto {
 export class RevenueTotalsDto {
   @ApiProperty({ description: 'Tahakkuk — açık ücret kalemlerinin toplamı.' })
   accruedMinor: number;
-  @ApiProperty({ description: 'Tahsil edilen — iptal edilmemiş tahsilatlar.' })
-  collectedMinor: number;
-  @ApiProperty() refundedMinor: number;
   @ApiProperty() currency: string;
 }
 
@@ -149,7 +146,6 @@ export class RevenueRowDto {
   @ApiProperty({ nullable: true, type: String }) groupId: string | null;
   @ApiProperty() groupLabel: string;
   @ApiProperty() accruedMinor: number;
-  @ApiProperty() collectedMinor: number;
 }
 
 export class RevenueReportDto {
@@ -172,8 +168,6 @@ export class StaffPerformanceRowDto {
   @ApiProperty({ description: 'Tamamlanmış randevulardaki hizmet kalemi sayısı.' })
   completedServices: number;
   @ApiProperty() revenueMinor: number;
-  @ApiProperty({ description: 'Ters kayıtlar düşülmüş net tahakkuk.' })
-  commissionMinor: number;
   @ApiProperty() bookedMinutes: number;
   @ApiProperty() availableMinutes: number;
   @ApiProperty() occupancyRate: number;

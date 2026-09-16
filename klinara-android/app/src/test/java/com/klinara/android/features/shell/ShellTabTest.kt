@@ -16,23 +16,18 @@ import org.junit.jupiter.api.Test
  */
 class ShellTabTest {
     @Test
-    @DisplayName("accountant: Yönetim açık, Takvim kilitli — iOS'ta düzeltilen hatanın regresyonu")
-    fun accountantSeesManagementButNotCalendar() {
-        val session = ShellSessions.forRole("accountant")
+    @DisplayName("İzinsiz rol: Takvim sekmesi durur ama içerik kilitli; Yönetim ve Müşteriler gizli")
+    fun roleWithoutPermissionsSeesLockedCalendar() {
+        val session = ShellSessions.forRole("tanimsiz-rol")
 
-        assertTrue(
-            ShellTab.Management.isVisible(session),
-            "Muhasebe `service:read`/`staff:read`/`schedule:read` taşımıyor; sekme yalnız " +
-                "finans izinleri sayıldığı için açılıyor. Bu koşul daralırsa Kasa ve Prim " +
-                "ekranlarına hiçbir giriş noktası kalmaz.",
-        )
         assertTrue(ShellTab.Calendar.isVisible(session), "Takvim sekmesi her rolde çizilir.")
         assertTrue(ShellTab.Dashboard.isVisible(session), "Dashboard açılış sekmesi, her rolde çizilir.")
         assertFalse(
             ShellTab.canSeeCalendar(session),
-            "Muhasebede hiç randevu izni yok; içerik 'erişiminiz yok' demeli.",
+            "Randevu izni yok; içerik 'erişiminiz yok' demeli.",
         )
-        assertTrue(ShellTab.Customers.isVisible(session))
+        assertFalse(ShellTab.Management.isVisible(session))
+        assertFalse(ShellTab.Customers.isVisible(session))
     }
 
     @Test

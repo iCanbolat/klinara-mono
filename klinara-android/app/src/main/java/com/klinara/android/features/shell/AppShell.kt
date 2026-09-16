@@ -260,8 +260,8 @@ private fun TodayTab(
                     trailing = trailing,
                 )
             } else {
-                // Sekme duruyor ama içerik dürüst: `accountant` rolünde hiç randevu
-                // izni yok ve varsayılan sekmenin role göre kaybolması bilgi
+                // Sekme duruyor ama içerik dürüst: rolde hiç randevu izni yoksa
+                // boş takvim gösterilmez ve varsayılan sekmenin role göre kaybolması bilgi
                 // mimarisini role göre değiştirmek olurdu.
                 KlinaraScreen(title = "Takvim", trailing = trailing) {
                     EmptyStateView(

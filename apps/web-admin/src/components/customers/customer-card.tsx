@@ -21,12 +21,12 @@ import { TimelinePanel } from './timeline-panel';
  * Müşteri kartı.
  *
  * ---------------------------------------------------------------------------
- * MUHASEBECİ İÇİN ZAMAN TÜNELİ SEKMESİ HİÇ RENDER EDİLMİYOR
+ * RANDEVU İZNİ OLMAYANA ZAMAN TÜNELİ SEKMESİ HİÇ RENDER EDİLMİYOR
  * ---------------------------------------------------------------------------
- * `accountant` `customer:read` taşıyor (defteri görüyor) ama
- * `appointment:read.*` TAŞIMIYOR. `GET /customers/:id/timeline` randevu
- * kayıtları döndürdüğü için ona 403 verir ve muhasebeci boş bir "Geçmiş"
- * sekmesi görürdü — yani "bu müşterinin hiç randevusu yok" derdi.
+ * `customer:read` taşıyıp `appointment:read.*` taşımayan bir rol (özel
+ * yapılandırılmış bir kiracı rolü) `GET /customers/:id/timeline`ten 403 alır
+ * ve boş bir "Geçmiş" sekmesi görürdü — yani "bu müşterinin hiç randevusu
+ * yok" derdi.
  *
  * Sekme izne göre HİÇ render edilmiyor.
  */
@@ -107,7 +107,7 @@ export function CustomerCard({ customerId }: { customerId: string }): ReactNode 
       <Tabs defaultValue="notes">
         <TabsList>
           <TabsTrigger value="notes">{t('customers.tab.notes')}</TabsTrigger>
-          {/* Muhasebeci için HİÇ render edilmiyor — bkz. dosya başlığı. */}
+          {/* Randevu izni yoksa HİÇ render edilmiyor — bkz. dosya başlığı. */}
           {canSeeTimeline ? (
             <TabsTrigger value="timeline">{t('customers.tab.timeline')}</TabsTrigger>
           ) : null}

@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
-  BLOCK_TYPES,
+  CONTENT_LIMITS,
   ERROR_CODES,
   resolveAssets,
   type BlockType,
@@ -11,23 +11,28 @@ import {
   type Branch,
   type ContentBlockInput,
   type PublicImage,
+  type PublicCategory,
   type PublicSitePayload,
   type SeoInput,
+  type Service,
+  type ServiceCategorySummary,
   type ThemeInput,
 } from '@klinara/shared';
 import { ApiProblemError, api } from '@/lib/api/client';
 import { describeProblem, networkError } from '@/lib/problem';
 import { bookingPageAccess } from '@/lib/permissions';
-import { moveBlock, removeBlock, replaceBlock } from '@/lib/editor/move-block';
-import { BLOCK_LABEL_KEY, emptyBlock } from '@/lib/editor/block-schema';
+import { insertBlock, moveBlock, removeBlock, replaceBlock } from '@/lib/editor/move-block';
+import { emptyBlock } from '@/lib/editor/block-schema';
 import { validateSections, validateSeo } from '@/lib/editor/validate';
 import { clearDraft, readDraft, saveDraft, shouldRestore } from '@/lib/editor/draft-recovery';
 import { useAssetLibrary } from '@/lib/editor/use-asset-library';
+import { buildPreviewCatalog } from '@/lib/editor/preview-catalog';
 import { useSession } from '@/components/session/session-provider';
 import { toast } from 'sonner';
 import { t } from '@/i18n/tr';
 import { Alert } from '@/components/ui/alert';
 import { Field, FieldTextarea } from '@/components/ui/field';
+import { publicEnv } from '@/config/env';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   AlertDialog,
@@ -39,8 +44,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Button } from '@/components/ui/button';
+import { AddBlockMenu } from './add-block-menu';
+import { AssetPicker } from './asset-picker';
 import { BlockList } from './block-list';
+import { EditorEmptyState, BlockFormHeader } from './editor-panels';
+import { SeoPreview } from './seo-preview';
 import { BlockForm } from './block-form';
 import { PublishBar } from './publish-bar';
 import { PreviewFrame } from './preview-frame';
@@ -70,6 +78,10 @@ export function ContentEditor(): ReactNode {
   const [conflict, setConflict] = useState(false);
   const [previewBase, setPreviewBase] = useState<PublicSitePayload | null>(null);
   const [preview, setPreview] = useState<unknown>(null);
+  const [catalog, setCatalog] = useState<{
+    services: Service[];
+    categories: ServiceCategorySummary[];
+  } | null>(null);
   const library = useAssetLibrary();
 
   const errors = useMemo(
@@ -155,6 +167,22 @@ export function ContentEditor(): ReactNode {
     })();
   }, [page, refreshPreview]);
 
+  // Hizmet listesi bloğu önizlemede boş kalmasın. Katalog editörde
+  // düzenlenmiyor; bir kez okumak yeterli.
+  useEffect(() => {
+    void (async () => {
+      try {
+        const [services, categories] = await Promise.all([
+          api.get<{ data: Service[] }>('services'),
+          api.get<{ data: ServiceCategorySummary[] }>('service-categories'),
+        ]);
+        setCatalog({ services: services.data, categories: categories.data });
+      } catch {
+        // Katalog okunamazsa blok "hizmet yok" gösterir; editör çalışmaya devam eder.
+      }
+    })();
+  }, []);
+
   /**
    * Varlık kimliği → görsel dizini.
    *
@@ -188,6 +216,13 @@ export function ContentEditor(): ReactNode {
    */
   const livePreview = useMemo(() => {
     if (previewBase === null) return null;
+    const categories: PublicCategory[] =
+      catalog === null
+        ? []
+        : buildPreviewCatalog(catalog.services, catalog.categories, {
+            showPrices: previewBase.settings.showPrices,
+            currency: previewBase.currency,
+          });
     return {
       site: {
         ...previewBase,
@@ -195,9 +230,9 @@ export function ContentEditor(): ReactNode {
         sections: resolveAssets(sections, assetIndex),
         seo: resolveAssets(seo, assetIndex),
       },
-      categories: [],
+      categories,
     };
-  }, [previewBase, theme, sections, seo, assetIndex]);
+  }, [previewBase, catalog, theme, sections, seo, assetIndex]);
 
   /**
    * Yükü GECİKTİREREK yayınla.
@@ -278,6 +313,37 @@ export function ContentEditor(): ReactNode {
     }
   }
 
+  /**
+   * ⌘S / Ctrl+S — tarayıcının "sayfayı kaydet" diyaloğu yerine taslağı kaydeder.
+   * Ref üzerinden: dinleyici bir kez bağlanıyor ama her zaman güncel `save`i
+   * ve durumu görüyor.
+   */
+  const shortcut = useRef<() => void>(() => undefined);
+  useEffect(() => {
+    shortcut.current = () => {
+      if (!readOnly && dirty && !saving) void save();
+    };
+  });
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent): void {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault();
+        shortcut.current();
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  function addBlock(type: BlockType): void {
+    mutate(() => {
+      const next = insertBlock(sections, emptyBlock(type), selected);
+      setSections(next.items);
+      setSelected(next.index);
+      setTab('content');
+    });
+  }
+
   if (access === 'misconfigured') {
     // Yazabiliyor ama okuyamıyor. Boş bir editör göstermek, üzerine yazacağı
     // şeyi görmeden kaydetmesine yol açardı.
@@ -286,6 +352,15 @@ export function ContentEditor(): ReactNode {
   if (access === 'none') return <Alert tone="warn">{t('error.forbiddenPage')}</Alert>;
 
   const selectedBlock = selected === null ? undefined : sections[selected];
+
+  // Yayındaki sayfa. Yerelde kanonik adres (`*.klinara.localhost`) çözülmüyor;
+  // önizleme origin'i geliştirme slug'ıyla aynı sayfayı açıyor.
+  const liveUrl =
+    page === null || page.status !== 'published'
+      ? null
+      : publicEnv.bookingPreviewOrigin.startsWith('http://localhost') || page.canonicalUrl === ''
+        ? publicEnv.bookingPreviewOrigin || null
+        : page.canonicalUrl;
 
   return (
     <div className="-m-6 flex h-[calc(100vh-3.5rem)] flex-col">
@@ -301,13 +376,13 @@ export function ContentEditor(): ReactNode {
       />
 
       {/*
-        Üç panel yalnız GENİŞ ekranda yan yana: 64+80 rem-dışı sabit genişlik +
-        önizleme, 1280px altında hiçbirine yer bırakmıyordu ve sayfa yatay
-        kayıyordu. Dar ekranda paneller alt alta geçiyor, önizleme gizleniyor —
-        önizlemeyi 300px genişlikte göstermek zaten yanıltıcı olurdu.
+        Üç panel yalnız GENİŞ ekranda yan yana: iki sabit panel + önizleme,
+        1280px altında hiçbirine yer bırakmıyordu ve sayfa yatay kayıyordu. Dar
+        ekranda paneller alt alta geçiyor, önizleme gizleniyor — önizlemeyi
+        300px genişlikte göstermek zaten yanıltıcı olurdu.
       */}
       <div className="flex min-h-0 flex-1 flex-col xl:flex-row">
-        <section className="w-full shrink-0 overflow-y-auto border-b border-border p-4 xl:w-64 xl:border-r xl:border-b-0">
+        <section className="flex w-full shrink-0 flex-col border-b border-border bg-card/40 xl:w-72 xl:border-r xl:border-b-0">
           {/*
             Radix `Tabs` — elle yazılmış `role="tablist"` DEĞİL.
 
@@ -316,91 +391,107 @@ export function ContentEditor(): ReactNode {
             ona ait olduğunu söyleyemiyordu. Roving tabindex ve `aria-controls`
             artık kütüphaneden geliyor.
           */}
-          <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)}>
-            <TabsList className="mb-3 w-full">
-              <TabsTrigger value="content">{t('editor.blocks')}</TabsTrigger>
-              <TabsTrigger value="theme">{t('editor.theme')}</TabsTrigger>
-              <TabsTrigger value="seo">{t('editor.seo')}</TabsTrigger>
-            </TabsList>
-
-          <TabsContent value="content">
-              <BlockList
-                sections={sections}
-                selected={selected}
-                readOnly={readOnly}
-                onSelect={setSelected}
-                onMove={(from, to) => mutate(() => setSections((current) => moveBlock(current, from, to)))}
-                onRemove={(index) =>
-                  mutate(() => {
-                    setSections((current) => removeBlock(current, index));
-                    setSelected(null);
-                  })
-                }
-                onToggleVisible={(index) =>
-                  mutate(() =>
-                    setSections((current) => {
-                      const block = current[index];
-                      if (block === undefined) return current;
-                      return replaceBlock(current, index, {
-                        ...block,
-                        visible: block.visible === false,
-                      });
-                    }),
-                  )
-                }
-              />
-              {readOnly ? null : (
-                <div className="mt-3 flex flex-wrap gap-1">
-                  {BLOCK_TYPES.map((type: BlockType) => (
-                    <Button
-                      key={type}
-                      size="sm"
-                      variant="secondary"
-                      onClick={() =>
-                        mutate(() => {
-                          setSections((current) => [...current, emptyBlock(type)]);
-                          setSelected(sections.length);
-                        })
-                      }
-                    >
-                      + {t(BLOCK_LABEL_KEY[type])}
-                    </Button>
-                  ))}
-                </div>
-              )}
-          </TabsContent>
-
-          <TabsContent value="theme">
-            <ThemePanel
-              theme={theme}
-              readOnly={readOnly}
-              onChange={(next) => mutate(() => setTheme(next))}
-            />
-          </TabsContent>
-
-          <TabsContent value="seo">
-            <div className="flex flex-col gap-4">
-              <Field
-                label={t('editor.seoTitle')}
-                value={seo.title ?? ''}
-                onChange={(event) => mutate(() => setSeo({ ...seo, title: event.target.value }))}
-                readOnly={readOnly}
-              />
-              <FieldTextarea
-                label={t('editor.seoDescription')}
-                value={seo.description ?? ''}
-                onChange={(event) =>
-                  mutate(() => setSeo({ ...seo, description: event.target.value }))
-                }
-                readOnly={readOnly}
-                rows={3}
-              />
+          <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)} className="flex min-h-0 flex-1 flex-col">
+            <div className="px-4 pt-4">
+              <TabsList className="w-full">
+                <TabsTrigger value="content">{t('editor.blocks')}</TabsTrigger>
+                <TabsTrigger value="theme">{t('editor.theme')}</TabsTrigger>
+                <TabsTrigger value="seo">{t('editor.seo')}</TabsTrigger>
+              </TabsList>
             </div>
-          </TabsContent>
+
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+              <TabsContent value="content" className="mt-0 flex flex-col gap-3">
+                <BlockList
+                  sections={sections}
+                  selected={selected}
+                  readOnly={readOnly}
+                  onSelect={setSelected}
+                  onMove={(from, to) =>
+                    mutate(() => {
+                      setSections((current) => moveBlock(current, from, to));
+                      if (selected === from) setSelected(to);
+                    })
+                  }
+                  onRemove={(index) =>
+                    mutate(() => {
+                      setSections((current) => removeBlock(current, index));
+                      setSelected(null);
+                    })
+                  }
+                  onToggleVisible={(index) =>
+                    mutate(() =>
+                      setSections((current) => {
+                        const block = current[index];
+                        if (block === undefined) return current;
+                        return replaceBlock(current, index, {
+                          ...block,
+                          visible: block.visible === false,
+                        });
+                      }),
+                    )
+                  }
+                />
+                {readOnly ? null : (
+                  <AddBlockMenu hasSelection={selected !== null} onAdd={addBlock} />
+                )}
+              </TabsContent>
+
+              <TabsContent value="theme" className="mt-0">
+                <ThemePanel
+                  theme={theme}
+                  readOnly={readOnly}
+                  onChange={(next) => mutate(() => setTheme(next))}
+                />
+              </TabsContent>
+
+              <TabsContent value="seo" className="mt-0">
+                <div className="flex flex-col gap-4">
+                  <p className="text-xs text-muted-foreground">{t('editor.seoHint')}</p>
+                  <Field
+                    label={t('editor.seoTitle')}
+                    value={seo.title ?? ''}
+                    maxLength={CONTENT_LIMITS.seo.title}
+                    hint={t('editor.charCount', {
+                      count: (seo.title ?? '').length,
+                      max: CONTENT_LIMITS.seo.title,
+                    })}
+                    onChange={(event) => mutate(() => setSeo({ ...seo, title: event.target.value }))}
+                    readOnly={readOnly}
+                  />
+                  <FieldTextarea
+                    label={t('editor.seoDescription')}
+                    value={seo.description ?? ''}
+                    maxLength={CONTENT_LIMITS.seo.description}
+                    hint={t('editor.charCount', {
+                      count: (seo.description ?? '').length,
+                      max: CONTENT_LIMITS.seo.description,
+                    })}
+                    onChange={(event) =>
+                      mutate(() => setSeo({ ...seo, description: event.target.value }))
+                    }
+                    readOnly={readOnly}
+                    rows={4}
+                  />
+                  <AssetPicker
+                    label={t('editor.seoImage')}
+                    assetId={seo.ogImageAssetId ?? null}
+                    purpose="og_image"
+                    readOnly={readOnly}
+                    onChange={(ogImageAssetId) => mutate(() => setSeo(withOgImage(seo, ogImageAssetId)))}
+                  />
+                  <SeoPreview
+                    url={page?.canonicalUrl || liveUrl || ''}
+                    title={seo.title ?? ''}
+                    description={seo.description ?? ''}
+                  />
+                </div>
+              </TabsContent>
+            </div>
           </Tabs>
         </section>
 
-        <section className="w-full shrink-0 overflow-y-auto border-b border-border p-4 xl:w-80 xl:border-r xl:border-b-0">
+        <section className="w-full shrink-0 overflow-y-auto border-b border-border p-5 xl:w-96 xl:border-r xl:border-b-0">
           {restored ? (
             <Alert tone="info" className="mb-3">
               {t('editor.draftRestored')}
@@ -412,21 +503,24 @@ export function ContentEditor(): ReactNode {
             </Alert>
           ) : null}
           {selectedBlock === undefined || selected === null ? (
-            <p className="text-sm text-muted-foreground">{t('editor.selectBlock')}</p>
+            <EditorEmptyState />
           ) : (
-            <BlockForm
-              block={selectedBlock}
-              index={selected}
-              branches={branches}
-              errors={errors}
-              readOnly={readOnly}
-              onChange={(next) => mutate(() => setSections((current) => replaceBlock(current, selected, next)))}
-            />
+            <div className="flex flex-col gap-5">
+              <BlockFormHeader block={selectedBlock} />
+              <BlockForm
+                block={selectedBlock}
+                index={selected}
+                branches={branches}
+                errors={errors}
+                readOnly={readOnly}
+                onChange={(next) => mutate(() => setSections((current) => replaceBlock(current, selected, next)))}
+              />
+            </div>
           )}
         </section>
 
-        <section className="hidden min-w-0 flex-1 p-4 xl:block">
-          <PreviewFrame payload={preview} />
+        <section className="hidden min-w-0 flex-1 bg-muted/40 p-4 xl:block">
+          <PreviewFrame payload={preview} liveUrl={liveUrl} />
         </section>
       </div>
 
@@ -472,4 +566,13 @@ function toMessage(caught: unknown): string {
   return caught instanceof ApiProblemError
     ? describeProblem(caught.problem, caught.retryAfterSeconds).message
     : networkError().message;
+}
+
+/** SEO görselini ayarla ya da anahtarı tamamen çıkar (`exactOptionalPropertyTypes`). */
+function withOgImage(seo: SeoInput, ogImageAssetId: string | null): SeoInput {
+  if (ogImageAssetId !== null) return { ...seo, ogImageAssetId };
+  const next: SeoInput = {};
+  if (seo.title !== undefined) next.title = seo.title;
+  if (seo.description !== undefined) next.description = seo.description;
+  return next;
 }

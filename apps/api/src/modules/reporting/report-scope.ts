@@ -17,8 +17,8 @@ export interface ReportScope {
   /**
    * Sorgunun kapsayacağı şubeler.
    *
-   * `null` "tüm kiracı" demektir ve YALNIZ `tenantWide` rollerde (owner,
-   * accountant) oluşur. Şube kapsamlı bir kullanıcı için burası her zaman
+   * `null` "tüm kiracı" demektir ve YALNIZ `tenantWide` rolde (owner)
+   * oluşur. Şube kapsamlı bir kullanıcı için burası her zaman
    * somut bir listedir; boş liste ise hiçbir şey döndürmez.
    */
   branchIds: string[] | null;
@@ -42,7 +42,7 @@ export interface ReportScope {
 /**
  * Personel daraltması gerekli mi?
  *
- * `report.revenue:read` taşıyan biri (owner, manager, accountant) tüm
+ * `report.revenue:read` taşıyan biri (owner, manager) tüm
  * personeli görür. Yalnız `report.performance:read.own` taşıyan bir uygulayıcı
  * ise kendi satırına kilitlenir — ve bu izin tek başına parasal alanları
  * AÇAR, çünkü kendi cirosu ve primi tam da raporun konusu. Açtığı tek şey

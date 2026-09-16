@@ -13,7 +13,7 @@ import com.klinara.android.services.formatting.Money
 import com.klinara.android.services.reports.ReportKind
 
 /**
- * Personel performansı — işlem, ciro, prim, doluluk. iOS `StaffPerformanceReportView` paritesi.
+ * Personel performansı — işlem, ciro, doluluk. iOS `StaffPerformanceReportView` paritesi.
  *
  * Ciro `charges` üzerinden (indirim, override, KDV orada), kalem fiyatından değil. Karşılaştırma
  * anahtarı YOK: sunucu bu raporda `compareTo`'yu yok sayıyor ve anahtar hiçbir şey değiştirmezdi.
@@ -59,12 +59,6 @@ fun StaffPerformanceReportScreen(
                 KlinaraRow(label = "Tamamlanan işlem", value = "${row.completedServices}")
                 KlinaraDivider()
                 KlinaraRow(label = "Ciro", value = Money.format(row.revenueMinor, report.currency))
-                KlinaraDivider()
-                KlinaraRow(
-                    label = "Prim",
-                    value = Money.format(row.commissionMinor, report.currency),
-                    detail = "Ters kayıtlar düşülmüştür",
-                )
                 KlinaraDivider()
                 KlinaraRow(
                     label = "Doluluk",

@@ -58,7 +58,7 @@ class BranchServicesTest {
                 ListEnvelope.serializer(MembershipSummary.serializer()),
                 Fixtures.read("staff/user-memberships.json"),
             )
-        assertNull(memberships.data.single { it.roleKey == "accountant" }.branchId)
+        assertNull(memberships.data.single { it.roleKey == "owner" }.branchId)
 
         val invitations =
             KlinaraJson.decodeFromString(
@@ -79,7 +79,7 @@ class BranchServicesTest {
         assertFalse("address" in patch)
         assertTrue(UpdateBranchInput().isEmpty)
 
-        val put = membershipsBody(listOf(MembershipInput("accountant"), MembershipInput("manager", "b1")))
+        val put = membershipsBody(listOf(MembershipInput("owner"), MembershipInput("manager", "b1")))
         val rows = put["memberships"] as JsonArray
         assertFalse("branchId" in (rows[0] as JsonObject))
         assertEquals("b1", (rows[1] as JsonObject)["branchId"]?.toString()?.trim('"'))
@@ -94,7 +94,7 @@ class BranchServicesTest {
 
             val users = MockUsersService(latencyEnabled = false)
             val noBranch = listOf(MembershipInput("practitioner"))
-            val tenantWithBranch = listOf(MembershipInput("accountant", MockIds.BRANCH_BODRUM))
+            val tenantWithBranch = listOf(MembershipInput("owner", MockIds.BRANCH_BODRUM))
             assertThrows<ApiError> { users.replaceMemberships(MockIds.USER_DERYA, noBranch) }
             assertThrows<ApiError> { users.replaceMemberships(MockIds.USER_DERYA, tenantWithBranch) }
 

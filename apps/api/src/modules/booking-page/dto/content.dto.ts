@@ -10,6 +10,7 @@ import {
 } from '@klinara/shared';
 import { Type } from 'class-transformer';
 import {
+  IsNotEmpty,
   ArrayMaxSize,
   IsArray,
   IsBoolean,
@@ -195,13 +196,42 @@ export class MapBlockDto extends BaseBlockDto {
   zoom?: number;
 }
 
+export class FaqItemDto {
+  @ApiProperty({ maxLength: CONTENT_LIMITS.faq.question })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(CONTENT_LIMITS.faq.question)
+  question: string;
+
+  @ApiProperty({ maxLength: CONTENT_LIMITS.faq.answer, description: 'Düz metin (HTML değil).' })
+  @IsString()
+  @MaxLength(CONTENT_LIMITS.faq.answer)
+  answer: string;
+}
+
+export class FaqBlockDto extends BaseBlockDto {
+  @ApiPropertyOptional({ maxLength: CONTENT_LIMITS.faq.title })
+  @IsOptional()
+  @IsString()
+  @MaxLength(CONTENT_LIMITS.faq.title)
+  title?: string;
+
+  @ApiProperty({ type: [FaqItemDto], maxItems: CONTENT_LIMITS.faq.items })
+  @IsArray()
+  @ArrayMaxSize(CONTENT_LIMITS.faq.items)
+  @ValidateNested({ each: true })
+  @Type(() => FaqItemDto)
+  items: FaqItemDto[];
+}
+
 export type ContentBlockDto =
   | HeroBlockDto
   | RichTextBlockDto
   | CarouselBlockDto
   | ServiceListBlockDto
   | ContactBlockDto
-  | MapBlockDto;
+  | MapBlockDto
+  | FaqBlockDto;
 
 export class ThemeDto {
   @ApiPropertyOptional({ example: '#0F766E', description: 'Birincil marka rengi.' })
@@ -267,6 +297,7 @@ export class SeoDto {
   ServiceListBlockDto,
   ContactBlockDto,
   MapBlockDto,
+  FaqBlockDto,
 )
 export class UpdateBookingPageContentDto {
   @ApiPropertyOptional({ type: ThemeDto })
@@ -285,6 +316,7 @@ export class UpdateBookingPageContentDto {
       { $ref: getSchemaPath(ServiceListBlockDto) },
       { $ref: getSchemaPath(ContactBlockDto) },
       { $ref: getSchemaPath(MapBlockDto) },
+      { $ref: getSchemaPath(FaqBlockDto) },
     ],
   })
   @IsArray()
@@ -301,6 +333,7 @@ export class UpdateBookingPageContentDto {
         { value: ServiceListBlockDto, name: 'serviceList' },
         { value: ContactBlockDto, name: 'contact' },
         { value: MapBlockDto, name: 'map' },
+        { value: FaqBlockDto, name: 'faq' },
       ],
     },
   })

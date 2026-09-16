@@ -172,7 +172,6 @@ describe('rota × yetki kapsamı', () => {
     const enforcedInServices = [
       'customer.medical:read', // notes.service.ts, files.service.ts
       'customer.medical:write',
-      'finance.price:override', // charges.service.ts
     ];
 
     /**

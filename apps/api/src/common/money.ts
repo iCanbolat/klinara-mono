@@ -132,25 +132,3 @@ export function splitVatInclusive(totalMinor: number, rateBasisPoints: number): 
   const vatMinor = roundHalfEven(totalMinor * rateBasisPoints, 10000 + rateBasisPoints);
   return { netMinor: totalMinor - vatMinor, vatMinor };
 }
-
-export type DiscountKind = 'percent' | 'amount';
-
-/**
- * İndirim tutarını hesaplar — TABANI AŞAMAZ.
- *
- * `percent` için `value` baz puandır (1500 = %15), `amount` için doğrudan
- * minor unit. Sonuç `[0, baseMinor]` aralığına kırpılır: kabul kriteri
- * "indirim sonrası tutar negatife düşemez" diyor ve bunu çağıranın
- * hatırlamasına bırakmak, bir gün hatırlamaması demekti.
- */
-export function applyDiscount(baseMinor: number, kind: DiscountKind, value: number): number {
-  if (!Number.isInteger(baseMinor) || baseMinor < 0) {
-    throw new RangeError('applyDiscount: taban negatif olmayan tamsayı olmalı.');
-  }
-  if (!Number.isInteger(value) || value < 0) {
-    throw new RangeError('applyDiscount: indirim değeri negatif olmayan tamsayı olmalı.');
-  }
-
-  const raw = kind === 'percent' ? roundHalfEven(baseMinor * value, 10000) : value;
-  return Math.min(raw, baseMinor);
-}

@@ -352,8 +352,7 @@ private enum Fixtures {
              "appointment:reopen", "service:write", "staff:write", "schedule:write",
              "customer.medical:read", "customer:merge",
              "package:write", "package:refund", "package:transfer",
-             "finance.payment:read", "finance.payment:write", "finance.price:override",
-             "finance.commission:read", "finance.commission:write", "report.revenue:read",
+             "report.revenue:read",
              "consent:manage", "notification:send", "notification:manage", "audit:read"]
             """
         }

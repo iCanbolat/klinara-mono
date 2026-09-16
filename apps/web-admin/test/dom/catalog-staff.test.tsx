@@ -379,7 +379,7 @@ describe('personel — roller ve şubeler', () => {
   it('sizden yetkili rol kilitli gösteriliyor ve olduğu gibi geri gönderiliyor', async () => {
     me = { ...MANAGER_B1, tenantWide: true };
     memberships = [
-      { id: 'm0', branchId: null, roleKey: 'accountant', roleName: 'Muhasebe' },
+      { id: 'm0', branchId: 'b1', roleKey: 'receptionist', roleName: 'Resepsiyon' },
       { id: 'm9', branchId: null, roleKey: 'owner', roleName: 'İşletme Sahibi' },
     ];
     put.mockResolvedValue({ data: memberships });
@@ -387,7 +387,7 @@ describe('personel — roller ve şubeler', () => {
     const sheet = await openEditor(user);
 
     expect(await within(sheet).findAllByText('Sizden yetkili bir rol — değiştirilemez.')).not.toHaveLength(0);
-    await user.click(within(sheet).getByRole('button', { name: 'Rolü kaldır: Muhasebe' }));
+    await user.click(within(sheet).getByRole('button', { name: 'Rolü kaldır: Resepsiyon' }));
     await user.click(within(sheet).getByRole('button', { name: 'Rolleri kaydet' }));
 
     await waitFor(() => {

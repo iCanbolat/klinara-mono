@@ -12,7 +12,7 @@ import type {
  *
  * Her raporda para İKİ kolonla yazılıyor: insan için `1.234,56` biçimli metin,
  * makine için ham kuruş. Yalnız birini yazmak iki kullanıcıdan birini
- * kaybederdi — muhasebeci Excel'de toplam almak ister, veri tarafı ondalık
+ * kaybederdi — Excel'de toplam alan kişi sayı ister, veri tarafı ondalık
  * ayracıyla uğraşmak istemez.
  */
 
@@ -31,13 +31,11 @@ export function occupancyCsv(report: OccupancyReportDto): string {
 
 export function revenueCsv(report: RevenueReportDto): string {
   return toCsv(
-    ['Kırılım', 'Tahakkuk', 'Tahakkuk (kuruş)', 'Tahsilat', 'Tahsilat (kuruş)', 'Para birimi'],
+    ['Kırılım', 'Ciro', 'Ciro (kuruş)', 'Para birimi'],
     report.data.map((row) => [
       row.groupLabel,
       csvMoney(row.accruedMinor),
       row.accruedMinor,
-      csvMoney(row.collectedMinor),
-      row.collectedMinor,
       report.totals.currency,
     ]),
   );
@@ -50,8 +48,6 @@ export function staffPerformanceCsv(report: StaffPerformanceReportDto): string {
       'Tamamlanan işlem',
       'Ciro',
       'Ciro (kuruş)',
-      'Prim',
-      'Prim (kuruş)',
       'Dolu dakika',
       'Müsait dakika',
       'Doluluk %',
@@ -61,8 +57,6 @@ export function staffPerformanceCsv(report: StaffPerformanceReportDto): string {
       row.completedServices,
       csvMoney(row.revenueMinor),
       row.revenueMinor,
-      csvMoney(row.commissionMinor),
-      row.commissionMinor,
       row.bookedMinutes,
       row.availableMinutes,
       String(row.occupancyRate).replace('.', ','),

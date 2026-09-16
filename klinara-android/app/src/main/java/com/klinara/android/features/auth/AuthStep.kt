@@ -73,7 +73,7 @@ data class AppSession(
      * Adaylardan **herhangi biri** yeterli.
      *
      * Yönetim sekmesi bunu kullanıyor: yalnız çalışma saatlerini düzenleyen bir
-     * yönetici de, yalnız kasayı gören bir muhasebeci de girebilmeli.
+     * yönetici de, yalnız iletişim kanalını yöneten bir kullanıcı da girebilmeli.
      */
     fun canAny(permissions: Collection<String>): Boolean = permissions.any(::can)
 

@@ -51,11 +51,6 @@ enum class ShellTab(
         /**
          * Yönetim sekmesini açan izinler.
          *
-         * **Finans izinlerinin burada olması iOS'ta bir DÜZELTMEYDİ.** `accountant`
-         * rolünde `service:read`, `staff:read`, `schedule:read` yok; eski koşulla
-         * muhasebe sekmeyi hiç göremiyor, dolayısıyla kendisi için yazılmış Kasa ve
-         * Prim ekranlarına da hiç ulaşamıyordu.
-         *
          * **`package:read` A5.1'de eklendi**, aynı sınıftan bir hatayı önlemek için:
          * paket tanımları ve raporları Yönetim'de yaşıyor. Bugün her paket izni olan rol
          * sekmeyi zaten başka bir izinle görüyor, ama koşul "şans eseri doğru" olmamalı —
@@ -66,8 +61,6 @@ enum class ShellTab(
                 Permissions.SERVICE_READ,
                 Permissions.STAFF_READ,
                 Permissions.SCHEDULE_READ,
-                Permissions.FINANCE_PAYMENT_READ,
-                Permissions.FINANCE_COMMISSION_READ,
                 Permissions.NOTIFICATION_READ,
                 Permissions.NOTIFICATION_MANAGE,
                 Permissions.PACKAGE_READ,
@@ -78,8 +71,8 @@ enum class ShellTab(
         /**
          * Takvim içeriği çizilsin mi?
          *
-         * Sekmenin görünürlüğünden AYRI bir soru: `accountant` sekmeyi görür ama
-         * randevuları göremez.
+         * Sekmenin görünürlüğünden AYRI bir soru: randevu izni olmayan bir rol sekmeyi
+         * görür ama randevuları göremez.
          */
         fun canSeeCalendar(session: AppSession): Boolean =
             session.canAny(Permissions.APPOINTMENT_READ_ALL, Permissions.APPOINTMENT_READ_OWN)

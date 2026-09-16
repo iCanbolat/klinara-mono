@@ -14,12 +14,11 @@ class ManagementSectionsTest {
     private fun titles(role: String) = managementSections(ShellSessions.forRole(role)).map { it.title }
 
     @Test
-    @DisplayName("Katalog kartı `service:read` ile: yönetici, resepsiyon ve uygulayıcı görür, muhasebe görmez")
+    @DisplayName("Katalog kartı `service:read` ile: yönetici, resepsiyon ve uygulayıcı görür")
     fun catalogCard() {
         listOf("owner", "manager", "receptionist", "practitioner").forEach { role ->
             assertEquals(true, "Katalog" in titles(role), role)
         }
-        assertEquals(false, "Katalog" in titles("accountant"))
     }
 
     @Test
@@ -40,7 +39,7 @@ class ManagementSectionsTest {
     }
 
     @Test
-    @DisplayName("İletişim kartı `notification:read` ile: muhasebe görmez, uygulayıcı görür (A8.1)")
+    @DisplayName("İletişim kartı `notification:read` ile: uygulayıcı da görür (A8.1)")
     fun communicationCard() {
         listOf("owner", "manager", "receptionist", "practitioner").forEach { role ->
             val card = managementSections(ShellSessions.forRole(role)).firstOrNull { it.title == "İletişim" }
@@ -56,19 +55,18 @@ class ManagementSectionsTest {
                 role,
             )
         }
-        assertEquals(false, "İletişim" in titles("accountant"))
     }
 
     @Test
     @DisplayName("Her satır route'a sahip bir hedef — boş kart yok")
     fun noEmptySections() {
-        listOf("owner", "manager", "receptionist", "practitioner", "accountant").forEach { role ->
+        listOf("owner", "manager", "receptionist", "practitioner").forEach { role ->
             managementSections(ShellSessions.forRole(role)).forEach { assertEquals(true, it.rows.isNotEmpty()) }
         }
     }
 
     @Test
-    @DisplayName("Şube ve Personel (A7.4–A7.5): şubeler `branch:read`, davetler `user:invite` ile; muhasebe kartı görmez")
+    @DisplayName("Şube ve Personel (A7.4–A7.5): şubeler `branch:read`, davetler `user:invite` ile")
     fun teamRows() {
         fun rows(role: String) =
             managementSections(ShellSessions.forRole(role))
@@ -86,6 +84,5 @@ class ManagementSectionsTest {
         )
         assertEquals(listOf(ManagementDestination.Staff, ManagementDestination.Branches), rows("receptionist"))
         assertEquals(listOf(ManagementDestination.Staff, ManagementDestination.Branches), rows("practitioner"))
-        assertEquals(null, rows("accountant"))
     }
 }

@@ -14,7 +14,7 @@ import Foundation
 ///
 /// **Açık** küme: sunucu yeni bir olay tanımladığında (doğum günü süpürücüsü,
 /// paket bakiyesi…) eski bir istemci mesaj günlüğünü çözemeyip patlamamalı.
-/// ``CommissionScope`` gibi form içinde seçilen kapalı kümelerden farkı bu:
+/// Form içinde seçilen kapalı kümelerden farkı bu:
 /// olay listesi sunucudan gelen bir veriyi **okur**, kullanıcı onu üretmez.
 nonisolated enum NotificationEvent: String, Codable, Sendable, CaseIterable, Identifiable {
     case appointmentConfirmation = "appointment_confirmation"

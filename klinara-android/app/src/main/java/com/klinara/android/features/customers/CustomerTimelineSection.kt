@@ -31,12 +31,8 @@ import com.klinara.android.services.networking.Loadable
 /**
  * Zaman çizelgesi — randevu, not, onam ve paket olayları tek akışta.
  *
- * İki **dürüstlük dipnotu** taşıyor ve ikisi de zorunlu:
- *
- * 1. **Tahsilat bu akışta YOK** (sunucudan gelmiyor, Faz 6'dan devreden madde).
- *    Sessizce gizlemek "bu müşteriden hiç tahsilat yapılmamış" izlenimi verirdi.
- * 2. **Klinik notlar izinsiz kullanıcıya hiç gelmiyor.** Bunu söylememek, eksik bir
- *    geçmişi tam bir geçmiş gibi göstermek olurdu.
+ * **Dürüstlük dipnotu:** klinik notlar izinsiz kullanıcıya hiç gelmiyor. Bunu söylememek,
+ * eksik bir geçmişi tam bir geçmiş gibi göstermek olurdu.
  */
 @Composable
 fun CustomerTimelineSection(
@@ -54,12 +50,7 @@ fun CustomerTimelineSection(
     KlinaraCard(
         title = "Zaman çizelgesi",
         footnote =
-            buildString {
-                append("Tahsilat hareketleri bu akışta henüz görünmüyor.")
-                if (!canReadMedical) {
-                    append(" Klinik notlar yetkiniz olmadığı için listeye dâhil edilmedi.")
-                }
-            },
+            if (canReadMedical) null else "Klinik notlar yetkiniz olmadığı için listeye dâhil edilmedi.",
         modifier = modifier,
     ) {
         TimelineFilters(

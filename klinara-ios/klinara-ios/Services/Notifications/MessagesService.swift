@@ -3,7 +3,7 @@ import Foundation
 /// Mesaj günlüğü (Faz 8.1).
 ///
 /// Tek uçlu ayrı bir sözleşme olmasının sebebi izin ailesi: `notification:read`
-/// salt okuma rollerinde (`accountant`) de var, `notification:manage` yok.
+/// salt okuma rollerinde (`practitioner`) de var, `notification:manage` yok.
 /// ``NotificationsService`` ile birleştirmek, günlüğü okuyabilen bir role
 /// şablon yazma metotlarını da göstermek olurdu.
 protocol MessagesService: Sendable {

@@ -185,7 +185,7 @@ class ReportsViewModelTest {
             advanceUntilIdle()
             val report = viewModel.state.value.revenue.valueOrNull!!
             assertNotNull(report.previous)
-            assertTrue(report.delta!!.containsKey("collectedMinor"))
+            assertTrue(report.delta!!.containsKey("accruedMinor"))
         }
 
     @Test

@@ -9,7 +9,7 @@ import kotlinx.serialization.Serializable
 // iOS `ReportModels.swift` paritesi.
 //
 // ⚠️ HİÇBİR SAYI BURADA HESAPLANMIYOR. Oranlar, toplamlar ve yüzde değişimler sunucudan geldiği
-// gibi taşınıyor (A5/A6'daki "bakiye istemcide hesaplanmaz" kuralı). Para `Long` kuruş; oranlar
+// gibi taşınıyor ("toplam istemcide hesaplanmaz" kuralı). Para `Long` kuruş; oranlar
 // sunucunun iki haneye yuvarladığı yüzde (`Double` yalnız GÖSTERİM için — hesap yok).
 
 /** Yanıtın kapsamı — istemci izinden TÜRETMEZ, sunucunun dediğini gösterir. */
@@ -80,7 +80,6 @@ enum class RevenueGrouping(
     Staff("staff", "Personel"),
     Branch("branch", "Şube"),
     Day("day", "Gün"),
-    Method("method", "Ödeme yöntemi"),
 }
 
 enum class NoShowGrouping(
@@ -130,20 +129,17 @@ data class OccupancyReport(
 
 @Serializable
 data class RevenueTotals(
+    /** Dönemde açılan, iptal edilmemiş ücret kalemleri (hizmet bedeli). */
     val accruedMinor: Long = 0,
-    val collectedMinor: Long = 0,
-    val refundedMinor: Long = 0,
     val currency: String = "TRY",
 )
 
 @Serializable
 data class RevenueRow(
     val groupId: String? = null,
-    /** Atıfsız satırda `"—"`; yöntem kırılımında ham yöntem (`card`, `cash`…). */
+    /** Atıfsız satırda `"—"`. */
     val groupLabel: String,
-    /** Yöntem kırılımında HER ZAMAN 0: ödeme yöntemi bir tahsilat özelliği, kalem değil. */
     val accruedMinor: Long = 0,
-    val collectedMinor: Long = 0,
 ) {
     val id: String get() = groupId ?: groupLabel
 }
@@ -158,28 +154,9 @@ data class RevenueReport(
     val previous: RevenueTotals? = null,
     val delta: ReportDelta? = null,
 ) {
-    /**
-     * Toplamlarda hareket var mı? iOS toplam kartını `data` boşken gizliyordu; oysa eski bir
-     * borca bu dönemde yapılan tahsilat satırsız ama toplamlı bir dönem üretir.
-     */
+    /** Dönemde ciro doğmuş mu? Satırlar sayfalı olabildiği için toplama da bakılır. */
     val hasMovement: Boolean
-        get() =
-            data.isNotEmpty() ||
-                listOf(totals.accruedMinor, totals.collectedMinor, totals.refundedMinor).any { it != 0L }
-}
-
-/** Ödeme yöntemi etiketleri — sunucunun `PaymentMethod` kümesi; bilinmeyen HAM kalır. */
-object PaymentMethodLabels {
-    private val LABELS =
-        mapOf(
-            "cash" to "Nakit",
-            "card" to "Kart",
-            "bank_transfer" to "Havale / EFT",
-            "gift_voucher" to "Hediye çeki",
-            "other" to "Diğer",
-        )
-
-    fun label(wire: String): String = LABELS[wire] ?: wire
+        get() = data.isNotEmpty() || totals.accruedMinor != 0L
 }
 
 // --- Personel performansı ---
@@ -190,8 +167,6 @@ data class StaffPerformanceRow(
     val staffName: String,
     val completedServices: Int = 0,
     val revenueMinor: Long = 0,
-    /** Ters kayıtlar düşülmüş. */
-    val commissionMinor: Long = 0,
     val bookedMinutes: Int = 0,
     val availableMinutes: Int = 0,
     val occupancyRate: Double = 0.0,

@@ -160,13 +160,6 @@ export class CustomerPackageResponseDto {
   @ApiProperty()
   refundAmountMinor: number;
 
-  @ApiProperty({
-    nullable: true,
-    enum: ['pending', 'settled'],
-    description: 'pending = borç doğdu, kasa hareketi Faz 6.2de bağlanacak',
-  })
-  refundSettlementStatus: string | null;
-
   @ApiProperty({ nullable: true, type: String })
   refundedAt: string | null;
 

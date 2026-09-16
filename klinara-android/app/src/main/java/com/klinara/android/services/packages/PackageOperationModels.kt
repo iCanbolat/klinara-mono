@@ -140,15 +140,13 @@ data class RefundPackageInput(
 /**
  * `RefundResultDto`.
  *
- * **Kasa hareketi yoktur.** Tutar satış anındaki tahsisten hesaplanır ve yükümlülük
- * `pending` yazılır; tahsilat tarafı Faz A6'da bağlanacak.
+ * İade SEANS iadesidir. Tutar satış anındaki tahsisten hesaplanır ve bilgi amaçlıdır;
+ * paranın müşteriye ödenmesi uygulamada takip edilmez.
  */
 @Serializable
 data class RefundResult(
     val refundedSessions: Int = 0,
     val refundAmountMinor: Long = 0,
-    /** `pending` ya da `settled`. */
-    val settlementStatus: String = "pending",
 )
 
 /** `TransferPackageDto` — [items] `null` ise tüm kalan hak devredilir. */

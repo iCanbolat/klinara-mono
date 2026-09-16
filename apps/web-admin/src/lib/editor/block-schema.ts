@@ -23,6 +23,7 @@ export type FieldKind =
   | 'markdown'
   | 'asset'
   | 'assetList'
+  | 'faqList'
   | 'uuidList'
   | 'boolean'
   | 'number'
@@ -90,6 +91,10 @@ export const BLOCK_FIELDS: Record<BlockType, readonly FieldSpec[]> = {
       max: CONTENT_LIMITS.map.zoom.max,
     },
   ],
+  faq: [
+    { key: 'title', kind: 'text', labelKey: 'Başlık', max: CONTENT_LIMITS.faq.title },
+    { key: 'items', kind: 'faqList', labelKey: 'Sorular', maxItems: CONTENT_LIMITS.faq.items },
+  ],
 };
 
 /** Blok türlerinin kullanıcıya gösterilen adı. */
@@ -100,6 +105,7 @@ export const BLOCK_LABEL_KEY: Record<BlockType, MessageKey> = {
   serviceList: 'block.serviceList',
   contact: 'block.contact',
   map: 'block.map',
+  faq: 'block.faq',
 };
 
 /** Yeni blok — zorunlu alanları boş ama GEÇERLİ bir iskeletle. */
@@ -117,6 +123,8 @@ export function emptyBlock(type: BlockType): ContentBlockInput {
       return { type };
     case 'map':
       return { type, zoom: CONTENT_LIMITS.map.zoom.default };
+    case 'faq':
+      return { type, items: [{ question: '', answer: '' }] };
   }
 }
 

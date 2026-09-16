@@ -22,9 +22,9 @@ import { canAny } from '@/lib/permissions';
  * Rapor hub'ı.
  *
  * Kartlar İZNE GÖRE süzülüyor ve süzme `canAny`: ciroyu `report.revenue:read`,
- * doluluk ve gelmeme raporlarını `appointment:read.all` açıyor. Muhasebeci
- * (takvim izni yok) ile resepsiyon (ciro izni yok) bu sayfada farklı kart
- * kümeleri görüyor — ve göremediği kart RENDER EDİLMİYOR, gizlenmiyor.
+ * doluluk ve gelmeme raporlarını `appointment:read.all` açıyor. Resepsiyon
+ * (ciro izni yok) ile uygulayıcı (yalnız kendi performansı) bu sayfada farklı
+ * kart kümeleri görüyor — ve göremediği kart RENDER EDİLMİYOR, gizlenmiyor.
  */
 
 interface ReportCard {

@@ -41,7 +41,7 @@ import com.klinara.android.services.networking.Loadable
  *
  * A4.1 kartın **kimlik yarısını** çiziyor: ad, iletişim, adres, kaynak, etiket.
  * Notlar ve zaman çizelgesi A4.3'te, fotoğraf ve dosyalar A4.4'te bu ekranın altına
- * biner; paket bölümü A5.2'de geldi, cari hesap (A6.1) de buraya gelecek.
+ * biner; paket bölümü A5.2'de geldi.
  *
  * **Sheet değil, gerçek bir `NavHost` hedefi** (Kural 2): sistem geri tuşu ve tahmini
  * geri kendiliğinden çalışsın diye.

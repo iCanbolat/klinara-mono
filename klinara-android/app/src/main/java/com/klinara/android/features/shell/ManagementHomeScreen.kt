@@ -113,8 +113,8 @@ fun managementSections(session: AppSession): List<ManagementSection> =
 
 /**
  * "Şube ve Personel" (A7.4–A7.5) — web panelindeki ekranın ve iOS `teamCard`ın karşılığı. Kapı
- * `staff:read`: `branch:read` HER rolde var ve kapı olsaydı muhasebeci yalnız şube listesinden
- * ibaret bir kart görürdü. Şubeler `branch:read`, davetler `user:invite` ile satır olarak eklenir.
+ * `staff:read`: `branch:read` HER rolde var ve kapı olsaydı personel izni olmayan bir rol yalnız
+ * şube listesinden ibaret bir kart görürdü. Şubeler `branch:read`, davetler `user:invite` ile satır olarak eklenir.
  */
 private fun teamSection(session: AppSession): ManagementSection? {
     if (!session.can(Permissions.STAFF_READ)) return null
@@ -150,7 +150,7 @@ private fun teamSection(session: AppSession): ManagementSection? {
  * sonda. Paket raporları A5.4'te Paketler kartındaydı; iOS'taki yerine taşındı.
  *
  * Klinik raporları satırı, beş rapordan EN AZ BİRİ açılabiliyorsa görünür ([ReportAccess]);
- * hangilerinin açıldığı giriş ekranında ayrıca süzülür. Prim (A6) buraya eklenecek.
+ * hangilerinin açıldığı giriş ekranında ayrıca süzülür.
  */
 private fun reportsSection(session: AppSession): ManagementSection? {
     val rows =
@@ -289,16 +289,5 @@ fun ManagementHomeScreen(
                 }
             }
         }
-
-        KlinaraCard(title = "Yakında") {
-            Text(
-                text = COMING_SOON,
-                style = KlinaraType.bodyM,
-                color = KlinaraTheme.colors.charcoalMuted,
-            )
-        }
     }
 }
-
-private const val COMING_SOON =
-    "Kasa ve prim Faz A6 ile geliyor."

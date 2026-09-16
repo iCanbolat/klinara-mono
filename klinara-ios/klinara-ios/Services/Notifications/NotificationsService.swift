@@ -3,8 +3,7 @@ import Foundation
 /// Bildirim **yapılandırması**: şablonlar, tercihler, hatırlatma ayarları ve
 /// iletişim izni (Faz 8.1 / 8.4).
 ///
-/// ``MessagesService`` ve ``WhatsAppService``den ayrı, ``CommissionsService``in
-/// ``FinanceService``den ayrılmasıyla aynı gerekçeyle: izin ailesi farklı.
+/// ``MessagesService`` ve ``WhatsAppService``den ayrı, çünkü izin ailesi farklı.
 /// Burası ağırlıklı `notification:manage`; mesaj günlüğü salt `notification:read`,
 /// gönderim `notification:send`. Sunucu bu üçünü **birbirine bindirmiyor** —
 /// resepsiyon tek tek mesaj gönderebilir ama kiracı şablonunu değiştiremez.

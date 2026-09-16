@@ -100,17 +100,15 @@ class MockAuthServiceTest {
             val manager = service(MockScenario.PasswordOnly).me()
             assertEquals(RolePermissions.forRole("manager"), manager.permissions)
 
-            // iOS'ta tam olarak BU eksikti: Faz 6 finans izinleri hiç eklenmemişti ve
-            // mock modda kasa/prim/cari ekranlarına ulaşılamıyordu.
-            assertTrue(manager.permissions.contains(Permissions.FINANCE_PAYMENT_READ))
-            assertTrue(manager.permissions.contains(Permissions.FINANCE_COMMISSION_READ))
-            assertTrue(manager.permissions.contains(Permissions.FINANCE_PRICE_OVERRIDE))
+            // Elle tutulan listede yeni fazların izinleri eksik kalıyordu; üretilmiş demet
+            // ciro raporunu da taşımalı.
+            assertTrue(manager.permissions.contains(Permissions.REPORT_REVENUE_READ))
 
             val practitioner = service(MockScenario.PractitionerScope).me()
             assertEquals(RolePermissions.forRole("practitioner"), practitioner.permissions)
             assertFalse(
-                practitioner.permissions.contains(Permissions.FINANCE_PAYMENT_WRITE),
-                "Uygulayıcı tahsilat yapamaz",
+                practitioner.permissions.contains(Permissions.REPORT_REVENUE_READ),
+                "Uygulayıcı genel ciroyu göremez",
             )
         }
 

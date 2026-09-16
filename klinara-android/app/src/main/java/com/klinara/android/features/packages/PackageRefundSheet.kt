@@ -14,7 +14,7 @@ import com.klinara.android.services.formatting.Money
  *
  * Tutar **satış anındaki tahsisten** hesaplanır, güncel katalog fiyatından değil:
  * kampanyalı satılan bir paketin iadesi liste fiyatından yapılırsa klinik taşımadığı bir
- * borcu öder. Kasa hareketi YOK — iade `pending` bir yükümlülük yazar ve ekran bunu söyler.
+ * borcu öder. İade SEANS iadesidir; paranın müşteriye ödenmesi uygulamada takip edilmez.
  */
 @Composable
 fun PackageRefundSheet(
@@ -50,9 +50,7 @@ fun PackageRefundSheet(
         )
         KlinaraCard(
             title = "Tutar",
-            footnote =
-                "Kasa hareketi oluşturulmaz: borç \"bekliyor\" olarak kaydedilir, " +
-                    "tahsilat Faz A6'da bağlanacak.",
+            footnote = "Kalan seanslar düşülür; tutar bilgi amaçlı kaydedilir.",
         ) {
             KlinaraRow(
                 label = "Tahmini iade",

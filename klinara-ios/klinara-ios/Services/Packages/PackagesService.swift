@@ -101,7 +101,7 @@ protocol PackagesService: Sendable {
     ) async throws -> CustomerPackage
 
     /// `POST /customer-packages/:id/refund` — `package:refund` izni ister.
-    /// Tutar satış anındaki tahsisten hesaplanır; kasa hareketi YOKTUR.
+    /// Tutar satış anındaki tahsisten hesaplanır ve bilgi amaçlıdır.
     func refund(
         id: String,
         version: Int,

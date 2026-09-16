@@ -41,7 +41,7 @@ export const publicEnv = {
   /** Yerelde konak adı çözümlemesini atlamak için; üretimde yok sayılır. */
   devSlug: process.env.NEXT_PUBLIC_DEV_SLUG ?? '',
   /**
-   * Yönetim panelinin origin'i — `/_preview` rotasının `postMessage` kontrolü.
+   * Yönetim panelinin origin'i — `/preview.frame` rotasının `postMessage` kontrolü.
    *
    * Boşsa önizleme rotası KAPALI. Bu rota kiracının alan adı altında keyfî
    * içerik render edebildiği için, hedef origin bilinmeden açık olmamalı.

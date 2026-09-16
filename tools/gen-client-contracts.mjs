@@ -179,7 +179,7 @@ ${ranks}
  * tek doğruluk kaynağı odur.
  *
  * Buranın ÜRETİLMİŞ olması bir hata sınıfını kapatıyor: iOS aynı listeyi elle tutuyordu
- * ve Faz 6'nın finans izinleri hiç eklenmediği için mock modda kasa, prim ve cari hesap
+ * ve yeni fazların izinleri eksik kaldığı için mock modda bazı yönetim
  * ekranlarına ulaşılamıyordu — testin yakalayamadığı, yalnız elle gezerken görülen bir
  * kayıp. Artık \`permissions.ts\` değiştiğinde bu dosya da değişir ve CI bayat kalmasına
  * izin vermez.

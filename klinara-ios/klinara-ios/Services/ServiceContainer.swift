@@ -18,8 +18,6 @@ final class ServiceContainer {
     let notes: any NotesService
     let files: any FilesService
     let packages: any PackagesService
-    let finance: any FinanceService
-    let commissions: any CommissionsService
     let notifications: any NotificationsService
     let messages: any MessagesService
     let whatsapp: any WhatsAppService
@@ -42,8 +40,6 @@ final class ServiceContainer {
         notes: any NotesService,
         files: any FilesService,
         packages: any PackagesService,
-        finance: any FinanceService,
-        commissions: any CommissionsService,
         notifications: any NotificationsService,
         messages: any MessagesService,
         whatsapp: any WhatsAppService,
@@ -62,8 +58,6 @@ final class ServiceContainer {
         self.notes = notes
         self.files = files
         self.packages = packages
-        self.finance = finance
-        self.commissions = commissions
         self.notifications = notifications
         self.messages = messages
         self.whatsapp = whatsapp
@@ -87,8 +81,6 @@ final class ServiceContainer {
             notes: LiveNotesService(client: client),
             files: LiveFilesService(client: client),
             packages: LivePackagesService(client: client),
-            finance: LiveFinanceService(client: client),
-            commissions: LiveCommissionsService(client: client),
             notifications: LiveNotificationsService(client: client),
             messages: LiveMessagesService(client: client),
             whatsapp: LiveWhatsAppService(client: client),
@@ -122,12 +114,6 @@ final class ServiceContainer {
             scenario: data
         )
         let packages = MockPackagesService(catalog: catalog, customers: customers, booking: booking)
-        let finance = MockFinanceService(customers: customers)
-        let commissions = MockCommissionsService()
-        // Tahsilat yazıldığında prim tahakkuku doğsun diye iki mock birbirine
-        // bağlanıyor. Gerçek sunucuda ikisi aynı transaction'da; burada zayıf
-        // bir referans, çünkü prim mock'u da finans kayıtlarını okuyor.
-        finance.commissions = commissions
         // Bildirim mock'u randevu mock'undan okuyor: bir randevunun hatırlatma
         // çizelgesi onun kendi saatinden türetiliyor. Ayrı tohumlanmış bir
         // kopya, ertelenen randevuda çizelgeyi yalan söyletirdi.
@@ -148,8 +134,6 @@ final class ServiceContainer {
             notes: MockNotesService(booking: booking),
             files: MockFilesService(),
             packages: packages,
-            finance: finance,
-            commissions: commissions,
             notifications: notifications,
             messages: messages,
             whatsapp: whatsapp,
@@ -174,8 +158,6 @@ final class ServiceContainer {
         (notes as? MockNotesService)?.reseed(canReadMedical: true)
         (files as? MockFilesService)?.reseed(canReadMedical: true)
         (packages as? MockPackagesService)?.reseed()
-        (finance as? MockFinanceService)?.reseed()
-        (commissions as? MockCommissionsService)?.reseed()
         (notifications as? MockNotificationsService)?.reseed()
         (messages as? MockMessagesService)?.reseed()
         (whatsapp as? MockWhatsAppService)?.reseed()

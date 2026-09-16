@@ -86,15 +86,24 @@ describe('karusel öge editörü', () => {
     // Başka bir kullanıcı varlığı silmiş olabilir. Seçenek listesine
     // eklenmezse `select` ilk ögeye kayar ve blok, kullanıcı hiç dokunmadan
     // BAŞKA bir görseli işaret eder.
-    renderItems({ items: [{ assetId: 'a9999999-9999-4999-8999-999999999999' }] });
-    const select = await screen.findByRole('combobox', { name: '1. görselin kaynağı' });
-    expect(select).toHaveValue('a9999999-9999-4999-8999-999999999999');
+    const { onChange } = renderItems({ items: [{ assetId: 'a9999999-9999-4999-8999-999999999999' }] });
+    expect(await screen.findByText('Görsel bulunamadı')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '1. görselin kaynağı' })).toBeInTheDocument();
+    expect(onChange).not.toHaveBeenCalled();
   });
 
   it('salt okunur modda sıralama ve silme düğmeleri YOK', async () => {
     renderItems({ readOnly: true });
     expect(await screen.findAllByLabelText('Alternatif metin')).toHaveLength(2);
     expect(screen.queryByRole('button', { name: '1. görseli sil' })).not.toBeInTheDocument();
+  });
+
+  it('"Görsel ekle" kütüphaneden seçileni alt metniyle ekliyor', async () => {
+    const user = userEvent.setup();
+    const { onChange } = renderItems();
+    await user.click(await screen.findByRole('button', { name: 'Görsel ekle' }));
+    await user.click(await screen.findByRole('button', { name: 'Muayene odası görselini seç' }));
+    expect(onChange).toHaveBeenCalledWith([...items, { assetId: ASSETS[1]!.id, alt: 'Muayene odası' }]);
   });
 
   it('sınır dolduğunda ekleme kapanıyor', async () => {

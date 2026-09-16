@@ -51,14 +51,13 @@ class CustomerPackageModelsTest {
     }
 
     @Test
-    @DisplayName("Sayfa çözülüyor; iade edilmiş paket kapalı ve kasa hareketi BEKLİYOR")
+    @DisplayName("Sayfa çözülüyor; iade edilmiş paket kapalı")
     fun pageDecodesRefunded() {
         val page = decode("packages/customer-package-page.json", Page.serializer(CustomerPackage.serializer()))
         val refunded = page.data[1]
 
         assertEquals(CustomerPackageStatus.Refunded, refunded.status)
         assertFalse(refunded.status.isOpen)
-        assertTrue(refunded.hasPendingRefundSettlement)
         assertEquals(0, refunded.remainingSessions)
     }
 

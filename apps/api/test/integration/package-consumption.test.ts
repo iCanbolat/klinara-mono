@@ -382,14 +382,12 @@ describe('paket tüketimi, iade, devir ve süre dolumu (Batch 5.3)', () => {
       expect(response.body).toEqual({
         refundedSessions: 6,
         refundAmountMinor: 240_000,
-        settlementStatus: 'pending',
       });
       expect(await remaining()).toBe(0);
 
       const after = await http(app).get(`/api/v1/customer-packages/${sold.id}`).set(ownerAuth());
-      const body = after.body as { status: string; refundSettlementStatus: string };
+      const body = after.body as { status: string };
       expect(body.status).toBe('refunded');
-      expect(body.refundSettlementStatus).toBe('pending');
     });
 
     it('resepsiyon iade yapamaz', async () => {

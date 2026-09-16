@@ -2,8 +2,8 @@ import SwiftUI
 
 /// Bildirim yapılandırması: şablonlar, tercihler ve şube hatırlatma ayarları.
 ///
-/// **Ekran ömürlü** — ayda bir girilen ayar köşeleri (``CommissionStore`` ile
-/// aynı gerekçe). Üç bağımsız ``LoadState``: kullanıcı yalnız hatırlatma
+/// **Ekran ömürlü** — ayda bir girilen ayar köşeleri; oturum boyunca bellekte
+/// tutmanın getirisi yok. Üç bağımsız ``LoadState``: kullanıcı yalnız hatırlatma
 /// ayarına girdiğinde şablonların da yüklenmesini beklemesi gereksiz olurdu.
 @MainActor
 @Observable

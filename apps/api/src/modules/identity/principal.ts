@@ -19,7 +19,7 @@ export interface Principal {
   permissions: ReadonlySet<string>;
   /** Şube kapsamlı üyeliklerin şubeleri. */
   branchIds: string[];
-  /** Kiracı kapsamlı bir rolü var mı (owner/accountant) — tüm şubeleri kapsar. */
+  /** Kiracı kapsamlı bir rolü var mı (owner) — tüm şubeleri kapsar. */
   tenantWide: boolean;
 }
 

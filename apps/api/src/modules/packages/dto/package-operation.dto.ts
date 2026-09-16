@@ -148,12 +148,6 @@ export class RefundResultDto {
 
   @ApiProperty({ description: 'Satış anındaki tahsisten hesaplanır (kuruş)' })
   refundAmountMinor: number;
-
-  @ApiProperty({
-    enum: ['pending', 'settled'],
-    description: 'pending = borç doğdu; kasa hareketi Batch 6.2de bağlanacak',
-  })
-  settlementStatus: string;
 }
 
 export class ListEntitlementsQueryDto {

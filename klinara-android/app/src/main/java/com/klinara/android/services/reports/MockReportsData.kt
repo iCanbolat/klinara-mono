@@ -53,9 +53,6 @@ internal class MockReportsData(
         val isOnline: Boolean,
         val minutes: Int,
         val priceMinor: Long,
-        /** Tahsil edilmemiş kalem 0; ödeme yöntemi yalnız tahsil edilende. */
-        val collectedMinor: Long,
-        val method: String?,
         val packageName: String?,
     ) {
         val branchId: String get() = MockIds.BRANCH_NISANTASI
@@ -114,7 +111,6 @@ internal class MockReportsData(
                     val service = skills[(index + slot) % skills.size]
                     val seed = index + position + slot
                     val status = status(day, today, seed)
-                    val paid = status == Status.Completed && seed % UNPAID_EVERY != 0
                     Visit(
                         date = day,
                         staffId = profile.id,
@@ -127,8 +123,6 @@ internal class MockReportsData(
                         isOnline = (index + slot) % ONLINE_EVERY == 0,
                         minutes = service.durationMinutes,
                         priceMinor = service.priceMinor,
-                        collectedMinor = if (paid) service.priceMinor else 0,
-                        method = if (paid) METHODS[seed % METHODS.size] else null,
                         packageName = PACKAGE_NAME.takeIf { service.id == MockIds.SERVICE_LASER },
                     )
                 }
@@ -163,13 +157,10 @@ internal class MockReportsData(
         private const val STAFF_STRIDE = 5
         private const val CUSTOMER_STRIDE = 7
         private const val CUSTOMER_BASE = 20
-        private const val UNPAID_EVERY = 6
         private const val ONLINE_EVERY = 3
         private const val NO_SHOW_EVERY = 9
         private const val CANCEL_EVERY = 13
         private const val CANCEL_REMAINDER = 5
-
-        private val METHODS = listOf("card", "cash", "card", "bank_transfer")
 
         /** `null` bilerek var: kaynağı girilmemiş müşteri "Belirtilmemiş" satırı olmalı. */
         private val SOURCES =

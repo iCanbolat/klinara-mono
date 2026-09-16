@@ -57,7 +57,7 @@ export const tenantSettings = pgTable('tenant_settings', {
   minLeadMinutes: integer('min_lead_minutes').notNull().default(0),
   /** Kaç gün ileriye randevu alınabilir. */
   maxAdvanceDays: integer('max_advance_days').notNull().default(180),
-  /** Yönetici rolleri (owner, manager, accountant) için 2FA zorunlu mu. */
+  /** Yönetici rolleri (owner, manager) için 2FA zorunlu mu. */
   requireMfaForAdmins: boolean('require_mfa_for_admins').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

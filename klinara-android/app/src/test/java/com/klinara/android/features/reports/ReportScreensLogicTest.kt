@@ -19,7 +19,6 @@ class ReportScreensLogicTest {
         val all = ReportKind.entries
         assertEquals(all, visible("owner"))
         assertEquals(all, visible("manager"))
-        assertEquals(listOf(ReportKind.Revenue, ReportKind.StaffPerformance), visible("accountant"))
         assertEquals(listOf(ReportKind.Occupancy, ReportKind.NoShow, ReportKind.Retention), visible("receptionist"))
         assertEquals(listOf(ReportKind.Occupancy, ReportKind.StaffPerformance), visible("practitioner"))
     }
@@ -34,7 +33,6 @@ class ReportScreensLogicTest {
                 ?.map { it.label }
 
         assertEquals(listOf("Klinik raporları", "Paket raporları"), rows("manager"))
-        assertEquals(listOf("Klinik raporları", "Paket raporları"), rows("accountant"))
         assertEquals(listOf("Klinik raporları", "Paket raporları"), rows("practitioner"))
         val packages = managementSections(ShellSessions.forRole("manager")).first { it.title == "Paketler" }
         assertEquals(listOf("Paket tanımları"), packages.rows.map { it.label })

@@ -41,12 +41,6 @@ export function StaffPerformanceReportView(): ReactNode {
       render: (row) => formatMoney(row.revenueMinor, currency),
     },
     {
-      key: 'commission',
-      header: t('reports.col.commission'),
-      numeric: true,
-      render: (row) => formatMoney(row.commissionMinor, currency),
-    },
-    {
       key: 'booked',
       header: t('reports.col.bookedMinutes'),
       numeric: true,

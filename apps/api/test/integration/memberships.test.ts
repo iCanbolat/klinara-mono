@@ -184,9 +184,9 @@ describe('rol değiştirme — PUT /users/:id/memberships (Faz 1 devreden madde)
       });
 
       await putMemberships(secondOwner.userId, [
-        { roleKey: 'accountant' },
+        { roleKey: 'manager', branchId: clinic.branch.id },
       ]).expect(200);
-      expect((await rolesOf(secondOwner.tokens)).roles).toEqual(['accountant']);
+      expect((await rolesOf(secondOwner.tokens)).roles).toEqual(['manager']);
     });
 
     it('şube kapsamlı rol şubesiz, kiracı kapsamlı rol şubeli GÖNDERİLEMEZ', async () => {
@@ -196,7 +196,7 @@ describe('rol değiştirme — PUT /users/:id/memberships (Faz 1 devreden madde)
       expect(missingBranch.status).toBe(400);
 
       const extraBranch = await putMemberships(receptionist.userId, [
-        { roleKey: 'accountant', branchId: clinic.branch.id },
+        { roleKey: 'owner', branchId: clinic.branch.id },
       ]);
       expect(extraBranch.status).toBe(400);
     });

@@ -46,7 +46,7 @@ export class PerformanceService {
   // ---------------------------------------------------------------------------
 
   /**
-   * İşlem sayısı, ciro, prim ve doluluk — personel başına tek satır.
+   * İşlem sayısı, ciro ve doluluk — personel başına tek satır.
    *
    * Ciro `charges` üzerinden okunuyor, `appointment_services.price_minor`
    * üzerinden DEĞİL. İkisi çoğu zaman aynı ama indirim, fiyat override'ı ve
@@ -102,20 +102,6 @@ export class PerformanceService {
            group by 1
         ),
 
-        -- Prim tahakkukları AYRI okunuyor: tetikleyicisi tahsilat olan bir prim
-        -- randevunun gününde değil, paranın alındığı günde doğar.
-        per_staff_commission as (
-          select ca.staff_profile_id,
-                 sum(ca.amount_minor)::bigint as commission_minor
-            from commission_accruals ca
-           where ca.created_at >= ${from}::timestamptz
-             and ca.created_at <  ${to}::timestamptz
-             and ${branchFilterSql(scope.branchIds, sql`ca.branch_id`)}
-             and (${scope.staffProfileId ?? null}::uuid is null
-                  or ca.staff_profile_id = ${scope.staffProfileId ?? null}::uuid)
-           group by 1
-        ),
-
         per_staff_minutes as (
           select sa.staff_profile_id,
                  sum(sa.available_minutes) as available_minutes
@@ -129,11 +115,10 @@ export class PerformanceService {
            group by 1
         ),
 
-        -- Personel kümesi DÖRT kaynağın birleşimi: sadece çalışmış, sadece
-        -- randevu almış ya da sadece primi olan biri de raporda görünmeli.
+        -- Personel kümesi ÜÇ kaynağın birleşimi: sadece çalışmış ya da sadece
+        -- randevu almış biri de raporda görünmeli.
         roster as (
           select staff_profile_id from per_staff_work
-          union select staff_profile_id from per_staff_commission
           union select staff_profile_id from per_staff_minutes
           union select staff_profile_id from per_staff_booked
         )
@@ -142,14 +127,12 @@ export class PerformanceService {
                u.full_name,
                coalesce(w.completed_services, 0)::int    as completed_services,
                coalesce(w.revenue_minor, 0)::bigint      as revenue_minor,
-               coalesce(cm.commission_minor, 0)::bigint  as commission_minor,
                coalesce(bk.booked_minutes, 0)::numeric   as booked_minutes,
                coalesce(mn.available_minutes, 0)::numeric as available_minutes
           from roster r
           join staff_profiles sp on sp.id = r.staff_profile_id
           join users u on u.id = sp.user_id
           left join per_staff_work w        on w.staff_profile_id = r.staff_profile_id
-          left join per_staff_commission cm on cm.staff_profile_id = r.staff_profile_id
           left join per_staff_minutes mn    on mn.staff_profile_id = r.staff_profile_id
           left join per_staff_booked bk     on bk.staff_profile_id = r.staff_profile_id
          order by revenue_minor desc, u.full_name
@@ -164,7 +147,6 @@ export class PerformanceService {
           staffName: String(row.full_name),
           completedServices: Number(row.completed_services ?? 0),
           revenueMinor: Number(row.revenue_minor ?? 0),
-          commissionMinor: Number(row.commission_minor ?? 0),
           bookedMinutes: Math.round(booked),
           availableMinutes: Math.round(available),
           occupancyRate: rate(booked, available),

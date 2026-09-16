@@ -101,7 +101,7 @@ class MockPackageOperationsTest {
         }
 
     @Test
-    @DisplayName("Kısmi iade: tutar SATIŞ TAHSİSİNDEN, borç bekliyor, paket açık kalıyor")
+    @DisplayName("Kısmi iade: tutar SATIŞ TAHSİSİNDEN, paket açık kalıyor")
     fun partialRefund() =
         runTest {
             val before = ayse()
@@ -112,10 +112,8 @@ class MockPackageOperationsTest {
 
             // 1.111.963 / 10 = 111.196 × 2 — liste fiyatı (145.000 × 2) DEĞİL.
             assertEquals(222_392L, result.refundAmountMinor)
-            assertEquals("pending", result.settlementStatus)
             assertEquals(4, after.sortedItems[0].remainingSessions)
             assertEquals(CustomerPackageStatus.Active, after.status)
-            assertTrue(after.hasPendingRefundSettlement)
             assertLedgerMatches(before.id)
         }
 

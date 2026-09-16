@@ -76,13 +76,11 @@ nonisolated struct RefundPackageInput: Encodable, Sendable, Equatable {
 
 /// `RefundResultDto`.
 ///
-/// **Kasa hareketi yoktur.** Tutar satış anındaki tahsisten hesaplanır ve
-/// yükümlülük `pending` yazılır; tahsilat tarafı Batch 6.2'de bağlanacak.
+/// İade SEANS iadesidir. Tutar satış anındaki tahsisten hesaplanır ve bilgi
+/// amaçlıdır; paranın müşteriye ödenmesi uygulamada takip edilmez.
 nonisolated struct RefundResult: Decodable, Sendable, Equatable {
     let refundedSessions: Int
     let refundAmountMinor: Int
-    /// `pending` ya da `settled`.
-    let settlementStatus: String
 }
 
 // MARK: - Devir

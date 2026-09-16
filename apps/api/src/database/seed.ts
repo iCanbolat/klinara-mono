@@ -2,6 +2,8 @@ import { createHash, randomBytes } from 'node:crypto';
 import { hash } from '@node-rs/argon2';
 import pg from 'pg';
 import { loadEnvOrExit } from '../config/load-env';
+import { buildDefaultTemplate } from '../modules/booking-page/template/default-template';
+import { seedBookingImages } from './seed-booking-images';
 
 /** `Algorithm.Argon2id`. Ambient const enum olduğu için değeri doğrudan yazıyoruz. */
 const ARGON2_ID = 2;
@@ -317,73 +319,72 @@ async function seed(): Promise<void> {
     );
 
     // Altı blok türünü de içeren yayınlanmış bir sürüm: renderer'ın her dalı
-    // yerelde görülebilsin. `content_hash` uygulamanın kanonik JSON'undan
-    // değil, burada sabit bir özet — seed'in amacı hash doğruluğu değil.
-    const sections = [
-      {
-        type: 'hero',
-        title: 'Demo Estetik Kliniği',
-        subtitle: 'Uzman kadromuzla cilt ve lazer bakımı. Online randevu birkaç adımda.',
-        ctaLabel: 'Hemen randevu al',
-      },
-      {
-        type: 'richText',
-        title: 'Hakkımızda',
-        body: '2015’ten beri **medikal estetik** alanında hizmet veriyoruz.\n\n- Sertifikalı uygulayıcılar\n- Tek kullanımlık ekipman\n- [Detaylı bilgi](https://ornek.test)',
-      },
-      { type: 'serviceList', title: 'Hizmetlerimiz' },
-      { type: 'contact', title: 'Şubelerimiz', showPhones: true, showAddresses: true },
-      { type: 'map', zoom: 14 },
-    ];
-    const theme = {
-      primaryColor: '#0F766E',
-      backgroundColor: '#FAF9F7',
-      textColor: '#1C1917',
-      fontFamily: 'inter',
-      radius: 'lg',
-    };
-    const seo = {
-      title: 'Demo Estetik Kliniği — Online Randevu',
-      description: 'Lazer epilasyon ve cilt bakımı için online randevu alın.',
-    };
+    // (kapak görseli ve galeri dahil) yerelde ve editör önizlemesinde görülebilsin.
+    // `content_hash` uygulamanın kanonik JSON'undan değil, burada sabit bir
+    // özet — seed'in amacı hash doğruluğu değil.
+    const images = await seedBookingImages(client, env, tenantId, ownerId);
+    // Yeni kliniklerin hazır şablonunun AYNISI (`default-template.ts`): demo
+    // klinikte görülen sayfa, müşterinin ilk gördüğü sayfa.
+    const { theme, sections, seo } = buildDefaultTemplate('Demo Estetik Kliniği', images);
     const contentHash = createHash('sha256')
       .update(JSON.stringify({ theme, sections, seo }))
       .digest('hex');
 
-    const revision = await client.query<{ id: string }>(
-      `insert into booking_page_revisions
-         (tenant_id, booking_site_id, revision_number, theme, sections, seo, content_hash, created_by)
-       values ($1, $2, 1, $3::jsonb, $4::jsonb, $5::jsonb, $6, $7)
-       on conflict (booking_site_id, revision_number) do nothing
-       returning id`,
-      [
-        tenantId,
-        siteId,
-        JSON.stringify(theme),
-        JSON.stringify(sections),
-        JSON.stringify(seo),
-        contentHash,
-        ownerId,
-      ],
+    // Sürümler DEĞİŞMEZ (trigger), seed içeriği tazelemek için yeni sürüm yazar:
+    // - hiç sürüm yoksa 1,
+    // - yayındaki sürüm hâlâ seed'in 1. sürümüyse ve seed içeriği değiştiyse
+    //   sonraki numara (eski veritabanları görselleri ve galeriyi böyle alır).
+    // Editörden YAYINLANMIŞ bir sürüm varsa içeriğe ve işaretçilere dokunulmaz.
+    const state = await client.query<{
+      max_number: number | null;
+      published_number: number | null;
+      published_hash: string | null;
+    }>(
+      `select (select max(revision_number) from booking_page_revisions where booking_site_id = s.id) as max_number,
+              r.revision_number as published_number,
+              r.content_hash as published_hash
+         from booking_sites s
+         left join booking_page_revisions r on r.id = s.published_revision_id
+        where s.id = $1`,
+      [siteId],
     );
-    const revisionId =
-      revision.rows[0]?.id ??
-      (
-        await client.query<{ id: string }>(
-          `select id from booking_page_revisions where booking_site_id = $1 and revision_number = 1`,
-          [siteId],
-        )
-      ).rows[0]?.id;
+    const current = state.rows[0];
+    const nextNumber =
+      current?.max_number == null
+        ? 1
+        : current.published_number === 1 && current.published_hash !== contentHash
+          ? current.max_number + 1
+          : null;
 
-    await client.query(
-      `update booking_sites
-          set status = 'published',
-              published_revision_id = $2,
-              draft_revision_id = $2,
-              published_at = coalesce(published_at, now())
-        where id = $1`,
-      [siteId, revisionId],
-    );
+    if (nextNumber !== null) {
+      const revision = await client.query<{ id: string }>(
+        `insert into booking_page_revisions
+           (tenant_id, booking_site_id, revision_number, theme, sections, seo, content_hash, created_by)
+         values ($1, $2, $3, $4::jsonb, $5::jsonb, $6::jsonb, $7, $8)
+         returning id`,
+        [
+          tenantId,
+          siteId,
+          nextNumber,
+          JSON.stringify(theme),
+          JSON.stringify(sections),
+          JSON.stringify(seo),
+          contentHash,
+          ownerId,
+        ],
+      );
+      await client.query(
+        `update booking_sites
+            set status = 'published',
+                published_revision_id = $2,
+                draft_revision_id = $2,
+                published_at = now()
+          where id = $1`,
+        [siteId, revision.rows[0]?.id],
+      );
+      process.stdout.write(`[seed] randevu sayfası içeriği: sürüm ${nextNumber} yayında\n`);
+      await purgeBookingCache(env, 'demo-klinik');
+    }
 
     // İkinci uygulayıcı — biri BİLEREK `is_visible_online = false`. Personel
     // seçim ucunun "takvimde çalışıyor ama adı internette görünmesin" kuralını
@@ -460,6 +461,31 @@ async function seed(): Promise<void> {
     );
   } finally {
     await client.end();
+  }
+}
+
+/**
+ * Yayından sonra web-booking önbelleğini boşaltır — `booking-page-purge.worker`
+ * ile aynı istek. Kritik değil: web-booking kapalıysa içerik en fazla beş
+ * dakika bayat kalır, seed bu yüzden düşmez.
+ */
+async function purgeBookingCache(
+  env: ReturnType<typeof loadEnvOrExit>,
+  slug: string,
+): Promise<void> {
+  if (env.WEB_REVALIDATE_URL === '') return;
+  try {
+    await fetch(env.WEB_REVALIDATE_URL, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-klinara-revalidate-secret': env.WEB_REVALIDATE_SECRET ?? '',
+      },
+      body: JSON.stringify({ slug, reason: 'seed' }),
+      signal: AbortSignal.timeout(env.WEB_REVALIDATE_TIMEOUT_MS),
+    });
+  } catch {
+    process.stdout.write('[seed] web-booking önbelleği boşaltılamadı (uygulama kapalı olabilir)\n');
   }
 }
 

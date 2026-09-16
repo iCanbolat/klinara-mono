@@ -159,11 +159,6 @@ describe('kullanıcılar, roller ve davetler (Batch 1.1 & 1.3)', () => {
         branchScoped: true,
         expected: { users: 403, invitations: 403, tenantPatch: 403, branchPost: 403 },
       },
-      {
-        role: 'accountant',
-        branchScoped: false,
-        expected: { users: 403, invitations: 403, tenantPatch: 403, branchPost: 403 },
-      },
     ];
 
     for (const testCase of CASES) {
@@ -368,8 +363,8 @@ describe('kullanıcılar, roller ve davetler (Batch 1.1 & 1.3)', () => {
 
     it('kiracı kapsamlı rol şubeye bağlanamaz', async () => {
       const res = await http(app).post('/api/v1/invitations').set(auth(fixture.owner.tokens)).send({
-        email: 'muhasebe@klinik.test',
-        roleKey: 'accountant',
+        email: 'ortak@klinik.test',
+        roleKey: 'owner',
         branchId: fixture.branch.id,
       });
       expect(res.status).toBe(400);

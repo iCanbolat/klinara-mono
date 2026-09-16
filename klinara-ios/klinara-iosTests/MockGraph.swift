@@ -16,8 +16,6 @@ struct MockGraph {
     let notes: MockNotesService
     let files: MockFilesService
     let packages: MockPackagesService
-    let finance: MockFinanceService
-    let commissions: MockCommissionsService
     let notifications: MockNotificationsService
     let messages: MockMessagesService
     let whatsapp: MockWhatsAppService
@@ -46,11 +44,6 @@ struct MockGraph {
             canReopen: canReopen
         )
         packages = MockPackagesService(catalog: catalog, customers: customers, booking: booking)
-        finance = MockFinanceService(customers: customers)
-        commissions = MockCommissionsService()
-        // Tahsilat prim tahakkuku doğursun diye iki mock bağlanıyor —
-        // ``ServiceContainer/mock(scenario:data:)`` ile birebir aynı bağ.
-        finance.commissions = commissions
         // ``ServiceContainer/mock(scenario:data:)`` ile birebir aynı bağ:
         // bildirim mock'u randevu mock'undan okuyor (çizelge randevunun kendi
         // saatinden türetiliyor) ve WhatsApp test gönderimi mesaj günlüğüne

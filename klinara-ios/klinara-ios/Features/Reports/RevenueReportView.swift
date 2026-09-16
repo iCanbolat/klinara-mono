@@ -1,10 +1,9 @@
 import SwiftUI
 
-/// Ciro — tahakkuk eden ve tahsil edilen, AYRI AYRI.
+/// Ciro — dönemde tamamlanan hizmetlerin ve satılan paketlerin bedeli.
 ///
-/// İkisi aynı sayı değil ve raporun en sık yanlış okunan yeri burası:
-/// tahakkuk "bu dönemde ne kadar borç doğdu", tahsilat "bu dönemde kasaya ne
-/// girdi". Eylülde açılan bir kalem ekimde tahsil edilir.
+/// Tahsilat takibi kapsam dışı: rapor "ne kadar hizmet verildi" sorusunu
+/// cevaplar, "kasaya ne girdi" sorusunu değil.
 struct RevenueReportView: View {
 
     let session: AppSession
@@ -14,8 +13,8 @@ struct RevenueReportView: View {
         KlinaraScreen(
             state: store.revenue,
             emptyCheck: { $0.data.isEmpty },
-            emptyTitle: "Bu dönemde hareket yok",
-            emptyMessage: "Seçilen aralıkta ücret kalemi ya da tahsilat oluşmamış.",
+            emptyTitle: "Bu dönemde ciro yok",
+            emptyMessage: "Seçilen aralıkta tamamlanan hizmet ya da paket satışı yok.",
             emptyIcon: "banknote",
             onRetry: { await store.loadRevenue() }
         ) { report in
@@ -38,23 +37,10 @@ struct RevenueReportView: View {
 
             KlinaraCard(title: "Toplam") {
                 KlinaraRow(
-                    label: "Tahakkuk",
+                    label: "Ciro",
                     value: Money.format(minor: report.totals.accruedMinor, currency: report.totals.currency),
-                    detail: "Dönemde açılan ücret kalemleri",
-                    isMonospaced: true
-                )
-                KlinaraDivider()
-                KlinaraRow(
-                    label: "Tahsilat",
-                    value: Money.format(minor: report.totals.collectedMinor, currency: report.totals.currency),
-                    detail: ReportFormat.delta(report.delta?["collectedMinor"] ?? nil)
-                        ?? "Dönemde yapılan, iptal edilmemiş tahsilatlar",
-                    isMonospaced: true
-                )
-                KlinaraDivider()
-                KlinaraRow(
-                    label: "İade",
-                    value: Money.format(minor: report.totals.refundedMinor, currency: report.totals.currency),
+                    detail: ReportFormat.delta(report.delta?["accruedMinor"] ?? nil)
+                        ?? "Tamamlanan hizmet ve paket satışları",
                     isMonospaced: true
                 )
             }
@@ -66,7 +52,7 @@ struct RevenueReportView: View {
                         KlinaraChartPoint(
                             id: $0.id,
                             label: $0.groupLabel,
-                            value: Double($0.collectedMinor) / 100
+                            value: Double($0.accruedMinor) / 100
                         )
                     },
                     format: { ReportFormat.number($0) }
@@ -76,14 +62,8 @@ struct RevenueReportView: View {
             ForEach(report.data) { row in
                 KlinaraCard(title: row.groupLabel) {
                     KlinaraRow(
-                        label: "Tahakkuk",
+                        label: "Ciro",
                         value: Money.format(minor: row.accruedMinor, currency: report.totals.currency),
-                        isMonospaced: true
-                    )
-                    KlinaraDivider()
-                    KlinaraRow(
-                        label: "Tahsilat",
-                        value: Money.format(minor: row.collectedMinor, currency: report.totals.currency),
                         isMonospaced: true
                     )
                 }
@@ -92,17 +72,6 @@ struct RevenueReportView: View {
             if store.canLoadMoreRevenue {
                 loadMoreTrigger
             }
-
-            // Kırılım toplamının genel toplamdan küçük olabilmesi raporun en
-            // sık "hata" sanılan davranışı; not her zaman görünür.
-            Text(
-                "Kırılım satırlarının tahsilat toplamı genel toplamdan küçük olabilir: "
-                    + "eski bir borca bu dönemde yapılan tahsilatın bağlanacağı kalem bu dönemde değildir."
-            )
-            .klinaraText(.bodyM)
-            .foregroundStyle(KlinaraColor.charcoalMuted)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, KlinaraMetrics.xs)
         }
         .navigationTitle("Ciro")
         .navigationBarTitleDisplayMode(.inline)

@@ -107,14 +107,10 @@ private fun SummaryCard(
     }
 }
 
-/**
- * İade edilmişse tutar ve **borcun kapanmadığı** görünmeli: kasa hareketi Faz A6'da
- * bağlanacak, o zamana kadar `pending` bir yükümlülük.
- */
+/** İade edilmişse seans sayısı ve bilgi amaçlı tutar görünür. */
 private fun refundFootnote(pkg: CustomerPackage): String? {
     if (pkg.refundedSessions <= 0) return null
-    val base = "${pkg.refundedSessions} seans iade edildi · ${Money.format(pkg.refundAmountMinor, pkg.currency)}"
-    return if (pkg.hasPendingRefundSettlement) "$base · Kasa hareketi henüz oluşturulmadı (Faz A6)." else base
+    return "${pkg.refundedSessions} seans iade edildi · ${Money.format(pkg.refundAmountMinor, pkg.currency)}"
 }
 
 @Composable
@@ -167,8 +163,7 @@ private fun ItemRow(
 
 /**
  * İşlem kartı — üç düğme ÜÇ AYRI izinle (A5.3). `package:refund` ve `package:transfer`,
- * `package:write`'a binmez: resepsiyonun düzeltme yetkisi iade yetkisi demek değil,
- * muhasebenin iade yetkisi satış yetkisi demek değil.
+ * `package:write`'a binmez: resepsiyonun düzeltme yetkisi iade yetkisi demek değil.
  *
  * Yapılamayacak işlem **pasif düğme olarak değil, hiç çizilmez** ve sebebi dipnotta
  * yazılır. Yetkisi olmayana ise ne düğme ne dipnot: yapamayacağı bir şeyi anlatmak da

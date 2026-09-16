@@ -446,8 +446,8 @@ export interface StaffProfile {
   userEmail: string;
   primaryBranchId: string | null;
   /**
-   * Aktif ŞUBE üyeliklerinin şubeleri; kiracı kapsamlı roller (owner,
-   * accountant) burada görünmez. `GET staff?branchId=` süzgeci bu küme VEYA
+   * Aktif ŞUBE üyeliklerinin şubeleri; kiracı kapsamlı rol (`owner`) burada
+   * görünmez. `GET staff?branchId=` süzgeci bu küme VEYA
    * `primaryBranchId` ile eşleşir.
    */
   branchIds: string[];
@@ -545,8 +545,7 @@ export interface ScheduleException {
  * `GET /holidays?branchId=` bu yüzden şube kayıtlarıyla BİRLİKTE kiracı geneli
  * kayıtları da döndürür — takvimi etkileyen kümenin tamamı budur.
  *
- * ⚠️ Kiracı geneli kayıt YAZMAK kiracı kapsamlı bir rol ister (`owner`,
- * `accountant`); şube yöneticisinin `schedule:write` izni vardır ama kapsamı
+ * ⚠️ Kiracı geneli kayıt YAZMAK kiracı kapsamlı bir rol ister (`owner`); şube yöneticisinin `schedule:write` izni vardır ama kapsamı
  * kendi şubesidir ve `403 BRANCH_FORBIDDEN` alır.
  *
  * ⚠️ `PATCH` tarihi ve şubeyi DEĞİŞTİRMEZ: başka bir gün, başka bir kayıttır.

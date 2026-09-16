@@ -1,69 +1,90 @@
 'use client';
 
-import type { ChangeEvent, ReactNode } from 'react';
-import { assetLabel, useAssetLibrary, ACCEPT_ATTRIBUTE } from '@/lib/editor/use-asset-library';
+import { ImageIcon, ImageOff } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
+import type { AssetPurpose } from '@klinara/shared';
+import { assetLabel, useAssetLibrary } from '@/lib/editor/use-asset-library';
 import { t } from '@/i18n/tr';
-import { Alert } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { AssetLibraryDialog } from './asset-library-dialog';
 
 /**
- * Tek görsel seçimi ve yükleme.
+ * Tek görsel alanı: seçili görselin önizlemesi, "Değiştir" ve "Kaldır".
  *
- * Listeleme/yükleme mekaniği `useAssetLibrary`de; burada kalan yalnız tek
- * alanlık sunum. Karusel öge editörü aynı kancayı kullanıyor ve böylece iki
+ * Listeleme/yükleme mekaniği `useAssetLibrary`de; seçim ve yükleme
+ * `AssetLibraryDialog`da. Karusel öge editörü aynı ikiliyi kullanıyor, yani iki
  * yüzey aynı kütüphaneyi, aynı ön denetimi ve aynı hata metinlerini paylaşıyor.
+ *
+ * Kütüphanede bulunmayan bir kimlik (başka bir kullanıcının sildiği varlık)
+ * sessizce boşaltılmıyor: "görsel bulunamadı" olarak gösteriliyor ve kullanıcı
+ * açıkça değiştirene ya da kaldırana kadar doküman aynı kimliği taşıyor.
  */
 export function AssetPicker({
   label,
   assetId,
+  purpose = 'booking_hero',
   readOnly,
   onChange,
 }: {
   label: string;
   assetId: string | null;
+  purpose?: AssetPurpose;
   readOnly: boolean;
   onChange: (assetId: string | null) => void;
 }): ReactNode {
   const library = useAssetLibrary();
-
-  async function upload(event: ChangeEvent<HTMLInputElement>): Promise<void> {
-    const file = event.target.files?.[0];
-    if (file === undefined) return;
-    const uploaded = await library.upload(file, 'booking_hero');
-    if (uploaded !== null) onChange(uploaded);
-    event.target.value = '';
-  }
+  const [open, setOpen] = useState(false);
+  const asset = assetId === null ? undefined : library.assets.find((candidate) => candidate.id === assetId);
 
   return (
     <div className="flex flex-col gap-1.5">
       <span className="text-sm font-medium text-foreground">{label}</span>
 
-      <select
-        value={assetId ?? ''}
-        onChange={(event) => onChange(event.target.value === '' ? null : event.target.value)}
-        disabled={readOnly}
-        aria-label={label}
-        className="h-10 rounded-md border border-border bg-card px-2 text-sm"
-      >
-        <option value="">— yok —</option>
-        {library.assets.map((asset) => (
-          <option key={asset.id} value={asset.id}>
-            {assetLabel(asset)}
-          </option>
-        ))}
-      </select>
+      <div className="flex items-center gap-3 rounded-lg border border-border bg-card p-2">
+        <div className="flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
+          {asset !== undefined ? (
+            // eslint-disable-next-line @next/next/no-img-element -- küçük önizleme; optimize edici katmanı gereksiz.
+            <img src={asset.url} alt="" className="h-full w-full object-cover" />
+          ) : assetId !== null ? (
+            <ImageOff aria-hidden="true" className="size-5 text-muted-foreground" />
+          ) : (
+            <ImageIcon aria-hidden="true" className="size-5 text-muted-foreground/60" />
+          )}
+        </div>
+
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <span className="truncate text-xs text-muted-foreground">
+            {asset !== undefined
+              ? assetLabel(asset)
+              : assetId !== null
+                ? t('asset.missing')
+                : '—'}
+          </span>
+          {readOnly ? null : (
+            <div className="flex gap-1.5">
+              <Button type="button" size="sm" variant="secondary" onClick={() => setOpen(true)}>
+                {assetId === null ? t('asset.choose') : t('asset.change')}
+              </Button>
+              {assetId !== null ? (
+                <Button type="button" size="sm" variant="ghost" onClick={() => onChange(null)}>
+                  {t('asset.remove')}
+                </Button>
+              ) : null}
+            </div>
+          )}
+        </div>
+      </div>
 
       {readOnly ? null : (
-        <input
-          type="file"
-          accept={ACCEPT_ATTRIBUTE}
-          onChange={(event) => void upload(event)}
-          disabled={library.uploading}
-          aria-label={t('asset.upload')}
-          className="text-xs text-muted-foreground"
+        <AssetLibraryDialog
+          open={open}
+          onOpenChange={setOpen}
+          library={library}
+          purpose={purpose}
+          selectedId={assetId}
+          onSelect={(id) => onChange(id)}
         />
       )}
-      {library.uploading ? <p className="text-xs text-muted-foreground">{t('asset.uploading')}</p> : null}
-      {library.error !== null ? <Alert tone="danger">{library.error}</Alert> : null}
     </div>
   );
 }

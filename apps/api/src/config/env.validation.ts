@@ -744,6 +744,17 @@ export class EnvironmentVariables {
   @IsNotEmpty()
   S3_PUBLIC_PREFIX: string = 'public';
 
+  /**
+   * Yeni kliniğin randevu sayfası hazır şablonla (görseller dahil) açılsın mı.
+   * Testlerde kapalı: sözleşme testleri boş sayfadan (`If-Match: W/"0"`) başlıyor.
+   */
+  @Expose()
+  @Transform(({ value }: { value: unknown }) =>
+    value === undefined ? undefined : value === 'true' || value === true,
+  )
+  @IsBoolean()
+  BOOKING_PAGE_TEMPLATE_ENABLED: boolean = true;
+
   @Expose()
   @Type(() => Number)
   @IsInt()

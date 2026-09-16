@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   allocateMinor,
-  applyDiscount,
   remainingValueMinor,
   roundHalfEven,
   splitVatInclusive,
@@ -115,25 +114,5 @@ describe('splitVatInclusive', () => {
 
   it('sıfır oranda KDV üretmez', () => {
     expect(splitVatInclusive(50_000, 0)).toEqual({ netMinor: 50_000, vatMinor: 0 });
-  });
-});
-
-describe('applyDiscount', () => {
-  it('yüzde indirimini baz puandan hesaplar', () => {
-    expect(applyDiscount(100_000, 'percent', 1500)).toBe(15_000);
-    expect(applyDiscount(100_000, 'percent', 10_000)).toBe(100_000);
-  });
-
-  it('tutar indirimini olduğu gibi uygular', () => {
-    expect(applyDiscount(100_000, 'amount', 25_000)).toBe(25_000);
-  });
-
-  it('TABANI AŞAMAZ — indirim sonrası tutar negatife düşemez', () => {
-    expect(applyDiscount(10_000, 'amount', 500_000)).toBe(10_000);
-  });
-
-  it('negatif değerleri reddeder', () => {
-    expect(() => applyDiscount(-1, 'amount', 1)).toThrow(RangeError);
-    expect(() => applyDiscount(1, 'amount', -1)).toThrow(RangeError);
   });
 });

@@ -24,9 +24,9 @@
  *   proxy'sinin sertifika sorusudur, `platform/*` kiracı-üstüdür.
  * - **`public/*`**: bu uygulamanın public yüzeyi okumak için hiçbir sebebi yok;
  *   taslak önizlemenin yetkili karşılığı `booking-page/preview`.
- * - **Finans, paket, bildirim, denetim** (`payments`, `charges`, `cash`,
- *   `commission*`, `packages`, `customer-packages`, `messages`, `audit*`):
- *   Faz 12 bunların HİÇBİRİNİ istemiyor. Kural aynı: uç buraya yazılmadıkça
+ * - **Paket, bildirim, denetim** (`packages`, `customer-packages`, `messages`,
+ *   `audit*`) ve API'den kaldırılmış finans uçları (`payments`, `charges`,
+ *   `cash`, `commission*`): Faz 12 bunların HİÇBİRİNİ istemiyor. Kural aynı: uç buraya yazılmadıkça
  *   geçmez. `consent-templates` / `consent-records` de burada: Faz 7
  *   daraltılınca o tablolar HİÇ yazılmadı, dolayısıyla o uçlar YOK.
  *

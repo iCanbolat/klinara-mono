@@ -50,7 +50,6 @@ export const REVENUE_GROUPINGS = [
   'staff',
   'branch',
   'day',
-  'method',
 ] as const;
 export type RevenueGrouping = (typeof REVENUE_GROUPINGS)[number];
 
@@ -97,11 +96,8 @@ export interface OccupancyReport {
 // ---------------------------------------------------------------------------
 
 export interface RevenueTotals {
-  /** Pencerede AÇILAN ücret kalemleri. */
+  /** Pencerede AÇILAN, iptal edilmemiş ücret kalemleri (hizmet bedeli). */
   accruedMinor: number;
-  /** Pencerede YAPILAN, iptal edilmemiş tahsilatlar. */
-  collectedMinor: number;
-  refundedMinor: number;
   currency: string;
 }
 
@@ -109,15 +105,8 @@ export interface RevenueRow {
   groupId: string | null;
   groupLabel: string;
   accruedMinor: number;
-  collectedMinor: number;
 }
 
-/**
- * ⚠️ `data` satırlarının `collectedMinor` toplamı `totals.collectedMinor`DAN
- * KÜÇÜK OLABİLİR ve bu bir hata değil: eski bir borca bu dönemde yapılan
- * tahsilatın bağlanacağı kalem pencerede değildir. İstemci toplamı
- * `totals`tan okur, satırları toplayarak DEĞİL.
- */
 export interface RevenueReport {
   scope: ReportScopeKind;
   period: ReportPeriod;
@@ -145,8 +134,6 @@ export interface StaffPerformanceRow {
   staffName: string;
   completedServices: number;
   revenueMinor: number;
-  /** Ters kayıtlar düşülmüş NET tahakkuk. */
-  commissionMinor: number;
   bookedMinutes: number;
   availableMinutes: number;
   occupancyRate: number;

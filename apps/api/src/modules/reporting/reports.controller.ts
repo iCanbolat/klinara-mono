@@ -60,12 +60,10 @@ export class ReportsController {
   @Get('revenue')
   @RequirePermission(PERMISSIONS.REPORT_REVENUE_READ)
   @ApiOperation({
-    summary: 'Ciro — tahakkuk eden ve tahsil edilen ayrı ayrı',
+    summary: 'Ciro — dönemde doğan hizmet bedeli',
     description:
-      'Tahakkuk: pencerede AÇILAN ücret kalemleri. Tahsilat: pencerede YAPILAN, ' +
-      'iptal edilmemiş tahsilatlar. İkisi aynı sayı değildir. Kırılım satırlarının ' +
-      'tahsilat toplamı genel toplamdan küçük olabilir: eski bir borca yapılan ' +
-      'tahsilatın bağlanacağı kalem bu pencerede değildir.',
+      'Pencerede AÇILAN, iptal edilmemiş ücret kalemleri: tamamlanan randevu hizmetleri ' +
+      've paket satışları (paket iadeleri eksi olarak). Tahsilat takibi kapsam dışıdır.',
   })
   @ApiOkResponse({ type: RevenueReportDto })
   revenueReport(

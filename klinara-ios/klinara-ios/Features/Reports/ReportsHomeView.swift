@@ -4,8 +4,8 @@ import SwiftUI
 ///
 /// Kartlar İZNE GÖRE süzülüyor ve süzme "en az biri" mantığında: ciroyu
 /// `report.revenue:read`, doluluk ve gelmeme raporlarını `appointment:read.all`
-/// açıyor. Muhasebede takvim izni, resepsiyonda ciro izni yok — ikisi de bu
-/// ekranda farklı kart kümesi görüyor.
+/// açıyor. Resepsiyonda ciro izni, uygulayıcıda genel rapor izni yok — ikisi de
+/// bu ekranda farklı kart kümesi görüyor.
 ///
 /// Göremediği kart RENDER EDİLMİYOR, devre dışı gösterilmiyor: kullanıcıya
 /// tıklayamayacağı bir satır sunmak, hiç göstermemekten kötü.

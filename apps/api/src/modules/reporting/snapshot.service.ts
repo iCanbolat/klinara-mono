@@ -95,8 +95,6 @@ export class SnapshotService {
           groupLabel: row.branchName,
           metrics: {
             accruedMinor: row.accruedMinor,
-            collectedMinor: row.collectedMinor,
-            refundedMinor: row.refundedMinor,
             appointments: 0,
           },
         })),

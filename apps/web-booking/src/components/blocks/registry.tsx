@@ -4,6 +4,7 @@ import { isBlockType } from '@klinara/shared';
 import {
   Carousel,
   Contact,
+  Faq,
   Hero,
   MapBlockView,
   RichText,
@@ -27,6 +28,7 @@ const REGISTRY: Record<BlockType, (props: { block: never; ctx: BlockContext }) =
   serviceList: ServiceList as never,
   contact: Contact as never,
   map: MapBlockView as never,
+  faq: Faq as never,
 };
 
 /** Render edilecek blokları süz — gizliler ve tanınmayanlar düşer. */

@@ -65,8 +65,8 @@ görünmezdi. `package-definition-page.json` imleçli sayfayı, **`validityDays:
 (süresiz — `0` değil) ve ileri sürümlü bir alanı taşıyor.
 
 `customer-package.json` kalem bazlı bakiyeyi (lazer 6/10, bakım 1/2) ve satış tahsisini
-taşıyor; `customer-package-page.json`'daki iade edilmiş paket **kasa hareketi bekleyen**
-(`refundSettlementStatus: "pending"`) bir yükümlülük. `package-ledger.json` bir tüketimi
+taşıyor; `customer-package-page.json`'daki iade edilmiş paket seans iadesini ve bilgi amaçlı
+iade tutarını taşıyor (parasal mutabakat kapsam dışı). `package-ledger.json` bir tüketimi
 ve onu geri alan **ters kaydı** (`reversesEntryId`) taşıyor; `ledger-unknown-kind.json`
 bilerek tanımadığımız bir `entryType` içeriyor. `package-entitlements.json` **çıplak
 dizi** — zarf YOK.
@@ -133,7 +133,6 @@ taşıyor (`accessToken` anahtarı hiç yok — test bunu da doğruluyor); şabl
 Yerel API'den (seed, `sahip@demo-klinik.test`) **yakalandı**; iOS'ta rapor fixture'ı yoktu.
 `occupancy.json` ve `no-show.json` `compareTo=previous` ile alındı: `delta`'da `null`
 (kıyaslanamaz — önceki dönem 0) ile `0` (değişim yok) yan yana duruyor ve ikisi ayrı
-çözülmeli. `occupancy-by-day.json` gün kırılımının `groupId: null` hâli; `revenue-by-method.json`
-tahakkuk sütununun yöntem kırılımında 0 olduğunu, `staff-performance-own.json` uygulayıcı
+çözülmeli. `occupancy-by-day.json` gün kırılımının `groupId: null` hâli; `staff-performance-own.json` uygulayıcı
 rolünün `scope: own` yanıtını çiviliyor. Bugünkü sunucu `pageInfo`'yu her yanıtta gönderiyor ama
 bu dosyalarda alan yok: model onu opsiyonel tutuyor, alanı taşımayan yanıt da çözülmeli.

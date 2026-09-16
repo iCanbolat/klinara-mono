@@ -240,6 +240,5 @@ class WhatsAppFeatureTest {
         assertTrue(seesWhatsApp("manager"))
         assertFalse(seesWhatsApp("receptionist"))
         assertFalse(seesWhatsApp("practitioner"))
-        assertFalse(seesWhatsApp("accountant"))
     }
 }

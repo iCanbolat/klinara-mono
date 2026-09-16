@@ -19,6 +19,10 @@ import { publicEnv } from '@/config/env';
  * web-admin tarafında kalıyor; burası saf bir renderer. Bir token olsaydı
  * ömrü, iptali ve iki uygulama arasında paylaşılan bir imza anahtarı da olurdu.
  *
+ * KLASÖR ADI `preview.frame`: `_preview` App Router'da private klasördür ve hiç
+ * rota olmuyordu — istek `[slug]`a düşüp "Sayfa bulunamadı" gösteriyordu. Nokta
+ * slug desenine uymadığı için bir kiracı slug'ıyla da çakışamaz (`unknown.host`).
+ *
  * ⚠️ `event.origin` kontrolü bu dosyanın TEK güvenlik önlemi. Olmasaydı
  * herhangi bir site bu rotayı iframe'e alıp içine keyfî içerik post edebilir
  * ve kiracının alan adı altında sahte bir sayfa gösterebilirdi.

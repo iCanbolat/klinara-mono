@@ -52,8 +52,8 @@ export interface NavItem {
    *
    * Raporlar için eklendi: ciroyu `report.revenue:read`, doluluk ve no-show'u
    * `appointment:read.all` açıyor ve bir rolün ikisine birden sahip olması
-   * şart değil. Yalnız VE ile ifade etmek, muhasebeciyi (takvim izni yok) ya
-   * da resepsiyonu (ciro izni yok) menüden tamamen düşürürdü.
+   * şart değil. Yalnız VE ile ifade etmek, resepsiyonu (ciro izni yok) menüden
+   * tamamen düşürürdü.
    */
   requiresAny?: readonly string[] | undefined;
 }
@@ -76,8 +76,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
   //
   // `requiresAny` şart: uygulayıcı `appointment:read.all` TAŞIMAZ, yalnız
   // `read.own` taşır. `requires` ile yazılsaydı takvimi hiç göremezdi.
-  // Muhasebeci ise ikisini de taşımıyor ve menüde takvim GÖRMÜYOR — boş bir
-  // ızgara göstermek, "bugün randevu yok" demek olurdu.
+  // İkisini de taşımayan bir rol menüde takvim GÖRMÜYOR — boş bir ızgara
+  // göstermek, "bugün randevu yok" demek olurdu.
   {
     path: '/takvim',
     labelKey: 'nav.calendar',
@@ -87,7 +87,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { path: '/musteriler', labelKey: 'nav.customers', requires: [PERMISSIONS.CUSTOMER_READ] },
   { path: '/katalog', labelKey: 'nav.catalog', requires: [PERMISSIONS.SERVICE_READ] },
   // "Şube ve Personel". Kapı `staff:read`: `branch:read` HER rolde var ve
-  // kapı olsaydı muhasebeci yalnız şube listesinden ibaret bir ekran görürdü.
+  // kapı olsaydı personel izni olmayan bir rol yalnız şube listesinden ibaret
+  // bir ekran görürdü.
   // Sekmeler kendi içinde ayrıca süzülüyor (`branch:write`, `user:invite`).
   { path: '/personel', labelKey: 'nav.staff', requires: [PERMISSIONS.STAFF_READ] },
   {

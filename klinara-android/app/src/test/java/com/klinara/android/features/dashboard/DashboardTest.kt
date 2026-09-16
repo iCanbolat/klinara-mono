@@ -7,6 +7,7 @@ import com.klinara.android.services.booking.CalendarDayQuery
 import com.klinara.android.services.booking.CalendarEntry
 import com.klinara.android.services.booking.CalendarResponse
 import com.klinara.android.services.booking.MockBookingService
+import com.klinara.android.services.contracts.Permissions
 import com.klinara.android.services.contracts.RolePermissions
 import com.klinara.android.services.networking.ApiError
 import com.klinara.android.services.reports.MockReportsService
@@ -180,12 +181,12 @@ class DashboardTest {
     }
 
     @Test
-    @DisplayName("Erişim web ile aynı: muhasebe takvim ve doluluk görmez, uygulayıcı yalnız takvim + kendi cirosu")
+    @DisplayName("Erişim web ile aynı: resepsiyon ciro görmez, uygulayıcı yalnız takvim + kendi cirosu")
     fun access() {
-        val accountant = DashboardAccess.of(RolePermissions.forRole("accountant")::contains)
-        assertFalse(accountant.calendar)
-        assertFalse(accountant.occupancy)
-        assertTrue(accountant.revenue)
+        val receptionist = DashboardAccess.of(RolePermissions.forRole("receptionist")::contains)
+        assertTrue(receptionist.calendar)
+        assertTrue(receptionist.occupancy)
+        assertFalse(receptionist.revenue)
 
         val practitioner = DashboardAccess.of(RolePermissions.forRole("practitioner")::contains)
         assertTrue(practitioner.calendar)
@@ -205,8 +206,8 @@ class DashboardTest {
         // Yüklenmeden önce değer yok ama kartlar var (yer tutucu).
         assertTrue(dashboardStats(null, manager).all { it.value == null })
 
-        val accountant = DashboardAccess.of(RolePermissions.forRole("accountant")::contains)
-        assertEquals(listOf("Bu ay ciro"), dashboardStats(null, accountant).map { it.label })
+        val revenueOnly = DashboardAccess.of(setOf(Permissions.REPORT_REVENUE_READ)::contains)
+        assertEquals(listOf("Bu ay ciro"), dashboardStats(null, revenueOnly).map { it.label })
     }
 
     // --- ViewModel ---
@@ -282,12 +283,12 @@ class DashboardTest {
         }
 
     @Test
-    @DisplayName("İzni olmayan kaynağa istek atılmıyor: muhasebe için takvim ve doluluk yok")
+    @DisplayName("İzni olmayan kaynağa istek atılmıyor: yalnız ciro izni varsa takvim ve doluluk yok")
     fun gatesRequests() =
         runTest(dispatcher) {
             val booking = booking()
-            val reports = reports("accountant")
-            val access = DashboardAccess.of(RolePermissions.forRole("accountant")::contains)
+            val reports = reports("owner")
+            val access = DashboardAccess.of(setOf(Permissions.REPORT_REVENUE_READ)::contains)
             DashboardViewModel(booking, reports, listOf(kadikoy), access) { now }
             advanceUntilIdle()
 

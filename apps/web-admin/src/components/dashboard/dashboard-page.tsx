@@ -36,8 +36,8 @@ import { useDashboard } from './use-dashboard';
  * aynı listeyi ikinci kez göstermek yer kaplamaktan öteye geçmediği için
  * kaldırıldı.
  *
- * Her bölüm kendi izniyle görünüyor (bkz. `use-dashboard.ts`): muhasebeci
- * takvim bölümlerini, resepsiyon ciro kartını hiç görmüyor.
+ * Her bölüm kendi izniyle görünüyor (bkz. `use-dashboard.ts`): resepsiyon ciro
+ * kartını hiç görmüyor.
  */
 
 const TODAY_LABEL = new Intl.DateTimeFormat('tr-TR', {

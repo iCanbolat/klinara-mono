@@ -155,8 +155,6 @@ nonisolated struct CustomerPackage: Codable, Sendable, Identifiable, Equatable {
     let outstandingMinor: Int
     let refundedSessions: Int
     let refundAmountMinor: Int
-    /// `pending` = borç doğdu, kasa hareketi Faz 6.2'de bağlanacak.
-    let refundSettlementStatus: String?
     let refundedAt: Date?
     let refundReason: String?
     let transferredFromPackageId: String?

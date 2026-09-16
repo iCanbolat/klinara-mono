@@ -171,8 +171,6 @@ data class CustomerPackage(
     val outstandingMinor: Long = 0,
     val refundedSessions: Int = 0,
     val refundAmountMinor: Long = 0,
-    /** `pending` = borç doğdu, kasa hareketi Faz A6'da bağlanacak. */
-    val refundSettlementStatus: String? = null,
     @Serializable(with = InstantSerializer::class)
     val refundedAt: Instant? = null,
     val refundReason: String? = null,
@@ -209,9 +207,6 @@ data class CustomerPackage(
         val expiry = expiresAt ?: return false
         return isOpenWithBalance && expiry.isAfter(now) && !expiry.isAfter(now.plus(within))
     }
-
-    /** İade edilmiş ama kasa hareketi henüz yok — ekran bunu gizlememeli. */
-    val hasPendingRefundSettlement: Boolean get() = refundSettlementStatus == "pending"
 }
 
 /** Dosya düzeyinde: `private companion` üretilen `serializer()`'ı da gizlerdi. */

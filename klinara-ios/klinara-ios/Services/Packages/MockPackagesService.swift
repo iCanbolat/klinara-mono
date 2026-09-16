@@ -332,7 +332,6 @@ final class MockPackagesService: PackagesService, @unchecked Sendable {
                 outstandingMinor: definition.totalPriceMinor,
                 refundedSessions: 0,
                 refundAmountMinor: 0,
-                refundSettlementStatus: nil,
                 refundedAt: nil,
                 refundReason: nil,
                 transferredFromPackageId: nil,
@@ -516,16 +515,13 @@ final class MockPackagesService: PackagesService, @unchecked Sendable {
                 status: updated.remainingSessions == 0 ? .refunded : updated.status,
                 refundedSessions: updated.refundedSessions + refundedSessions,
                 refundAmountMinor: updated.refundAmountMinor + amount,
-                // Kasa hareketi YOK: borç doğar, tahsilat Faz 6.2'de bağlanır.
-                refundSettlementStatus: "pending",
                 refundedAt: Date(),
                 refundReason: input.reason,
                 version: updated.version + 1
             )
             return RefundResult(
                 refundedSessions: refundedSessions,
-                refundAmountMinor: amount,
-                settlementStatus: "pending"
+                refundAmountMinor: amount
             )
         }
     }
@@ -604,7 +600,6 @@ final class MockPackagesService: PackagesService, @unchecked Sendable {
                 outstandingMinor: targetItems.reduce(0) { $0 + $1.outstandingMinor },
                 refundedSessions: 0,
                 refundAmountMinor: 0,
-                refundSettlementStatus: nil,
                 refundedAt: nil,
                 refundReason: nil,
                 transferredFromPackageId: source.id,
@@ -930,7 +925,6 @@ final class MockPackagesService: PackagesService, @unchecked Sendable {
         outstandingMinor: Int? = nil,
         refundedSessions: Int? = nil,
         refundAmountMinor: Int? = nil,
-        refundSettlementStatus: String? = nil,
         refundedAt: Date? = nil,
         refundReason: String? = nil,
         version: Int? = nil,
@@ -954,7 +948,6 @@ final class MockPackagesService: PackagesService, @unchecked Sendable {
             outstandingMinor: outstandingMinor ?? pkg.outstandingMinor,
             refundedSessions: refundedSessions ?? pkg.refundedSessions,
             refundAmountMinor: refundAmountMinor ?? pkg.refundAmountMinor,
-            refundSettlementStatus: refundSettlementStatus ?? pkg.refundSettlementStatus,
             refundedAt: refundedAt ?? pkg.refundedAt,
             refundReason: refundReason ?? pkg.refundReason,
             transferredFromPackageId: pkg.transferredFromPackageId,

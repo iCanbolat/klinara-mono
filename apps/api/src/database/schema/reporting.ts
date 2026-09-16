@@ -22,8 +22,6 @@ export interface OccupancyMetrics {
 /** Ciro kovasının ölçüleri — hepsi minor unit tamsayısı. */
 export interface RevenueMetrics {
   accruedMinor: number;
-  collectedMinor: number;
-  refundedMinor: number;
   appointments: number;
 }
 

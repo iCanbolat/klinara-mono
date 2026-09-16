@@ -25,7 +25,7 @@ class MembershipDraftTest {
     @DisplayName("Kimse kendinden yüksek rolü atayamaz; platform yöneticisi hiç listelenmez")
     fun assignable() {
         assertEquals(
-            listOf("owner", "manager", "accountant", "receptionist", "practitioner"),
+            listOf("owner", "manager", "receptionist", "practitioner"),
             MembershipRules.assignableRoles(owner.roles).map { it.key },
         )
         assertFalse("owner" in MembershipRules.assignableRoles(managerB1.roles).map { it.key })
@@ -58,15 +58,15 @@ class MembershipDraftTest {
                 row("a", "practitioner", null),
                 row("b", "receptionist", "b1"),
                 row("c", "receptionist", "b1"),
-                row("d", "accountant", null),
+                row("d", "owner", null),
             )
         assertEquals(
             mapOf("a" to MembershipIssue.BranchRequired, "c" to MembershipIssue.Duplicate),
             MembershipRules.issues(rows),
         )
         assertEquals(
-            listOf(MembershipInput("accountant")),
-            MembershipRules.inputs(listOf(row("d", "accountant", "b1"))),
+            listOf(MembershipInput("owner")),
+            MembershipRules.inputs(listOf(row("d", "owner", "b1"))),
         )
         assertTrue(MembershipRules.same(rows, rows.reversed()))
     }

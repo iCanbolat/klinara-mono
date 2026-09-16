@@ -181,7 +181,6 @@ internal fun statusBadges(
         if (pkg.status == CustomerPackageStatus.Active && pkg.remainingSessions == 0) {
             add("Hak bitti" to KlinaraBadgeTone.Muted)
         }
-        if (pkg.hasPendingRefundSettlement) add("İade ödemesi bekliyor" to KlinaraBadgeTone.Warning)
     }
 
 internal fun toneOf(status: CustomerPackageStatus): KlinaraBadgeTone =

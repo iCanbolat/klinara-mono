@@ -127,7 +127,6 @@ describe('rapor sözleşmesi', () => {
       'staff',
       'branch',
       'day',
-      'method',
     ]);
     expect([...NO_SHOW_GROUPINGS]).toEqual(['staff', 'branch', 'service', 'day']);
   });

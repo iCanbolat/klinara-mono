@@ -1,14 +1,14 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import type { Branch, CarouselItemInput, ContentBlockInput } from '@klinara/shared';
-import { BLOCK_FIELDS, BLOCK_LABEL_KEY, type FieldSpec } from '@/lib/editor/block-schema';
+import type { Branch, CarouselItemInput, ContentBlockInput, FaqItemInput } from '@klinara/shared';
+import { BLOCK_FIELDS, type FieldSpec } from '@/lib/editor/block-schema';
 import type { FieldError } from '@/lib/editor/validate';
-import { t } from '@/i18n/tr';
-import { Field } from '@/components/ui/field';
+import { Field, FieldSelect, FieldSwitch, FieldTextarea } from '@/components/ui/field';
 import { AssetPicker } from './asset-picker';
 import { CarouselItems } from './carousel-items';
 import { CategoryPicker } from './category-picker';
+import { FaqItems } from './faq-items';
 
 /**
  * Seçili bloğun formu — ŞARTNAMEDEN üretiliyor.
@@ -47,8 +47,7 @@ export function BlockForm({
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      <h2 className="text-sm font-semibold text-foreground">{t(BLOCK_LABEL_KEY[block.type])}</h2>
+    <div className="flex flex-col gap-4">
 
       {BLOCK_FIELDS[block.type].map((field) => {
         const value = record[field.key];
@@ -59,35 +58,34 @@ export function BlockForm({
           case 'markdown':
           case 'textarea':
             return (
-              <label key={field.key} className="flex flex-col gap-1.5">
-                <span className="text-sm font-medium text-foreground">{label}</span>
-                <textarea
-                  value={typeof value === 'string' ? value : ''}
-                  onChange={(event) => set(field.key, event.target.value)}
-                  maxLength={field.max}
-                  rows={10}
-                  readOnly={readOnly}
-                  className="rounded-md border border-border bg-card p-2 font-mono text-sm"
-                />
-                {error !== undefined ? (
-                  <span role="alert" className="text-xs text-destructive">
-                    {error}
-                  </span>
-                ) : null}
-              </label>
+              <FieldTextarea
+                key={field.key}
+                label={label}
+                value={typeof value === 'string' ? value : ''}
+                onChange={(event) => set(field.key, event.target.value)}
+                maxLength={field.max}
+                rows={12}
+                readOnly={readOnly}
+                error={error}
+                hint={
+                  field.kind === 'markdown'
+                    ? `**kalın**, - liste, [bağlantı](https://…) · ${String((typeof value === 'string' ? value : '').length)}/${String(field.max ?? '')}`
+                    : undefined
+                }
+                className="font-mono text-sm"
+              />
             );
 
           case 'boolean':
             return (
-              <label key={field.key} className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={value !== false}
-                  onChange={(event) => set(field.key, event.target.checked)}
-                  disabled={readOnly}
-                />
-                {label}
-              </label>
+              <FieldSwitch
+                key={field.key}
+                label={label}
+                checked={value !== false}
+                disabled={readOnly}
+                onCheckedChange={(checked) => set(field.key, checked)}
+                className="rounded-lg border border-border px-3"
+              />
             );
 
           case 'number':
@@ -109,22 +107,20 @@ export function BlockForm({
 
           case 'branch':
             return (
-              <label key={field.key} className="flex flex-col gap-1.5">
-                <span className="text-sm font-medium text-foreground">{label}</span>
-                <select
-                  value={typeof value === 'string' ? value : ''}
-                  onChange={(event) => set(field.key, event.target.value)}
-                  disabled={readOnly}
-                  className="h-10 rounded-md border border-border bg-card px-2 text-sm"
-                >
-                  <option value="">Tümü</option>
-                  {branches.map((branch) => (
-                    <option key={branch.id} value={branch.id}>
-                      {branch.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <FieldSelect
+                key={field.key}
+                label={label}
+                value={typeof value === 'string' ? value : ''}
+                onChange={(event) => set(field.key, event.target.value)}
+                disabled={readOnly}
+              >
+                <option value="">Tümü</option>
+                {branches.map((branch) => (
+                  <option key={branch.id} value={branch.id}>
+                    {branch.name}
+                  </option>
+                ))}
+              </FieldSelect>
             );
 
           case 'asset':
@@ -144,6 +140,18 @@ export function BlockForm({
                 key={field.key}
                 label={label}
                 items={Array.isArray(value) ? (value as CarouselItemInput[]) : []}
+                readOnly={readOnly}
+                error={error}
+                onChange={(items) => set(field.key, items)}
+              />
+            );
+
+          case 'faqList':
+            return (
+              <FaqItems
+                key={field.key}
+                label={label}
+                items={Array.isArray(value) ? (value as FaqItemInput[]) : []}
                 readOnly={readOnly}
                 error={error}
                 onChange={(items) => set(field.key, items)}

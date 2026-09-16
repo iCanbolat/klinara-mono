@@ -214,7 +214,6 @@ export async function updatePackage(
     refundReason: string | null;
     refundedAt: Date;
     refundedBy: string | null;
-    refundSettlementStatus: 'pending' | 'settled';
     note: string | null;
   }>,
 ): Promise<void> {
@@ -254,10 +253,6 @@ function hydratePackage(row: Record<string, unknown>): CustomerPackageRow {
     refundReason: (row.refund_reason ?? null) as string | null,
     refundedAt: row.refunded_at == null ? null : new Date(row.refunded_at as string),
     refundedBy: (row.refunded_by ?? null) as string | null,
-    refundSettlementStatus: (row.refund_settlement_status ?? null) as
-      | 'pending'
-      | 'settled'
-      | null,
     transferredFromPackageId: (row.transferred_from_package_id ?? null) as string | null,
     soldBy: (row.sold_by ?? null) as string | null,
     note: (row.note ?? null) as string | null,

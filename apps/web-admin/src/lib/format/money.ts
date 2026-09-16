@@ -8,7 +8,7 @@
  * `priceMinor` 50000. Bu dönüşümün her formda tekrar yazılması, `* 100`un
  * bir yerde `parseFloat` ile yapılması demek — ve `parseFloat('12.10') * 100`
  * JavaScript'te **1209.9999999999998** eder. Bir kuruşluk kayma fiyat
- * listesinde görünmez ama tahsilat mutabakatında görünür.
+ * listesinde görünmez ama ciro toplamında görünür.
  *
  * Bu yüzden dönüşüm TAMSAYI aritmetiğiyle, tek yerde.
  */

@@ -26,7 +26,7 @@ import type { ComboboxOption } from '@/components/ui/combobox';
  * ---------------------------------------------------------------------------
  * YAZARAK ONAY — `ConfirmButton` YETMEZ
  * ---------------------------------------------------------------------------
- * Bu işlem GERİ ALINAMAZ ve iki müşterinin randevu, paket, tahsilat
+ * Bu işlem GERİ ALINAMAZ ve iki müşterinin randevu, paket ve not
  * geçmişini kalıcı olarak birleştiriyor. Yanlış kaydı seçmek, iki farklı
  * insanın tıbbi geçmişini tek karta toplamak demek.
  *

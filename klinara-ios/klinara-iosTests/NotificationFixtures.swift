@@ -6,7 +6,7 @@ import Foundation
 /// Gövdeler `apps/api` entegrasyon test altyapısı ayağa kaldırılıp gerçek HTTP
 /// uçlarına gidilerek alındı (`test/helpers/app` + gerçek Postgres, Graph API
 /// için `test/helpers/whatsapp` mock'u); alan adları, `null`'lar ve tarih
-/// biçimleri olduğu gibi duruyor. ``FinanceFixtures`` ile aynı disiplin: elle
+/// biçimleri olduğu gibi duruyor. Aynı disiplin: elle
 /// kurulmuş örnekler sözleşmeyi test etmez, yalnız kendi varsayımımızı
 /// tekrar eder.
 ///

@@ -310,7 +310,7 @@ describe('çalışma saatleri ve istisnalar', () => {
 
     it('BAŞKA kiracının şube kimliği 403 BRANCH_FORBIDDEN alır', async () => {
       // Faz 3'te bu kontrol yoktu: `canAccessBranch` kiracı geneli rolleri
-      // (owner/accountant) tüm şubelere açıyor ve şubenin gerçekten bu
+      // (owner) tüm şubelere açıyor ve şubenin gerçekten bu
       // kiracıya ait olduğunu sormuyordu. Yabancı kimlik uygulama katmanından
       // geçiyor, sızıntıyı yalnız RLS ve kapsam trigger'ı engelliyordu — yani
       // çağıran ilgisiz bir hata alıyordu. Artık `BranchAccessService` aidiyeti

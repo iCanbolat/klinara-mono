@@ -36,8 +36,8 @@ struct DashboardTests {
     private var revenue: RevenueReport {
         RevenueReport(
             scope: .all, period: period,
-            totals: RevenueTotals(accruedMinor: 150_000, collectedMinor: 0, refundedMinor: 0, currency: "TRY"),
-            data: [RevenueRow(groupId: "b2", groupLabel: "Nişantaşı", accruedMinor: 150_000, collectedMinor: 0)],
+            totals: RevenueTotals(accruedMinor: 150_000, currency: "TRY"),
+            data: [RevenueRow(groupId: "b2", groupLabel: "Nişantaşı", accruedMinor: 150_000)],
             pageInfo: nil, previous: nil, delta: nil
         )
     }
@@ -111,7 +111,7 @@ struct DashboardTests {
         func row(_ id: String, _ name: String, services: Int, revenue: Int) -> StaffPerformanceRow {
             StaffPerformanceRow(
                 staffProfileId: id, staffName: name, completedServices: services, revenueMinor: revenue,
-                commissionMinor: 0, bookedMinutes: 0, availableMinutes: 0, occupancyRate: 0
+                bookedMinutes: 0, availableMinutes: 0, occupancyRate: 0
             )
         }
         let report = StaffPerformanceReport(
@@ -147,13 +147,13 @@ struct DashboardTests {
         #expect(stats.map(\.label) == ["Bugünkü randevu", "Bu ay doluluk", "Bu ay ciro", "Bu ay gelmeme"])
         #expect(stats.allSatisfy { $0.value == nil })
 
-        let accountant = DashboardAccess(calendar: false, occupancy: false, revenue: true, staff: true)
-        #expect(DashboardView.stats(nil, access: accountant).map(\.label) == ["Bu ay ciro"])
+        let revenueOnly = DashboardAccess(calendar: false, occupancy: false, revenue: true, staff: true)
+        #expect(DashboardView.stats(nil, access: revenueOnly).map(\.label) == ["Bu ay ciro"])
     }
 
     // MARK: Store
 
-    @Test("İzni olmayan kaynağa istek atılmıyor: muhasebe için takvim ve doluluk yok")
+    @Test("İzni olmayan kaynağa istek atılmıyor: yalnız ciro izni varsa takvim ve doluluk yok")
     func gatesRequests() async {
         let reports = RecordingReports()
         let store = DashboardStore(
@@ -229,7 +229,7 @@ private final class RecordingReports: ReportsService, @unchecked Sendable {
         if failRevenue { throw APIError.network }
         return RevenueReport(
             scope: .all, period: Self.period,
-            totals: RevenueTotals(accruedMinor: 1, collectedMinor: 0, refundedMinor: 0, currency: "TRY"),
+            totals: RevenueTotals(accruedMinor: 1, currency: "TRY"),
             data: [], pageInfo: nil, previous: nil, delta: nil
         )
     }

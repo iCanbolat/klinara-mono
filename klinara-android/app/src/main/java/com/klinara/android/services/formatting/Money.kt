@@ -14,7 +14,7 @@ internal val TrLocale: Locale = Locale.forLanguageTag("tr-TR")
  *
  * Sunucu tutarları `bigint` **kuruş** olarak gönderiyor; istemcide `Long` kalır.
  * `Double`/`Float` YASAK: bir kez kayan noktaya düşen tutar 0,1 + 0,2 ≠ 0,3 dünyasına
- * girer ve kısmi tahsilat ile prim matematiğinde kuruş hatası birikir.
+ * girer ve ciro toplamlarında kuruş hatası birikir.
  *
  * **`NumberFormat.getCurrencyInstance` KULLANILMAZ.** JVM (JDK CLDR) ve Android (ICU)
  * aynı yerel için farklı çıktı verir — sembol konumu ve NBSP vs normal boşluk. Birim

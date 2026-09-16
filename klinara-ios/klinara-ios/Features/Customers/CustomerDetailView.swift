@@ -14,7 +14,6 @@ struct CustomerDetailView: View {
 
     @State private var record: CustomerRecordStore?
     @State private var packages: CustomerPackagesStore?
-    @State private var account: CustomerAccountStore?
     @State private var thumbnails: ThumbnailCache?
     @State private var optOuts: CustomerOptOutStore?
     @State private var isEditing = false
@@ -171,15 +170,8 @@ struct CustomerDetailView: View {
                 CustomerPackagesSection(session: session, store: packages)
             }
 
-            // Cari hesap paketlerin ALTINDA: "kaç seansı kaldı" sorusu
-            // kasada "ne kadar ödeyecek" sorusundan önce geliyor ve paket
-            // hakkı olan müşterinin borcu çoğu zaman sıfır.
-            if let account {
-                CustomerAccountSection(session: session, store: account)
-            }
-
-            // İletişim izni cari hesabın ALTINDA ve dosyaların ÜSTÜNDE: para
-            // sorusundan sonra gelen ama klinik veriden önce sorulan bir soru.
+            // İletişim izni paketlerin ALTINDA ve dosyaların ÜSTÜNDE: klinik
+            // veriden önce sorulan bir soru.
             // Ayrı bir izin istiyor (`notification:read`) — müşteri okuma
             // modeli bu bilgiyi taşımıyor.
             if let optOuts {
@@ -245,13 +237,6 @@ struct CustomerDetailView: View {
             : nil
         packages = packageStore
 
-        // Aynı gerekçe: `finance.payment:read` yoksa cari hesap store'u hiç
-        // kurulmaz ve bölüm çizilmez.
-        let accountStore = session.can(Permissions.financePaymentRead)
-            ? CustomerAccountStore(customerId: customerId, service: session.services.finance)
-            : nil
-        account = accountStore
-
         // Aynı gerekçe: iletişim izni ayrı bir uçta ve ayrı bir izinde
         // (`notification:read`). İzinsiz kullanıcıya boş bir kart göstermek
         // "bu müşterinin izin kaydı yok" demek olurdu; oysa bilmiyoruz.
@@ -269,8 +254,7 @@ struct CustomerDetailView: View {
         async let notes: Void = store.loadNotes()
         async let files: Void = store.loadFiles()
         async let packageList: Void = packageStore?.load() ?? ()
-        async let accountLoad: Void = accountStore?.load() ?? ()
-        _ = await (timeline, notes, files, packageList, accountLoad)
+        _ = await (timeline, notes, files, packageList)
     }
 
     private func archive() async {

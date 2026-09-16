@@ -28,6 +28,9 @@ const BASE: Record<string, string> = {
   // koşuyor; `QueueService.send` sessizce atlanıyor ve worker'lar doğrudan
   // çağrılarak sınanıyor (bkz. customer-files.test.ts).
   QUEUE_ENABLED: 'false',
+  // Yeni kliniğin randevu sayfası şablonsuz, BOŞ başlar: içerik sözleşme
+  // testleri `W/"0"`dan yazıyor. Şablonun kendisi booking-page-template.test.ts'te.
+  BOOKING_PAGE_TEMPLATE_ENABLED: 'false',
 };
 
 /**

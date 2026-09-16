@@ -6,8 +6,8 @@ import SwiftUI
 /// değil: kampanyalı satılan bir paketin iadesi liste fiyatından yapılırsa
 /// klinik taşımadığı bir borcu öder.
 ///
-/// Kasa hareketi yoktur; iade `pending` bir yükümlülük yazar ve tahsilat
-/// tarafı Faz 6.2'de bağlanır. Kullanıcı bunu ekranda görmeli.
+/// İade SEANS iadesidir; tutar bilgi amaçlı kaydedilir ve paranın müşteriye
+/// ödenmesi uygulamada takip edilmez.
 struct PackageRefundSheet: View {
 
     let session: AppSession
@@ -96,7 +96,7 @@ struct PackageRefundSheet: View {
     private var amountSection: some View {
         KlinaraFormSection(
             title: "Tutar",
-            footnote: "Kasa hareketi oluşturulmaz: borç `bekliyor` olarak kaydedilir, tahsilat Faz 6'da bağlanacak."
+            footnote: "Kalan seanslar düşülür; tutar bilgi amaçlı kaydedilir."
         ) {
             KlinaraRow(
                 label: "Tahmini iade",

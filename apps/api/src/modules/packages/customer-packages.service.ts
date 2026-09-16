@@ -269,7 +269,6 @@ export class CustomerPackagesService {
       outstandingMinor: mapped.reduce((sum, item) => sum + item.outstandingMinor, 0),
       refundedSessions: row.refundedSessions,
       refundAmountMinor: row.refundAmountMinor,
-      refundSettlementStatus: row.refundSettlementStatus,
       refundedAt: row.refundedAt?.toISOString() ?? null,
       refundReason: row.refundReason,
       transferredFromPackageId: row.transferredFromPackageId,

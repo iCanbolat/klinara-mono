@@ -27,7 +27,6 @@ nonisolated enum MembershipRules {
     static let assignable: [Role] = [
         Role(key: "owner", rank: 80, isTenantScoped: true),
         Role(key: "manager", rank: 60, isTenantScoped: false),
-        Role(key: "accountant", rank: 40, isTenantScoped: true),
         Role(key: "receptionist", rank: 30, isTenantScoped: false),
         Role(key: "practitioner", rank: 20, isTenantScoped: false),
     ]

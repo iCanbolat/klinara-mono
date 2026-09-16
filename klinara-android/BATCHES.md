@@ -1,3 +1,10 @@
+> 🚫 **KAPSAMDAN ÇIKARILDI (2026-09-16).** Ürün randevu odağına çekildi: tahsilat
+> (kısmi/tam), kasa, iade, prim, indirim, cari hesap ve `accountant` rolü tüm
+> uygulamalardan kaldırıldı — migration `0045_remove_finance_scope.sql`. KALAN yalnız
+> `charges`: randevu tamamlanınca ve paket satılınca OTOMATİK doğan hizmet bedeli; ciro
+> raporu, dashboard "Bu ay ciro" ve personel performansı ondan okur. Bu dosyadaki `accountant`,
+> kasa/prim ve A6 anıları tarihsel kayıttır.
+
 # Batch notları
 
 Her batch'in kapanış notu. Sapmalar, yeni bağımlılıkların gerekçesi ve iOS ile

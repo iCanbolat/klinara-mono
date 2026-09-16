@@ -77,8 +77,6 @@ export type LedgerEntryType =
 
 export type CustomerPackageStatus = 'active' | 'expired' | 'refunded' | 'transferred';
 
-export type PackageRefundSettlement = 'pending' | 'settled';
-
 export const customerPackages = pgTable(
   'customer_packages',
   {
@@ -108,7 +106,6 @@ export const customerPackages = pgTable(
     refundReason: text('refund_reason'),
     refundedAt: timestamp('refunded_at', { withTimezone: true }),
     refundedBy: uuid('refunded_by'),
-    refundSettlementStatus: text('refund_settlement_status').$type<PackageRefundSettlement>(),
     transferredFromPackageId: uuid('transferred_from_package_id'),
     soldBy: uuid('sold_by'),
     note: text('note'),

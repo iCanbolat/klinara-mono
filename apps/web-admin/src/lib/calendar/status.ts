@@ -62,7 +62,7 @@ const TRANSITIONS: Record<AppointmentStatus, readonly Transition[]> = {
   in_progress: [{ to: 'completed' }, { to: 'cancelled' }],
   completed: [
     // Tamamlanmış randevuya dokunmak ayrı bir yetki: seans hakkı tüketilmiş,
-    // tahsilat açılmış olabilir ve geri almak TERS KAYIT üretir.
+    // hizmet bedeli yazılmış olabilir ve geri almak TERS KAYIT üretir.
     { to: 'in_progress', permission: PERMISSIONS.APPOINTMENT_REOPEN },
     { to: 'cancelled', permission: PERMISSIONS.APPOINTMENT_REOPEN },
   ],

@@ -18,16 +18,9 @@ internal object MockReportCsv {
 
     fun revenue(report: RevenueReport): String =
         csv(
-            listOf("Kırılım", "Tahakkuk", "Tahakkuk (kuruş)", "Tahsilat", "Tahsilat (kuruş)", "Para birimi"),
+            listOf("Kırılım", "Ciro", "Ciro (kuruş)", "Para birimi"),
             report.data.map {
-                listOf(
-                    it.groupLabel,
-                    money(it.accruedMinor),
-                    "${it.accruedMinor}",
-                    money(it.collectedMinor),
-                    "${it.collectedMinor}",
-                    report.totals.currency,
-                )
+                listOf(it.groupLabel, money(it.accruedMinor), "${it.accruedMinor}", report.totals.currency)
             },
         )
 
@@ -38,8 +31,6 @@ internal object MockReportCsv {
                 "Tamamlanan işlem",
                 "Ciro",
                 "Ciro (kuruş)",
-                "Prim",
-                "Prim (kuruş)",
                 "Dolu dakika",
                 "Müsait dakika",
                 "Doluluk %",
@@ -50,8 +41,6 @@ internal object MockReportCsv {
                     "${it.completedServices}",
                     money(it.revenueMinor),
                     "${it.revenueMinor}",
-                    money(it.commissionMinor),
-                    "${it.commissionMinor}",
                     "${it.bookedMinutes}",
                     "${it.availableMinutes}",
                     decimal(it.occupancyRate),

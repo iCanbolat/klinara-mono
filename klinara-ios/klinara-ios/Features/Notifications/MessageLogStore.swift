@@ -3,7 +3,6 @@ import SwiftUI
 /// Mesaj günlüğü — hangi bildirimin ne olduğu.
 ///
 /// **Ekran ömürlü**: günlük bir teşhis aracı, günlük akışın parçası değil.
-/// ``CommissionStore`` ile aynı gerekçe.
 ///
 /// Süzgeç değiştiğinde cursor'un sıfırlanması bu tipin tek incelikli yeri:
 /// eski cursor yeni süzgeçte anlamsızdır ve taşınırsa sayfa ortasından

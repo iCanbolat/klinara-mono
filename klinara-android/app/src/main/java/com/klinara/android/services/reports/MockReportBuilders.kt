@@ -13,7 +13,7 @@ import kotlin.math.roundToLong
  *
  * - toplam oran satır oranlarının ortalaması DEĞİL, toplam pay / toplam payda;
  * - iptal edilen randevunun dakikası dolu sayılmaz, gelmeyeninki sayılır (slot yine tutuldu);
- * - gelmeme grain'i randevu; ciro tahakkuku tamamlanan kalem, tahsilat yapılan ödeme;
+ * - gelmeme grain'i randevu; ciro tamamlanan kalem;
  * - sıralamalar sunucudaki `order by`'lar.
  */
 internal object MockReportBuilders {
@@ -57,27 +57,17 @@ internal object MockReportBuilders {
         visits: List<Visit>,
         groupBy: RevenueGrouping,
     ): List<RevenueRow> {
-        if (groupBy == RevenueGrouping.Method) {
-            // Yöntem bir TAHSİLAT özelliği: tahakkuk sütunu bu kırılımda her zaman 0.
-            return visits
-                .filter { it.method != null }
-                .groupBy { it.method!! }
-                .map { (method, rows) -> RevenueRow(null, method, 0, rows.sumOf { it.collectedMinor }) }
-                .sortedWith(compareByDescending<RevenueRow> { it.collectedMinor }.thenBy { it.groupLabel })
-        }
         return visits
             .filter { it.status == Status.Completed }
             .groupBy { revenueKey(groupBy, it) }
             .map { (key, rows) ->
-                RevenueRow(key.first, key.second, rows.sumOf { it.priceMinor }, rows.sumOf { it.collectedMinor })
+                RevenueRow(key.first, key.second, rows.sumOf { it.priceMinor })
             }.sortedWith(compareByDescending<RevenueRow> { it.accruedMinor }.thenBy { it.groupLabel })
     }
 
     fun revenueTotals(visits: List<Visit>): RevenueTotals =
         RevenueTotals(
             accruedMinor = visits.filter { it.status == Status.Completed }.sumOf { it.priceMinor },
-            collectedMinor = visits.sumOf { it.collectedMinor },
-            refundedMinor = 0,
         )
 
     // --- Personel performansı ---
@@ -99,7 +89,6 @@ internal object MockReportBuilders {
                     staffName = name,
                     completedServices = completed.size,
                     revenueMinor = revenue,
-                    commissionMinor = (revenue * COMMISSION_BASIS_POINTS.getOrDefault(id, 0) / BASIS_POINTS),
                     bookedMinutes = booked,
                     availableMinutes = available,
                     occupancyRate = rate(booked.toLong(), available.toLong()),
@@ -219,8 +208,6 @@ internal fun OccupancyTotals.delta(previous: OccupancyTotals): ReportDelta =
 internal fun RevenueTotals.delta(previous: RevenueTotals): ReportDelta =
     mapOf(
         "accruedMinor" to percentDelta(accruedMinor, previous.accruedMinor),
-        "collectedMinor" to percentDelta(collectedMinor, previous.collectedMinor),
-        "refundedMinor" to percentDelta(refundedMinor, previous.refundedMinor),
     )
 
 internal fun NoShowTotals.delta(previous: NoShowTotals): ReportDelta =
@@ -290,7 +277,6 @@ private fun revenueKey(
         RevenueGrouping.Staff -> visit.staffId to visit.staffName
         RevenueGrouping.Branch -> visit.branchId to branchName(visit.branchId)
         RevenueGrouping.Day -> null to visit.date.toString()
-        RevenueGrouping.Method -> null to (visit.method ?: "—")
     }
 
 private fun noShowKey(
@@ -313,15 +299,9 @@ private fun branchName(id: String): String =
 
 private const val PERCENT_SCALE = 10_000
 private const val HUNDRED = 100.0
-private const val BASIS_POINTS = 10_000
-private const val DERYA_BASIS_POINTS = 1_000
-private const val MERVE_BASIS_POINTS = 1_200
 private const val PACKAGE_GROUP_ID = "9ac00000-0000-4000-8000-000000000001"
 private const val COHORT_30 = 30
 private const val COHORT_60 = 60
 private const val COHORT_90 = 90
 private val COHORT_DAYS = listOf(COHORT_30, COHORT_60, COHORT_90)
 
-/** Prim oranı (baz puan). Onur'un kuralı yok — sıfır primli satır da görünmeli. */
-private val COMMISSION_BASIS_POINTS =
-    mapOf(MockIds.STAFF_DERYA to DERYA_BASIS_POINTS, MockIds.STAFF_MERVE to MERVE_BASIS_POINTS)

@@ -7,7 +7,7 @@ import * as credentialsRepo from './credentials.repository';
 import * as identityRepo from './identity.repository';
 
 /** Kiracı ayarı `require_mfa_for_admins` bu rolleri kapsar. */
-const ADMIN_ROLES = new Set<string>([ROLES.OWNER, ROLES.MANAGER, ROLES.ACCOUNTANT]);
+const ADMIN_ROLES = new Set<string>([ROLES.OWNER, ROLES.MANAGER]);
 
 export interface MfaRequirement {
   required: boolean;

@@ -325,22 +325,6 @@ describe('takvim görünümleri (Batch 3.4)', () => {
       expect(res.status).toBe(200);
       expect((res.body as CalendarBody).appointments).toHaveLength(0);
     });
-
-    it('finans rolü takvime erişemez', async () => {
-      const accountant = await inviteMember(app, clinic.owner.tokens, {
-        email: 'muhasebe@demo-klinik.test',
-        roleKey: 'accountant',
-      });
-
-      const res = await http(app)
-        .get('/api/v1/calendar/day')
-        .query({ branchId: clinic.branch.id, date: MONDAY })
-        .set(auth(accountant.tokens))
-        .set(branch());
-
-      expect(res.status).toBe(403);
-      expect((res.body as { code: string }).code).toBe('FORBIDDEN');
-    });
   });
 
   // -------------------------------------------------------------------------

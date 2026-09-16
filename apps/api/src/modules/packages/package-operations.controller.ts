@@ -117,7 +117,7 @@ export class PackageOperationsController {
   @ApiOperation({
     summary: 'Paketi (kısmen) iade et',
     description:
-      'Tutar SATIŞ ANINDAKİ tahsisten hesaplanır. Kasa hareketi YOKTUR: yükümlülük `pending` olarak kaydedilir, tahsilat tarafı Batch 6.2de bağlanır.',
+      'Kalan seansları iade eder. Tutar SATIŞ ANINDAKİ tahsisten hesaplanır ve bilgi amaçlıdır; paranın ödenmesi takip edilmez.',
   })
   @ApiHeader({ name: 'If-Match', required: true, example: 'W/"3"' })
   @ApiHeader({ name: 'Idempotency-Key', required: false })

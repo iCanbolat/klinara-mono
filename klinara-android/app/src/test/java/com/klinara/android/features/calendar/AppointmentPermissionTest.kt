@@ -32,9 +32,9 @@ class AppointmentPermissionTest {
     }
 
     @Test
-    @DisplayName("`accountant` randevu yazamaz — aksiyon kartı HİÇ çizilmez")
-    fun accountantSeesNoActions() {
-        val session = ShellSessions.forRole("accountant")
+    @DisplayName("Tanımsız rol randevu yazamaz — aksiyon kartı HİÇ çizilmez")
+    fun unknownRoleSeesNoActions() {
+        val session = ShellSessions.forRole("tanimsiz-rol")
 
         assertTrue(!session.can(Permissions.APPOINTMENT_WRITE))
         assertTrue(!session.can(Permissions.APPOINTMENT_REOPEN))

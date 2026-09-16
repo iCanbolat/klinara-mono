@@ -297,9 +297,9 @@ class SchedulingFeatureTest {
     }
 
     @Test
-    @DisplayName("Takvim kurulumu kartı `schedule:read` ile: muhasebe görmüyor; dipnot şube saat dilimini söylüyor")
+    @DisplayName("Takvim kurulumu kartı `schedule:read` ile; dipnot şube saat dilimini söylüyor")
     fun permissions() {
-        val roles = listOf("owner", "manager", "receptionist", "practitioner", "accountant")
+        val roles = listOf("owner", "manager", "receptionist", "practitioner")
         val sees =
             roles.filter { role ->
                 managementSections(ShellSessions.forRole(role)).any { it.title == "Takvim kurulumu" }

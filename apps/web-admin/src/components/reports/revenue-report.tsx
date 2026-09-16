@@ -18,7 +18,6 @@ const GROUPS = [
   { value: 'staff', label: 'Personel' },
   { value: 'branch', label: 'Şube' },
   { value: 'day', label: 'Gün' },
-  { value: 'method', label: 'Ödeme yöntemi' },
 ] as const;
 
 type Row = RevenueReport['data'][number];
@@ -45,15 +44,9 @@ export function RevenueReportView(): ReactNode {
       numeric: true,
       render: (row) => formatMoney(row.accruedMinor, currency),
     },
-    {
-      key: 'collected',
-      header: t('reports.col.collected'),
-      numeric: true,
-      render: (row) => formatMoney(row.collectedMinor, currency),
-    },
   ];
 
-  const delta = formatDelta(data?.delta?.collectedMinor);
+  const delta = formatDelta(data?.delta?.accruedMinor);
 
   return (
     <ReportShell
@@ -62,9 +55,6 @@ export function RevenueReportView(): ReactNode {
       scope={data?.scope}
       error={error}
       loading={loading}
-      // Kırılım toplamının genel toplamdan küçük olabilmesi raporun en sık
-      // "hata" sanılan davranışı; not her zaman görünür.
-      note={t('reports.revenueRowsNote')}
       filters={
         <ReportFilters
           preset={preset}
@@ -87,20 +77,18 @@ export function RevenueReportView(): ReactNode {
       {data === null ? null : (
         <>
           <dl className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <Stat label={t('reports.col.accrued')} value={formatMoney(data.totals.accruedMinor, currency)} />
             <Stat
-              label={t('reports.col.collected')}
-              value={formatMoney(data.totals.collectedMinor, currency)}
+              label={t('reports.col.accrued')}
+              value={formatMoney(data.totals.accruedMinor, currency)}
               hint={compare ? (delta ?? t('reports.deltaUnavailable')) : undefined}
             />
-            <Stat label="İade" value={formatMoney(data.totals.refundedMinor, currency)} />
           </dl>
 
           <ReportChart
             kind={groupBy === 'day' ? 'line' : 'bar'}
             points={data.data.map((row) => ({
               label: row.groupLabel,
-              value: row.collectedMinor,
+              value: row.accruedMinor,
             }))}
             format={(value) => formatMoney(value, currency)}
           />

@@ -26,24 +26,17 @@ struct AppShellView: View {
 
     /// Yönetim sekmesi Faz 2'nin tamamını barındırır; izinlerden herhangi biri
     /// yeter (yalnız çalışma saatlerini düzenleyen bir yönetici de girebilmeli).
-    ///
-    /// Faz 6 ile finans izinleri de sayılıyor ve bu bir düzeltme:
-    /// `accountant` rolünde `service:read`, `staff:read`, `schedule:read`
-    /// **yok**. Eski koşulla muhasebe sekmeyi hiç göremez, dolayısıyla kendisi
-    /// için yazılmış Kasa ve Prim ekranlarına da hiç ulaşamazdı.
     private var showsManagement: Bool {
         session.canAny(
             Permissions.serviceRead,
             Permissions.staffRead,
             Permissions.scheduleRead,
-            Permissions.financePaymentRead,
-            Permissions.financeCommissionRead,
             Permissions.notificationRead,
             Permissions.notificationManage
         )
     }
 
-    /// `accountant` rolünde hiç randevu izni yok. Sekme yine de duruyor —
+    /// Randevu izni olmayan bir rolde sekme yine de duruyor —
     /// varsayılan seçili sekmenin bazı rollerde kaybolması bilgi mimarisini
     /// role göre değiştirmek olurdu — ama içerik "erişimin yok" der.
     private var canSeeCalendar: Bool {
@@ -146,20 +139,6 @@ enum Permissions {
     /// başına hiçbir şubenin cirosunu açmaz. Daraltmayı sunucu yapıyor ve
     /// yanıttaki `scope` alanı bunu söylüyor.
     static let reportPerformanceReadOwn = "report.performance:read.own"
-    /// Borç kalemi, tahsilat ve kasa görüntüleme (Faz 6). Cari hesap bölümü ve
-    /// kasa ekranları buna bakar.
-    static let financePaymentRead = "finance.payment:read"
-    /// Kalem açma, tahsilat alma, kasa açma/kapatma ve iade.
-    static let financePaymentWrite = "finance.payment:write"
-    /// Katalog fiyatının dışına çıkma. `finance.payment:write` üzerine **binmez**:
-    /// gerekçe `package:refund` ile aynı — resepsiyonun günlük tahsilat izni
-    /// yetkisiz indirim anlamına gelemez.
-    static let financePriceOverride = "finance.price:override"
-    /// Prim kuralı, tahakkuk, dönem ve raporun görüntülenmesi. Muhasebe primi
-    /// **görür** ama kuralını değiştiremez; yazma ayrı izinde.
-    static let financeCommissionRead = "finance.commission:read"
-    /// Prim kuralı yazma ve dönem kapatma. `owner` + `manager`.
-    static let financeCommissionWrite = "finance.commission:write"
     /// Mesaj günlüğü, gelen kutusu, şablon ve hatırlatma ayarlarının okunması (Faz 8).
     static let notificationRead = "notification:read"
     /// Tek tek mesaj gönderme ve gelen mesajı işlendi işaretleme. `manage`
@@ -167,7 +146,7 @@ enum Permissions {
     /// şablonunu değiştiremez. Sunucudaki ayrımın aynısı.
     static let notificationSend = "notification:send"
     /// Şablon, bildirim tercihi, hatırlatma ayarı ve WhatsApp kimlik bilgileri.
-    /// `send`i **kapsamaz**: şablonu yöneten bir muhasebeci mesaj göndermek
+    /// `send`i **kapsamaz**: şablonu yöneten bir kullanıcı mesaj göndermek
     /// zorunda değil.
     static let notificationManage = "notification:manage"
 }

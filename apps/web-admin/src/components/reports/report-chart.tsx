@@ -31,7 +31,7 @@ import {
 export interface ChartPoint {
   label: string;
   value: number;
-  /** İkinci seri (ciroda tahsilat, doluluğun yanında müsaitlik). */
+  /** İkinci seri (doluluğun yanında müsaitlik). */
   secondary?: number | undefined;
 }
 

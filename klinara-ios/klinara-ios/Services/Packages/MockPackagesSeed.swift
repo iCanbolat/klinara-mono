@@ -110,7 +110,6 @@ enum MockPackagesSeed {
             outstandingMinor: 692_308,
             refundedSessions: 0,
             refundAmountMinor: 0,
-            refundSettlementStatus: nil,
             refundedAt: nil,
             refundReason: nil,
             transferredFromPackageId: nil,

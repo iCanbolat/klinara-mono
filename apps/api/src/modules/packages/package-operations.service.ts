@@ -151,10 +151,9 @@ export class PackageOperationsService {
    * (`finance.price:override`) Faz 6.1'de geliyor, şimdi o kapıyı açmak
    * yetkisiz indirim demek olurdu.
    *
-   * NEGATİF ücret kalemi burada doğar (6.1) ama KASA HAREKETİ YOK:
-   * `refund_settlement_status = 'pending'` "klinik bu parayı borçlandı, henüz
-   * ödemedi" demektir. Paranın fiilen çıkması ve durumun `settled`'a dönmesi
-   * Batch 6.3'ün (kasa/iade) işidir.
+   * İade SEANS iadesidir: kalan haklar düşer, tutar bilgi amaçlı
+   * `refund_amount_minor`a yazılır ve ciroyu düzelten NEGATİF ücret kalemi
+   * doğar. Paranın müşteriye ödenmesi uygulamada takip edilmez (0045).
    */
   async refund(
     principal: Principal,
@@ -228,12 +227,11 @@ export class PackageOperationsService {
         refundReason: input.reason,
         refundedAt: new Date(),
         refundedBy: principal.userId,
-        refundSettlementStatus: 'pending' as const,
         ...(remainingAfter === 0 ? { status: 'refunded' as const } : {}),
       };
     });
 
-    return { refundedSessions, refundAmountMinor, settlementStatus: 'pending' };
+    return { refundedSessions, refundAmountMinor };
   }
 
   /**

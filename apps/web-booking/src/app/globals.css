@@ -190,3 +190,15 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* Yatay şeritlerde (galeri, sekmeler) kaydırma çubuğu gizli; kaydırma çalışır. */
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+html {
+  scroll-behavior: smooth;
+}

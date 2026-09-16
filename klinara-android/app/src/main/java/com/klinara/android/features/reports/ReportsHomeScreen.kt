@@ -24,15 +24,15 @@ private val ReportKind.detail: String
     get() =
         when (this) {
             ReportKind.Occupancy -> "Müsait dakikaların ne kadarı dolu"
-            ReportKind.Revenue -> "Tahakkuk eden ve tahsil edilen, ayrı ayrı"
-            ReportKind.StaffPerformance -> "İşlem, ciro, prim ve doluluk"
+            ReportKind.Revenue -> "Tamamlanan hizmet ve paket satışlarının bedeli"
+            ReportKind.StaffPerformance -> "İşlem, ciro ve doluluk"
             ReportKind.NoShow -> "Randevu başına gelmeme ve iptal oranı"
             ReportKind.Retention -> "Yeni müşteri, geri gelen ve geliş kaynağı"
         }
 
 /**
- * Klinik raporlarının girişi (A9). Satırlar [ReportAccess] ile süzülür: muhasebe takvim iznini,
- * resepsiyon ciro iznini taşımıyor — ikisi farklı satır kümesi görür. Görülemeyen rapor
+ * Klinik raporlarının girişi (A9). Satırlar [ReportAccess] ile süzülür: resepsiyon ciro iznini,
+ * uygulayıcı genel raporları taşımıyor — ikisi farklı satır kümesi görür. Görülemeyen rapor
  * ÇİZİLMEZ; ciro kapalıysa bunun sebebi yazılır ("yok" ile "göremiyorsun" farkı).
  */
 @Composable

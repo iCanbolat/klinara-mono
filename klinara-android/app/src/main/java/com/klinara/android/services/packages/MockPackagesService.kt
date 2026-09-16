@@ -384,14 +384,12 @@ class MockPackagesService(
                 status = if (current.remainingSessions == 0) CustomerPackageStatus.Refunded else current.status,
                 refundedSessions = current.refundedSessions + refunded,
                 refundAmountMinor = current.refundAmountMinor + amount,
-                // Kasa hareketi YOK: borç doğar, tahsilat Faz A6'da bağlanır.
-                refundSettlementStatus = "pending",
                 refundedAt = ledger.nextInstant(),
                 refundReason = input.reason.trim(),
                 version = current.version + 1,
             )
         }
-        return RefundResult(refunded, amount, "pending").also { idempotentRefunds[idempotencyKey] = it }
+        return RefundResult(refunded, amount).also { idempotentRefunds[idempotencyKey] = it }
     }
 
     override suspend fun transfer(
@@ -441,7 +439,6 @@ class MockPackagesService(
                 status = CustomerPackageStatus.Active,
                 refundedSessions = 0,
                 refundAmountMinor = 0,
-                refundSettlementStatus = null,
                 refundedAt = null,
                 refundReason = null,
                 transferredFromPackageId = source.id,

@@ -54,7 +54,7 @@ struct BranchStaffDecodingTests {
           {"id":"a1","email":"yeni@demo-klinik.test","roleKey":"practitioner","branchId":"b2",
            "expiresAt":"2026-09-23T10:00:00.000Z","createdAt":"2026-09-16T10:00:00.000Z",
            "acceptedAt":null,"revokedAt":null},
-          {"id":"a2","email":"muhasebe@demo-klinik.test","roleKey":"accountant","branchId":null,
+          {"id":"a2","email":"ortak@demo-klinik.test","roleKey":"owner","branchId":null,
            "expiresAt":"2026-09-20T10:00:00.000Z","createdAt":"2026-09-13T10:00:00.000Z",
            "acceptedAt":null,"revokedAt":null}
         ]}
@@ -142,7 +142,7 @@ struct MembershipRulesTests {
     @Test("Kimse kendinden yüksek rolü atayamaz")
     func assignable() {
         #expect(MembershipRules.assignableRoles(for: owner.roles).map(\.key)
-            == ["owner", "manager", "accountant", "receptionist", "practitioner"])
+            == ["owner", "manager", "receptionist", "practitioner"])
         #expect(!MembershipRules.assignableRoles(for: managerB1.roles).map(\.key).contains("owner"))
     }
 
@@ -170,10 +170,10 @@ struct MembershipRulesTests {
             draft("a", "practitioner", nil),
             draft("b", "receptionist", "b1"),
             draft("c", "receptionist", "b1"),
-            draft("d", "accountant", nil),
+            draft("d", "owner", nil),
         ]
         #expect(MembershipRules.issues(rows) == ["a": .branchRequired, "c": .duplicate])
-        #expect(MembershipRules.inputs([draft("d", "accountant", "b1")]) == [MembershipInput(roleKey: "accountant")])
+        #expect(MembershipRules.inputs([draft("d", "owner", "b1")]) == [MembershipInput(roleKey: "owner")])
         #expect(MembershipRules.same(rows, rows.reversed()))
     }
 }

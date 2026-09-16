@@ -40,6 +40,15 @@ export function validateSections(sections: readonly ContentBlockInput[]): FieldE
       if (Array.isArray(value) && field.maxItems !== undefined && value.length > field.maxItems) {
         errors.push({ path, message: `En fazla ${String(field.maxItems)} öge.` });
       }
+      // SSS: sunucu boş soruyu reddediyor (`@IsNotEmpty`); kaydetmeden söyle.
+      if (field.kind === 'faqList' && Array.isArray(value)) {
+        const blank = (value as { question?: unknown }[]).findIndex(
+          (item) => typeof item.question !== 'string' || item.question.trim() === '',
+        );
+        if (blank !== -1) {
+          errors.push({ path, message: `${String(blank + 1)}. soru boş bırakılamaz.` });
+        }
+      }
       if (typeof value === 'number') {
         if (field.min !== undefined && value < field.min) {
           errors.push({ path, message: `En az ${String(field.min)} olmalı.` });

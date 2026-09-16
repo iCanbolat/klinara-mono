@@ -15,11 +15,7 @@ import { Button } from '@/components/ui/button';
  * geliyor: `package_sale` satışın kendisi (bir satış = bir satır),
  * `package_ledger` ise satış sonrası defter hareketleri (tüketim, iade,
  * devir, süre dolumu, düzeltme).
- *
- * ⚠️ TAHSİLAT hâlâ yok: defterde duruyor ama bu sorguya eklenmedi (Faz 6'dan
- * devreden madde). Boşluk ekranda AÇIKÇA SÖYLENİYOR — sessizce gizlemek,
- * kullanıcının "bu müşteriden hiç tahsilat yapılmamış" diye düşünmesine yol
- * açardı.
+
  */
 /** `payload` gevşek tipli (`Record<string, unknown>`); sürüm sayı ya da yok. */
 function consentVersion(payload: Record<string, unknown>): string {
@@ -97,9 +93,6 @@ export function TimelinePanel({ customerId }: { customerId: string }): ReactNode
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Boşluk sessizce gizlenmiyor — bkz. dosya başlığı. */}
-      <p className="text-xs text-muted-foreground">{t('customers.timeline.partial')}</p>
-
       {error !== null ? (
         <Alert tone="danger">
           <span role="alert">{error}</span>

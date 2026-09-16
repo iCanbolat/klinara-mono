@@ -84,7 +84,7 @@ import kotlinx.coroutines.flow.SharedFlow
  * "refactor" edilir; ilerleme gibi görünen çalkantı):
  *
  *     customers A3.4 · notifications(opt-out) A4.2 · notes A4.3 ✓ · files A4.4 ✓ · packages A5.1 ✓
- *     finance A6.1 · commissions A6.4 · catalog/staff/users/scheduling A7 ✓
+ *     catalog/staff/users/scheduling A7 ✓ (finans A6 kapsam dışı)
  *     notifications/messages/whatsapp A8 ✓ · reports A9 ✓
  *
  * **A3.1'de iki servis planlanandan ÖNCE geldi** ve `ANDROID_DEVELOPMENT.md` §6 buna

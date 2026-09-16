@@ -2,8 +2,8 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { createTestApp } from '../helpers/app';
 import { startTestDatabase, type TestDatabase } from '../helpers/database';
-import { auth, bootstrapTenant, http, inviteMember, PLATFORM_TOKEN } from '../helpers/identity';
-import { setupClinic, type CustomerBody } from '../helpers/clinic';
+import { auth, bootstrapTenant, http, PLATFORM_TOKEN } from '../helpers/identity';
+import { branchHeader, setupClinic, type CustomerBody } from '../helpers/clinic';
 
 interface Problem {
   code: string;
@@ -176,18 +176,18 @@ describe('müşteri çekirdeği (Batch 3.0)', () => {
 
   it('customer:write izni olmayan rol müşteri oluşturamaz', async () => {
     const clinic = await setupClinic(app);
-    const accountant = await inviteMember(app, clinic.owner.tokens, {
-      email: 'muhasebe@demo-klinik.test',
-      roleKey: 'accountant',
-    });
-
-    const read = await http(app).get('/api/v1/customers').set(auth(accountant.tokens));
+    // Uygulayıcı müşteriyi OKUR ama oluşturamaz.
+    const read = await http(app)
+      .get('/api/v1/customers')
+      .set(auth(clinic.practitioner.tokens))
+      .set(branchHeader(clinic.branch.id));
     expect(read.status).toBe(200);
 
     const write = await http(app)
       .post('/api/v1/customers')
-      .set(auth(accountant.tokens))
-      .send({ fullName: 'Muhasebeden' });
+      .set(auth(clinic.practitioner.tokens))
+      .set(branchHeader(clinic.branch.id))
+      .send({ fullName: 'Uygulayıcıdan' });
     expect(write.status).toBe(403);
   });
 });

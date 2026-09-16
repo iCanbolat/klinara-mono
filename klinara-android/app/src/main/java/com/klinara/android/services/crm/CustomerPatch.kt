@@ -216,7 +216,6 @@ data class CustomerMergeResult(
                 "customer_file_groups" to "fotoğraf grubu",
                 "customer_tag_assignments" to "etiket",
                 "customer_packages" to "paket",
-                "payments" to "tahsilat",
             )
     }
 }

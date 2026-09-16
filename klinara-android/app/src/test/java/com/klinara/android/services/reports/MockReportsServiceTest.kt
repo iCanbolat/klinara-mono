@@ -50,7 +50,6 @@ class MockReportsServiceTest {
             //                                   doluluk ciro  perf  gelmeme kazanım
             assertEquals(listOf(true, true, true, true, true), matrix("owner"))
             assertEquals(listOf(true, true, true, true, true), matrix("manager"))
-            assertEquals(listOf(false, true, true, false, false), matrix("accountant"))
             assertEquals(listOf(true, false, false, true, true), matrix("receptionist"))
             assertEquals(listOf(true, false, true, false, false), matrix("practitioner"))
         }
@@ -142,15 +141,13 @@ class MockReportsServiceTest {
         }
 
     @Test
-    @DisplayName("Ciro: yöntem kırılımında tahakkuk 0; tahsilat kırılımı toplamı tutuyor")
-    fun revenueByMethod() =
+    @DisplayName("Ciro: kırılım toplamı genel toplamı tutuyor")
+    fun revenueAddsUp() =
         runTest {
-            val report = service().revenue(ReportQuery(august, null), RevenueGrouping.Method)
+            val report = service().revenue(ReportQuery(august, null), RevenueGrouping.Service)
 
             assertTrue(report.data.isNotEmpty())
-            assertTrue(report.data.all { it.accruedMinor == 0L })
-            assertEquals(report.totals.collectedMinor, report.data.sumOf { it.collectedMinor })
-            assertTrue(report.totals.accruedMinor > report.totals.collectedMinor, "ödenmemiş kalem var")
+            assertEquals(report.totals.accruedMinor, report.data.sumOf { it.accruedMinor })
         }
 
     @Test
@@ -198,7 +195,7 @@ class MockReportsServiceTest {
             val lines = text.removePrefix("\uFEFF").split("\r\n").filter { it.isNotEmpty() }
 
             assertTrue(text.startsWith("\uFEFF"))
-            assertEquals("Kırılım;Tahakkuk;Tahakkuk (kuruş);Tahsilat;Tahsilat (kuruş);Para birimi", lines.first())
+            assertEquals("Kırılım;Ciro;Ciro (kuruş);Para birimi", lines.first())
             val report = service().revenue(ReportQuery(august, null), RevenueGrouping.Service)
             assertEquals(report.data.size, lines.size - 1)
             val first = report.data.first()

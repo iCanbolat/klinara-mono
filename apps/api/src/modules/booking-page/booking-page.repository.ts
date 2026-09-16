@@ -45,6 +45,15 @@ export async function findTenantSlug(tx: Tx, tenantId: string): Promise<string |
   return row?.slug;
 }
 
+export async function findTenantName(tx: Tx, tenantId: string): Promise<string | undefined> {
+  const [row] = await tx
+    .select({ name: tenants.name })
+    .from(tenants)
+    .where(eq(tenants.id, tenantId))
+    .limit(1);
+  return row?.name;
+}
+
 export async function insertSite(
   tx: Tx,
   values: { tenantId: string; slug: string; defaultBranchId: string | null },

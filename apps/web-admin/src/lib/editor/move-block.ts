@@ -53,3 +53,12 @@ export function canMove(length: number, index: number, direction: -1 | 1): boole
   const target = index + direction;
   return target >= 0 && target < length;
 }
+
+/**
+ * Bloğu `after` indeksinin ALTINA ekler; `after` `null`sa sona. Yeni bloğun
+ * indeksini de döner ki editör onu seçebilsin.
+ */
+export function insertBlock<T>(items: readonly T[], item: T, after: number | null): { items: T[]; index: number } {
+  const index = after === null || after >= items.length ? items.length : after + 1;
+  return { items: [...items.slice(0, index), item, ...items.slice(index)], index };
+}

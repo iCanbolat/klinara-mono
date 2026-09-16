@@ -66,45 +66,32 @@ enum MockReportsSeed {
 
     static let revenueTotals = RevenueTotals(
         accruedMinor: 1_250_000,
-        collectedMinor: 980_000,
-        refundedMinor: 45_000,
         currency: "TRY"
     )
 
     static let revenuePrevious = RevenueTotals(
         accruedMinor: 1_100_000,
-        collectedMinor: 1_070_000,
-        refundedMinor: 0,
         currency: "TRY"
     )
 
     static func revenueRows(groupBy: RevenueGrouping) -> [RevenueRow] {
         switch groupBy {
-        case .method:
-            return [
-                // Yöntem kırılımında tahakkuk BİLEREK sıfır: ödeme yöntemi bir
-                // kalem özelliği değil, tahsilat özelliği.
-                RevenueRow(groupId: nil, groupLabel: "card", accruedMinor: 0, collectedMinor: 720_000),
-                RevenueRow(groupId: nil, groupLabel: "cash", accruedMinor: 0, collectedMinor: 260_000),
-            ]
         case .day:
             return [
-                RevenueRow(groupId: nil, groupLabel: "2026-09-07", accruedMinor: 450_000, collectedMinor: 380_000),
-                RevenueRow(groupId: nil, groupLabel: "2026-09-08", accruedMinor: 800_000, collectedMinor: 600_000),
+                RevenueRow(groupId: nil, groupLabel: "2026-09-07", accruedMinor: 450_000),
+                RevenueRow(groupId: nil, groupLabel: "2026-09-08", accruedMinor: 800_000),
             ]
         default:
             return [
                 RevenueRow(
                     groupId: MockCatalogSeed.serviceLazerTumVucut,
                     groupLabel: "Tüm Vücut Lazer",
-                    accruedMinor: 900_000,
-                    collectedMinor: 700_000
+                    accruedMinor: 900_000
                 ),
                 RevenueRow(
                     groupId: MockCatalogSeed.serviceLazerBolgesel,
                     groupLabel: "Bölgesel Lazer",
-                    accruedMinor: 350_000,
-                    collectedMinor: 280_000
+                    accruedMinor: 350_000
                 ),
             ]
         }
@@ -118,7 +105,6 @@ enum MockReportsSeed {
             staffName: "Ayşe Yılmaz",
             completedServices: 42,
             revenueMinor: 780_000,
-            commissionMinor: 78_000,
             bookedMinutes: 540,
             availableMinutes: 960,
             occupancyRate: 56.25
@@ -131,7 +117,6 @@ enum MockReportsSeed {
                 staffName: "Mehmet Demir",
                 completedServices: 27,
                 revenueMinor: 470_000,
-                commissionMinor: 47_000,
                 bookedMinutes: 450,
                 availableMinutes: 480,
                 occupancyRate: 93.75

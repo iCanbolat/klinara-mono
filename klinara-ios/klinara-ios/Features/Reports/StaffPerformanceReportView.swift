@@ -51,13 +51,6 @@ struct StaffPerformanceReportView: View {
                     )
                     KlinaraDivider()
                     KlinaraRow(
-                        label: "Prim",
-                        value: Money.format(minor: row.commissionMinor, currency: report.currency),
-                        detail: "Ters kayıtlar düşülmüştür",
-                        isMonospaced: true
-                    )
-                    KlinaraDivider()
-                    KlinaraRow(
                         label: "Doluluk",
                         value: ReportFormat.percent(row.occupancyRate),
                         detail: "\(ReportFormat.minutes(row.bookedMinutes)) / \(ReportFormat.minutes(row.availableMinutes))"

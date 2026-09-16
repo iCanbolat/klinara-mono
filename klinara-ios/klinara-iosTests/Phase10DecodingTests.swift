@@ -64,28 +64,13 @@ struct Phase10DecodingTests {
         #expect(unattributed.id == "—")
     }
 
-    @Test("Ciro raporunda tahakkuk ve tahsilat AYRI çözülür")
+    @Test("Ciro raporu çözülür; tahsilat alanı yok")
     func decodesRevenue() throws {
         let report = try Fixtures.decode(RevenueReport.self, from: ReportFixtures.revenue)
 
         #expect(report.totals.currency == "TRY")
-        // İkisi aynı sayı değil ve olmamalı: fixture'da 350.000 kuruşluk
-        // tahakkuk var ama tahsilat 180.000. Raporun en sık yanlış okunan
-        // yeri tam olarak bu ayrım.
         #expect(report.totals.accruedMinor == 350_000)
-        #expect(report.totals.collectedMinor == 180_000)
-        #expect(report.totals.accruedMinor != report.totals.collectedMinor)
-    }
-
-    @Test("Ödeme yöntemi kırılımında tahakkuk sıfır")
-    func decodesRevenueByMethod() throws {
-        let report = try Fixtures.decode(RevenueReport.self, from: ReportFixtures.revenueByMethod)
-        let card = try #require(report.data.first { $0.groupLabel == "card" })
-
-        #expect(card.collectedMinor == 180_000)
-        // Yöntem bir KALEM özelliği değil; sunucu bu kırılımda tahakkuku
-        // bilerek sıfır döndürüyor.
-        #expect(card.accruedMinor == 0)
+        #expect(report.data.map(\.accruedMinor) == [250_000, 100_000])
     }
 
     // MARK: Personel performansı

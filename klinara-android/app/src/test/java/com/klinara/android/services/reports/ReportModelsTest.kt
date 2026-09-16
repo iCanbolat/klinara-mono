@@ -47,7 +47,7 @@ class ReportModelsTest {
     }
 
     @Test
-    @DisplayName("Ciro: atıfsız satır `—`; toplam kırılım toplamından büyük olabilir")
+    @DisplayName("Ciro: atıfsız satır `—`")
     fun revenueDecodes() {
         val report = decode("revenue", RevenueReport.serializer())
 
@@ -58,17 +58,7 @@ class ReportModelsTest {
     }
 
     @Test
-    @DisplayName("Ciro yöntem kırılımı: tahakkuk 0, etiket ham yöntem → Türkçe ad")
-    fun revenueByMethod() {
-        val row = decode("revenue-by-method", RevenueReport.serializer()).data.single()
-
-        assertEquals(0L, row.accruedMinor)
-        assertEquals("Kart", PaymentMethodLabels.label(row.groupLabel))
-        assertEquals("crypto", PaymentMethodLabels.label("crypto"))
-    }
-
-    @Test
-    @DisplayName("Satırsız ama tahsilatlı dönem 'hareket yok' SAYILMAZ")
+    @DisplayName("Satırsız ama cirolu dönem 'hareket yok' SAYILMAZ (sayfalı satırlar)")
     fun revenueWithoutRowsCanStillHaveMovement() {
         val report = decode("revenue", RevenueReport.serializer()).copy(data = emptyList())
 

@@ -117,7 +117,7 @@ class LiveReportsServiceTest {
     @DisplayName("Dışa aktarım: POST gövdesinde filtre, sorgu dizgesi BOŞ; ham baytlar dönüyor")
     fun exportPostsFilterInBody() =
         runTest {
-            val csv = "\uFEFFKırılım;Tahakkuk\r\nCilt bakımı;900,00\r\n".toByteArray()
+            val csv = "\uFEFFKırılım;Ciro\r\nCilt bakımı;900,00\r\n".toByteArray()
             server.enqueue(
                 MockResponse
                     .Builder()
@@ -131,7 +131,7 @@ class LiveReportsServiceTest {
                 service.export(
                     ReportKind.Revenue,
                     ReportQuery(september, branchId = "b-1", compareToPrevious = true),
-                    RevenueGrouping.Method.wire,
+                    RevenueGrouping.Staff.wire,
                 )
 
             assertArrayEquals(csv, bytes)
@@ -141,7 +141,7 @@ class LiveReportsServiceTest {
             assertNull(request.url.query, "tarih aralığı ve şube erişim loglarına düşmemeli")
             val body = Json.parseToJsonElement(request.body!!.utf8()).jsonObject
             assertEquals(setOf("from", "to", "branchId", "groupBy"), body.keys)
-            assertEquals("method", body["groupBy"]!!.jsonPrimitive.content)
+            assertEquals("staff", body["groupBy"]!!.jsonPrimitive.content)
         }
 
     @Test

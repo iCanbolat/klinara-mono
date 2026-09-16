@@ -30,7 +30,7 @@ class PackagePermissionTest {
     ) = availableOperations(pkg, ShellSessions.forRole(role).packagePermissions, now)
 
     @Test
-    @DisplayName("Rol başına işlem matrisi: resepsiyon iade/devir YAPAMAZ, muhasebe düzeltme/satış YAPAMAZ")
+    @DisplayName("Rol başına işlem matrisi: resepsiyon iade/devir YAPAMAZ, uygulayıcı hiçbirini yapamaz")
     fun roleMatrix() =
         runTest {
             val pkg = ayse()
@@ -39,7 +39,6 @@ class PackagePermissionTest {
             assertEquals(all, operationsFor("owner", pkg))
             assertEquals(all, operationsFor("manager", pkg))
             assertEquals(listOf(PackageOperation.Adjust), operationsFor("receptionist", pkg))
-            assertEquals(listOf(PackageOperation.Refund), operationsFor("accountant", pkg))
             assertEquals(emptyList<PackageOperation>(), operationsFor("practitioner", pkg))
         }
 
@@ -61,10 +60,10 @@ class PackagePermissionTest {
         }
 
     @Test
-    @DisplayName("Paket bölümü `package:read` ile, satış `package:write` ile — muhasebe satış yapamaz")
+    @DisplayName("Paket bölümü `package:read` ile, satış `package:write` ile — uygulayıcı satış yapamaz")
     fun sectionAndSaleGates() {
-        assertEquals(true, ShellSessions.forRole("accountant").can(Permissions.PACKAGE_READ))
-        assertEquals(false, ShellSessions.forRole("accountant").packagePermissions.canWrite)
         assertEquals(true, ShellSessions.forRole("practitioner").can(Permissions.PACKAGE_READ))
+        assertEquals(false, ShellSessions.forRole("practitioner").packagePermissions.canWrite)
+        assertEquals(true, ShellSessions.forRole("receptionist").packagePermissions.canWrite)
     }
 }

@@ -106,7 +106,7 @@ extension Fixtures {
 
     /// `GET /customer-packages/:id` → 200.
     ///
-    /// Kalemler gömülü; `refundSettlementStatus`, `refundedAt`, `refundReason`
+    /// Kalemler gömülü; `refundedAt`, `refundReason`
     /// ve `transferredFromPackageId` `null`. Damgalar **UTC ve kesirli**.
     static let customerPackage = """
     {
@@ -127,7 +127,6 @@ extension Fixtures {
       "outstandingMinor": 1200000,
       "refundedSessions": 0,
       "refundAmountMinor": 0,
-      "refundSettlementStatus": null,
       "refundedAt": null,
       "refundReason": null,
       "transferredFromPackageId": null,
@@ -183,7 +182,6 @@ extension Fixtures {
           "outstandingMinor": 1200000,
           "refundedSessions": 0,
           "refundAmountMinor": 0,
-          "refundSettlementStatus": null,
           "refundedAt": null,
           "refundReason": null,
           "transferredFromPackageId": null,

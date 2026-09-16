@@ -1,5 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
+import { ERROR_CODES } from '@klinara/shared';
+import { AppError } from '../../common/errors/app-error';
+import { PG_ERROR, isPgError, pgConstraintName } from '../../common/errors/db-errors';
 import type { Tx } from '../../database/tenant-tx';
 import { computeChargeAmounts, computeRefundAmounts } from './charge-math';
 import * as repo from './finance.repository';
@@ -18,8 +21,8 @@ export interface PackageRefundLine {
  * ile borcun doğması atomik olmalı, ve atomiklik ayrı bir mekanizma değil,
  * aynı transaction'da olmalarının doğal sonucudur.
  *
- * Bu servis PARANIN NASIL HAREKET ETTİĞİNİ bilmez; yalnız borcun doğduğunu
- * kaydeder. Tahsilat 0028'in, kasa 0029'un işidir.
+ * Bu servis yalnız borcun (hizmet bedelinin) doğduğunu kaydeder; tahsilat
+ * takibi kapsam dışıdır (0045).
  */
 @Injectable()
 export class ChargeGenerationService {
@@ -80,9 +83,7 @@ export class ChargeGenerationService {
    * Randevu tamamlaması geri alındığında borcu iptal eder.
    *
    * Satır SİLİNMEZ, `void` edilir: iptal edilmiş bir borç kalemi de denetim
-   * izidir. Kaleme tahsilat yapılmışsa iptal edilmez — para girmiş bir borcu
-   * yok saymak, cari bakiyeyi alacaklı tarafa kaydırırdı; bu durumda çağıran
-   * önce tahsilatı iptal etmelidir.
+   * izidir.
    */
   async voidForAppointment(
     tx: Tx,
@@ -177,9 +178,8 @@ export class ChargeGenerationService {
    * Paket iadesinin NEGATİF borç kalemlerini yazar.
    *
    * Tutar Faz 5'in `remainingValueMinor` hesabından gelir (satış anındaki
-   * `item_total_minor` üzerinden) ve burada yalnız KDV'si ayrılır. Bu kalem
-   * "klinik bu parayı borçlandı" der; paranın kasadan ÇIKMASI 0029'un işidir
-   * ve `refund_settlement_status` orada `settled`'a döner.
+   * `item_total_minor` üzerinden) ve burada yalnız KDV'si ayrılır. Kalem ciroyu
+   * düzeltmek içindir; paranın iadesi klinik dışında takip edilir.
    */
   async generateForPackageRefund(
     tx: Tx,
@@ -219,12 +219,6 @@ export class ChargeGenerationService {
       });
     }
     return billable.length;
-  }
-
-  /** Randevunun AÇIK ücret kalemlerinin kimlikleri (prim ters kaydı için). */
-  async openChargeIdsForAppointment(tx: Tx, appointmentId: string): Promise<string[]> {
-    const rows = await repo.listOpenChargesForAppointment(tx, appointmentId);
-    return rows.map((row) => row.id);
   }
 
   /** Bu randevu için hangi kalemlerin borcu zaten yazılmış. */
@@ -289,5 +283,27 @@ export class ChargeGenerationService {
         },
       ]),
     );
+  }
+
+  /** Borç kalemi kaynaklı DB hatalarının istemci karşılıkları. */
+  static translate(error: unknown): unknown {
+    if (isPgError(error, PG_ERROR.CHARGE_NOT_OPEN)) {
+      return AppError.conflict(ERROR_CODES.CONFLICT, 'İptal edilmiş ücret kalemi değiştirilemez');
+    }
+    if (isPgError(error, PG_ERROR.PACKAGE_BINDING_INVALID)) {
+      return new AppError(422, ERROR_CODES.VALIDATION_FAILED, 'Ücret kalemi kaynağıyla uyuşmuyor', {
+        detail: 'Kalem, randevunun ya da paketin müşterisine yazılmalıdır.',
+      });
+    }
+    if (
+      isPgError(error, PG_ERROR.UNIQUE_VIOLATION) &&
+      pgConstraintName(error) === 'charges_appointment_service_once'
+    ) {
+      return AppError.conflict(
+        ERROR_CODES.CONFLICT,
+        'Bu randevu kalemi için zaten açık bir ücret kalemi var',
+      );
+    }
+    return error;
   }
 }

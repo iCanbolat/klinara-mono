@@ -20,6 +20,7 @@ import {
   ContactBlockDto,
   HeroBlockDto,
   MapBlockDto,
+  FaqBlockDto,
   RichTextBlockDto,
   SeoDto,
   ServiceListBlockDto,
@@ -112,6 +113,7 @@ const DTO_BY_TYPE = {
   serviceList: ServiceListBlockDto,
   contact: ContactBlockDto,
   map: MapBlockDto,
+  faq: FaqBlockDto,
 } as const;
 
 /** Her tür için doğrulamayı geçen en küçük geçerli gövde. */
@@ -122,4 +124,5 @@ const SAMPLE_BLOCK: Record<(typeof BLOCK_TYPES)[number], Record<string, unknown>
   serviceList: { type: 'serviceList' },
   contact: { type: 'contact' },
   map: { type: 'map' },
+  faq: { type: 'faq', items: [] },
 };

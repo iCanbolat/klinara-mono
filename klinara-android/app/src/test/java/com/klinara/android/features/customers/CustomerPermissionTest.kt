@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test
  * İzinler üretilmiş `RolePermissions`'tan geliyor; elle yazılmış bir liste sapabilir.
  */
 class CustomerPermissionTest {
-    private val roles = listOf("owner", "manager", "accountant", "receptionist", "practitioner")
+    private val roles = listOf("owner", "manager", "receptionist", "practitioner")
 
     @Test
     @DisplayName("Müşteriler sekmesi `customer:read` ile çizilir")
@@ -47,13 +47,13 @@ class CustomerPermissionTest {
     }
 
     @Test
-    @DisplayName("`accountant` müşteriyi OKUR ama yazamaz")
-    fun accountantIsReadOnly() {
-        val accountant = ShellSessions.forRole("accountant")
+    @DisplayName("`practitioner` müşteriyi OKUR ama yazamaz")
+    fun practitionerIsReadOnly() {
+        val practitioner = ShellSessions.forRole("practitioner")
 
-        assertTrue(accountant.can(Permissions.CUSTOMER_READ))
-        assertFalse(accountant.can(Permissions.CUSTOMER_WRITE))
-        assertFalse(accountant.can(Permissions.CUSTOMER_MERGE))
+        assertTrue(practitioner.can(Permissions.CUSTOMER_READ))
+        assertFalse(practitioner.can(Permissions.CUSTOMER_WRITE))
+        assertFalse(practitioner.can(Permissions.CUSTOMER_MERGE))
     }
 
     @Test

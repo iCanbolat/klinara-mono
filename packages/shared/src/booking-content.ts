@@ -22,6 +22,7 @@ export const BLOCK_TYPES = [
   'serviceList',
   'contact',
   'map',
+  'faq',
 ] as const;
 export type BlockType = (typeof BLOCK_TYPES)[number];
 
@@ -44,6 +45,7 @@ export const CONTENT_LIMITS = {
   serviceList: { title: 120, categoryIds: 30 },
   contact: { title: 120 },
   map: { zoom: { min: 1, max: 20, default: 15 } },
+  faq: { title: 120, items: 30, question: 200, answer: 1_000 },
   seo: { title: 70, description: 160 },
 } as const;
 
@@ -114,13 +116,25 @@ export interface MapBlockInput extends BlockBase<'map'> {
   zoom?: number;
 }
 
+export interface FaqItemInput {
+  question: string;
+  /** Düz metin; satır sonları korunur. HTML ve Markdown yok. */
+  answer: string;
+}
+
+export interface FaqBlockInput extends BlockBase<'faq'> {
+  title?: string;
+  items: FaqItemInput[];
+}
+
 export type ContentBlockInput =
   | HeroBlockInput
   | RichTextBlockInput
   | CarouselBlockInput
   | ServiceListBlockInput
   | ContactBlockInput
-  | MapBlockInput;
+  | MapBlockInput
+  | FaqBlockInput;
 
 export interface ThemeInput {
   primaryColor?: string;
@@ -152,6 +166,7 @@ export type CarouselBlock = Omit<CarouselBlockInput, 'items'> & { items: Carouse
 export type ServiceListBlock = ServiceListBlockInput;
 export type ContactBlock = ContactBlockInput;
 export type MapBlock = MapBlockInput;
+export type FaqBlock = FaqBlockInput;
 
 export type ContentBlock =
   | HeroBlock
@@ -159,7 +174,8 @@ export type ContentBlock =
   | CarouselBlock
   | ServiceListBlock
   | ContactBlock
-  | MapBlock;
+  | MapBlock
+  | FaqBlock;
 
 export type Theme = Omit<ThemeInput, 'logoAssetId'> & { logo?: PublicImage | null };
 export type Seo = Omit<SeoInput, 'ogImageAssetId'> & { ogImage?: PublicImage | null };

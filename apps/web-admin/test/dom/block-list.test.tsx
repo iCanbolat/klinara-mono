@@ -69,7 +69,7 @@ describe('blok listesi', () => {
     renderList({
       sections: [{ type: 'hero', title: 'Kapak', visible: false }],
     });
-    expect(screen.getByText('(Gizli)')).toBeInTheDocument();
+    expect(screen.getByText('Gizli')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /göster/ })).toHaveAttribute('aria-pressed', 'true');
   });
 
@@ -79,6 +79,21 @@ describe('blok listesi', () => {
     renderList({ readOnly: true });
     expect(screen.queryByRole('button', { name: /taşı/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /sil/ })).not.toBeInTheDocument();
+  });
+
+  it('silme ONAY istiyor; onaydan önce blok çıkarılmıyor', async () => {
+    const user = userEvent.setup();
+    const onRemove = vi.fn();
+    renderList({ onRemove });
+    await user.click(screen.getByRole('button', { name: 'Metin bloğunu sil' }));
+    expect(onRemove).not.toHaveBeenCalled();
+    await user.click(await screen.findByRole('button', { name: 'Sil' }));
+    expect(onRemove).toHaveBeenCalledWith(1);
+  });
+
+  it('satır, tür adının altında blok başlığını özetliyor', () => {
+    renderList();
+    expect(screen.getByRole('button', { name: /Kapak\s*Kapak/ })).toBeInTheDocument();
   });
 
   it('liste sıralı bir <ol> — sıra anlamlı', () => {

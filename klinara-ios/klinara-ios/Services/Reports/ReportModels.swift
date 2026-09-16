@@ -92,7 +92,6 @@ nonisolated enum RevenueGrouping: String, Sendable, CaseIterable, Identifiable {
     case staff
     case branch
     case day
-    case method
 
     var id: String { rawValue }
 
@@ -103,17 +102,13 @@ nonisolated enum RevenueGrouping: String, Sendable, CaseIterable, Identifiable {
         case .staff: return "Personel"
         case .branch: return "Şube"
         case .day: return "Gün"
-        case .method: return "Ödeme yöntemi"
         }
     }
 }
 
 nonisolated struct RevenueTotals: Decodable, Sendable, Equatable {
-    /// Pencerede AÇILAN ücret kalemleri (kuruş).
+    /// Pencerede AÇILAN, iptal edilmemiş ücret kalemleri — hizmet bedeli (kuruş).
     let accruedMinor: Int
-    /// Pencerede YAPILAN, iptal edilmemiş tahsilatlar (kuruş).
-    let collectedMinor: Int
-    let refundedMinor: Int
     let currency: String
 }
 
@@ -121,15 +116,10 @@ nonisolated struct RevenueRow: Decodable, Sendable, Identifiable, Equatable {
     let groupId: String?
     let groupLabel: String
     let accruedMinor: Int
-    let collectedMinor: Int
 
     var id: String { groupId ?? groupLabel }
 }
 
-/// ⚠️ `data` satırlarının tahsilat toplamı `totals.collectedMinor`DAN küçük
-/// olabilir ve bu bir hata değil: eski bir borca bu dönemde yapılan tahsilatın
-/// bağlanacağı kalem pencerede değildir. Ekran toplamı `totals`tan okuyor,
-/// satırları toplayarak değil.
 nonisolated struct RevenueReport: Decodable, Sendable, Equatable {
     let scope: ReportScopeKind
     let period: ReportPeriod
@@ -152,8 +142,6 @@ nonisolated struct StaffPerformanceRow: Decodable, Sendable, Identifiable, Equat
     let staffName: String
     let completedServices: Int
     let revenueMinor: Int
-    /// Ters kayıtlar düşülmüş NET tahakkuk.
-    let commissionMinor: Int
     let bookedMinutes: Int
     let availableMinutes: Int
     let occupancyRate: Double

@@ -90,8 +90,8 @@ describe('şube birleştirme', () => {
     ],
   } as unknown as OccupancyReport;
   const revenue = {
-    totals: { accruedMinor: 150000, collectedMinor: 0, refundedMinor: 0, currency: 'TRY' },
-    data: [{ groupId: 'b2', groupLabel: 'Nişantaşı', accruedMinor: 150000, collectedMinor: 0 }],
+    totals: { accruedMinor: 150000, currency: 'TRY' },
+    data: [{ groupId: 'b2', groupLabel: 'Nişantaşı', accruedMinor: 150000 }],
   } as unknown as RevenueReport;
 
   it('rapor geldiyse satırı olmayan şube SIFIR, rapor hiç yoksa NULL', () => {
@@ -179,7 +179,6 @@ describe('personel ciro sıralaması', () => {
     staffName: name,
     revenueMinor,
     completedServices,
-    commissionMinor: 0,
     bookedMinutes: 0,
     availableMinutes: 0,
     occupancyRate: 0,

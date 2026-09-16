@@ -114,7 +114,7 @@ final class MockReportsService: ReportsService, @unchecked Sendable {
             data: slice.data,
             pageInfo: slice.pageInfo,
             previous: compareToPrevious ? MockReportsSeed.revenuePrevious : nil,
-            delta: compareToPrevious ? ["collectedMinor": -8.4] : nil
+            delta: compareToPrevious ? ["accruedMinor": 13.6] : nil
         )
     }
 

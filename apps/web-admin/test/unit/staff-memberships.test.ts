@@ -18,7 +18,6 @@ describe('rol/şube kuralları', () => {
     expect(assignableRolesFor(OWNER)).toEqual([
       'owner',
       'manager',
-      'accountant',
       'receptionist',
       'practitioner',
     ]);
@@ -50,7 +49,7 @@ describe('rol/şube kuralları', () => {
       { key: 'a', roleKey: 'practitioner', branchId: null },
       { key: 'b', roleKey: 'receptionist', branchId: 'b1' },
       { key: 'c', roleKey: 'receptionist', branchId: 'b1' },
-      { key: 'd', roleKey: 'accountant', branchId: null },
+      { key: 'd', roleKey: 'owner', branchId: null },
     ]);
     expect(issues).toEqual({ a: 'branchRequired', c: 'duplicate' });
   });
@@ -58,16 +57,16 @@ describe('rol/şube kuralları', () => {
   it('kiracı kapsamlı rol şubesiz gönderiliyor', () => {
     expect(
       toInputs([
-        { key: 'a', roleKey: 'accountant', branchId: null },
+        { key: 'a', roleKey: 'owner', branchId: null },
         { key: 'b', roleKey: 'manager', branchId: 'b1' },
       ]),
-    ).toEqual([{ roleKey: 'accountant' }, { roleKey: 'manager', branchId: 'b1' }]);
+    ).toEqual([{ roleKey: 'owner' }, { roleKey: 'manager', branchId: 'b1' }]);
   });
 
   it('karşılaştırma sıradan bağımsız', () => {
     const a = [
       { roleKey: 'manager', branchId: 'b1' },
-      { roleKey: 'accountant', branchId: null },
+      { roleKey: 'owner', branchId: null },
     ];
     expect(sameMemberships(a, [...a].reverse())).toBe(true);
     expect(sameMemberships(a, a.slice(0, 1))).toBe(false);

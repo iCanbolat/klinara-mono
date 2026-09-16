@@ -1,33 +1,39 @@
 'use client';
 
-import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
-import { useRef, useState, type ChangeEvent, type ReactNode } from 'react';
+import { ChevronDown, ChevronUp, ImageOff, Plus, Trash2 } from 'lucide-react';
+import { useRef, useState, type ReactNode } from 'react';
 import { CONTENT_LIMITS, type CarouselItemInput } from '@klinara/shared';
 import { moveItem } from '@/lib/editor/move-block';
-import { assetLabel, useAssetLibrary, ACCEPT_ATTRIBUTE } from '@/lib/editor/use-asset-library';
+import { useAssetLibrary } from '@/lib/editor/use-asset-library';
 import { t } from '@/i18n/tr';
-import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { AssetLibraryDialog } from './asset-library-dialog';
 
 const LIMITS = CONTENT_LIMITS.carousel;
+
+/** Diyalog neyi seçiyor: yeni bir öge mi, var olan ögenin görseli mi. */
+type Target = { kind: 'add' } | { kind: 'replace'; index: number };
 
 /**
  * Karusel ögelerinin düzenleyicisi (Faz 11.5'ten devreden madde).
  *
- * Blok formu bu alanı salt okunur bir sayaç olarak gösteriyordu; galeriyi
- * kurmanın tek yolu API'ye elle istek atmaktı.
+ * Her öge küçük resmiyle bir kart: görsele tıklamak kütüphaneyi açıp o ögenin
+ * görselini değiştiriyor, "Görsel ekle" aynı kütüphaneden yeni öge ekliyor.
+ * Yerel `<select>` görselleri yalnız adlarıyla gösteriyordu.
  *
  * Sıralama `BlockList` ile AYNI deseni izliyor ve bu bir tercih değil,
  * tutarlılık meselesi: birincil mekanizma erişilebilir olan ("Yukarı/Aşağı
  * taşı" düğmeleri, `aria-label`da SIRA NUMARASI ile), taşıma sonrası odak
  * taşınan satırda kalıyor ve değişiklik `role="status"` ile duyuruluyor.
- * Sürükle-bırak BURADA YOK: blok listesinde fare kolaylığı olarak eklenmişti,
- * ama karusel satırları metin girdileri taşıyor ve `draggable` bir satırda
- * metin seçmek tarayıcıda sürüklemeye dönüşüyor — kolaylık değil, engel.
+ * Sürükle-bırak BURADA YOK: karusel satırları metin girdileri taşıyor ve
+ * `draggable` bir satırda metin seçmek tarayıcıda sürüklemeye dönüşüyor.
+ *
+ * Kütüphanede bulunmayan bir kimlik (başka bir kullanıcının sildiği varlık)
+ * KORUNUYOR ve "görsel bulunamadı" olarak gösteriliyor; kullanıcı dokunmadan
+ * ögenin başka bir görsele kayması, fark edilmeyen bir içerik değişikliği olurdu.
  *
  * Öge sayısı `CONTENT_LIMITS.carousel.items`ta dolduğunda "Görsel ekle"
- * DEVRE DIŞI kalıyor: sınırı forma elle yazmak yerine sözlükten okumak, sunucu
- * sınırı değiştiğinde ikisinin ayrışmamasını sağlıyor.
+ * DEVRE DIŞI kalıyor.
  */
 export function CarouselItems({
   items,
@@ -44,6 +50,7 @@ export function CarouselItems({
 }): ReactNode {
   const library = useAssetLibrary();
   const [announcement, setAnnouncement] = useState('');
+  const [target, setTarget] = useState<Target | null>(null);
   const moveRefs = useRef(new Map<number, HTMLButtonElement>());
 
   const full = items.length >= LIMITS.items;
@@ -64,17 +71,28 @@ export function CarouselItems({
     requestAnimationFrame(() => moveRefs.current.get(to)?.focus());
   }
 
-  async function addUploaded(event: ChangeEvent<HTMLInputElement>): Promise<void> {
-    const file = event.target.files?.[0];
-    if (file === undefined) return;
-    const uploaded = await library.upload(file, 'booking_gallery');
-    if (uploaded !== null) onChange([...items, { assetId: uploaded }]);
-    event.target.value = '';
+  function select(assetId: string): void {
+    if (target === null) return;
+    if (target.kind === 'add') {
+      const asset = library.assets.find((candidate) => candidate.id === assetId);
+      // Kütüphanedeki alternatif metin başlangıç değeri olarak taşınıyor.
+      const alt = asset?.altText ?? null;
+      onChange([...items, alt === null ? { assetId } : { assetId, alt }]);
+    } else {
+      patch(target.index, { assetId });
+    }
   }
+
+  const selectedId = target?.kind === 'replace' ? (items[target.index]?.assetId ?? null) : null;
 
   return (
     <fieldset className="flex flex-col gap-2 border-0 p-0">
-      <legend className="text-sm font-medium text-foreground">{label}</legend>
+      <legend className="mb-2 flex w-full items-center justify-between text-sm font-medium text-foreground">
+        <span>{label}</span>
+        <span className="text-xs font-normal text-muted-foreground">
+          {items.length}/{LIMITS.items}
+        </span>
+      </legend>
 
       {/* `polite`: sıralama kullanıcının kendi eylemi, sözünü kesmemeli. */}
       <span role="status" aria-live="polite" className="sr-only">
@@ -82,20 +100,69 @@ export function CarouselItems({
       </span>
 
       {items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t('carousel.empty')}</p>
+        <p className="rounded-lg border border-dashed border-border px-3 py-5 text-center text-sm text-muted-foreground">
+          {t('carousel.empty')}
+        </p>
       ) : (
         <ol className="flex flex-col gap-2">
-          {items.map((item, index) => (
-            <li
-              key={index}
-              className="flex flex-col gap-1.5 rounded-md border border-border bg-card p-2"
-            >
-              <div className="flex items-center gap-1">
-                <span className="flex-1 text-xs font-medium text-muted-foreground">
-                  {t('carousel.item', { position: index + 1 })}
-                </span>
+          {items.map((item, index) => {
+            const asset = library.assets.find((candidate) => candidate.id === item.assetId);
+            const position = index + 1;
+            return (
+              <li key={index} className="flex gap-3 rounded-lg border border-border bg-card p-2">
+                <div className="flex shrink-0 flex-col gap-1.5">
+                  <button
+                    type="button"
+                    disabled={readOnly}
+                    onClick={() => setTarget({ kind: 'replace', index })}
+                    aria-label={t('carousel.image', { position })}
+                    className="group relative flex h-20 w-24 items-center justify-center overflow-hidden rounded-md bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default"
+                  >
+                    {asset !== undefined ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- küçük önizleme; optimize edici katmanı gereksiz.
+                      <img src={asset.url} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="flex flex-col items-center gap-1 px-1 text-center text-[10px] text-muted-foreground">
+                        <ImageOff aria-hidden="true" className="size-4" />
+                        {library.assets.length === 0 ? item.assetId.slice(0, 8) : t('asset.missing')}
+                      </span>
+                    )}
+                    {readOnly ? null : (
+                      <span className="absolute inset-x-0 bottom-0 bg-black/55 py-0.5 text-center text-[10px] font-medium text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                        {t('asset.change')}
+                      </span>
+                    )}
+                  </button>
+                  <span className="text-center text-[11px] text-muted-foreground">
+                    {t('carousel.item', { position })}
+                  </span>
+                </div>
+
+                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                  <label className="flex flex-col gap-0.5">
+                    <span className="text-xs text-muted-foreground">{t('carousel.alt')}</span>
+                    <input
+                      value={item.alt ?? ''}
+                      onChange={(event) => patch(index, { alt: event.target.value })}
+                      maxLength={LIMITS.alt}
+                      readOnly={readOnly}
+                      className="h-8 rounded-md border border-border bg-background px-2 text-sm"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-0.5">
+                    <span className="text-xs text-muted-foreground">{t('carousel.caption')}</span>
+                    <input
+                      value={item.caption ?? ''}
+                      onChange={(event) => patch(index, { caption: event.target.value })}
+                      maxLength={LIMITS.caption}
+                      readOnly={readOnly}
+                      className="h-8 rounded-md border border-border bg-background px-2 text-sm"
+                    />
+                  </label>
+                </div>
+
                 {readOnly ? null : (
-                  <>
+                  <div className="flex shrink-0 flex-col items-center gap-0.5">
                     <button
                       type="button"
                       ref={(node) => {
@@ -104,8 +171,8 @@ export function CarouselItems({
                       }}
                       onClick={() => move(index, -1)}
                       disabled={index === 0}
-                      aria-label={t('carousel.moveUp', { position: index + 1 })}
-                      className="rounded p-1 text-muted-foreground hover:bg-muted disabled:opacity-30"
+                      aria-label={t('carousel.moveUp', { position })}
+                      className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30"
                     >
                       <ChevronUp aria-hidden="true" className="h-4 w-4" />
                     </button>
@@ -113,109 +180,54 @@ export function CarouselItems({
                       type="button"
                       onClick={() => move(index, 1)}
                       disabled={index === items.length - 1}
-                      aria-label={t('carousel.moveDown', { position: index + 1 })}
-                      className="rounded p-1 text-muted-foreground hover:bg-muted disabled:opacity-30"
+                      aria-label={t('carousel.moveDown', { position })}
+                      className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30"
                     >
                       <ChevronDown aria-hidden="true" className="h-4 w-4" />
                     </button>
                     <button
                       type="button"
-                      onClick={() =>
-                        onChange(items.filter((_, position) => position !== index))
-                      }
-                      aria-label={t('carousel.remove', { position: index + 1 })}
-                      className="rounded p-1 text-muted-foreground hover:bg-muted"
+                      onClick={() => onChange(items.filter((_, other) => other !== index))}
+                      aria-label={t('carousel.remove', { position })}
+                      className="mt-auto rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                     >
                       <Trash2 aria-hidden="true" className="h-4 w-4" />
                     </button>
-                  </>
+                  </div>
                 )}
-              </div>
-
-              <label className="flex flex-col gap-1">
-                <span className="sr-only">{t('carousel.image', { position: index + 1 })}</span>
-                <select
-                  value={item.assetId}
-                  onChange={(event) => patch(index, { assetId: event.target.value })}
-                  disabled={readOnly}
-                  aria-label={t('carousel.image', { position: index + 1 })}
-                  className="h-9 rounded-md border border-border bg-card px-2 text-sm"
-                >
-                  {/*
-                    Kütüphanede olmayan bir kimlik (başka bir kullanıcının
-                    sildiği varlık) seçili kalabilir; onu bir seçenek olarak
-                    göstermeseydik `select` ilk ögeye kayar ve KULLANICI HİÇ
-                    DOKUNMADAN blok başka bir görseli işaret ederdi.
-                  */}
-                  {library.assets.some((asset) => asset.id === item.assetId) ? null : (
-                    <option value={item.assetId}>{item.assetId.slice(0, 8)}</option>
-                  )}
-                  {library.assets.map((asset) => (
-                    <option key={asset.id} value={asset.id}>
-                      {assetLabel(asset)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="flex flex-col gap-1">
-                <span className="text-xs text-muted-foreground">{t('carousel.alt')}</span>
-                <input
-                  value={item.alt ?? ''}
-                  onChange={(event) => patch(index, { alt: event.target.value })}
-                  maxLength={LIMITS.alt}
-                  readOnly={readOnly}
-                  className="h-9 rounded-md border border-border bg-card px-2 text-sm"
-                />
-              </label>
-
-              <label className="flex flex-col gap-1">
-                <span className="text-xs text-muted-foreground">{t('carousel.caption')}</span>
-                <input
-                  value={item.caption ?? ''}
-                  onChange={(event) => patch(index, { caption: event.target.value })}
-                  maxLength={LIMITS.caption}
-                  readOnly={readOnly}
-                  className="h-9 rounded-md border border-border bg-card px-2 text-sm"
-                />
-              </label>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ol>
       )}
 
       {readOnly ? null : (
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              disabled={full || library.assets.length === 0}
-              onClick={() => {
-                const first = library.assets[0];
-                if (first !== undefined) onChange([...items, { assetId: first.id }]);
-              }}
-            >
-              {t('carousel.add')}
-            </Button>
-            <input
-              type="file"
-              accept={ACCEPT_ATTRIBUTE}
-              onChange={(event) => void addUploaded(event)}
-              disabled={library.uploading || full}
-              aria-label={t('asset.upload')}
-              className="text-xs text-muted-foreground"
-            />
-          </div>
+        <>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="border-dashed"
+            disabled={full}
+            onClick={() => setTarget({ kind: 'add' })}
+          >
+            <Plus aria-hidden="true" className="size-4" />
+            {t('carousel.add')}
+          </Button>
           {full ? (
             <p className="text-xs text-muted-foreground">{t('carousel.full', { max: LIMITS.items })}</p>
           ) : null}
-        </div>
+          <AssetLibraryDialog
+            open={target !== null}
+            onOpenChange={(open) => !open && setTarget(null)}
+            library={library}
+            purpose="booking_gallery"
+            selectedId={selectedId}
+            onSelect={select}
+          />
+        </>
       )}
 
-      {library.uploading ? <p className="text-xs text-muted-foreground">{t('asset.uploading')}</p> : null}
-      {library.error !== null ? <Alert tone="danger">{library.error}</Alert> : null}
       {error !== undefined ? (
         <span role="alert" className="text-xs text-destructive">
           {error}

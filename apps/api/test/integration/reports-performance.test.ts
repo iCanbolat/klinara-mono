@@ -12,7 +12,6 @@ interface StaffPerformanceReport {
     staffName: string;
     completedServices: number;
     revenueMinor: number;
-    commissionMinor: number;
     bookedMinutes: number;
     occupancyRate: number;
   }[];

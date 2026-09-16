@@ -44,8 +44,7 @@ struct Phase5DecodingTests {
         #expect(pkg.status == .active)
         #expect(pkg.items.count == 2)
         #expect(pkg.remainingSessions == pkg.items.reduce(0) { $0 + $1.remainingSessions })
-        // Faz 6'ya bırakılan alanlar bu aşamada daima null geliyor.
-        #expect(pkg.refundSettlementStatus == nil)
+        // İade edilmemiş pakette iade alanları null.
         #expect(pkg.refundedAt == nil)
         #expect(pkg.transferredFromPackageId == nil)
         // Yükümlülük kalemlerin toplamı; sayaçtan değil tahsisten türetiliyor.

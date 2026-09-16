@@ -120,46 +120,18 @@ enum ReportFixtures {
       },
       "totals": {
         "accruedMinor": 350000,
-        "collectedMinor": 180000,
-        "refundedMinor": 0,
         "currency": "TRY"
       },
       "data": [
         {
           "groupId": null,
           "groupLabel": "—",
-          "accruedMinor": 250000,
-          "collectedMinor": 80000
+          "accruedMinor": 250000
         },
         {
           "groupId": "c8824957-3200-4b9d-b1f9-927cc793649c",
           "groupLabel": "Bölgesel Lazer",
-          "accruedMinor": 100000,
-          "collectedMinor": 100000
-        }
-      ]
-    }
-    """
-
-    static let revenueByMethod = """
-    {
-      "scope": "all",
-      "period": {
-        "from": "2020-01-01T00:00:00+03:00",
-        "to": "2099-01-01T00:00:00+03:00"
-      },
-      "totals": {
-        "accruedMinor": 350000,
-        "collectedMinor": 180000,
-        "refundedMinor": 0,
-        "currency": "TRY"
-      },
-      "data": [
-        {
-          "groupId": null,
-          "groupLabel": "card",
-          "accruedMinor": 0,
-          "collectedMinor": 180000
+          "accruedMinor": 100000
         }
       ]
     }
@@ -179,7 +151,6 @@ enum ReportFixtures {
           "staffName": "Demo Uygulayıcı",
           "completedServices": 2,
           "revenueMinor": 100000,
-          "commissionMinor": 0,
           "bookedMinutes": 60,
           "availableMinutes": 3240,
           "occupancyRate": 1.85
@@ -202,7 +173,6 @@ enum ReportFixtures {
           "staffName": "Demo Uygulayıcı",
           "completedServices": 2,
           "revenueMinor": 100000,
-          "commissionMinor": 0,
           "bookedMinutes": 60,
           "availableMinutes": 3240,
           "occupancyRate": 1.85

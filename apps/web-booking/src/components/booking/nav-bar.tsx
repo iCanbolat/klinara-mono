@@ -27,7 +27,7 @@ export function NavBar({
 }) {
   return (
     <div
-      className="sticky bottom-0 z-20 -mx-4 mt-2 flex items-center justify-between gap-3 border-t border-line bg-card/95 px-4 py-3 backdrop-blur-sm sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:backdrop-blur-none"
+      className="sticky bottom-0 z-20 -mx-4 mt-2 flex items-center justify-between gap-3 border-t border-line bg-card/95 px-4 py-3 backdrop-blur-sm sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:backdrop-blur-none"
       style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
     >
       <Button type="button" variant="ghost" disabled={!canGoBack} onClick={onBack}>

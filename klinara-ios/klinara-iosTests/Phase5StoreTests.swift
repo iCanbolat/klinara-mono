@@ -271,8 +271,6 @@ struct Phase5StoreTests {
         #expect(result.refundedSessions == 2)
         // Liste fiyatından değil, satış anındaki tahsisten.
         #expect(result.refundAmountMinor == unit * 2)
-        // Kasa hareketi yok: borç doğdu, tahsilat Faz 6.2'de bağlanacak.
-        #expect(result.settlementStatus == "pending")
         #expect(store.package(id: pkg.id)?.remainingSessions == pkg.remainingSessions - 2)
     }
 

@@ -4,6 +4,7 @@ import { createTestApp } from '../helpers/app';
 import { startTestDatabase, type TestDatabase } from '../helpers/database';
 import { auth, http, PLATFORM_TOKEN } from '../helpers/identity';
 import { branchHeader, setupClinic, type ClinicFixture } from '../helpers/clinic';
+import { insertCharge } from '../helpers/charges';
 
 const FROM = '2026-09-01T00:00:00+03:00';
 const TO = '2026-10-01T00:00:00+03:00';
@@ -49,16 +50,7 @@ describe('rapor CSV dışa aktarımı (Batch 10.1)', () => {
   });
 
   it('ciro dosyası indiriliyor: doğru tip, ad ve BOM', async () => {
-    await http(app)
-      .post('/api/v1/charges')
-      .set(ownerAuth())
-      .set(branch())
-      .send({
-        customerId: clinic.customer.id,
-        source: 'manual',
-        description: 'Kalem; virgüllü',
-        unitPriceMinor: 123_456,
-      });
+    await insertCharge(database.ownerPool, clinic, 123_456, 'Kalem; virgüllü');
 
     const res = await exportCsv('revenue');
 
@@ -72,23 +64,14 @@ describe('rapor CSV dışa aktarımı (Batch 10.1)', () => {
 
     const body = res.text;
     expect(body.charCodeAt(0)).toBe(0xfeff);
-    expect(body).toContain('Kırılım;Tahakkuk;Tahakkuk (kuruş)');
+    expect(body).toContain('Kırılım;Ciro;Ciro (kuruş)');
     // Para İKİ kolonda: insan için ondalık, makine için ham kuruş.
     expect(body).toContain('1234,56');
     expect(body).toContain('123456');
   });
 
   it('alan içindeki ayraç TIRNAKLANIYOR — sütun kaymıyor', async () => {
-    await http(app)
-      .post('/api/v1/charges')
-      .set(ownerAuth())
-      .set(branch())
-      .send({
-        customerId: clinic.customer.id,
-        source: 'manual',
-        description: 'Kalem',
-        unitPriceMinor: 1000,
-      });
+    await insertCharge(database.ownerPool, clinic, 1000, 'Kalem');
 
     const res = await exportCsv('revenue', { groupBy: 'branch' });
     expect(res.status).toBe(200);

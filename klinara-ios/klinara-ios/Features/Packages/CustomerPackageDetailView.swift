@@ -119,16 +119,11 @@ struct CustomerPackageDetailView: View {
         }
     }
 
-    /// İade edilmişse tutar ve **borcun kapanmadığı** görünmeli: kasa hareketi
-    /// Faz 6.2'de bağlanacak, o zamana kadar `pending` bir yükümlülük.
+    /// İade edilmişse seans sayısı ve bilgi amaçlı tutar görünür.
     private func refundFootnote(_ pkg: CustomerPackage) -> String? {
         guard pkg.refundedSessions > 0 else { return nil }
-        var text = "\(pkg.refundedSessions) seans iade edildi · "
+        return "\(pkg.refundedSessions) seans iade edildi · "
             + Money.format(minor: pkg.refundAmountMinor, currency: pkg.currency)
-        if pkg.refundSettlementStatus == "pending" {
-            text += " · Kasa hareketi henüz oluşturulmadı (Faz 6)."
-        }
-        return text
     }
 
     private func itemsCard(_ pkg: CustomerPackage) -> some View {

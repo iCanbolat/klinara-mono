@@ -181,7 +181,7 @@ export class UpdateTenantSettingsDto {
   maxAdvanceDays?: number;
 
   /**
-   * Yönetici rolleri (owner, manager, accountant) için 2FA zorunluluğu.
+   * Yönetici rolleri (owner, manager) için 2FA zorunluluğu.
    *
    * Açıldığında, TOTP'si olmayan yöneticiler girişte kurulum akışına düşer;
    * doğrulanmadan tam yetkili token ALMAZLAR.

@@ -57,17 +57,7 @@ export const PERMISSIONS = {
   PACKAGE_REFUND: 'package:refund',
   PACKAGE_TRANSFER: 'package:transfer',
 
-  // --- Finans ---
-  FINANCE_PAYMENT_READ: 'finance.payment:read',
-  FINANCE_PAYMENT_WRITE: 'finance.payment:write',
-  // Katalog fiyatının dışına çıkma. `finance.payment:write` üzerine BİNMEZ:
-  // gerekçe `package:refund` ile aynı — resepsiyonun günlük tahsilat iznine
-  // binen bir fiyat override'ı, yetkisiz indirim demektir.
-  FINANCE_PRICE_OVERRIDE: 'finance.price:override',
-  FINANCE_COMMISSION_READ: 'finance.commission:read',
-  // Prim kuralı yazmak ve dönem kapatmak. `:read` yalnız okuma sözleşmesidir;
-  // muhasebe primi GÖRÜR ama kuralını değiştiremez.
-  FINANCE_COMMISSION_WRITE: 'finance.commission:write',
+  // --- Raporlar ---
   REPORT_REVENUE_READ: 'report.revenue:read',
   /**
    * Uygulayıcının YALNIZ KENDİ performans raporunu görmesi (10.1).
@@ -121,7 +111,6 @@ export const ROLES = {
   MANAGER: 'manager',
   RECEPTIONIST: 'receptionist',
   PRACTITIONER: 'practitioner',
-  ACCOUNTANT: 'accountant',
 } as const;
 
 export type RoleKey = (typeof ROLES)[keyof typeof ROLES];
@@ -195,11 +184,6 @@ export const ROLE_DEFINITIONS: RoleDefinition[] = [
       P.PACKAGE_WRITE,
       P.PACKAGE_REFUND,
       P.PACKAGE_TRANSFER,
-      P.FINANCE_PAYMENT_READ,
-      P.FINANCE_PAYMENT_WRITE,
-      P.FINANCE_PRICE_OVERRIDE,
-      P.FINANCE_COMMISSION_READ,
-      P.FINANCE_COMMISSION_WRITE,
       P.REPORT_REVENUE_READ,
       P.CONSENT_MANAGE,
       P.NOTIFICATION_SEND,
@@ -207,25 +191,6 @@ export const ROLE_DEFINITIONS: RoleDefinition[] = [
       P.BOOKING_PAGE_READ,
       P.BOOKING_PAGE_MANAGE,
       P.AUDIT_READ,
-    ],
-  },
-  {
-    key: ROLES.ACCOUNTANT,
-    scope: 'tenant',
-    name: 'Muhasebe',
-    rank: 40,
-    // Tıbbi kayıt YOK. Muhasebenin sağlık verisine erişmesi için bir gerekçe
-    // olmadığı gibi, KVKK m.6 açısından erişimin dar tutulması yükümlülüktür.
-    permissions: [
-      P.TENANT_READ,
-      P.BRANCH_READ,
-      P.CUSTOMER_READ,
-      P.PACKAGE_READ,
-      P.PACKAGE_REFUND,
-      P.FINANCE_PAYMENT_READ,
-      P.FINANCE_PAYMENT_WRITE,
-      P.FINANCE_COMMISSION_READ,
-      P.REPORT_REVENUE_READ,
     ],
   },
   {
@@ -238,8 +203,6 @@ export const ROLE_DEFINITIONS: RoleDefinition[] = [
       P.BRANCH_READ,
       ...OPERATIONS,
       P.PACKAGE_WRITE,
-      P.FINANCE_PAYMENT_READ,
-      P.FINANCE_PAYMENT_WRITE,
       P.CONSENT_MANAGE,
       P.NOTIFICATION_SEND,
       P.BOOKING_PAGE_READ,

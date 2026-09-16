@@ -27,7 +27,7 @@ export interface StaffProfileWithUser {
  * `branchId` verilirse yalnız o şubeye AİT personel döner: ana şubesi o şube
  * olanlar VEYA o şubede aktif bir üyeliği (rolü) olanlar. Birden çok şubede
  * çalışan personel her şubenin listesinde görünür; kiracı kapsamlı roller
- * (owner, accountant) yalnız ana şubeleri eşleşirse listelenir.
+ * (owner) yalnız ana şubeleri eşleşirse listelenir.
  */
 export async function listStaffProfiles(
   tx: Tx,

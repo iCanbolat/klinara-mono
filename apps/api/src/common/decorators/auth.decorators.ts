@@ -53,7 +53,7 @@ export const RequireAnyPermission = (...permissions: Permission[]) =>
 /**
  * `X-Branch-Id` başlığını ZORUNLU kılar ve kullanıcının o şubede üyeliğini arar.
  *
- * Kiracı kapsamlı roller (owner, accountant) tüm şubeleri kapsar.
+ * Kiracı kapsamlı roller (owner) tüm şubeleri kapsar.
  */
 export const RequireBranchScope = () => SetMetadata(BRANCH_SCOPE_KEY, true);
 

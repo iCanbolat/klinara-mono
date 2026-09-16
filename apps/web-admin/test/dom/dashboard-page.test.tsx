@@ -185,7 +185,7 @@ describe('karşılama sayfası', () => {
   });
 
   it('izni olmayan kaynağa istek atmıyor ve kartını çizmiyor', async () => {
-    // Muhasebeci: ciro var, takvim yok.
+    // Yalnız ciro izni: takvim bölümleri istek atmamalı.
     permissions = [PERMISSIONS.REPORT_REVENUE_READ];
     render(<DashboardPage />);
 

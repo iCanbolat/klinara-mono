@@ -1,4 +1,5 @@
 import { RenderBlocks } from '@/components/blocks/registry';
+import { SiteFooter, SiteHeader } from '@/components/site-chrome';
 import { fetchServices, fetchSite } from '@/lib/api-server';
 
 /**
@@ -15,8 +16,12 @@ export default async function SitePage({ params }: { params: Promise<{ slug: str
   const [site, categories] = await Promise.all([fetchSite(slug), fetchServices(slug)]);
 
   return (
-    <main>
-      <RenderBlocks sections={site.sections} ctx={{ site, categories }} />
-    </main>
+    <>
+      <SiteHeader site={site} />
+      <main>
+        <RenderBlocks sections={site.sections} ctx={{ site, categories }} />
+      </main>
+      <SiteFooter site={site} />
+    </>
   );
 }

@@ -20,7 +20,7 @@ const CACHE_TTL_MS = 60_000;
  * 1. **Üyelik** — kullanıcının bu şubede rolü var mı? (`canAccessBranch`)
  * 2. **Aidiyet** — bu şube gerçekten bu kiracının mı?
  *
- * Faz 3'e kadar yalnız (1) sorulyordu; kiracı geneli roller (owner/accountant)
+ * Faz 3'e kadar yalnız (1) sorulyordu; kiracı geneli roller (owner)
  * `tenantWide` oldukları için YABANCI bir şube kimliğini de geçiriyordu. Sızıntı
  * yoktu (okuma RLS yüzünden boş küme, yazım kapsam trigger'ında `409`) ama
  * çağıran anlamsız bir hata alıyordu ve kontrol her modülde ayrı ayrı

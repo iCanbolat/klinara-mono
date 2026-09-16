@@ -46,7 +46,6 @@ enum RoleName {
         case "manager": "Yönetici"
         case "receptionist": "Resepsiyon"
         case "practitioner": "Uygulayıcı"
-        case "accountant": "Muhasebe"
         case "platform_admin": "Platform yöneticisi"
         default: key
         }
