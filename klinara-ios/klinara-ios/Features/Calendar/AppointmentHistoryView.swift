@@ -17,6 +17,7 @@ struct AppointmentHistoryView: View {
     var body: some View {
         KlinaraScreen(
             state: state,
+            skeleton: .rows,
             emptyCheck: \.isEmpty,
             emptyTitle: "Kayıt yok",
             emptyMessage: "Bu randevu için henüz bir olay kaydedilmemiş.",

@@ -202,11 +202,11 @@ internal object MockNotificationsSeed {
     private val DEFAULT_BODIES: List<Pair<NotificationEvent, List<Pair<NotificationChannel, String>>>> =
         listOf(
             NotificationEvent.AppointmentConfirmation to
-                smsEmail("Sayın {{customerName}}, {{appointmentAt}} randevunuz oluşturuldu. {{branchName}}"),
+                smsOnly("Sayın {{customerName}}, {{appointmentAt}} randevunuz oluşturuldu. {{branchName}}"),
             NotificationEvent.AppointmentReminder to
-                smsEmail("Sayın {{customerName}}, {{appointmentAt}} randevunuzu hatırlatırız. {{branchName}}"),
+                smsOnly("Sayın {{customerName}}, {{appointmentAt}} randevunuzu hatırlatırız. {{branchName}}"),
             NotificationEvent.AppointmentCancelled to
-                smsEmail("Sayın {{customerName}}, {{appointmentAt}} randevunuz iptal edilmiştir. {{branchName}}"),
+                smsOnly("Sayın {{customerName}}, {{appointmentAt}} randevunuz iptal edilmiştir. {{branchName}}"),
             NotificationEvent.NoShowFollowup to
                 listOf(
                     NotificationChannel.Sms to
@@ -214,9 +214,9 @@ internal object MockNotificationsSeed {
                             "{{branchName}} olarak yeni randevu için bekleriz.",
                 ),
             NotificationEvent.PackageBalance to
-                smsEmail("Sayın {{customerName}}, {{packageName}} paketinizde {{remainingSessions}} seans kaldı."),
+                smsOnly("Sayın {{customerName}}, {{packageName}} paketinizde {{remainingSessions}} seans kaldı."),
             NotificationEvent.PackageExpiring to
-                smsEmail("Sayın {{customerName}}, {{packageName}} paketiniz {{expiresAt}} tarihinde doluyor."),
+                smsOnly("Sayın {{customerName}}, {{packageName}} paketiniz {{expiresAt}} tarihinde doluyor."),
             NotificationEvent.Birthday to
                 listOf(NotificationChannel.Sms to "Sayın {{customerName}}, doğum gününüzü kutlarız! {{branchName}}"),
             NotificationEvent.AutoReply to
@@ -224,7 +224,8 @@ internal object MockNotificationsSeed {
             NotificationEvent.StaffInternal to listOf(NotificationChannel.Email to "{{message}}"),
         )
 
-    private fun smsEmail(body: String) = listOf(NotificationChannel.Sms to body, NotificationChannel.Email to body)
+    /** Müşteri olaylarının varsayılan gövdesi yalnız SMS'te durur; WhatsApp metni Meta'dan gelir. */
+    private fun smsOnly(body: String) = listOf(NotificationChannel.Sms to body)
 
     /**
      * Kiracı doğum günü mesajını kapatmış (`channels: []`) ve randevu hatırlatmasında sessiz
@@ -236,7 +237,7 @@ internal object MockNotificationsSeed {
                 preferenceId = "e5000000-0000-4000-8000-000000000001",
                 event = NotificationEvent.AppointmentReminder,
                 kind = NotificationKind.Transactional,
-                channels = listOf(NotificationChannel.WhatsApp, NotificationChannel.Email),
+                channels = listOf(NotificationChannel.WhatsApp, NotificationChannel.Sms),
                 quietHoursStart = "22:00",
                 quietHoursEnd = "08:00",
             ),

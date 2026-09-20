@@ -8,8 +8,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
-
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -26,12 +27,16 @@ import androidx.compose.ui.unit.dp
 import com.klinara.android.designsystem.KlinaraMetrics
 import com.klinara.android.designsystem.KlinaraTheme
 import com.klinara.android.designsystem.KlinaraType
+import com.klinara.android.designsystem.components.EmptyStateView
 import com.klinara.android.designsystem.components.ErrorBanner
 import com.klinara.android.designsystem.components.KlinaraButton
 import com.klinara.android.designsystem.components.KlinaraButtonKind
 import com.klinara.android.designsystem.components.KlinaraCard
 import com.klinara.android.designsystem.components.KlinaraScreen
+import com.klinara.android.designsystem.components.KlinaraSkeleton
+import com.klinara.android.designsystem.components.KlinaraSkeletonStyle
 import com.klinara.android.designsystem.components.KlinaraTextField
+import com.klinara.android.designsystem.components.KlinaraToolbarAction
 import com.klinara.android.designsystem.components.klinaraClickable
 import com.klinara.android.services.files.FileGroup
 import com.klinara.android.services.files.FilePosition
@@ -61,22 +66,33 @@ fun PhotoGroupsScreen(
     val colors = KlinaraTheme.colors
     var showEditor by remember { mutableStateOf(false) }
 
-    KlinaraScreen(title = "Öncesi / sonrası", modifier = modifier, onBack = onBack) {
+    KlinaraScreen(
+        title = "Öncesi / sonrası",
+        modifier = modifier,
+        onBack = onBack,
+        trailing = {
+            if (canWriteMedical) {
+                KlinaraToolbarAction(contentDescription = "Yeni grup", onClick = { showEditor = true })
+            }
+        },
+    ) {
         error?.let { ErrorBanner(message = it, retryLabel = "Kapat", onRetry = onDismissError) }
 
         when (groups) {
             Loadable.Loading ->
-                Text("Yükleniyor…", style = KlinaraType.bodyM, color = colors.charcoalMuted)
+                KlinaraSkeleton(style = KlinaraSkeletonStyle.cardsShort)
 
             is Loadable.Failed -> ErrorBanner(message = groups.message)
 
             is Loadable.Loaded ->
                 if (groups.value.isEmpty()) {
-                    Text(
-                        "Henüz karşılaştırma grubu yok. Bir grup açıp öncesi ve sonrası " +
-                            "fotoğraflarını yan yana tutabilirsiniz.",
-                        style = KlinaraType.bodyM,
-                        color = colors.charcoalMuted,
+                    EmptyStateView(
+                        title = "Karşılaştırma grubu yok",
+                        message =
+                            "Bir grup açıp öncesi ve sonrası fotoğraflarını yan yana tutabilirsiniz.",
+                        icon = Icons.Filled.Share,
+                        actionTitle = if (canWriteMedical) "Yeni grup" else null,
+                        onAction = if (canWriteMedical) ({ showEditor = true }) else null,
                     )
                 } else {
                     groups.value.forEach { group ->
@@ -89,15 +105,6 @@ fun PhotoGroupsScreen(
                         )
                     }
                 }
-        }
-
-        if (canWriteMedical) {
-            KlinaraButton(
-                title = "Yeni grup",
-                onClick = { showEditor = true },
-                kind = KlinaraButtonKind.Secondary,
-                modifier = Modifier.fillMaxWidth(),
-            )
         }
     }
 

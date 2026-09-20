@@ -1,6 +1,7 @@
 package com.klinara.android.features.notifications
 
 import com.klinara.android.services.integrations.MockWhatsAppService
+import com.klinara.android.services.formatting.BranchClock
 import com.klinara.android.services.networking.Loadable
 import com.klinara.android.services.notifications.Message
 import com.klinara.android.services.notifications.MessageFilter
@@ -91,10 +92,85 @@ class MessageLogViewModelTest {
             advanceUntilIdle()
 
             viewModel.setStatus(MessageStatusFilter.All)
-            viewModel.setChannel(MessageChannelFilter.All)
+            viewModel.clearFilters()
             advanceUntilIdle()
 
             assertEquals(1, counting.calls)
+        }
+
+    @Test
+    @DisplayName("Özet sayaçları yüklenmiş satırlardan çıkar")
+    fun summaryCountsLoadedRows() =
+        runTest(dispatcher) {
+            val viewModel = MessageLogViewModel(messages())
+            viewModel.load()
+            advanceUntilIdle()
+
+            val state = viewModel.state.value
+            val rows = state.rows
+            assertEquals(rows.size, state.summary.total)
+            assertEquals(rows.count { it.status == MessageStatus.Failed }, state.summary.failed)
+            assertEquals(rows.count { it.status == MessageStatus.Skipped }, state.summary.skipped)
+        }
+
+    @Test
+    @DisplayName("Satırlar şube saatinde güne göre gruplanır; sıra korunur")
+    fun groupsByBranchDay() =
+        runTest(dispatcher) {
+            val viewModel = MessageLogViewModel(messages())
+            viewModel.load()
+            advanceUntilIdle()
+
+            val clock = BranchClock("Europe/Istanbul")
+            val groups = viewModel.state.value.groups(clock)
+
+            // Gruplar en yeniden eskiye: sunucunun sırası korunuyor, yeniden sıralanmıyor.
+            assertEquals(groups.map { it.day }.sortedDescending(), groups.map { it.day })
+            // Hiçbir satır kaybolmadı, hiçbiri iki gruba düşmedi.
+            assertEquals(viewModel.state.value.rows, groups.flatMap { it.messages })
+            // Bir grubun içindeki her satır gerçekten o güne ait.
+            groups.forEach { group ->
+                group.messages.forEach { assertEquals(group.day, clock.startOfDay(it.createdAt)) }
+            }
+        }
+
+    @Test
+    @DisplayName("Süzgeçleri temizlemek durum ve olayı birlikte sıfırlar")
+    fun clearFiltersResetsBoth() =
+        runTest(dispatcher) {
+            val viewModel = MessageLogViewModel(messages())
+            viewModel.load()
+            advanceUntilIdle()
+
+            viewModel.setStatus(MessageStatusFilter.Failed)
+            viewModel.toggleEvent(NotificationEvent.AppointmentReminder)
+            advanceUntilIdle()
+            assertTrue(viewModel.state.value.filter.hasUserFilters)
+
+            viewModel.clearFilters()
+            advanceUntilIdle()
+
+            val state = viewModel.state.value
+            assertEquals(MessageStatusFilter.All, state.status)
+            assertNull(state.event)
+            assertFalse(state.filter.hasUserFilters)
+        }
+
+    @Test
+    @DisplayName("Özet şeridinde seçili sayaca ikinci dokunuş süzgeci kaldırır")
+    fun toggleStatusClearsWhenRepeated() =
+        runTest(dispatcher) {
+            val viewModel = MessageLogViewModel(messages())
+            viewModel.load()
+            advanceUntilIdle()
+
+            viewModel.toggleStatus(MessageStatusFilter.Failed)
+            advanceUntilIdle()
+            assertEquals(MessageStatusFilter.Failed, viewModel.state.value.status)
+
+            viewModel.toggleStatus(MessageStatusFilter.Failed)
+            advanceUntilIdle()
+            assertEquals(MessageStatusFilter.All, viewModel.state.value.status)
         }
 
     @Test

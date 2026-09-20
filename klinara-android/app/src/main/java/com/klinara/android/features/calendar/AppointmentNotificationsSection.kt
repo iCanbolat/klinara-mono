@@ -21,6 +21,7 @@ import com.klinara.android.designsystem.components.ErrorBanner
 import com.klinara.android.designsystem.components.KlinaraBadge
 import com.klinara.android.designsystem.components.KlinaraCard
 import com.klinara.android.designsystem.components.KlinaraDivider
+import com.klinara.android.designsystem.components.KlinaraSkeletonSection
 import com.klinara.android.services.ServiceContainer
 import com.klinara.android.services.formatting.BranchClock
 import com.klinara.android.services.networking.Loadable
@@ -64,7 +65,7 @@ fun AppointmentNotificationsSection(
     ) {
         when (val state = rows) {
             Loadable.Loading ->
-                Text("Yükleniyor…", style = KlinaraType.bodyM, color = KlinaraTheme.colors.charcoalMuted)
+                KlinaraSkeletonSection()
             is Loadable.Failed ->
                 ErrorBanner(message = state.message, onRetry = if (state.isRetryable) viewModel::load else null)
             is Loadable.Loaded ->

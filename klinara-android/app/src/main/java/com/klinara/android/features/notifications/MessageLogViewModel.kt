@@ -4,13 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.klinara.android.services.ServiceContainer
+import com.klinara.android.services.formatting.BranchClock
 import com.klinara.android.services.networking.ApiError
 import com.klinara.android.services.networking.Loadable
 import com.klinara.android.services.notifications.Message
 import com.klinara.android.services.notifications.MessageFilter
 import com.klinara.android.services.notifications.MessageStatus
 import com.klinara.android.services.notifications.MessagesService
-import com.klinara.android.services.notifications.NotificationChannel
 import com.klinara.android.services.notifications.NotificationEvent
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.Instant
 
 /**
  * Durum süzgeci. Seçicide dört seçenek var; "Gönderilmedi" kesiliyordu, iOS gibi "Atlandı".
@@ -35,19 +36,38 @@ enum class MessageStatusFilter(
     Delivered("Ulaştı", MessageStatus.Delivered),
 }
 
-/** Yalnız gerçekten gönderim yapan kanallar: SMS ve push'un sağlayıcısı yok (Ek M), boş liste üretirlerdi. */
-enum class MessageChannelFilter(
+/** Bir gün başlığı ve altındaki mesajlar. */
+data class MessageDayGroup(
+    /** Şube saatinde günün başlangıcı — sıralama ve kimlik. */
+    val day: Instant,
     val title: String,
-    val value: NotificationChannel?,
+    val messages: List<Message>,
+)
+
+/**
+ * Yüklenmiş satırlardan çıkarılan sayaçlar.
+ *
+ * **Kapsamı yüklenmiş sayfalardır**, tüm günlük değil: sunucuda sayaç ucu yok ve açmıyoruz
+ * (Kural 1). Ekran bu yüzden kapsamı yazıyla söyler — yanlış bir toplam göstermektense neyin
+ * sayıldığını söylemek.
+ */
+data class MessageLogSummary(
+    val total: Int = 0,
+    val failed: Int = 0,
+    val skipped: Int = 0,
 ) {
-    All("Tüm kanallar", null),
-    WhatsApp("WhatsApp", NotificationChannel.WhatsApp),
-    Email("E-posta", NotificationChannel.Email),
+    companion object {
+        fun of(messages: List<Message>): MessageLogSummary =
+            MessageLogSummary(
+                total = messages.size,
+                failed = messages.count { it.status == MessageStatus.Failed },
+                skipped = messages.count { it.status == MessageStatus.Skipped },
+            )
+    }
 }
 
 data class MessageLogUiState(
     val status: MessageStatusFilter = MessageStatusFilter.All,
-    val channel: MessageChannelFilter = MessageChannelFilter.All,
     val event: NotificationEvent? = null,
     val messages: Loadable<List<Message>> = Loadable.Loading,
     val nextCursor: String? = null,
@@ -55,8 +75,27 @@ data class MessageLogUiState(
     /** Sonraki sayfa düştü — satırlar KORUNUR, listenin sonunda "Tekrar dene" çizilir. */
     val loadMoreError: String? = null,
 ) {
+    /**
+     * **Kanal süzgeci yok.** Klinik müşterisiyle yalnız WhatsApp üzerinden yazışıyor; tek
+     * seçenekli bir süzgeç listeden fazla yer tutan bir yanıltma olurdu. Alan modelde duruyor
+     * (uç hâlâ destekliyor) ama ekran onu set etmiyor: geçmişteki e-posta kayıtları günlükte
+     * görünmeye devam etsin.
+     */
     val filter: MessageFilter
-        get() = MessageFilter(channel = channel.value, event = event, status = status.value)
+        get() = MessageFilter(event = event, status = status.value)
+
+    val rows: List<Message> get() = messages.valueOrNull.orEmpty()
+
+    val summary: MessageLogSummary get() = MessageLogSummary.of(rows)
+
+    /**
+     * Güne göre gruplanmış satırlar — sunucu zaten en yeniden eskiye sıralı döndürüyor, bu
+     * yüzden görülme sırası korunur ve yeniden sıralanmaz.
+     */
+    fun groups(clock: BranchClock): List<MessageDayGroup> =
+        rows
+            .groupBy { clock.startOfDay(it.createdAt) }
+            .map { (day, messages) -> MessageDayGroup(day, clock.relativeDayLabel(day), messages) }
 }
 
 /**
@@ -133,7 +172,17 @@ class MessageLogViewModel(
 
     fun setStatus(status: MessageStatusFilter) = applyIfChanged { it.copy(status = status) }
 
-    fun setChannel(channel: MessageChannelFilter) = applyIfChanged { it.copy(channel = channel) }
+    /** Özet şeridinden gelen "seçiliyse kaldır" davranışı da buradan geçer. */
+    fun toggleStatus(status: MessageStatusFilter) =
+        applyIfChanged { it.copy(status = if (it.status == status) MessageStatusFilter.All else status) }
+
+    fun clearFilters() = applyIfChanged { it.copy(status = MessageStatusFilter.All, event = null) }
+
+    /** "Tekrar dene": hatayı temizler ve aynı sayfayı yeniden ister. */
+    fun retryLoadMore() {
+        _state.update { it.copy(loadMoreError = null) }
+        loadMore()
+    }
 
     /** Seçili çipe tekrar dokunmak süzgeci kaldırır. */
     fun toggleEvent(event: NotificationEvent) =

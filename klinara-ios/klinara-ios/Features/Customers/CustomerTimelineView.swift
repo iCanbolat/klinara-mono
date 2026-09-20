@@ -27,10 +27,7 @@ struct CustomerTimelineView: View {
         switch record.timeline {
         case .loading:
             KlinaraCard(title: "Zaman çizelgesi") {
-                ProgressView()
-                    .tint(KlinaraColor.sage)
-                    .frame(maxWidth: .infinity)
-                    .padding(KlinaraMetrics.lg)
+                KlinaraSkeletonSection()
             }
 
         case .failed(let error):

@@ -2,6 +2,7 @@ package com.klinara.android.designsystem.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -22,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.klinara.android.designsystem.KlinaraMetrics
@@ -111,7 +113,13 @@ fun KlinaraRow(
     }
 }
 
-/** Tıklanabilir satır — bir sonraki ekrana götürür. */
+/**
+ * Tıklanabilir satır — bir sonraki ekrana götürür.
+ *
+ * [icon] iOS `KlinaraNavigationRow`'un `icon:` parametresinin karşılığı: baştaki 24dp'lik
+ * sabit yuvada, `sageDeep` tonunda bir sembol. Null geçen çağıranlar (liste satırları)
+ * bugünkü görünümü aynen korur — ikon yalnız hub satırlarının işine yarar.
+ */
 @Composable
 fun KlinaraNavigationRow(
     label: String,
@@ -120,6 +128,7 @@ fun KlinaraNavigationRow(
     value: String? = null,
     detail: String? = null,
     enabled: Boolean = true,
+    @DrawableRes icon: Int? = null,
 ) {
     val colors = KlinaraTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
@@ -132,7 +141,16 @@ fun KlinaraNavigationRow(
                 .klinaraClickable(enabled, Role.Button, interactionSource, onClick)
                 .padding(vertical = KlinaraMetrics.sm),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(KlinaraMetrics.md),
     ) {
+        if (icon != null) {
+            Icon(
+                painter = painterResource(icon),
+                contentDescription = null,
+                tint = if (enabled) colors.sageDeep else colors.charcoalMuted,
+                modifier = Modifier.size(ROW_ICON_SIZE),
+            )
+        }
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 label,
@@ -156,3 +174,4 @@ fun KlinaraNavigationRow(
 }
 
 private val CHEVRON_SIZE = 20.dp
+private val ROW_ICON_SIZE = 22.dp

@@ -37,12 +37,15 @@ struct CustomerTagListView: View {
     var body: some View {
         KlinaraScreen(
             state: store.tagState,
+            skeleton: .rows,
             emptyCheck: \.isEmpty,
             emptyTitle: "Etiket yok",
             emptyMessage: canWrite
                 ? "Sağ üstteki artı ile ilk etiketi oluşturun."
                 : "Henüz etiket tanımlanmamış.",
             emptyIcon: "tag",
+            emptyActionTitle: canWrite ? "Yeni etiket" : nil,
+            emptyAction: canWrite ? { editing = .create } : nil,
             onRetry: { await store.loadTags(force: true) }
         ) { tags in
             if let error {

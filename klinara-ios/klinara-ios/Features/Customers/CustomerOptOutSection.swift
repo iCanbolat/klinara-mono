@@ -41,10 +41,7 @@ struct CustomerOptOutSection: View {
     private var content: some View {
         switch store.state {
         case .loading:
-            ProgressView()
-                .tint(KlinaraColor.sage)
-                .frame(maxWidth: .infinity)
-                .padding(KlinaraMetrics.lg)
+            KlinaraSkeletonSection(hasDetail: false)
 
         case .failed(let failure):
             ErrorBanner(error: failure, onRetry: { Task { await store.load() } })

@@ -25,11 +25,13 @@ import com.klinara.android.designsystem.components.KlinaraButtonKind
 import com.klinara.android.designsystem.components.KlinaraCard
 import com.klinara.android.designsystem.components.KlinaraRow
 import com.klinara.android.designsystem.components.KlinaraScreen
+import com.klinara.android.designsystem.components.KlinaraSkeleton
+import com.klinara.android.designsystem.components.KlinaraSkeletonStyle
 import com.klinara.android.designsystem.components.PhoneNumber
 import com.klinara.android.features.auth.AppSession
 import com.klinara.android.features.customers.files.CustomerFilesSection
-import com.klinara.android.features.packages.CustomerPackagesCard
 import com.klinara.android.features.customers.files.CustomerFilesViewModel
+import com.klinara.android.features.packages.CustomerPackagesCard
 import com.klinara.android.services.ServiceContainer
 import com.klinara.android.services.contracts.Permissions
 import com.klinara.android.services.crm.Customer
@@ -119,12 +121,7 @@ fun CustomerDetailScreen(
             }
 
             when (val loadable = state.customer) {
-                Loadable.Loading ->
-                    Text(
-                        text = "Yükleniyor…",
-                        style = KlinaraType.bodyM,
-                        color = KlinaraTheme.colors.charcoalMuted,
-                    )
+                Loadable.Loading -> KlinaraSkeleton(style = KlinaraSkeletonStyle.detail)
 
                 is Loadable.Failed ->
                     ErrorBanner(

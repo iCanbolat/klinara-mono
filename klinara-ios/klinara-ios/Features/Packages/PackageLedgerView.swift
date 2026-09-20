@@ -17,10 +17,7 @@ struct PackageLedgerView: View {
         switch store.ledger(for: packageId) {
         case .loading:
             KlinaraCard(title: "Defter") {
-                ProgressView()
-                    .tint(KlinaraColor.sage)
-                    .frame(maxWidth: .infinity)
-                    .padding(KlinaraMetrics.lg)
+                KlinaraSkeletonSection()
             }
 
         case .failed(let error):

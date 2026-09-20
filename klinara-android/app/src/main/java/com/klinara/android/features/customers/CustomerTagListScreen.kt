@@ -28,7 +28,10 @@ import com.klinara.android.designsystem.components.KlinaraButtonKind
 import com.klinara.android.designsystem.components.KlinaraCard
 import com.klinara.android.designsystem.components.KlinaraNavigationRow
 import com.klinara.android.designsystem.components.KlinaraScreen
+import com.klinara.android.designsystem.components.KlinaraSkeleton
+import com.klinara.android.designsystem.components.KlinaraSkeletonStyle
 import com.klinara.android.designsystem.components.KlinaraTextField
+import com.klinara.android.designsystem.components.KlinaraToolbarAction
 import com.klinara.android.features.auth.AppSession
 import com.klinara.android.services.ServiceContainer
 import com.klinara.android.services.contracts.Permissions
@@ -61,7 +64,12 @@ fun CustomerTagListScreen(
             title = "Müşteri etiketleri",
             modifier = modifier,
             onBack = onBack,
-            trailing = trailing,
+            trailing = {
+                if (canWrite) {
+                    KlinaraToolbarAction(contentDescription = "Yeni etiket", onClick = viewModel::startCreate)
+                }
+                trailing?.invoke(this)
+            },
         ) {
             state.error?.let {
                 ErrorBanner(message = it, retryLabel = "Kapat", onRetry = viewModel::dismissError)
@@ -71,17 +79,9 @@ fun CustomerTagListScreen(
                 tags = state.tags,
                 canWrite = canWrite,
                 onEdit = viewModel::startEdit,
+                onCreate = viewModel::startCreate,
                 onRetry = viewModel::load,
             )
-
-            if (canWrite) {
-                KlinaraButton(
-                    title = "Yeni etiket",
-                    onClick = viewModel::startCreate,
-                    kind = KlinaraButtonKind.Secondary,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
         }
 
         if (state.isSaving) AuthLoadingOverlay(message = "Kaydediliyor…")
@@ -129,11 +129,12 @@ private fun TagListBody(
     tags: Loadable<List<CustomerTag>>,
     canWrite: Boolean,
     onEdit: (CustomerTag) -> Unit,
+    onCreate: () -> Unit,
     onRetry: () -> Unit,
 ) {
     when (tags) {
         Loadable.Loading ->
-            Text("Yükleniyor…", style = KlinaraType.bodyM, color = KlinaraTheme.colors.charcoalMuted)
+            KlinaraSkeleton(style = KlinaraSkeletonStyle.rows)
 
         is Loadable.Failed ->
             ErrorBanner(message = tags.message, onRetry = if (tags.isRetryable) onRetry else null)
@@ -149,6 +150,8 @@ private fun TagListBody(
                             "Bu kiracıda tanımlı müşteri etiketi bulunmuyor."
                         },
                     icon = Icons.Filled.Info,
+                    actionTitle = if (canWrite) "Yeni etiket" else null,
+                    onAction = if (canWrite) onCreate else null,
                 )
             } else {
                 KlinaraCard(

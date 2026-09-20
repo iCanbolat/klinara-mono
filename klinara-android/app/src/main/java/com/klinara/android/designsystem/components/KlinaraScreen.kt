@@ -19,6 +19,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Icon
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -56,23 +57,46 @@ fun KlinaraScreen(
     contentPadding: PaddingValues = defaultContentPadding(),
     verticalSpacing: Dp = KlinaraMetrics.lg,
     trailing: @Composable (RowScope.() -> Unit)? = null,
+    /**
+     * Aşağı çekerek yenileme — iOS `.refreshable` paritesi.
+     *
+     * Ekrana bir "Yenile" düğmesi koymak, her açılışta yer kaplayan ve yalnız ağ bir kez
+     * düştüğünde işe yarayan bir kalıcı kontrol demekti; jest, kaydırılan içeriğin doğal
+     * devamı. Hata sonrası yeniden deneme yolu `ErrorBanner(onRetry)`de kalır.
+     */
+    onRefresh: (() -> Unit)? = null,
+    isRefreshing: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(modifier = modifier.fillMaxSize().statusBarsPadding()) {
         TopBar(title = title, onBack = onBack, trailing = trailing)
 
-        val bodyModifier =
-            Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .let { if (scrollable) it.verticalScroll(rememberScrollState()) else it }
-                .padding(contentPadding)
+        // Kaydırma durumu KOŞULSUZ hatırlanır: `remember` bir koşulun içinde çağrılınca
+        // `scrollable` değiştiğinde (takvim gün↔hafta) kompozisyon ağacı yeniden kuruluyordu.
+        val scrollState = rememberScrollState()
+        val bodyContent: @Composable (Modifier) -> Unit = { bodyModifier ->
+            Column(
+                modifier =
+                    bodyModifier
+                        .fillMaxWidth()
+                        .let { if (scrollable) it.verticalScroll(scrollState) else it }
+                        .padding(contentPadding),
+                verticalArrangement = Arrangement.spacedBy(verticalSpacing),
+                content = content,
+            )
+        }
 
-        Column(
-            modifier = bodyModifier,
-            verticalArrangement = Arrangement.spacedBy(verticalSpacing),
-            content = content,
-        )
+        if (onRefresh != null) {
+            PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = onRefresh,
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+            ) {
+                bodyContent(Modifier.fillMaxSize())
+            }
+        } else {
+            bodyContent(Modifier.weight(1f))
+        }
     }
 }
 

@@ -9,13 +9,13 @@ import Testing
 @Suite("CalendarStore")
 struct CalendarStoreTests {
 
-    private func makeStore(_ graph: MockGraph) async -> CalendarStore {
+    private func makeStore(_ graph: MockGraph, today: Date? = nil) async -> CalendarStore {
         let catalog = CatalogStore(service: graph.catalog)
         await catalog.load()
         let store = CalendarStore(
             service: graph.booking,
             catalog: catalog,
-            today: graph.workingTuesday()
+            today: today ?? graph.workingTuesday()
         )
         store.cacheCustomers(graph.customers.snapshot)
         return store
@@ -194,7 +194,9 @@ struct CalendarStoreTests {
     @Test("Hafta yanıtı yoğunluğu gün ve saat kırılımında verir")
     func weekLoadFillsDensity() async {
         let graph = MockGraph(scenario: .busyDay)
-        let store = await makeStore(graph)
+        // Tohum randevular ``MockNow/reference`` gününde; sabit salıya
+        // bakarsak istenen hafta o günü hiç kapsamaz ve yoğunluk boş gelir.
+        let store = await makeStore(graph, today: graph.seededDay)
         store.mode = .week
         await store.load(branchId: MockGraph.branchId, clock: graph.clock)
 

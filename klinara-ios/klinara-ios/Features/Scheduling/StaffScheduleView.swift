@@ -53,7 +53,7 @@ struct StaffScheduleView: View {
     private var content: some View {
         switch state {
         case .loading:
-            ProgressView().tint(KlinaraColor.sage).frame(maxWidth: .infinity, maxHeight: .infinity)
+            KlinaraSkeletonView(style: .rowsLong)
 
         case .failed(let failure):
             VStack {

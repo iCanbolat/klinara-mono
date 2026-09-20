@@ -21,21 +21,21 @@ object NotificationEventCatalog {
         val variables: List<String>,
     )
 
-    private val whatsappSmsEmail =
-        listOf(NotificationChannel.WhatsApp, NotificationChannel.Sms, NotificationChannel.Email)
+    // Müşteriye e-posta GİTMEZ: klinik müşterisiyle yalnız WhatsApp üzerinden yazışır.
+    // `StaffInternal` bir istisna değil, farklı bir alıcı — personele giden iç bildirim.
     private val whatsappSms = listOf(NotificationChannel.WhatsApp, NotificationChannel.Sms)
     private val appointmentVariables = listOf("customerName", "branchName", "appointmentAt", "serviceName")
 
     val definitions: Map<NotificationEvent, Definition> =
         mapOf(
             NotificationEvent.AppointmentConfirmation to
-                Definition(NotificationKind.Transactional, whatsappSmsEmail, appointmentVariables),
+                Definition(NotificationKind.Transactional, whatsappSms, appointmentVariables),
             NotificationEvent.AppointmentReminder to
-                Definition(NotificationKind.Transactional, whatsappSmsEmail, appointmentVariables),
+                Definition(NotificationKind.Transactional, whatsappSms, appointmentVariables),
             NotificationEvent.AppointmentCancelled to
                 Definition(
                     NotificationKind.Transactional,
-                    whatsappSmsEmail,
+                    whatsappSms,
                     listOf("customerName", "branchName", "appointmentAt"),
                 ),
             NotificationEvent.NoShowFollowup to
@@ -43,13 +43,13 @@ object NotificationEventCatalog {
             NotificationEvent.PackageBalance to
                 Definition(
                     NotificationKind.Transactional,
-                    whatsappSmsEmail,
+                    whatsappSms,
                     listOf("customerName", "packageName", "remainingSessions"),
                 ),
             NotificationEvent.PackageExpiring to
                 Definition(
                     NotificationKind.Transactional,
-                    whatsappSmsEmail,
+                    whatsappSms,
                     listOf("customerName", "packageName", "expiresAt", "remainingSessions"),
                 ),
             NotificationEvent.Birthday to

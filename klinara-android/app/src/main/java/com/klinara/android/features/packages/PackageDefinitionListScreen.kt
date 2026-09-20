@@ -1,5 +1,6 @@
 package com.klinara.android.features.packages
 
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -8,19 +9,20 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -36,12 +38,15 @@ import com.klinara.android.designsystem.components.KlinaraBadgeTone
 import com.klinara.android.designsystem.components.KlinaraButton
 import com.klinara.android.designsystem.components.KlinaraButtonKind
 import com.klinara.android.designsystem.components.KlinaraCard
-import com.klinara.android.designsystem.components.KlinaraDivider
-import com.klinara.android.designsystem.components.KlinaraNavigationRow
+import com.klinara.android.designsystem.components.KlinaraCheckMenuItem
+import com.klinara.android.designsystem.components.KlinaraIcons
+import com.klinara.android.designsystem.components.KlinaraOverflowMenu
 import com.klinara.android.designsystem.components.KlinaraScreen
-import com.klinara.android.designsystem.components.KlinaraSegmentedPicker
-import com.klinara.android.designsystem.components.KlinaraTextField
-import com.klinara.android.designsystem.components.KlinaraToggleRow
+import com.klinara.android.designsystem.components.KlinaraSearchField
+import com.klinara.android.designsystem.components.KlinaraSkeleton
+import com.klinara.android.designsystem.components.KlinaraSkeletonStyle
+import com.klinara.android.designsystem.components.KlinaraToolbarAction
+import com.klinara.android.designsystem.components.klinaraClickable
 import com.klinara.android.features.auth.AppSession
 import com.klinara.android.services.ServiceContainer
 import com.klinara.android.services.contracts.Permissions
@@ -58,9 +63,14 @@ import com.klinara.android.services.packages.PackageDefinition
  * `package:read` görür, `package:write` değiştirir. Yazma izni olmayanda "Yeni paket" ve
  * "Emekliye ayır" HİÇ çizilmez; satır yine açılır ama editör salt okunur.
  *
+ * **Kontroller gövdede değil üst çubukta** (iOS kalıbı): arama ince bir şerit, "pasifleri
+ * göster" ve şube kapsamı `KlinaraOverflowMenu` içinde. Üçü de gövdedeyken listeden önce
+ * üç satır kontrol geliyordu ve ilk paket ekranın dışında kalıyordu.
+ *
  * **iOS'tan sapma:** iOS emekliye ayırmayı `swipeActions`'a koyuyor. Android'de kaydırma
  * jesti yerleşik bir keşif kalıbı değil ve TalkBack kullanıcısına hiç görünmez; eylem
- * kartın içinde açık bir düğme.
+ * satırın kendi "⋮" menüsünde — kartın içindeki tam genişlikte düğme, listeyi her satırda
+ * ikiye bölüyordu.
  */
 @Composable
 fun PackageDefinitionListScreen(
@@ -78,42 +88,53 @@ fun PackageDefinitionListScreen(
 
     // Varsayılan KAPALI: tanım ekranı bir yönetim ekranı ve çoğu paket şube kısıtı taşımıyor.
     var scopedToBranch by rememberSaveable { mutableStateOf(false) }
+    var showsInactive by rememberSaveable { mutableStateOf(false) }
+    var query by rememberSaveable { mutableStateOf("") }
     val scope = if (scopedToBranch) session.activeBranchId else null
 
     // Editörden dönüşte de koşar (gezinme bu ekranı yeniden kurar) ve sessizce tazeler.
     LaunchedEffect(scope) { viewModel.ensureScope(scope) }
 
     Box {
-        KlinaraScreen(title = "Paketler", modifier = modifier, onBack = onBack, trailing = trailing) {
+        KlinaraScreen(
+            title = "Paketler",
+            modifier = modifier,
+            onBack = onBack,
+            trailing = {
+                if (canWrite) KlinaraToolbarAction(contentDescription = "Yeni paket", onClick = { onOpen(null) })
+                KlinaraOverflowMenu {
+                    KlinaraCheckMenuItem(
+                        label = "Pasifleri göster",
+                        isChecked = showsInactive,
+                        onToggle = { showsInactive = it },
+                    )
+                    // Tek şubeli kiracıda çizilmez: seçenek sunmayan bir seçici, yer
+                    // kaplayan bir yanıltmadır. Oturumun şube menüsüne KATILMADI: orası
+                    // seçili şubeyi tüm uygulama için değiştirir, burası yalnız kapsam.
+                    if (session.canSwitchBranch) {
+                        KlinaraCheckMenuItem(
+                            label = session.activeBranch?.name?.let { "Yalnız $it" } ?: "Yalnız seçili şube",
+                            isChecked = scopedToBranch,
+                            onToggle = { scopedToBranch = it },
+                        )
+                    }
+                }
+                trailing?.invoke(this)
+            },
+        ) {
             state.error?.let { ErrorBanner(message = it, retryLabel = "Kapat", onRetry = viewModel::dismissError) }
-
-            // Tek şubeli kiracıda çizilmez: seçenek sunmayan bir seçici, yer kaplayan bir yanıltmadır.
-            if (session.canSwitchBranch) {
-                KlinaraSegmentedPicker(
-                    options = listOf(false, true),
-                    selected = scopedToBranch,
-                    onSelect = { scopedToBranch = it },
-                    title = { if (it) session.activeBranch?.name ?: "Seçili şube" else "Tüm şubeler" },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
 
             DefinitionsSection(
                 state = state,
                 session = session,
                 canWrite = canWrite,
+                query = query,
+                onQuery = { query = it },
+                showsInactive = showsInactive,
                 viewModel = viewModel,
                 onOpen = { onOpen(it.id) },
+                onCreate = { onOpen(null) },
             )
-
-            if (canWrite) {
-                KlinaraButton(
-                    title = "Yeni paket",
-                    onClick = { onOpen(null) },
-                    kind = KlinaraButtonKind.Secondary,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
         }
 
         if (state.isSaving) AuthLoadingOverlay(message = "Kaydediliyor…")
@@ -143,20 +164,22 @@ fun PackageDefinitionListScreen(
  * Listenin durum dalları — ekran fonksiyonundan ayrı: arama, filtre ve sayfalama aynı
  * gövdede birleşince tek bir `@Composable` okunmaz hâle geliyordu.
  */
+@Suppress("LongParameterList")
 @Composable
 private fun DefinitionsSection(
     state: PackageDefinitionListUiState,
     session: AppSession,
     canWrite: Boolean,
+    query: String,
+    onQuery: (String) -> Unit,
+    showsInactive: Boolean,
     viewModel: PackageDefinitionListViewModel,
     onOpen: (PackageDefinition) -> Unit,
+    onCreate: () -> Unit,
 ) {
-    var query by rememberSaveable { mutableStateOf("") }
-    var showsInactive by rememberSaveable { mutableStateOf(false) }
-
     when (val definitions = state.definitions) {
         Loadable.Loading ->
-            Text("Yükleniyor…", style = KlinaraType.bodyM, color = KlinaraTheme.colors.charcoalMuted)
+            KlinaraSkeleton(style = KlinaraSkeletonStyle.cards)
 
         is Loadable.Failed ->
             ErrorBanner(
@@ -174,15 +197,12 @@ private fun DefinitionsSection(
                         } else {
                             "Paket tanımlamak için yöneticinizle görüşün."
                         },
-                    icon = Icons.Filled.ShoppingCart,
+                    iconRes = KlinaraIcons.packageBox,
+                    actionTitle = if (canWrite) "Yeni paket" else null,
+                    onAction = if (canWrite) onCreate else null,
                 )
             } else {
-                KlinaraTextField(label = "Paket ara", value = query, onValueChange = { query = it })
-                KlinaraToggleRow(
-                    label = "Pasifleri göster",
-                    isOn = showsInactive,
-                    onToggle = { showsInactive = it },
-                )
+                KlinaraSearchField(value = query, onValueChange = onQuery, placeholder = "Paket ara")
                 DefinitionList(
                     definitions = filtered(definitions.value, query, showsInactive),
                     session = session,
@@ -216,15 +236,13 @@ private fun DefinitionList(
     }
     definitions.forEach { definition ->
         KlinaraCard {
-            DefinitionRow(definition = definition, session = session, onClick = { onOpen(definition) })
-            if (canWrite && !definition.isArchived && definition.isActive) {
-                KlinaraDivider()
-                KlinaraButton(
-                    title = "Emekliye ayır",
-                    onClick = { onRetire(definition) },
-                    kind = KlinaraButtonKind.Tertiary,
-                )
-            }
+            DefinitionRow(
+                definition = definition,
+                session = session,
+                canRetire = canWrite && !definition.isArchived && definition.isActive,
+                onClick = { onOpen(definition) },
+                onRetire = { onRetire(definition) },
+            )
         }
     }
 }
@@ -234,63 +252,102 @@ private fun DefinitionList(
 private fun DefinitionRow(
     definition: PackageDefinition,
     session: AppSession,
+    canRetire: Boolean,
     onClick: () -> Unit,
+    onRetire: () -> Unit,
 ) {
     val colors = KlinaraTheme.colors
-    Column(verticalArrangement = Arrangement.spacedBy(KlinaraMetrics.xs)) {
-        KlinaraNavigationRow(label = definition.name, detail = summary(definition), onClick = onClick)
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(KlinaraMetrics.sm),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                Money.format(definition.totalPriceMinor, definition.currency),
-                style = KlinaraType.bodyEmphasis,
-                color = colors.charcoal,
-            )
-            // Üstü çizili liste fiyatı yalnız indirim varken: eşitken göstermek "indirim yok"
-            // mesajını gürültüye çevirirdi.
-            if (definition.discountMinor != null) {
-                Text(
-                    Money.format(definition.listPriceMinor, definition.currency),
-                    style = KlinaraType.bodyM.copy(textDecoration = TextDecoration.LineThrough),
-                    color = colors.charcoalMuted,
-                )
-            }
-        }
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(KlinaraMetrics.xs),
+    val interactionSource = remember { MutableInteractionSource() }
+    Row(verticalAlignment = Alignment.Top) {
+        Column(
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .klinaraClickable(true, Role.Button, interactionSource, onClick),
             verticalArrangement = Arrangement.spacedBy(KlinaraMetrics.xs),
         ) {
-            definition.discountPercent?.let { KlinaraBadge("%$it indirim", tone = KlinaraBadgeTone.Positive) }
-            when {
-                definition.isArchived -> KlinaraBadge("Arşiv", tone = KlinaraBadgeTone.Muted)
-                !definition.isActive -> KlinaraBadge("Pasif", tone = KlinaraBadgeTone.Muted)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(KlinaraMetrics.sm),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    definition.name,
+                    style = KlinaraType.bodyEmphasis,
+                    color = colors.charcoal,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    Money.format(definition.totalPriceMinor, definition.currency),
+                    style = KlinaraType.bodyEmphasis,
+                    color = colors.charcoal,
+                )
+                // Üstü çizili liste fiyatı yalnız indirim varken: eşitken göstermek
+                // "indirim yok" mesajını gürültüye çevirirdi.
+                if (definition.discountMinor != null) {
+                    Text(
+                        Money.format(definition.listPriceMinor, definition.currency),
+                        style = KlinaraType.bodyM.copy(textDecoration = TextDecoration.LineThrough),
+                        color = colors.charcoalMuted,
+                    )
+                }
             }
-            // Rozet şubenin ADINI taşır: "şubeye özel" hangi şube olduğunu söylemiyordu.
-            definition.branchId?.let { branchId ->
-                KlinaraBadge(session.branches.firstOrNull { it.id == branchId }?.name ?: "Şubeye özel")
+
+            // Kalem dökümü ile geçerlilik AYRI satırlarda: tek bir noktalı dizide ikisi de
+            // okunmuyordu ve hangisinin nerede bittiği belli olmuyordu.
+            Text(contents(definition), style = KlinaraType.bodyM, color = colors.charcoalMuted)
+            Text(validity(definition), style = KlinaraType.bodyM, color = colors.charcoalMuted)
+
+            // Rozet sırası iki platformda SABİT: indirim → durum → şube → online →
+            // devredilemez. Sıra değişirse aynı paket iki uygulamada farklı okunur.
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(KlinaraMetrics.xs),
+                verticalArrangement = Arrangement.spacedBy(KlinaraMetrics.xs),
+            ) {
+                definition.discountPercent?.let { KlinaraBadge("%$it indirim", tone = KlinaraBadgeTone.Positive) }
+                when {
+                    definition.isArchived -> KlinaraBadge("Arşiv", tone = KlinaraBadgeTone.Muted)
+                    !definition.isActive -> KlinaraBadge("Pasif", tone = KlinaraBadgeTone.Muted)
+                }
+                // Rozet şubenin ADINI taşır: "şubeye özel" hangi şube olduğunu söylemiyordu.
+                definition.branchId?.let { branchId ->
+                    KlinaraBadge(session.branches.firstOrNull { it.id == branchId }?.name ?: "Şubeye özel")
+                }
+                if (definition.isOnlineSellable) KlinaraBadge("Online", tone = KlinaraBadgeTone.Positive)
+                if (!definition.isTransferable) KlinaraBadge("Devredilemez", tone = KlinaraBadgeTone.Warning)
             }
-            if (definition.isOnlineSellable) KlinaraBadge("Online", tone = KlinaraBadgeTone.Positive)
-            if (!definition.isTransferable) KlinaraBadge("Devredilemez", tone = KlinaraBadgeTone.Warning)
+        }
+
+        if (canRetire) {
+            KlinaraOverflowMenu {
+                    dismiss ->
+                DropdownMenuItem(
+                    text = { Text("Emekliye ayır", style = KlinaraType.bodyL, color = colors.charcoal) },
+                    onClick = {
+                        dismiss()
+                        onRetire()
+                    },
+                )
+            }
         }
     }
 }
 
-/**
- * "12 seans · 10 Lazer epilasyon, 2 Cilt bakımı · 365 gün geçerli".
- *
- * Geçerlilik burada duruyor çünkü paketin satılabilirliğini belirleyen ikinci bilgi o.
- */
-internal fun summary(definition: PackageDefinition): String =
+/** "12 seans · 10 Lazer epilasyon, 2 Cilt bakımı" — paketin İÇİ. */
+internal fun contents(definition: PackageDefinition): String =
     buildList {
         add("${definition.totalSessions} seans")
         definition.sortedItems
             .joinToString(", ") { "${it.quantity} ${it.serviceName}" }
             .takeIf { it.isNotEmpty() }
             ?.let(::add)
-        add(definition.validityDays?.let { "$it gün geçerli" } ?: "Süresiz")
     }.joinToString(" · ")
+
+/**
+ * Geçerlilik kendi satırında: paketin satılabilirliğini belirleyen ikinci bilgi o ve kalem
+ * dökümünün kuyruğunda kayboluyordu.
+ */
+internal fun validity(definition: PackageDefinition): String =
+    definition.validityDays?.let { "$it gün geçerli" } ?: "Süresiz"
 
 private fun filtered(
     definitions: List<PackageDefinition>,

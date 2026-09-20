@@ -2,27 +2,20 @@ package com.klinara.android.features.catalog
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.klinara.android.designsystem.KlinaraMetrics
 import com.klinara.android.designsystem.KlinaraTheme
 import com.klinara.android.designsystem.KlinaraType
 import com.klinara.android.designsystem.components.AuthLoadingOverlay
@@ -30,14 +23,17 @@ import com.klinara.android.designsystem.components.EmptyStateView
 import com.klinara.android.designsystem.components.ErrorBanner
 import com.klinara.android.designsystem.components.KlinaraBadge
 import com.klinara.android.designsystem.components.KlinaraBadgeTone
-import com.klinara.android.designsystem.components.KlinaraButton
-import com.klinara.android.designsystem.components.KlinaraButtonKind
+import com.klinara.android.designsystem.components.KlinaraBottomSheet
 import com.klinara.android.designsystem.components.KlinaraCard
 import com.klinara.android.designsystem.components.KlinaraDivider
 import com.klinara.android.designsystem.components.KlinaraNavigationRow
+import com.klinara.android.designsystem.components.KlinaraReorderableColumn
 import com.klinara.android.designsystem.components.KlinaraScreen
+import com.klinara.android.designsystem.components.KlinaraSkeleton
+import com.klinara.android.designsystem.components.KlinaraSkeletonStyle
 import com.klinara.android.designsystem.components.KlinaraTextField
 import com.klinara.android.designsystem.components.KlinaraToggleRow
+import com.klinara.android.designsystem.components.KlinaraToolbarAction
 import com.klinara.android.features.auth.AppSession
 import com.klinara.android.services.ServiceContainer
 import com.klinara.android.services.catalog.ServiceCategory
@@ -47,11 +43,14 @@ import com.klinara.android.services.networking.Loadable
 /**
  * Hizmet kategorileri (A7.1) — iOS `ServiceCategoryListView` paritesi.
  *
- * Sıra yukarı/aşağı düğmeleriyle değişir. iOS kartında "basılı tutup sürükleyin" dipnotu
- * var ama arayüzde sürükleme yok, düğme var — o dipnot burada **yazılmadı** (§7.8 notu).
+ * **Satır yalnız bir satır.** Önce her satırda chevron, yukarı ok ve aşağı ok yan yana
+ * duruyor, altında da "Pasife al" düğmesi vardı: üç kategorilik bir listede on iki
+ * dokunma hedefi. Sıralama artık basılı tutup sürüklemeyle yapılıyor (iOS'un yıllardır
+ * yazılı olan ama arayüzde karşılığı olmayan dipnotu nihayet doğru), pasife alma ise
+ * kategorinin kendi panelinde — yıkıcı bir aksiyon listede tek dokunuş uzaklıkta durmamalı.
  *
- * Editör bir diyalog (`CustomerTagListScreen` deseni): üç alanlık bir form için ayrı bir
- * gezinme hedefi fazla.
+ * Editör bir `AlertDialog` değil alttan açılan bir panel: diyalogda yıkıcı aksiyona yer
+ * yoktu ve o yüzden listeye taşınmıştı.
  */
 @Composable
 fun ServiceCategoryListScreen(
@@ -69,12 +68,22 @@ fun ServiceCategoryListScreen(
     LaunchedEffect(Unit) { viewModel.load() }
 
     Box {
-        KlinaraScreen(title = "Kategoriler", modifier = modifier, onBack = onBack, trailing = trailing) {
+        KlinaraScreen(
+            title = "Kategoriler",
+            modifier = modifier,
+            onBack = onBack,
+            trailing = {
+                if (canWrite) {
+                    KlinaraToolbarAction(contentDescription = "Yeni kategori", onClick = viewModel::startCreate)
+                }
+                trailing?.invoke(this)
+            },
+        ) {
             state.error?.let { ErrorBanner(message = it, retryLabel = "Kapat", onRetry = viewModel::dismissError) }
 
             when (val catalog = state.catalog) {
                 Loadable.Loading ->
-                    Text("Yükleniyor…", style = KlinaraType.bodyM, color = KlinaraTheme.colors.charcoalMuted)
+                    KlinaraSkeleton(style = KlinaraSkeletonStyle.rows)
                 is Loadable.Failed ->
                     ErrorBanner(message = catalog.message, onRetry = if (catalog.isRetryable) viewModel::load else null)
                 is Loadable.Loaded ->
@@ -83,24 +92,18 @@ fun ServiceCategoryListScreen(
                             title = "Kategori yok",
                             message = "Hizmetler kategori altında gruplanır. Önce bir kategori ekleyin.",
                             icon = Icons.AutoMirrored.Filled.List,
+                            actionTitle = if (canWrite) "Yeni kategori" else null,
+                            onAction = if (canWrite) viewModel::startCreate else null,
                         )
                     } else {
                         CategoryCard(
                             categories = state.categories,
                             snapshot = catalog.value,
                             canWrite = canWrite,
-                            viewModel = viewModel,
+                            onOpen = viewModel::startEdit,
+                            onMove = viewModel::moveTo,
                         )
                     }
-            }
-
-            if (canWrite) {
-                KlinaraButton(
-                    title = "Yeni kategori",
-                    onClick = viewModel::startCreate,
-                    kind = KlinaraButtonKind.Secondary,
-                    modifier = Modifier.fillMaxWidth(),
-                )
             }
         }
 
@@ -108,14 +111,20 @@ fun ServiceCategoryListScreen(
     }
 
     state.draft?.let { draft ->
-        CategoryEditorDialog(
+        // Panelde "Pasife al" gösterilmesi için düzenlenen kaydın kendisi lazım: taslak
+        // yalnız formun alanlarını taşıyor, kategorinin aktifliğini liste biliyor.
+        val editing = draft.id?.let { id -> state.categories.firstOrNull { it.id == id } }
+        CategoryEditorSheet(
             draft = draft,
+            editing = editing,
             error = state.draftError,
             fieldErrors = state.draftFieldErrors,
             canWrite = canWrite,
+            isSaving = state.isSaving,
             onUpdate = viewModel::updateDraft,
             onSave = viewModel::saveDraft,
             onCancel = viewModel::cancelDraft,
+            onDeactivate = { viewModel.askDeactivate(it) },
         )
     }
 
@@ -141,58 +150,57 @@ private fun CategoryCard(
     categories: List<ServiceCategory>,
     snapshot: CatalogSnapshot,
     canWrite: Boolean,
-    viewModel: ServiceCategoryListViewModel,
+    onOpen: (ServiceCategory) -> Unit,
+    onMove: (Int, Int) -> Unit,
 ) {
     KlinaraCard(
         footnote =
             if (canWrite) {
-                "Sıra, hizmet listesinde ve randevu formunda grupların sırasıdır. " +
-                    "Aktif hizmeti olan kategori pasife alınamaz."
+                "Sıralamak için basılı tutup sürükleyin. Sıra, hizmet listesinde ve randevu " +
+                    "formunda grupların sırasıdır."
             } else {
                 null
             },
     ) {
-        categories.forEachIndexed { index, category ->
+        KlinaraReorderableColumn(
+            items = categories,
+            key = ServiceCategory::id,
+            onMove = onMove,
+            isEnabled = canWrite,
+            verticalArrangement = Arrangement.spacedBy(0.dp),
+        ) { index, category ->
             if (index > 0) KlinaraDivider()
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(KlinaraMetrics.xs)) {
-                    KlinaraNavigationRow(
-                        label = category.name,
-                        value = "${snapshot.activeServiceCount(category.id)} hizmet",
-                        detail = category.slug,
-                        onClick = { viewModel.startEdit(category) },
-                    )
-                    if (!category.isActive) KlinaraBadge("Pasif", tone = KlinaraBadgeTone.Muted)
-                }
-                if (canWrite) {
-                    IconButton(onClick = { viewModel.move(category, -1) }, enabled = index > 0) {
-                        Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "${category.name} yukarı taşı")
-                    }
-                    IconButton(onClick = { viewModel.move(category, 1) }, enabled = index < categories.lastIndex) {
-                        Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "${category.name} aşağı taşı")
-                    }
-                }
-            }
-            if (canWrite && category.isActive) {
-                KlinaraButton(
-                    title = "Pasife al",
-                    onClick = { viewModel.askDeactivate(category) },
-                    kind = KlinaraButtonKind.Tertiary,
-                )
-            }
+            KlinaraNavigationRow(
+                label = category.name,
+                value = "${snapshot.activeServiceCount(category.id)} hizmet",
+                detail = category.slug,
+                onClick = { onOpen(category) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (!category.isActive) KlinaraBadge("Pasif", tone = KlinaraBadgeTone.Muted)
         }
     }
 }
 
+/**
+ * Kategori paneli — oluşturma ve düzenleme.
+ *
+ * Pasife alma **burada**: listede her satırın altında duran bir "Pasife al" düğmesi, hem
+ * listeyi okunmaz kılıyor hem de yıkıcı bir işlemi yanlışlıkla dokunulacak yere koyuyordu.
+ * iOS `CategoryEditorSheet` ile aynı yer.
+ */
 @Composable
-private fun CategoryEditorDialog(
+private fun CategoryEditorSheet(
     draft: CategoryForm,
+    editing: ServiceCategory?,
     error: String?,
     fieldErrors: Map<String, String>,
     canWrite: Boolean,
+    isSaving: Boolean,
     onUpdate: ((CategoryForm) -> CategoryForm) -> Unit,
     onSave: () -> Unit,
     onCancel: () -> Unit,
+    onDeactivate: (ServiceCategory) -> Unit,
 ) {
     val title =
         when {
@@ -200,42 +208,43 @@ private fun CategoryEditorDialog(
             canWrite -> "Kategoriyi düzenle"
             else -> "Kategori"
         }
-    AlertDialog(
-        onDismissRequest = onCancel,
-        title = { Text(title, style = KlinaraType.titleM) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(KlinaraMetrics.md)) {
-                error?.let { ErrorBanner(message = it) }
-                KlinaraTextField(
-                    label = "Kategori adı",
-                    value = draft.name,
-                    onValueChange = { value -> onUpdate { it.withName(value) } },
-                    placeholder = "Epilasyon",
-                    error = fieldErrors["name"],
-                    enabled = canWrite,
-                )
-                KlinaraTextField(
-                    label = "Kod (slug)",
-                    value = draft.slug,
-                    onValueChange = { value -> onUpdate { it.withSlug(value) } },
-                    placeholder = "epilasyon",
-                    error = draft.slugError ?: fieldErrors["slug"],
-                    enabled = canWrite,
-                )
-                KlinaraToggleRow(
-                    label = "Aktif",
-                    isOn = draft.isActive,
-                    onToggle = { value -> onUpdate { it.copy(isActive = value) } },
-                    enabled = canWrite,
-                )
-            }
-        },
-        confirmButton = {
-            if (canWrite) {
-                TextButton(onClick = onSave, enabled = draft.isValid && draft.isDirty) { Text("Kaydet") }
-            }
-        },
-        dismissButton = { TextButton(onClick = onCancel) { Text(if (canWrite) "Vazgeç" else "Kapat") } },
-        containerColor = KlinaraTheme.colors.surfaceRaised,
-    )
+    val deactivatable = editing?.takeIf { canWrite && it.isActive }
+
+    KlinaraBottomSheet(
+        title = title,
+        onDismiss = onCancel,
+        isDirty = draft.isDirty,
+        confirmTitle = if (canWrite) "Kaydet" else null,
+        canConfirm = draft.isValid && draft.isDirty,
+        isSaving = isSaving,
+        onConfirm = if (canWrite) onSave else null,
+        dismissTitle = if (canWrite) "Vazgeç" else "Kapat",
+        destructiveTitle = deactivatable?.let { "Pasife al" },
+        onDestructive = deactivatable?.let { category -> { onDeactivate(category) } },
+        destructiveNote = deactivatable?.let { "Aktif hizmeti olan kategori pasife alınamaz." },
+    ) {
+        error?.let { ErrorBanner(message = it) }
+        KlinaraTextField(
+            label = "Kategori adı",
+            value = draft.name,
+            onValueChange = { value -> onUpdate { it.withName(value) } },
+            placeholder = "Epilasyon",
+            error = fieldErrors["name"],
+            enabled = canWrite,
+        )
+        KlinaraTextField(
+            label = "Kod (slug)",
+            value = draft.slug,
+            onValueChange = { value -> onUpdate { it.withSlug(value) } },
+            placeholder = "epilasyon",
+            error = draft.slugError ?: fieldErrors["slug"],
+            enabled = canWrite,
+        )
+        KlinaraToggleRow(
+            label = "Aktif",
+            isOn = draft.isActive,
+            onToggle = { value -> onUpdate { it.copy(isActive = value) } },
+            enabled = canWrite,
+        )
+    }
 }

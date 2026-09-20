@@ -1,12 +1,6 @@
 package com.klinara.android.features.calendar
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandHorizontally
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -15,12 +9,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -31,24 +26,26 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.klinara.android.designsystem.KlinaraMetrics
 import com.klinara.android.designsystem.KlinaraTheme
 import com.klinara.android.designsystem.KlinaraType
-import com.klinara.android.designsystem.components.ColorDot
 import com.klinara.android.designsystem.components.DensityLegend
 import com.klinara.android.designsystem.components.DensityStrip
 import com.klinara.android.designsystem.components.ErrorBanner
-import com.klinara.android.designsystem.components.KlinaraButton
-import com.klinara.android.designsystem.components.KlinaraButtonKind
+import com.klinara.android.designsystem.components.FabContentClearance
+import com.klinara.android.designsystem.components.KlinaraFab
+import com.klinara.android.designsystem.components.KlinaraFabBox
+import com.klinara.android.designsystem.components.KlinaraFilterPill
 import com.klinara.android.designsystem.components.KlinaraScreen
 import com.klinara.android.designsystem.components.KlinaraSegmentedPicker
 import com.klinara.android.designsystem.components.klinaraClickable
@@ -106,20 +103,19 @@ fun CalendarHomeScreen(
             CalendarMode.Agenda, CalendarMode.Day -> clock.formatDate(state.selectedDate)
         }
 
+    KlinaraFabBox(
+        fab = onCreate?.let { create -> { KlinaraFab(contentDescription = "Yeni randevu", onClick = create) } },
+        modifier = modifier,
+    ) {
     KlinaraScreen(
         title = title,
-        modifier = modifier,
         // Hafta ızgarası kendi kaydırmasını kurar; dış kaydırma iç kaydırmayı yutar.
         scrollable = state.mode != CalendarMode.Week,
-        contentPadding = contentPaddingFor(state.mode),
+        contentPadding = CalendarContentPadding,
         verticalSpacing = KlinaraMetrics.md,
         trailing = trailing,
     ) {
         CalendarHeader(clock = clock, state = state, viewModel = viewModel, now = now)
-
-        onCreate?.let {
-            KlinaraButton(title = "Yeni randevu", onClick = it, kind = KlinaraButtonKind.Secondary)
-        }
 
         when (val calendar = state.calendar) {
             Loadable.Loading ->
@@ -135,15 +131,28 @@ fun CalendarHomeScreen(
                     onRetry = if (calendar.isRetryable) ({ viewModel.load(branchId) }) else null,
                 )
 
-            is Loadable.Loaded ->
+            is Loadable.Loaded -> {
+                // Yenilenirken eski gün, yeni tarihin altında tam opak durursa başka günün
+                // randevusu bu güne aitmiş gibi okunur; sönük ve dokunulamaz çizilir.
+                val bodyAlpha by animateFloatAsState(
+                    targetValue = if (state.isRefreshing) REFRESHING_ALPHA else 1f,
+                    label = "refresh",
+                )
+                Box(modifier = Modifier.alpha(bodyAlpha)) {
                 CalendarBody(
                     clock = clock,
                     state = state,
-                    onSelect = { entry: CalendarEntry -> onSelectAppointment(entry.id) },
+                    onSelect = { entry: CalendarEntry -> if (!state.isRefreshing) onSelectAppointment(entry.id) },
                     onSelectDay = viewModel::select,
                     now = now,
+                    onCreate = onCreate,
                 )
+                }
+            }
         }
+
+        if (state.mode != CalendarMode.Week && onCreate != null) Spacer(Modifier.height(FabContentClearance))
+    }
     }
 }
 
@@ -154,6 +163,7 @@ private fun CalendarBody(
     onSelect: (CalendarEntry) -> Unit,
     onSelectDay: (Instant) -> Unit,
     now: Instant,
+    onCreate: (() -> Unit)?,
 ) {
     when (state.mode) {
         CalendarMode.Agenda ->
@@ -163,6 +173,7 @@ private fun CalendarBody(
                 terminal = state.terminalEntries,
                 staffColor = state::staffColor,
                 onSelect = onSelect,
+                onCreate = onCreate,
             )
 
         CalendarMode.Day ->
@@ -224,17 +235,16 @@ private fun CalendarHeader(
                 onSelect = viewModel::setMode,
                 title = { it.turkishName },
                 modifier = Modifier.weight(1f),
+                icon = { painterResource(it.iconRes) },
             )
 
             // "Bugün" yalnız bugünde DEĞİLKEN görünür: her zaman duran bir düğme,
             // basıldığında hiçbir şey olmayan bir düğme olurdu. Seçicinin yanında
             // durur ki gezinme satırının genişliği hiç değişmesin.
-            AnimatedVisibility(
-                visible = !clock.isToday(state.selectedDate, now),
-                enter = fadeIn() + expandHorizontally(expandFrom = Alignment.Start),
-                exit = fadeOut() + shrinkHorizontally(shrinkTowards = Alignment.Start),
-            ) {
-                TodayButton(onClick = { viewModel.goToToday(now) })
+            // Yalnız bugünde DEĞİLKEN yer kaplar. Genişleme animasyonu yok: seçici
+            // genişliğinin animasyonla daralıp açılması geçişlerde titreme gibi okunuyordu.
+            if (!clock.isToday(state.selectedDate, now)) {
+                TodayButton(enabled = true, onClick = { viewModel.goToToday(now) })
             }
         }
 
@@ -289,62 +299,24 @@ private fun StaffFilterRow(
 ) {
     val staff = state.activeStaff
     if (staff.isEmpty()) return
+    val colors = KlinaraTheme.colors
 
     Row(
         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(KlinaraMetrics.xs),
+        horizontalArrangement = Arrangement.spacedBy(KlinaraMetrics.sm),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        FilterChip(label = "Tümü", isSelected = state.staffFilter == null, color = null) {
+        KlinaraFilterPill(label = "Tümü", isSelected = state.staffFilter == null, onClick = {
             onToggle(state.staffFilter)
-        }
+        })
         staff.forEach { profile ->
-            FilterChip(
+            KlinaraFilterPill(
                 label = profile.userFullName,
                 isSelected = state.staffFilter == profile.id,
-                color = profile.calendarColor,
-            ) { onToggle(profile.id) }
+                dotColor = accentColor(profile.calendarColor, colors.sage),
+                onClick = { onToggle(profile.id) },
+            )
         }
-    }
-}
-
-@Composable
-private fun FilterChip(
-    label: String,
-    isSelected: Boolean,
-    color: String?,
-    onClick: () -> Unit,
-) {
-    val colors = KlinaraTheme.colors
-    val interaction = remember(label) { MutableInteractionSource() }
-
-    Row(
-        modifier =
-            Modifier
-                .background(if (isSelected) colors.sageSoft else colors.surfaceRaised, CircleShape)
-                .border(
-                    if (isSelected) KlinaraMetrics.focusBorderWidth else KlinaraMetrics.borderWidth,
-                    if (isSelected) colors.sageDeep else colors.border,
-                    CircleShape,
-                ).klinaraClickable(
-                    enabled = true,
-                    role = Role.Button,
-                    interactionSource = interaction,
-                    onClick = onClick,
-                ).clearAndSetSemantics {
-                    contentDescription = label
-                    selected = isSelected
-                    role = Role.Button
-                }.padding(horizontal = KlinaraMetrics.sm, vertical = CHIP_VERTICAL_PADDING),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(KlinaraMetrics.xs),
-    ) {
-        if (color != null) ColorDot(color = accentColor(color, colors.sage), size = CHIP_DOT_SIZE)
-        Text(
-            text = label,
-            style = KlinaraType.bodyM,
-            color = if (isSelected) colors.sageDeep else colors.charcoalMuted,
-            maxLines = 1,
-        )
     }
 }
 
@@ -375,21 +347,29 @@ private fun StepButton(
 }
 
 @Composable
-private fun TodayButton(onClick: () -> Unit) {
+private fun TodayButton(
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val colors = KlinaraTheme.colors
     val interaction = remember { MutableInteractionSource() }
     Box(
         modifier =
-            Modifier
+            modifier
                 .heightIn(min = KlinaraMetrics.minTouchTarget)
                 .klinaraClickable(
-                    enabled = true,
+                    enabled = enabled,
                     role = Role.Button,
                     interactionSource = interaction,
                     onClick = onClick,
                 ).clearAndSetSemantics {
-                    contentDescription = "Bugüne dön"
-                    role = Role.Button
+                    if (enabled) {
+                        contentDescription = "Bugüne dön"
+                        role = Role.Button
+                    } else {
+                        hideFromAccessibility()
+                    }
                 }.padding(horizontal = KlinaraMetrics.xs),
         contentAlignment = Alignment.Center,
     ) {
@@ -397,16 +377,17 @@ private fun TodayButton(onClick: () -> Unit) {
     }
 }
 
-@Composable
-private fun contentPaddingFor(mode: CalendarMode): PaddingValues =
+/**
+ * Tüm modlarda AYNI dolgu. Önceden ajanda 24 dp, ızgaralar 16 dp kullanıyordu; mod
+ * değişince başlık, şerit ve çipler yana kayıyor ve geçiş "titriyor" gibi görünüyordu.
+ * 16 dp ızgaranın okunabilirliği için gereken değer, ajanda kartları da bunu taşıyor.
+ */
+private val CalendarContentPadding =
     PaddingValues(
-        // Izgara modlarında yatay dolgu daraltılır: 24 dp iki yandan, saat cetveli ve
-        // çakışan sütunlar için kalan genişliği okunamaz hâle getiriyordu.
-        start = if (mode == CalendarMode.Agenda) KlinaraMetrics.screenInset else KlinaraMetrics.md,
-        end = if (mode == CalendarMode.Agenda) KlinaraMetrics.screenInset else KlinaraMetrics.md,
+        start = KlinaraMetrics.md,
+        end = KlinaraMetrics.md,
         top = KlinaraMetrics.md,
         bottom = KlinaraMetrics.xl,
     )
 
-private val CHIP_VERTICAL_PADDING = 6.dp
-private val CHIP_DOT_SIZE = 8.dp
+private const val REFRESHING_ALPHA = 0.35f

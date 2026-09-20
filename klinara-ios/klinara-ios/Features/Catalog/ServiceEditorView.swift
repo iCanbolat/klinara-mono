@@ -83,14 +83,13 @@ struct ServiceEditorView: View {
                 )
                 .onChange(of: form.slug) { _, newValue in form.slugDidChange(newValue) }
 
-                Picker("Kategori", selection: $form.categoryId) {
-                    ForEach(activeCategories) { category in
-                        Text(category.name).tag(category.id)
-                    }
-                }
-                .pickerStyle(.menu)
-                .tint(KlinaraColor.sageDeep)
-                .klinaraText(.bodyM)
+                KlinaraPickerField(
+                    label: "Kategori",
+                    options: activeCategories,
+                    selection: $form.categoryId,
+                    title: \.name,
+                    placeholder: "Kategori seçin"
+                )
 
                 KlinaraTextField(
                     label: "Açıklama",
@@ -144,6 +143,11 @@ struct ServiceEditorView: View {
                     amountMinor: $form.priceMinor,
                     error: fieldErrors["priceMinor"]
                 )
+
+                Text("KDV oranı")
+                    .klinaraText(.label)
+                    .foregroundStyle(KlinaraColor.charcoalMuted)
+                    .padding(.bottom, -KlinaraMetrics.sm)
 
                 Picker("KDV oranı", selection: $form.vatRateBasisPoints) {
                     ForEach(VatRate.common, id: \.self) { rate in

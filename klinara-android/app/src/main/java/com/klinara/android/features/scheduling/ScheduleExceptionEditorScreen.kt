@@ -15,6 +15,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.klinara.android.designsystem.KlinaraMetrics
 import com.klinara.android.designsystem.KlinaraTheme
 import com.klinara.android.designsystem.KlinaraType
+import com.klinara.android.designsystem.components.rememberUnsavedChangesGuard
 import com.klinara.android.designsystem.components.AuthLoadingOverlay
 import com.klinara.android.designsystem.components.ErrorBanner
 import com.klinara.android.designsystem.components.FieldErrorText

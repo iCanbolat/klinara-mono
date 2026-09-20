@@ -19,6 +19,8 @@ import com.klinara.android.designsystem.components.KlinaraDivider
 import com.klinara.android.designsystem.components.KlinaraNavigationRow
 import com.klinara.android.designsystem.components.KlinaraRow
 import com.klinara.android.designsystem.components.KlinaraScreen
+import com.klinara.android.designsystem.components.KlinaraSkeleton
+import com.klinara.android.designsystem.components.KlinaraSkeletonStyle
 import com.klinara.android.designsystem.components.KlinaraTagField
 import com.klinara.android.designsystem.components.KlinaraTextEditor
 import com.klinara.android.designsystem.components.KlinaraTextField
@@ -73,7 +75,7 @@ fun StaffDetailScreen(
 
             when (val profile = state.profile) {
                 Loadable.Loading ->
-                    Text("Yükleniyor…", style = KlinaraType.bodyM, color = KlinaraTheme.colors.charcoalMuted)
+                    KlinaraSkeleton(style = KlinaraSkeletonStyle.formLong)
                 is Loadable.Failed ->
                     ErrorBanner(message = profile.message, onRetry = if (profile.isRetryable) viewModel::load else null)
                 is Loadable.Loaded -> {

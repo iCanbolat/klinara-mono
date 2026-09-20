@@ -130,12 +130,13 @@ class NotificationDraftsTest {
             )
         val confirmation = groups.first { it.event == NotificationEvent.AppointmentConfirmation }
 
+        // E-posta müşteri olaylarından çıktı: katalogda yalnız WhatsApp ve SMS kaldı.
         assertEquals(
-            listOf(NotificationChannel.WhatsApp, NotificationChannel.Sms, NotificationChannel.Email),
+            listOf(NotificationChannel.WhatsApp, NotificationChannel.Sms),
             confirmation.rows.map { it.template.channel },
             "Katalog sırası: WhatsApp önce",
         )
-        assertEquals(listOf(true, false, true), confirmation.rows.map { it.isMissing })
+        assertEquals(listOf(true, false), confirmation.rows.map { it.isMissing })
     }
 
     // --- Tercih taslağı ---
@@ -187,7 +188,9 @@ class NotificationDraftsTest {
         val moved = draft.movingUp(NotificationChannel.Sms)
         assertEquals(listOf(NotificationChannel.Sms, NotificationChannel.WhatsApp), moved.channels)
         assertEquals(moved, moved.movingUp(NotificationChannel.Sms))
-        assertEquals(listOf(NotificationChannel.Email, NotificationChannel.Push), draft.availableChannels)
+        // Eklenebilecek kanal kalmadı: taslak zaten WhatsApp + SMS taşıyor ve müşteriye
+        // gidebilecek küme bu ikisinden ibaret.
+        assertEquals(emptyList<NotificationChannel>(), draft.availableChannels)
         assertEquals("b1", moved.copy(isBranchScope = true).input("b1").branchId)
     }
 

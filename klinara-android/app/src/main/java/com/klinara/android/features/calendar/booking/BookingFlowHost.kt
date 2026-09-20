@@ -12,6 +12,8 @@ import com.klinara.android.designsystem.KlinaraTheme
 import com.klinara.android.designsystem.KlinaraType
 import com.klinara.android.designsystem.components.ErrorBanner
 import com.klinara.android.designsystem.components.KlinaraScreen
+import com.klinara.android.designsystem.components.KlinaraSkeleton
+import com.klinara.android.designsystem.components.KlinaraSkeletonStyle
 import com.klinara.android.features.auth.AppSession
 import com.klinara.android.services.ServiceContainer
 import com.klinara.android.services.booking.Appointment
@@ -64,7 +66,7 @@ fun BookingFlowHost(
 
         existing == null ->
             KlinaraScreen(title = "Randevuyu ertele", onBack = onBack, modifier = modifier) {
-                Text("Yükleniyor…", style = KlinaraType.bodyM, color = KlinaraTheme.colors.charcoalMuted)
+                KlinaraSkeleton(style = KlinaraSkeletonStyle.form)
             }
 
         else ->

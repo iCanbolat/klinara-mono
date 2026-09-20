@@ -42,8 +42,11 @@ import com.klinara.android.designsystem.KlinaraType
  * - [Primary]: dolu sage — ekranda **tek** birincil aksiyon olur.
  * - [Secondary]: kenarlıklı — eşdeğer ağırlıkta alternatif.
  * - [Tertiary]: düz metin — "vazgeç", "daha sonra", yardımcı yollar.
+ * - [Destructive]: `danger` tonunda düz metin — "pasife al" gibi geri alması pahalı
+ *   aksiyonlar. Marka yeşiliyle çizilen bir "Pasife al", kaydetmekle aynı ağırlıkta
+ *   görünüyordu; iOS'taki `role: .destructive` karşılığı.
  */
-enum class KlinaraButtonKind { Primary, Secondary, Tertiary }
+enum class KlinaraButtonKind { Primary, Secondary, Tertiary, Destructive }
 
 /**
  * Yükseklik SABİT DEĞİL (`defaultMinSize`): erişilebilirlik punto boylarında etiket
@@ -156,13 +159,14 @@ private fun buttonPalette(
             when (kind) {
                 KlinaraButtonKind.Primary -> if (enabled) colors.sage else colors.disabled
                 KlinaraButtonKind.Secondary -> colors.surfaceRaised
-                KlinaraButtonKind.Tertiary -> Color.Transparent
+                KlinaraButtonKind.Tertiary, KlinaraButtonKind.Destructive -> Color.Transparent
             },
         content =
             when {
                 !enabled -> colors.charcoalMuted
                 kind == KlinaraButtonKind.Primary -> colors.surfaceRaised
                 kind == KlinaraButtonKind.Secondary -> colors.charcoal
+                kind == KlinaraButtonKind.Destructive -> colors.danger
                 else -> colors.sageDeep
             },
         spinner = if (kind == KlinaraButtonKind.Primary) colors.surfaceRaised else colors.sage,

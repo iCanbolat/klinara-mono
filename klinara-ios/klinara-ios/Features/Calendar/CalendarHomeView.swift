@@ -25,6 +25,8 @@ struct CalendarHomeView: View {
 
                 KlinaraScreen(
                     state: store.state,
+                    skeleton: .agenda,
+                    isRefreshing: store.isRefreshing,
                     onRetry: { await store.load(branchId: session.selectedBranchId, clock: clock) }
                 ) { _ in
                     switch store.mode {
@@ -34,7 +36,8 @@ struct CalendarHomeView: View {
                             active: store.activeEntries,
                             terminal: store.terminalEntries,
                             staffColor: staffColor,
-                            onSelect: { selected = $0 }
+                            onSelect: { selected = $0 },
+                            onCreate: canWrite ? { isBooking = true } : nil
                         )
                     case .grid:
                         dayGrid
@@ -57,10 +60,31 @@ struct CalendarHomeView: View {
                         )
                     }
                 }
+                // Aşağı çekerek yenileme YALNIZ gövdenin işi — bu yüzden dış
+                // `VStack`e DEĞİL, buraya bağlı.
+                //
+                // `.refreshable` eylemi ORTAMA koyuyor ve altındaki her
+                // kaydırma görünümü onu üstleniyor. Dış yığında dururken
+                // başlıktaki personel hapı şeridi de (yatay bir `ScrollView`)
+                // eylemi üstleniyordu: hapları yana kaydırmaya çalışmak
+                // takvimi yeniden çektiriyor, yeni istek süreni iptal
+                // ettiriyor ve iptal ekrana boş bir kırmızı bant olarak
+                // düşüyordu.
+                .refreshable {
+                    await store.load(branchId: session.selectedBranchId, clock: clock)
+                }
             }
             .background(KlinaraColor.surface)
+            .klinaraFAB(isVisible: canWrite, accessibilityLabel: "Yeni randevu") { isBooking = true }
             .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
+            // Tarih BAŞ kenarda, şube menüsü SON kenarda.
+            //
+            // İkisi de solda dururken üst çubuk "hangi şube" ile "hangi gün"ü
+            // yan yana, ayrımsız bir blok hâlinde veriyordu; ortalanmış bir
+            // başlık ise sağdaki menünün genişliği kadar sola kayıyordu.
+            // `.inlineLarge` tarihi baş kenara sabitler: ekranın ne olduğu
+            // solda, kapsamı sağda — diğer sekmelerdeki düzenin aynısı.
+            .toolbarTitleDisplayMode(.inline)
             .toolbar { toolbar }
             .task(id: store.loadKey(clock: clock, branchId: session.selectedBranchId)) {
                 async let calendar: Void = store.load(
@@ -75,9 +99,6 @@ struct CalendarHomeView: View {
                 async let customers: Void = session.customerStore.load()
                 _ = await (calendar, catalog, staff, customers)
                 store.cacheCustomers(session.customerStore.customers)
-            }
-            .refreshable {
-                await store.load(branchId: session.selectedBranchId, clock: clock)
             }
             .sheet(item: $selected) { entry in
                 AppointmentDetailView(session: session, entryId: entry.id)
@@ -205,13 +226,14 @@ struct CalendarHomeView: View {
     private var staffFilterRow: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: KlinaraMetrics.sm) {
-                filterChip(title: "Tümü", isSelected: store.staffFilter == nil) {
+                KlinaraFilterPill(title: "Tümü", isSelected: store.staffFilter == nil) {
                     store.filter(staffProfileId: nil)
                 }
                 ForEach(session.staffStore.profiles.filter(\.isActive)) { profile in
-                    filterChip(
+                    KlinaraFilterPill(
                         title: profile.userFullName,
-                        isSelected: store.staffFilter == profile.id
+                        isSelected: store.staffFilter == profile.id,
+                        dotColor: Color(hex: profile.calendarColor) ?? KlinaraColor.sage
                     ) {
                         store.filter(staffProfileId: store.staffFilter == profile.id ? nil : profile.id)
                     }
@@ -220,42 +242,10 @@ struct CalendarHomeView: View {
         }
     }
 
-    private func filterChip(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(isSelected ? KlinaraColor.surfaceRaised : KlinaraColor.charcoal)
-                .padding(.horizontal, KlinaraMetrics.md)
-                .frame(height: 34)
-                .background(isSelected ? KlinaraColor.sageDeep : KlinaraColor.surfaceRaised)
-                .overlay(
-                    Capsule().stroke(
-                        isSelected ? KlinaraColor.sageDeep : KlinaraColor.border,
-                        lineWidth: KlinaraMetrics.borderWidth
-                    )
-                )
-                .clipShape(.capsule)
-                .contentShape(.capsule)
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
-    }
-
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
-        ToolbarItem(placement: .topBarLeading) {
+        ToolbarItem(placement: .topBarTrailing) {
             BranchMenu(session: session)
-        }
-
-        if canWrite {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    isBooking = true
-                } label: {
-                    Image(systemName: "plus")
-                }
-                .accessibilityLabel("Yeni randevu")
-            }
         }
     }
 

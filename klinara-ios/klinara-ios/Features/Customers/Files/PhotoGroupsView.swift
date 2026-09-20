@@ -30,6 +30,7 @@ struct PhotoGroupsView: View {
     var body: some View {
         KlinaraScreen(
             state: record.groups,
+            skeleton: .cardsShort,
             onRetry: { await record.loadFiles() }
         ) { groups in
             if groups.isEmpty {
@@ -38,7 +39,9 @@ struct PhotoGroupsView: View {
                     title: "Grup yok",
                     message: canWrite
                         ? "Öncesi/sonrası karşılaştırması için bir grup oluşturun."
-                        : "Henüz karşılaştırma grubu oluşturulmamış."
+                        : "Henüz karşılaştırma grubu oluşturulmamış.",
+                    actionTitle: canWrite ? "Yeni grup" : nil,
+                    action: canWrite ? { creating = true } : nil
                 )
             } else {
                 ForEach(groups) { group in

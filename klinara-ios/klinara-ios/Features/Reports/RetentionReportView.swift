@@ -13,6 +13,7 @@ struct RetentionReportView: View {
     var body: some View {
         KlinaraScreen(
             state: store.retention,
+            skeleton: .report,
             emptyCheck: { $0.totals.activeCustomers == 0 },
             emptyTitle: "Bu dönemde müşteri yok",
             emptyMessage: "Seçilen aralıkta tamamlanmış randevusu olan müşteri bulunmuyor.",

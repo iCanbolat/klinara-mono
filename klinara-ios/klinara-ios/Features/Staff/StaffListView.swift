@@ -31,17 +31,23 @@ struct StaffListView: View {
     var body: some View {
         KlinaraScreen(
             state: store.state,
+            skeleton: .cardsLong,
             emptyCheck: \.isEmpty,
             emptyTitle: "Personel yok",
             emptyMessage: canWrite
                 ? "Personel profili mevcut bir kullanıcıya bağlanır. Önce kullanıcıyı davet edin, sonra buradan profilini oluşturun."
                 : "Personel eklemek için yöneticinizle görüşün.",
             emptyIcon: "person.text.rectangle",
+            // Personel profili mevcut bir kullanıcıya bağlanır: boş listede
+            // yapılacak ilk iş davet etmek, profil açmak değil.
+            emptyActionTitle: canInvite ? "Personel davet et" : (canWrite ? "Yeni personel" : nil),
+            emptyActionIcon: canInvite ? "person.badge.plus" : "plus",
+            emptyAction: canInvite
+                ? { showsInvite = true }
+                : (canWrite ? { showsCreate = true } : nil),
             onRetry: { await store.reload() }
         ) { profiles in
             let visible = filtered(profiles)
-
-            branchFilterBar
 
             if visible.isEmpty {
                 Text(searchText.isEmpty ? "Bu şubede personel yok. Rol ve şube atamasını personelin detayından yapabilirsiniz." : "Aramanızla eşleşen personel yok.")
@@ -61,24 +67,14 @@ struct StaffListView: View {
         .navigationTitle("Personel")
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $searchText, prompt: "Personel ara")
+        .klinaraFAB(isVisible: canInvite || canWrite) { addButton }
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                branchFilterBar
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Toggle("Pasifleri göster", isOn: $showsInactive)
-                    if canInvite {
-                        Button {
-                            showsInvite = true
-                        } label: {
-                            Label("Personel davet et", systemImage: "person.badge.plus")
-                        }
-                    }
-                    if canWrite {
-                        Button {
-                            showsCreate = true
-                        } label: {
-                            Label("Yeni personel", systemImage: "plus")
-                        }
-                    }
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
@@ -165,7 +161,34 @@ struct StaffListView: View {
         Set(profile.services.filter(\.isActive).map(\.serviceId)).count
     }
 
-    /// Süzgeç satırı — hangi şubeye bakıldığı her an görünür olsun.
+    /// FAB: iki aksiyon da mümkünse menü, yalnız biri mümkünse doğrudan o.
+    @ViewBuilder
+    private var addButton: some View {
+        if canInvite && canWrite {
+            Menu {
+                Button {
+                    showsInvite = true
+                } label: {
+                    Label("Personel davet et", systemImage: "person.badge.plus")
+                }
+                Button {
+                    showsCreate = true
+                } label: {
+                    Label("Yeni personel", systemImage: "person.crop.circle.badge.plus")
+                }
+            } label: {
+                KlinaraFABLabel()
+            }
+            .accessibilityLabel("Personel ekle")
+        } else if canInvite {
+            KlinaraFloatingActionButton(accessibilityLabel: "Personel davet et") { showsInvite = true }
+        } else {
+            KlinaraFloatingActionButton(accessibilityLabel: "Yeni personel") { showsCreate = true }
+        }
+    }
+
+    /// Şube süzgeci, gezinme çubuğunda — hangi şubeye bakıldığı her an görünür olsun.
+    /// Oturumun şubesini değiştirmez, yalnız bu listeyi daraltır.
     private var branchFilterBar: some View {
         Menu {
             Picker("Şube", selection: Binding(
@@ -180,16 +203,14 @@ struct StaffListView: View {
                 }
             }
         } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "line.3.horizontal.decrease.circle")
+            HStack(spacing: 4) {
                 Text(effectiveBranchId.flatMap { id in session.branches.first { $0.id == id }?.name } ?? "Tüm şubeler")
-                    .klinaraText(.bodyEmphasis)
-                Image(systemName: "chevron.down").font(.system(size: 10, weight: .semibold))
+                    .klinaraText(.bodyM)
+                    .lineLimit(1)
+                Image(systemName: "chevron.up.chevron.down").font(.system(size: 11, weight: .semibold))
             }
             .foregroundStyle(KlinaraColor.sageDeep)
-            .padding(.horizontal, KlinaraMetrics.md)
-            .frame(minHeight: 36)
-            .background(KlinaraColor.sageSoft, in: .capsule)
+            .padding(.horizontal, KlinaraMetrics.sm)
         }
         .accessibilityLabel("Şube süzgeci")
     }

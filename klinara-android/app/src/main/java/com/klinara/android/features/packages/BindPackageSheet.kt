@@ -16,6 +16,8 @@ import com.klinara.android.designsystem.components.KlinaraCard
 import com.klinara.android.designsystem.components.KlinaraDivider
 import com.klinara.android.designsystem.components.KlinaraScreen
 import com.klinara.android.designsystem.components.KlinaraSelectableRow
+import com.klinara.android.designsystem.components.KlinaraSkeleton
+import com.klinara.android.designsystem.components.KlinaraSkeletonStyle
 import com.klinara.android.services.formatting.BranchClock
 import com.klinara.android.services.networking.Loadable
 import com.klinara.android.services.packages.PackageEntitlement
@@ -45,7 +47,7 @@ fun BindPackageSheet(
 
             when (val options = state.entitlements) {
                 Loadable.Loading ->
-                    Text("Yükleniyor…", style = KlinaraType.bodyM, color = KlinaraTheme.colors.charcoalMuted)
+                    KlinaraSkeleton(style = KlinaraSkeletonStyle.rowsShort)
                 is Loadable.Failed ->
                     ErrorBanner(message = options.message, onRetry = if (options.isRetryable) onRetry else null)
                 is Loadable.Loaded ->

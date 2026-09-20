@@ -14,7 +14,7 @@ import type {
 import { QUEUES } from '../../lib/queue/queue.constants';
 import { QueueService } from '../../lib/queue/queue.service';
 import { ChannelRegistryService } from './channel-registry.service';
-import { EVENT_DEFINITIONS } from './default-templates';
+import { CUSTOMER_CHANNELS, EVENT_DEFINITIONS, isCustomerEvent } from './default-templates';
 import * as repo from './notifications.repository';
 import { isQuietHour, nextSendableInstant } from './quiet-hours';
 import { renderTemplate } from './template-renderer';
@@ -76,7 +76,14 @@ export class NotificationDispatcherService {
     }
 
     const preference = await repo.findEffectivePreference(tx, { event: input.event, branchId });
-    const wanted = input.channels ?? preference?.channels ?? definition.channels;
+    const requestedChannels = input.channels ?? preference?.channels ?? definition.channels;
+
+    // Müşteriye e-posta GİTMEZ. Kural yeni; kiracıların kayıtlı tercih
+    // listeleri hâlâ `email` taşıyor olabilir ve süzülmezse ilk sırada duran
+    // ölü bir kanal WhatsApp'ın önünü keserdi.
+    const wanted = isCustomerEvent(input.event)
+      ? requestedChannels.filter((candidate) => CUSTOMER_CHANNELS.includes(candidate))
+      : requestedChannels;
 
     // Adresi olmayan kanal ATLANIR: e-postası olmayan bir müşteriye e-posta
     // "denemek" yalnız başarısız bir satır üretirdi.

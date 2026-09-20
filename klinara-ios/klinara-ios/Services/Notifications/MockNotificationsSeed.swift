@@ -114,7 +114,7 @@ enum MockNotificationsSeed {
                 branchId: nil,
                 event: .appointmentReminder,
                 kind: .transactional,
-                channels: [.whatsapp, .email],
+                channels: [.whatsapp, .sms],
                 quietHoursStart: "22:00",
                 quietHoursEnd: "08:00",
                 isDefault: false

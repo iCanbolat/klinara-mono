@@ -21,6 +21,7 @@ import com.klinara.android.designsystem.components.KlinaraButtonKind
 import com.klinara.android.designsystem.components.KlinaraCard
 import com.klinara.android.designsystem.components.KlinaraDivider
 import com.klinara.android.designsystem.components.KlinaraRow
+import com.klinara.android.designsystem.components.KlinaraSkeletonSection
 import com.klinara.android.services.formatting.BranchClock
 import com.klinara.android.services.networking.Loadable
 import com.klinara.android.services.packages.LedgerEntryType
@@ -46,7 +47,7 @@ fun PackageLedgerSection(
     when (ledger) {
         Loadable.Loading ->
             KlinaraCard(title = "Defter", modifier = modifier) {
-                Text("Yükleniyor…", style = KlinaraType.bodyM, color = KlinaraTheme.colors.charcoalMuted)
+                KlinaraSkeletonSection()
             }
         is Loadable.Failed -> ErrorBanner(message = ledger.message, onRetry = if (ledger.isRetryable) onRetry else null)
         is Loadable.Loaded ->

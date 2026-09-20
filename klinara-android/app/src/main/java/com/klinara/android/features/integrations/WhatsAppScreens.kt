@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,6 +31,8 @@ import com.klinara.android.designsystem.components.KlinaraNavigationRow
 import com.klinara.android.designsystem.components.KlinaraRow
 import com.klinara.android.designsystem.components.KlinaraScreen
 import com.klinara.android.designsystem.components.KlinaraSelectableRow
+import com.klinara.android.designsystem.components.KlinaraSkeleton
+import com.klinara.android.designsystem.components.KlinaraSkeletonStyle
 import com.klinara.android.designsystem.components.KlinaraTextField
 import com.klinara.android.designsystem.components.PhoneNumberField
 import com.klinara.android.services.formatting.BranchClock
@@ -68,7 +71,7 @@ fun WhatsAppSettingsScreen(
             state.error?.let { ErrorBanner(message = it, retryLabel = "Kapat", onRetry = actions.onDismissError) }
             when (val account = state.account) {
                 Loadable.Loading ->
-                    Text("Yükleniyor…", style = KlinaraType.bodyM, color = KlinaraTheme.colors.charcoalMuted)
+                    KlinaraSkeleton(style = KlinaraSkeletonStyle.rowsShort)
                 is Loadable.Failed ->
                     ErrorBanner(message = account.message, onRetry = if (account.isRetryable) actions.onRetry else null)
                 is Loadable.Loaded -> {
@@ -80,8 +83,10 @@ fun WhatsAppSettingsScreen(
                                 "Meta Business hesabınızın WABA kimliği, telefon numarası kimliği ve erişim " +
                                     "token'ı gerekir.",
                             icon = Icons.Filled.Share,
+                            actionTitle = "Yapılandır",
+                            actionIcon = Icons.Filled.Settings,
+                            onAction = actions.onEdit,
                         )
-                        KlinaraButton(title = "Yapılandır", onClick = actions.onEdit)
                     } else {
                         StatusCard(value, clock)
                         state.lastVerify?.let { VerifyResultCard(it) }
@@ -336,7 +341,7 @@ fun WhatsAppTemplateListScreen(
     val colors = KlinaraTheme.colors
     KlinaraScreen(title = "Onaylı şablonlar", modifier = modifier, onBack = onBack) {
         when (templates) {
-            Loadable.Loading -> Text("Yükleniyor…", style = KlinaraType.bodyM, color = colors.charcoalMuted)
+            Loadable.Loading -> KlinaraSkeleton(style = KlinaraSkeletonStyle.cardsShort)
             is Loadable.Failed ->
                 ErrorBanner(message = templates.message, onRetry = if (templates.isRetryable) onRetry else null)
             is Loadable.Loaded ->

@@ -5,17 +5,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -27,13 +27,16 @@ import com.klinara.android.designsystem.components.EmptyStateView
 import com.klinara.android.designsystem.components.ErrorBanner
 import com.klinara.android.designsystem.components.KlinaraBadge
 import com.klinara.android.designsystem.components.KlinaraBadgeTone
-import com.klinara.android.designsystem.components.KlinaraButton
-import com.klinara.android.designsystem.components.KlinaraButtonKind
 import com.klinara.android.designsystem.components.KlinaraCard
+import com.klinara.android.designsystem.components.KlinaraCheckMenuItem
 import com.klinara.android.designsystem.components.KlinaraDivider
+import com.klinara.android.designsystem.components.KlinaraIcons
+import com.klinara.android.designsystem.components.KlinaraOverflowMenu
 import com.klinara.android.designsystem.components.KlinaraRow
 import com.klinara.android.designsystem.components.KlinaraScreen
-import com.klinara.android.designsystem.components.KlinaraSegmentedPicker
+import com.klinara.android.designsystem.components.KlinaraSkeleton
+import com.klinara.android.designsystem.components.KlinaraSkeletonStyle
+import com.klinara.android.designsystem.components.KlinaraToolbarAction
 import com.klinara.android.features.auth.AppSession
 import com.klinara.android.services.ServiceContainer
 import com.klinara.android.services.auth.BranchSummary
@@ -50,6 +53,12 @@ import com.klinara.android.services.scheduling.Weekday
  * Yönetim'den şube geneli, personel detayından o personele daraltılmış açılır. Satırlar
  * düzenlenmez (sunucuda PATCH yok); "Kaldır" yumuşak siler ve personel o aralıkta yeniden
  * müsait olur. Kaldırma hatası **yutulmaz**.
+ *
+ * Aralık seçici (30/90/365 gün) gövdede değil üst çubuğun "⋮" menüsünde — iOS'ta da orada
+ * (`ScheduleExceptionListView`). Bir kez ayarlanıp unutulan bir tercih listenin üstünde
+ * kalıcı bir şerit kaplamamalı. "Kaldır" da satırın kendi menüsünde: kartın içindeki tam
+ * genişlikte düğme listeyi her satırda ikiye bölüyordu. Kaydırma jesti YOK — TalkBack
+ * kullanıcısına hiç görünmezdi.
  */
 @Composable
 fun ScheduleExceptionListScreen(
@@ -69,6 +78,32 @@ fun ScheduleExceptionListScreen(
         return
     }
     ExceptionListContent(session, container, branch, staffProfileId, onBack, onCreate, modifier, trailing)
+}
+
+/** Üst çubuğun aksiyonları — ekranın kendi "Yeni istisna"sı, aralık menüsü, çağıranın yuvası. */
+@Composable
+private fun RowScope.ExceptionListActions(
+    canWrite: Boolean,
+    range: ExceptionRange,
+    onRange: (ExceptionRange) -> Unit,
+    onCreate: () -> Unit,
+    trailing: @Composable (RowScope.() -> Unit)?,
+) {
+    if (canWrite) KlinaraToolbarAction(contentDescription = "Yeni istisna", onClick = onCreate)
+    KlinaraOverflowMenu {
+            dismiss ->
+        ExceptionRange.entries.forEach { option ->
+            KlinaraCheckMenuItem(
+                label = option.title,
+                isChecked = option == range,
+                onToggle = {
+                    dismiss()
+                    onRange(option)
+                },
+            )
+        }
+    }
+    trailing?.invoke(this)
 }
 
 @Suppress("LongParameterList")
@@ -96,19 +131,19 @@ private fun ExceptionListContent(
     LaunchedEffect(Unit) { viewModel.load() }
 
     Box {
-        KlinaraScreen(title = "İzin ve istisnalar", modifier = modifier, onBack = onBack, trailing = trailing) {
+        KlinaraScreen(
+            title = "İzin ve istisnalar",
+            modifier = modifier,
+            onBack = onBack,
+            trailing = {
+                ExceptionListActions(canWrite, state.range, viewModel::setRange, onCreate, trailing)
+            },
+        ) {
             state.error?.let { ErrorBanner(message = it, retryLabel = "Kapat", onRetry = viewModel::dismissError) }
-            KlinaraSegmentedPicker(
-                options = ExceptionRange.entries,
-                selected = state.range,
-                onSelect = viewModel::setRange,
-                title = { it.title },
-                modifier = Modifier.fillMaxWidth(),
-            )
 
             when (val rows = state.rows) {
                 Loadable.Loading ->
-                    Text("Yükleniyor…", style = KlinaraType.bodyM, color = KlinaraTheme.colors.charcoalMuted)
+                    KlinaraSkeleton(style = KlinaraSkeletonStyle.cards)
                 is Loadable.Failed ->
                     ErrorBanner(message = rows.message, onRetry = if (rows.isRetryable) viewModel::load else null)
                 is Loadable.Loaded ->
@@ -116,7 +151,9 @@ private fun ExceptionListContent(
                         EmptyStateView(
                             title = "İstisna yok",
                             message = "Seçilen aralıkta izin, tatil veya özel açılış kaydı bulunmuyor.",
-                            icon = Icons.Filled.DateRange,
+                            iconRes = KlinaraIcons.calendarException,
+                            actionTitle = if (canWrite) "Yeni istisna" else null,
+                            onAction = if (canWrite) onCreate else null,
                         )
                     } else {
                         KlinaraCard(footnote = "Kayıtlar ${branch.timezone} saat diliminde gösterilir.") {
@@ -132,15 +169,6 @@ private fun ExceptionListContent(
                             }
                         }
                     }
-            }
-
-            if (canWrite) {
-                KlinaraButton(
-                    title = "Yeni istisna",
-                    onClick = onCreate,
-                    kind = KlinaraButtonKind.Secondary,
-                    modifier = Modifier.fillMaxWidth(),
-                )
             }
         }
 
@@ -173,20 +201,34 @@ private fun ExceptionRow(
     canWrite: Boolean,
     onDelete: () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(KlinaraMetrics.xs)) {
-        KlinaraRow(label = staffName, detail = clock.formatSpan(exception.startsAt, exception.endsAt))
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(KlinaraMetrics.xs),
+    Row(verticalAlignment = Alignment.Top) {
+        Column(
+            modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(KlinaraMetrics.xs),
         ) {
-            recurrenceLabel(exception)?.let { KlinaraBadge(it) }
-            exception.recurrenceUntil
-                ?.takeIf { exception.recurrenceType == ScheduleRecurrence.Weekly }
-                ?.let { KlinaraBadge("${clock.formatDate(it)} tarihine kadar", tone = KlinaraBadgeTone.Muted) }
-            exception.reason?.takeIf { it.isNotBlank() }?.let { KlinaraBadge(it, tone = KlinaraBadgeTone.Muted) }
+            KlinaraRow(label = staffName, detail = clock.formatSpan(exception.startsAt, exception.endsAt))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(KlinaraMetrics.xs),
+                verticalArrangement = Arrangement.spacedBy(KlinaraMetrics.xs),
+            ) {
+                recurrenceLabel(exception)?.let { KlinaraBadge(it) }
+                exception.recurrenceUntil
+                    ?.takeIf { exception.recurrenceType == ScheduleRecurrence.Weekly }
+                    ?.let { KlinaraBadge("${clock.formatDate(it)} tarihine kadar", tone = KlinaraBadgeTone.Muted) }
+                exception.reason?.takeIf { it.isNotBlank() }?.let { KlinaraBadge(it, tone = KlinaraBadgeTone.Muted) }
+            }
         }
         if (canWrite) {
-            KlinaraButton(title = "Kaldır", onClick = onDelete, kind = KlinaraButtonKind.Tertiary)
+            KlinaraOverflowMenu {
+                    dismiss ->
+                DropdownMenuItem(
+                    text = { Text("Kaldır", style = KlinaraType.bodyL, color = KlinaraTheme.colors.charcoal) },
+                    onClick = {
+                        dismiss()
+                        onDelete()
+                    },
+                )
+            }
         }
     }
 }

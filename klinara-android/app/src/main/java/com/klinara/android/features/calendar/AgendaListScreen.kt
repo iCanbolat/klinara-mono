@@ -49,12 +49,16 @@ fun AgendaListScreen(
     staffColor: (String?) -> String?,
     onSelect: (CalendarEntry) -> Unit,
     modifier: Modifier = Modifier,
+    /** Boş gündeki birincil aksiyon. `null` → yazma izni yok, düğme çizilmez. */
+    onCreate: (() -> Unit)? = null,
 ) {
     if (active.isEmpty() && terminal.isEmpty()) {
         EmptyStateView(
             title = "Bu günde randevu yok",
-            message = "Başka bir gün seçebilir ya da yeni bir randevu oluşturabilirsiniz.",
+            message = "Başka bir gün seçebilir ya da bugüne yeni bir randevu ekleyebilirsiniz.",
             icon = Icons.Filled.DateRange,
+            actionTitle = "Yeni randevu".takeIf { onCreate != null },
+            onAction = onCreate,
             modifier = modifier,
         )
         return

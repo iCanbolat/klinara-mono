@@ -17,9 +17,11 @@ import com.klinara.android.designsystem.components.EmptyStateView
 import com.klinara.android.designsystem.components.ErrorBanner
 import com.klinara.android.designsystem.components.KlinaraButton
 import com.klinara.android.designsystem.components.KlinaraButtonKind
-import com.klinara.android.designsystem.components.KlinaraChartKind
 import com.klinara.android.designsystem.components.KlinaraCard
+import com.klinara.android.designsystem.components.KlinaraChartKind
 import com.klinara.android.designsystem.components.KlinaraScreen
+import com.klinara.android.designsystem.components.KlinaraSkeleton
+import com.klinara.android.designsystem.components.KlinaraSkeletonStyle
 import com.klinara.android.designsystem.components.KlinaraToggleRow
 import com.klinara.android.designsystem.components.ReportPeriodBar
 import com.klinara.android.services.networking.Loadable
@@ -89,12 +91,9 @@ internal fun <T> ReportScaffold(
         controls()
         when (report) {
             Loadable.Loading ->
-                Text(
-                    "Yükleniyor…",
-                    style = KlinaraType.bodyM,
-                    color = KlinaraTheme.colors.charcoalMuted,
-                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-                )
+                // `liveRegion` iskelete TAŞINMADI: yer tutucunun kendisi zaten
+                // "Yükleniyor" olarak duyuruluyor ve iki duyuru üst üste binerdi.
+                KlinaraSkeleton(style = KlinaraSkeletonStyle.report)
             is Loadable.Failed ->
                 ErrorBanner(message = report.message, onRetry = actions.onRetry.takeIf { report.isRetryable })
             is Loadable.Loaded ->

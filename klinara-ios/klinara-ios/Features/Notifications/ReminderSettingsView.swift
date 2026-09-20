@@ -68,9 +68,7 @@ struct ReminderSettingsView: View {
         if let store {
             switch store.reminderState {
             case .loading:
-                ProgressView()
-                    .tint(KlinaraColor.sage)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                KlinaraSkeletonView(style: .form)
 
             case .failed(let failure):
                 VStack {
@@ -85,9 +83,7 @@ struct ReminderSettingsView: View {
                 }
             }
         } else {
-            ProgressView()
-                .tint(KlinaraColor.sage)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            KlinaraSkeletonView(style: .form)
         }
     }
 

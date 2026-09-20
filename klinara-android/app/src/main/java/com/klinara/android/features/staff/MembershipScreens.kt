@@ -42,9 +42,12 @@ import com.klinara.android.designsystem.components.KlinaraDivider
 import com.klinara.android.designsystem.components.KlinaraRow
 import com.klinara.android.designsystem.components.KlinaraScreen
 import com.klinara.android.designsystem.components.KlinaraSelectableRow
+import com.klinara.android.designsystem.components.KlinaraSkeleton
+import com.klinara.android.designsystem.components.KlinaraSkeletonStyle
 import com.klinara.android.designsystem.components.KlinaraTextField
+import com.klinara.android.designsystem.components.KlinaraToolbarAction
+import com.klinara.android.designsystem.components.rememberUnsavedChangesGuard
 import com.klinara.android.features.auth.AppSession
-import com.klinara.android.features.scheduling.rememberUnsavedChangesGuard
 import com.klinara.android.services.ServiceContainer
 import com.klinara.android.services.contracts.Permissions
 import com.klinara.android.services.contracts.RoleNames
@@ -105,7 +108,7 @@ fun MembershipEditorScreen(
             state.error?.let { ErrorBanner(message = it, retryLabel = "Kapat", onRetry = viewModel::dismissError) }
             if (state.saved == null) {
                 if (state.loadError == null) {
-                    Text("Yükleniyor…", style = KlinaraType.bodyM, color = KlinaraTheme.colors.charcoalMuted)
+                    KlinaraSkeleton(style = KlinaraSkeletonStyle.formShort)
                 }
                 return@KlinaraScreen
             }
@@ -341,19 +344,26 @@ fun InvitationListScreen(
     // Davet formundan dönüşte de koşar: yeni davet listede görünsün.
     LaunchedEffect(Unit) { viewModel.load() }
 
-    KlinaraScreen(title = "Davetler", modifier = modifier, onBack = onBack) {
+    KlinaraScreen(
+        title = "Davetler",
+        modifier = modifier,
+        onBack = onBack,
+        trailing = { KlinaraToolbarAction(contentDescription = "Personel davet et", onClick = onInvite) },
+    ) {
         state.error?.let { ErrorBanner(message = it, retryLabel = "Kapat", onRetry = viewModel::dismissError) }
         val invitations = state.invitations
         when {
             invitations == null && state.loadError != null ->
                 ErrorBanner(message = state.loadError!!, onRetry = viewModel::load)
             invitations == null ->
-                Text("Yükleniyor…", style = KlinaraType.bodyM, color = KlinaraTheme.colors.charcoalMuted)
+                KlinaraSkeleton(style = KlinaraSkeletonStyle.cardsShort)
             invitations.isEmpty() ->
                 EmptyStateView(
                     title = "Bekleyen davet yok",
                     message = "Davet edilen kişi e-postadaki bağlantıyla parolasını belirleyip katılır.",
                     icon = Icons.Filled.Email,
+                    actionTitle = "Personel davet et",
+                    onAction = onInvite,
                 )
             else ->
                 KlinaraCard(footnote = "İptal edilen davetin bağlantısı hemen geçersiz olur.") {
@@ -363,8 +373,6 @@ fun InvitationListScreen(
                     }
                 }
         }
-
-        KlinaraButton(title = "Personel davet et", onClick = onInvite, modifier = Modifier.fillMaxWidth())
     }
 
     state.pendingRevoke?.let { invitation ->

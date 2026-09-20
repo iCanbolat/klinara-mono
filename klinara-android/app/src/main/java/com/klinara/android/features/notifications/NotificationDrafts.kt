@@ -156,9 +156,9 @@ data class PreferenceDraft(
 ) {
     val isDirty: Boolean get() = original != null && copy(original = null) != original
 
-    /** Eklenebilecek kanallar — sunucunun `ALL_CHANNELS` kümesinden seçilmemiş olanlar. */
+    /** Eklenebilecek kanallar — sunucunun `CUSTOMER_CHANNELS` kümesinden seçilmemiş olanlar. */
     val availableChannels: List<NotificationChannel>
-        get() = NotificationChannel.all.filterNot { it in channels }
+        get() = NotificationChannel.customerSelectable.filterNot { it in channels }
 
     /** Pencere gece yarısını aşıyor mu (21:00–09:00)? Bir hata değil; ekran açıkça söyler. */
     val crossesMidnight: Boolean get() = quietHoursEnabled && quietEnd <= quietStart && quietEnd != quietStart
@@ -198,7 +198,10 @@ data class PreferenceDraft(
             val draft =
                 PreferenceDraft(
                     event = preference.event,
-                    channels = preference.channels.filter { it != NotificationChannel.Unknown },
+                    // Kapsam dışı kalmış kanal (e-posta, push) ve tanınmayan kanal ÇİZİLMEZ:
+                    // kullanıcıya taşıyamayacağı ve sunucunun reddedeceği bir satır göstermek,
+                    // kaydetmeye çalıştığında açıklanamayan bir hata demekti.
+                    channels = preference.channels.filter { it in NotificationChannel.customerSelectable },
                     isBranchScope = preference.branchId != null,
                     quietHoursEnabled = enabled,
                     // Kapalı satırda saatler 00:00 gelir; anahtar açılınca makul bir pencere önerilsin.

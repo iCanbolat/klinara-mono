@@ -7,6 +7,7 @@ import com.klinara.android.services.ServiceContainer
 import com.klinara.android.services.crm.Customer
 import com.klinara.android.services.crm.CustomerListQuery
 import com.klinara.android.services.crm.CustomerService
+import com.klinara.android.services.crm.CustomerTag
 import com.klinara.android.services.networking.Loadable
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -27,15 +28,42 @@ data class CustomerListUiState(
     val search: Loadable<List<Customer>>? = null,
     val term: String = "",
     val isLoadingMore: Boolean = false,
+    /**
+     * Sonraki sayfa alınamadı.
+     *
+     * Hatanın **görünür** olması şart: sessizce yutulduğunda liste sonunda "Yükleniyor…"
+     * yazısı sonsuza kadar duruyor ve tetikleyici `LaunchedEffect(customers.size)` liste
+     * büyümediği için bir daha koşmuyordu — kullanıcı ekrandan çıkıp dönmeden ikinci
+     * sayfayı hiç alamıyordu.
+     */
+    val loadMoreError: String? = null,
     private val nextCursor: String? = null,
+    /** Filtre satırının etiketleri. Gelmezse satır çizilmez; liste yine çalışır. */
+    val tags: List<CustomerTag> = emptyList(),
+    /** null = tüm müşteriler. Gezinme listesinde sunucuya `tagId` olarak gider. */
+    val selectedTagId: String? = null,
 ) {
-    /** Ekranın çizeceği liste: arama varsa o, yoksa gezinme listesi. */
-    val visible: Loadable<List<Customer>> get() = search ?: list
+    /**
+     * Ekranın çizeceği liste: arama varsa o, yoksa gezinme listesi.
+     *
+     * Arama ucu `tagId` almıyor; etiket seçiliyken arama sonuçları istemcide daraltılır.
+     * Sonuçlar zaten küçük (arama sayfalanmıyor), yani eksik sonuç riski yok.
+     */
+    val visible: Loadable<List<Customer>>
+        get() {
+            val tagId = selectedTagId
+            val results = search ?: return list
+            if (tagId == null || results !is Loadable.Loaded) return results
+            return Loadable.Loaded(results.value.filter { customer -> customer.tags.any { it.id == tagId } })
+        }
 
     val isSearching: Boolean get() = search != null
 
     /** Arama sırasında sayfalama YOK: arama ucu zaten sayfalanmıyor. */
-    val canLoadMore: Boolean get() = !isSearching && nextCursor != null && !isLoadingMore
+    val canLoadMore: Boolean get() = !isSearching && nextCursor != null && !isLoadingMore && loadMoreError == null
+
+    /** Hata satırı gösterilir: imleç duruyor, yeniden denenebilir. */
+    val hasMore: Boolean get() = !isSearching && nextCursor != null
 
     internal val cursor: String? get() = nextCursor
 }
@@ -64,6 +92,7 @@ class CustomerListViewModel(
 
     private var searchJob: Job? = null
     private var loadMoreJob: Job? = null
+    private var reloadJob: Job? = null
 
     /** Yüklenmişse tekrar çekmez; şube değişimi gibi gerçek sebepler [reload] çağırır. */
     fun load() {
@@ -72,16 +101,40 @@ class CustomerListViewModel(
     }
 
     fun reload() {
-        _state.update { it.copy(list = Loadable.Loading) }
-        viewModelScope.launch {
-            val page = Loadable.of { customers.list(CustomerListQuery()) }
-            _state.update {
-                it.copy(
-                    list = page.map { result -> result.data },
-                    nextCursor = page.valueOrNull?.pageInfo?.nextCursor,
-                )
-            }
+        // Etiket hızlı değiştirilirse önceki etiketin sayfası sonradan gelip listeyi ezmesin.
+        reloadJob?.cancel()
+        loadMoreJob?.cancel()
+        val tagId = _state.value.selectedTagId
+        _state.update {
+            it.copy(list = Loadable.Loading, nextCursor = null, isLoadingMore = false, loadMoreError = null)
         }
+        reloadJob =
+            viewModelScope.launch {
+                val page = Loadable.of { customers.list(CustomerListQuery(tagId = tagId)) }
+                _state.update {
+                    it.copy(
+                        list = page.map { result -> result.data },
+                        nextCursor = page.valueOrNull?.pageInfo?.nextCursor,
+                    )
+                }
+            }
+    }
+
+    /** Etiketler bir kez çekilir; hata sessizdir — filtre satırı yalnızca görünmez. */
+    fun loadTags() {
+        if (_state.value.tags.isNotEmpty()) return
+        viewModelScope.launch {
+            val tags = runCatching { customers.tags() }.getOrNull() ?: return@launch
+            _state.update { it.copy(tags = tags.sortedBy { tag -> tag.name.lowercase() }) }
+        }
+    }
+
+    /** Seçili etikete tekrar dokunmak filtreyi temizler (takvimin personel çipiyle aynı). */
+    fun selectTag(tagId: String?) {
+        val next = if (_state.value.selectedTagId == tagId) null else tagId
+        if (next == _state.value.selectedTagId) return
+        _state.update { it.copy(selectedTagId = next) }
+        reload()
     }
 
     /**
@@ -95,10 +148,11 @@ class CustomerListViewModel(
         if (!current.canLoadMore || loadMoreJob?.isActive == true) return
         val cursor = current.cursor ?: return
 
-        _state.update { it.copy(isLoadingMore = true) }
+        _state.update { it.copy(isLoadingMore = true, loadMoreError = null) }
         loadMoreJob =
             viewModelScope.launch {
-                when (val page = Loadable.of { customers.list(CustomerListQuery(cursor = cursor)) }) {
+                val query = CustomerListQuery(cursor = cursor, tagId = current.selectedTagId)
+                when (val page = Loadable.of { customers.list(query) }) {
                     is Loadable.Loaded ->
                         _state.update {
                             it.copy(
@@ -108,9 +162,19 @@ class CustomerListViewModel(
                             )
                         }
                     // İmleç korunur: sayfa gelmedi ama liste ve sıradaki adres duruyor.
-                    else -> _state.update { it.copy(isLoadingMore = false) }
+                    // Hata state'e yazılır ki listenin sonunda "Tekrar dene" çıksın.
+                    is Loadable.Failed ->
+                        _state.update { it.copy(isLoadingMore = false, loadMoreError = page.message) }
+                    Loadable.Loading -> _state.update { it.copy(isLoadingMore = false) }
                 }
             }
+    }
+
+    /** Sayfa hatasından sonra elle yeniden deneme. */
+    fun retryLoadMore() {
+        if (_state.value.loadMoreError == null) return
+        _state.update { it.copy(loadMoreError = null) }
+        loadMore()
     }
 
     /**

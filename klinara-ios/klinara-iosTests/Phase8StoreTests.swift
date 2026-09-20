@@ -23,7 +23,7 @@ struct Phase8StoreTests {
 
     @Test("İlk sayfa cursor bırakır; `loadMore` listeyi büyütür, sıfırlamaz")
     func paginatesMessages() async {
-        let store = MessageLogStore(service: graph().messages)
+        let store = MessageLogStore(service: graph().messages, clock: BranchClock(timeZoneIdentifier: "Europe/Istanbul"))
         await store.load()
 
         let firstPage = store.messages
@@ -39,7 +39,7 @@ struct Phase8StoreTests {
 
     @Test("Süzgeç değişince cursor SIFIRLANIR — eski cursor yeni süzgeçte anlamsız")
     func filterChangeResetsCursor() async {
-        let store = MessageLogStore(service: graph().messages)
+        let store = MessageLogStore(service: graph().messages, clock: BranchClock(timeZoneIdentifier: "Europe/Istanbul"))
         await store.load()
         #expect(store.cursor != nil)
 
@@ -52,7 +52,7 @@ struct Phase8StoreTests {
 
     @Test("Aynı süzgeç yeniden uygulanınca yeniden yükleme yapılmaz")
     func idempotentFilter() async {
-        let store = MessageLogStore(service: graph().messages)
+        let store = MessageLogStore(service: graph().messages, clock: BranchClock(timeZoneIdentifier: "Europe/Istanbul"))
         await store.load()
         let before = store.messages.map(\.id)
 
@@ -63,7 +63,7 @@ struct Phase8StoreTests {
 
     @Test("Günlük en yeni mesajı önce gösterir")
     func messagesAreNewestFirst() async {
-        let store = MessageLogStore(service: graph().messages)
+        let store = MessageLogStore(service: graph().messages, clock: BranchClock(timeZoneIdentifier: "Europe/Istanbul"))
         await store.load()
 
         let dates = store.messages.map(\.createdAt)
@@ -72,7 +72,7 @@ struct Phase8StoreTests {
 
     @Test("Atlanmış mesaj günlükte KALIR — gitmedi mi, hiç denendi mi ayrımı")
     func skippedMessagesStayVisible() async {
-        let store = MessageLogStore(service: graph().messages, filter: MessageFilter(status: .skipped))
+        let store = MessageLogStore(service: graph().messages, clock: BranchClock(timeZoneIdentifier: "Europe/Istanbul"), filter: MessageFilter(status: .skipped))
         await store.load()
 
         let skipped = try? #require(store.messages.first)
@@ -517,7 +517,7 @@ struct Phase8StoreTests {
         let mock = graph()
         let store = WhatsAppStore(service: mock.whatsapp)
         await store.loadTemplates()
-        let log = MessageLogStore(service: mock.messages)
+        let log = MessageLogStore(service: mock.messages, clock: BranchClock(timeZoneIdentifier: "Europe/Istanbul"))
         await log.load()
         let idsBefore = Set(log.messages.map(\.id))
 

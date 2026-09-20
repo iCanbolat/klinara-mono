@@ -21,10 +21,13 @@ struct ScheduleExceptionListView: View {
     var body: some View {
         KlinaraScreen(
             state: state,
+            skeleton: .cards,
             emptyCheck: \.isEmpty,
             emptyTitle: "İstisna yok",
             emptyMessage: "Seçilen aralıkta izin, tatil veya özel açılış kaydı bulunmuyor.",
             emptyIcon: "calendar.badge.exclamationmark",
+            emptyActionTitle: canWrite ? "Yeni istisna" : nil,
+            emptyAction: canWrite ? { showsEditor = true } : nil,
             onRetry: { await load() }
         ) { items in
             if let actionError { ErrorBanner(error: actionError) }

@@ -20,6 +20,7 @@ import com.klinara.android.designsystem.components.KlinaraButton
 import com.klinara.android.designsystem.components.KlinaraButtonKind
 import com.klinara.android.designsystem.components.KlinaraCard
 import com.klinara.android.designsystem.components.KlinaraRow
+import com.klinara.android.designsystem.components.KlinaraSkeletonSection
 import com.klinara.android.designsystem.components.KlinaraToggleRow
 import com.klinara.android.features.auth.AppSession
 import com.klinara.android.services.ServiceContainer
@@ -72,7 +73,7 @@ fun CustomerOptOutSection(
 
         when (val records = state.records) {
             Loadable.Loading ->
-                Text("Yükleniyor…", style = KlinaraType.bodyM, color = KlinaraTheme.colors.charcoalMuted)
+                KlinaraSkeletonSection(hasDetail = false)
 
             is Loadable.Failed ->
                 ErrorBanner(
@@ -180,4 +181,4 @@ private fun OptOutBody(
 }
 
 /** Kanal bazlı kapsam (A8.2) — push'a ticari ileti gitmiyor, listede yok. */
-internal val OPT_OUT_CHANNELS: List<NotificationChannel> = NotificationChannel.selectable
+internal val OPT_OUT_CHANNELS: List<NotificationChannel> = NotificationChannel.customerSelectable

@@ -565,6 +565,7 @@ private fun ManagementTab(
                 container = container,
                 onBack = { navController.popBackStack() },
                 onOpen = { id -> navController.navigate(ShellRoutes.ServiceEditor(id)) },
+                trailing = trailing,
             )
         }
 

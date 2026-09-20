@@ -35,6 +35,8 @@ import com.klinara.android.designsystem.components.KlinaraCard
 import com.klinara.android.designsystem.components.KlinaraDivider
 import com.klinara.android.designsystem.components.KlinaraRow
 import com.klinara.android.designsystem.components.KlinaraScreen
+import com.klinara.android.designsystem.components.KlinaraSkeleton
+import com.klinara.android.designsystem.components.KlinaraSkeletonStyle
 import com.klinara.android.designsystem.components.KlinaraTextEditor
 import com.klinara.android.designsystem.components.KlinaraTextField
 import com.klinara.android.designsystem.components.KlinaraToggleRow
@@ -68,7 +70,7 @@ fun NotificationTemplateListScreen(
         }
         when (templates) {
             Loadable.Loading ->
-                Text("Yükleniyor…", style = KlinaraType.bodyM, color = KlinaraTheme.colors.charcoalMuted)
+                KlinaraSkeleton(style = KlinaraSkeletonStyle.rows)
             is Loadable.Failed ->
                 ErrorBanner(message = templates.message, onRetry = if (templates.isRetryable) onRetry else null)
             is Loadable.Loaded ->

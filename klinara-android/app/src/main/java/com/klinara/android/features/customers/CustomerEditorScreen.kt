@@ -24,6 +24,9 @@ import com.klinara.android.designsystem.components.KlinaraButton
 import com.klinara.android.designsystem.components.KlinaraCard
 import com.klinara.android.designsystem.components.KlinaraScreen
 import com.klinara.android.designsystem.components.KlinaraSegmentedPicker
+import com.klinara.android.designsystem.components.KlinaraSkeleton
+import com.klinara.android.designsystem.components.KlinaraSkeletonSection
+import com.klinara.android.designsystem.components.KlinaraSkeletonStyle
 import com.klinara.android.designsystem.components.KlinaraTextField
 import com.klinara.android.designsystem.components.PhoneNumberField
 import com.klinara.android.services.ServiceContainer
@@ -70,7 +73,7 @@ fun CustomerEditorScreen(
 
             when (val loaded = state.loaded) {
                 Loadable.Loading ->
-                    Text("Yükleniyor…", style = KlinaraType.bodyM, color = KlinaraTheme.colors.charcoalMuted)
+                    KlinaraSkeleton(style = KlinaraSkeletonStyle.formLong)
 
                 is Loadable.Failed ->
                     ErrorBanner(
@@ -232,7 +235,7 @@ private fun TagPickerCard(
     ) {
         when (val tags = state.tags) {
             Loadable.Loading ->
-                Text("Yükleniyor…", style = KlinaraType.bodyM, color = KlinaraTheme.colors.charcoalMuted)
+                KlinaraSkeletonSection(hasDetail = false)
 
             is Loadable.Failed ->
                 // Etiket gelmemesi formu düşürmez: ikinci dereceden bir bilgi için

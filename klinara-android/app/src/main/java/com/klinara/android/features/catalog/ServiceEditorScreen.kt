@@ -24,6 +24,8 @@ import com.klinara.android.designsystem.components.KlinaraRow
 import com.klinara.android.designsystem.components.KlinaraScreen
 import com.klinara.android.designsystem.components.KlinaraSegmentedPicker
 import com.klinara.android.designsystem.components.KlinaraSelectableRow
+import com.klinara.android.designsystem.components.KlinaraSkeleton
+import com.klinara.android.designsystem.components.KlinaraSkeletonStyle
 import com.klinara.android.designsystem.components.KlinaraStepperRow
 import com.klinara.android.designsystem.components.KlinaraTextEditor
 import com.klinara.android.designsystem.components.KlinaraTextField
@@ -76,7 +78,7 @@ fun ServiceEditorScreen(
 
             when (val loaded = state.loaded) {
                 Loadable.Loading ->
-                    Text("Yükleniyor…", style = KlinaraType.bodyM, color = KlinaraTheme.colors.charcoalMuted)
+                    KlinaraSkeleton(style = KlinaraSkeletonStyle.formLong)
                 is Loadable.Failed ->
                     ErrorBanner(message = loaded.message, onRetry = if (loaded.isRetryable) viewModel::load else null)
                 is Loadable.Loaded -> {

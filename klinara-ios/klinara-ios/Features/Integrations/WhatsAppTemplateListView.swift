@@ -28,10 +28,7 @@ struct WhatsAppTemplateListView: View {
     private var content: some View {
         switch store.templatesState {
         case .loading:
-            ProgressView()
-                .tint(KlinaraColor.sage)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, KlinaraMetrics.xl)
+            KlinaraSkeletonBody(style: .cardsShort)
 
         case .failed(let error):
             ErrorBanner(error: error, onRetry: { Task { await store.loadTemplates() } })

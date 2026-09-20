@@ -19,10 +19,15 @@ struct BranchListView: View {
     var body: some View {
         KlinaraScreen(
             state: state,
+            skeleton: .cardsShort,
             emptyCheck: \.isEmpty,
             emptyTitle: "Şube yok",
-            emptyMessage: canWrite ? "İlk şubenizi sağ üstteki + ile ekleyin." : nil,
+            // Mesaj artık "+ ile ekleyin" demiyor: aksiyon boş durumun
+            // kendisinde duruyor ve yön tarifi gereksizleşti.
+            emptyMessage: canWrite ? "İlk şubenizi ekleyerek başlayın." : nil,
             emptyIcon: "building.2",
+            emptyActionTitle: canWrite ? "Yeni şube" : nil,
+            emptyAction: canWrite ? { showsCreate = true } : nil,
             onRetry: { await load() }
         ) { branches in
             KlinaraCard(

@@ -18,8 +18,11 @@ import com.klinara.android.designsystem.components.KlinaraButton
 import com.klinara.android.designsystem.components.KlinaraButtonKind
 import com.klinara.android.designsystem.components.KlinaraCard
 import com.klinara.android.designsystem.components.KlinaraScreen
+import com.klinara.android.designsystem.components.KlinaraSkeleton
+import com.klinara.android.designsystem.components.KlinaraSkeletonStyle
 import com.klinara.android.designsystem.components.KlinaraTimeField
 import com.klinara.android.designsystem.components.KlinaraToggleRow
+import com.klinara.android.designsystem.components.rememberUnsavedChangesGuard
 import com.klinara.android.features.auth.AppSession
 import com.klinara.android.services.ServiceContainer
 import com.klinara.android.services.auth.BranchSummary
@@ -87,7 +90,7 @@ private fun BranchHoursContent(
 
             when (val loaded = state.loaded) {
                 Loadable.Loading ->
-                    Text("Yükleniyor…", style = KlinaraType.bodyM, color = KlinaraTheme.colors.charcoalMuted)
+                    KlinaraSkeleton(style = KlinaraSkeletonStyle.rowsLong)
                 is Loadable.Failed ->
                     ErrorBanner(message = loaded.message, onRetry = if (loaded.isRetryable) viewModel::load else null)
                 is Loadable.Loaded -> {

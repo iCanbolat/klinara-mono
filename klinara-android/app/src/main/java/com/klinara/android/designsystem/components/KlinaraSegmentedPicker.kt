@@ -3,16 +3,20 @@ package com.klinara.android.designsystem.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -31,11 +35,9 @@ import com.klinara.android.designsystem.KlinaraType
  * A0.3'te "çağıranı yok" diye ertelenmişti; takvimin gün/hafta/ajanda geçişi ilk
  * gerçek çağıran.
  *
- * **İkon YOK, yalnız metin.** iOS'taki karşılığı ikon + metin taşıyor ama Compose
- * `material-icons-core` setinde ızgara/hafta ikonu bulunmuyor ve
- * `material-icons-extended` bir mod seçici uğruna eklenecek bir bağımlılık değil
- * (§7.7: "kolay oldu" gerekçe değildir). "Ajanda / Gün / Hafta" kendi kendini
- * anlatıyor; ikon burada bilgi taşımıyordu zaten.
+ * İsteğe bağlı [icon]: iOS karşılığı ikon + metin taşıyor. `material-icons-core`
+ * setinde ızgara/hafta ikonu bulunmadığı için ikonlar `res/drawable` altındaki küçük
+ * vektörlerden gelir; `material-icons-extended` bir mod seçici uğruna eklenmedi.
  *
  * Erişilebilirlik: her segment `Role.Tab` ve `selected` durumuyla duyurulur, dokunma
  * hedefi [KlinaraMetrics.minTouchTarget] altına düşmez.
@@ -48,6 +50,7 @@ fun <T> KlinaraSegmentedPicker(
     title: (T) -> String,
     modifier: Modifier = Modifier,
     accessibilityLabel: (T) -> String = title,
+    icon: (@Composable (T) -> Painter)? = null,
 ) {
     val colors = KlinaraTheme.colors
     val shape = RoundedCornerShape(KlinaraMetrics.controlRadius)
@@ -86,17 +89,26 @@ fun <T> KlinaraSegmentedPicker(
                         }.padding(horizontal = KlinaraMetrics.xs),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    text = title(option),
-                    style = KlinaraType.bodyEmphasis,
-                    color = if (isSelected) colors.surfaceRaised else colors.charcoalMuted,
-                    maxLines = 1,
-                    // fontScale 2.0'da üç segment yan yana sığmıyor; kırpmak sarmaktan
-                    // iyi, çünkü seçili durum ve konum anlamı zaten taşıyor (A2.1'de
-                    // sekme etiketleri için verilen kararın aynısı).
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center,
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    val tint = if (isSelected) colors.surfaceRaised else colors.charcoalMuted
+                    if (icon != null) {
+                        Icon(icon(option), contentDescription = null, tint = tint, modifier = Modifier.size(ICON_SIZE))
+                    }
+                    Text(
+                        text = title(option),
+                        style = KlinaraType.bodyEmphasis,
+                        color = tint,
+                        maxLines = 1,
+                        // fontScale 2.0'da üç segment yan yana sığmıyor; kırpmak sarmaktan
+                        // iyi, çünkü seçili durum ve konum anlamı zaten taşıyor (A2.1'de
+                        // sekme etiketleri için verilen kararın aynısı).
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                    )
+                }
             }
         }
     }
@@ -105,3 +117,4 @@ fun <T> KlinaraSegmentedPicker(
 private val TRACK_PADDING = 3.dp
 private val SEGMENT_HEIGHT = 40.dp
 private val SEGMENT_RADIUS = 9.dp
+private val ICON_SIZE = 16.dp

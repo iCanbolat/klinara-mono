@@ -24,6 +24,8 @@ import com.klinara.android.designsystem.components.KlinaraCard
 import com.klinara.android.designsystem.components.KlinaraDivider
 import com.klinara.android.designsystem.components.KlinaraRow
 import com.klinara.android.designsystem.components.KlinaraScreen
+import com.klinara.android.designsystem.components.KlinaraSkeleton
+import com.klinara.android.designsystem.components.KlinaraSkeletonStyle
 import com.klinara.android.services.formatting.BranchClock
 import com.klinara.android.services.formatting.Money
 import com.klinara.android.services.networking.Loadable
@@ -51,7 +53,7 @@ fun CustomerPackageDetailScreen(
     KlinaraScreen(title = state.pkg.valueOrNull?.name ?: "Paket", modifier = modifier, onBack = onBack) {
         when (val pkg = state.pkg) {
             Loadable.Loading ->
-                Text("Yükleniyor…", style = KlinaraType.bodyM, color = KlinaraTheme.colors.charcoalMuted)
+                KlinaraSkeleton(style = KlinaraSkeletonStyle.detail)
             is Loadable.Failed -> ErrorBanner(message = pkg.message, onRetry = if (pkg.isRetryable) onRetry else null)
             is Loadable.Loaded -> {
                 SummaryCard(pkg.value, clock, now)

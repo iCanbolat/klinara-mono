@@ -134,6 +134,13 @@ final class AuthFlowModel {
             return
         }
         await loadProfileAndRoute()
+
+        // Geri yükleme ağ/sunucu hatasıyla düştüyse hiçbir adım atanmadı ve
+        // açılış ekranı sonsuza dek dönerdi. Oturum silinmez (ağ geri gelince
+        // token hâlâ geçerli olabilir); kullanıcı giriş ekranında hatayı görür.
+        if step == .launch {
+            step = .identifier
+        }
     }
 
     // MARK: - Passkey ile giriş
@@ -412,6 +419,12 @@ final class AuthFlowModel {
         switch outcome {
         case .success(let tokenPair):
             tokens.save(tokenPair)
+            // `save` önceki oturumun şube/kiracı kimliğini korur (token
+            // yenilemede gereken bu). Yeni girişte ise kalıntı bir şube kimliği
+            // `X-Branch-Id` olarak gidip her isteği `BRANCH_FORBIDDEN` ile
+            // düşürür — örn. mock'tan canlıya geçişte ya da başka kliniğe girişte.
+            // Şube, `routeToBranchOrFinish` içinde erişilebilir listeden seçilir.
+            tokens.setBranch(nil)
             resetChallenge()
             await loadProfileAndRoute()
 

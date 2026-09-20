@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Yönetim hub satır ikonu. iOS SF Symbol karşılığı için KlinaraIcons.kt. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="1.6"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M5.2,3.6h10.1l3.5,3.5v13a1.5,1.5 0,0 1,-1.5 1.5h-12.1a1.5,1.5 0,0 1,-1.5 -1.5v-15a1.5,1.5 0,0 1,1.5 -1.5z" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="1.6"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M15.3,3.6v3.5h3.5" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="1.6"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M8,12.2h8M8,15.4h8M8,18.6h5" />
+</vector>

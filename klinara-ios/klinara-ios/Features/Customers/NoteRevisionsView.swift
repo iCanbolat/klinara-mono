@@ -20,6 +20,7 @@ struct NoteRevisionsView: View {
         NavigationStack {
             KlinaraScreen(
                 state: state,
+                skeleton: .rowsShort,
                 onRetry: { await load() }
             ) { revisions in
                 KlinaraCard(title: "Güncel metin", footnote: "Sürüm \(note.version)") {

@@ -1,20 +1,18 @@
 {
   "id": null,
-  "event": "appointment_confirmation",
+  "event": "staff_internal",
   "channel": "email",
   "locale": "tr",
   "kind": "transactional",
-  "subject": "Randevunuz oluşturuldu",
-  "body": "Sayın {{customerName}},\\n\\n{{appointmentAt}} tarihindeki {{serviceName}} randevunuz oluşturuldu.\\n\\n{{branchName}}",
+  "subject": "{{subject}}",
+  "body": "{{message}}",
   "whatsappTemplateName": null,
   "whatsappTemplateLanguage": null,
   "whatsappVariables": [],
   "isActive": true,
   "isDefault": true,
   "variables": [
-    "customerName",
-    "appointmentAt",
-    "serviceName",
-    "branchName"
+    "subject",
+    "message"
   ]
 }

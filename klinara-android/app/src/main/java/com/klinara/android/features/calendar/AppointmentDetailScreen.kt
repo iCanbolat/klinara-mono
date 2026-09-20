@@ -34,6 +34,8 @@ import com.klinara.android.designsystem.components.KlinaraDivider
 import com.klinara.android.designsystem.components.KlinaraNavigationRow
 import com.klinara.android.designsystem.components.KlinaraRow
 import com.klinara.android.designsystem.components.KlinaraScreen
+import com.klinara.android.designsystem.components.KlinaraSkeleton
+import com.klinara.android.designsystem.components.KlinaraSkeletonStyle
 import com.klinara.android.designsystem.components.KlinaraTextField
 import com.klinara.android.features.auth.AppSession
 import com.klinara.android.services.ServiceContainer
@@ -86,7 +88,7 @@ fun AppointmentDetailScreen(
 
             when (val appointment = state.appointment) {
                 Loadable.Loading ->
-                    Text("Yükleniyor…", style = KlinaraType.bodyM, color = KlinaraTheme.colors.charcoalMuted)
+                    KlinaraSkeleton(style = KlinaraSkeletonStyle.detail)
 
                 is Loadable.Failed ->
                     ErrorBanner(

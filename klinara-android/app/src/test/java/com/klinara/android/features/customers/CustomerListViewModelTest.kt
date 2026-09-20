@@ -20,6 +20,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
@@ -171,6 +172,60 @@ class CustomerListViewModelTest {
             val results = viewModel.state.value.search?.valueOrNull.orEmpty()
             assertTrue(results.any { it.fullName == MockCustomers.ALL.first().fullName })
         }
+
+    @Test
+    @DisplayName("Sayfa hatası GÖRÜNÜR olur ve imleç korunur; tekrar denenince sayfa gelir")
+    fun failedPageIsVisibleAndRetryable() =
+        runTest {
+            val flaky = MockCustomerService(latencyEnabled = false)
+            val counting = CountingCustomers(flaky, pageLimit = 3)
+            val viewModel = subject(counting)
+            viewModel.load()
+            advanceUntilIdle()
+            val loaded = viewModel.state.value.visible.valueOrNull!!
+
+            flaky.failing = true
+            viewModel.loadMore()
+            advanceUntilIdle()
+
+            // Hata sessizce yutulursa listenin sonunda "Yükleniyor…" sonsuza kadar durur
+            // ve tetikleyici (liste büyümediği için) bir daha koşmaz.
+            assertNotNull(viewModel.state.value.loadMoreError)
+            assertFalse(viewModel.state.value.canLoadMore)
+            assertTrue(viewModel.state.value.hasMore)
+
+            flaky.failing = false
+            viewModel.retryLoadMore()
+            advanceUntilIdle()
+
+            assertNull(viewModel.state.value.loadMoreError)
+            assertTrue(viewModel.state.value.visible.valueOrNull!!.size > loaded.size)
+        }
+
+    @Test
+    @DisplayName("Etiket seçiliyken sonraki sayfa da `tagId` ile isteniyor")
+    fun loadMoreCarriesTheSelectedTag() =
+        runTest {
+            val counting = CountingCustomers(MockCustomerService(latencyEnabled = false), pageLimit = 3)
+            val viewModel = subject(counting)
+            viewModel.load()
+            viewModel.loadTags()
+            advanceUntilIdle()
+
+            val tagId = viewModel.state.value.tags.first().id
+            viewModel.selectTag(tagId)
+            advanceUntilIdle()
+            assertEquals(tagId, counting.lastListQuery?.tagId)
+
+            if (viewModel.state.value.canLoadMore) {
+                viewModel.loadMore()
+                advanceUntilIdle()
+                // Filtre sunucu tarafında: ikinci sayfa filtresiz istenirse kullanıcı,
+                // seçtiği etikete ait olmayan kayıtların listeye eklendiğini görür.
+                assertEquals(tagId, counting.lastListQuery?.tagId)
+                assertNotNull(counting.lastListQuery?.cursor)
+            }
+        }
 }
 
 /**
@@ -187,9 +242,13 @@ private class CountingCustomers(
         private set
     var lastTerm: String? = null
         private set
+    var lastListQuery: CustomerListQuery? = null
+        private set
 
-    override suspend fun list(query: CustomerListQuery): Page<Customer> =
-        delegate.list(if (pageLimit != null) query.copy(limit = pageLimit) else query)
+    override suspend fun list(query: CustomerListQuery): Page<Customer> {
+        lastListQuery = query
+        return delegate.list(if (pageLimit != null) query.copy(limit = pageLimit) else query)
+    }
 
     override suspend fun get(id: String): Customer = delegate.get(id)
 

@@ -207,6 +207,23 @@ class BranchClock(timeZoneIdentifier: String?) {
         now: Instant = Instant.now(),
     ): Boolean = isSameDay(instant, now)
 
+    /**
+     * Bir gün başlığının etiketi: "Bugün", "Dün", yoksa "11 Eylül 2026".
+     *
+     * Gruplanmış listelerde tarih satır satır tekrar etmez, başlıkta bir kez durur; okuyanın
+     * aradığı ayrım da çoğunlukla "bugün mü, değil mi". Yıl **her zaman** yazılır: "11 Eylül"
+     * bir yıl sonra okunduğunda hangi eylül olduğunu söylemez.
+     */
+    fun relativeDayLabel(
+        instant: Instant,
+        now: Instant = Instant.now(),
+    ): String =
+        when {
+            isSameDay(instant, now) -> "Bugün"
+            isSameDay(instant, adding(-1, now)) -> "Dün"
+            else -> formatDate(instant)
+        }
+
     private companion object {
         const val MINUTES_PER_HOUR = 60
         const val SECONDS_PER_MINUTE = 60L

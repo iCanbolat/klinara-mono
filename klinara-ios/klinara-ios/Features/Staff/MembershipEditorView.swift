@@ -56,7 +56,7 @@ struct MembershipEditorView: View {
                 ErrorBanner(error: loadError, onRetry: { Task { await load() } })
                     .padding(KlinaraMetrics.screenInset)
             } else {
-                ProgressView().tint(KlinaraColor.sage)
+                KlinaraSkeletonView(style: .formShort)
             }
         }
         .navigationTitle("Roller ve şubeler")

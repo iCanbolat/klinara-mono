@@ -22,6 +22,14 @@ data class ServiceCategoryListUiState(
     val draftError: String? = null,
     val draftFieldErrors: Map<String, String> = emptyMap(),
     val isSaving: Boolean = false,
+    /**
+     * Sürükleyerek sıralama sürüyor.
+     *
+     * [isSaving]'den AYRI: o, ekranı kilitleyen "Kaydediliyor…" örtüsünü açıyor ve
+     * sürüklemenin ardından ekranın yarım saniye donması, taşımayı bir kayıt işlemi gibi
+     * gösterirdi. Sıralama iyimser uygulanır, örtü açılmaz.
+     */
+    val isReordering: Boolean = false,
     val error: String? = null,
     val pendingDeactivation: ServiceCategory? = null,
 ) {
@@ -37,10 +45,10 @@ data class ServiceCategoryListUiState(
 /**
  * Hizmet kategorileri (A7.1) — iOS `ServiceCategoryListView` paritesi.
  *
- * **Sıralama iki `PATCH`**: taşınan kategori komşunun `sortOrder`'ını, komşu da onunkini
- * alır. Sunucuda toplu sıralama ucu yok (Kural 1); ikinci yazma düşerse iki kategori aynı
- * sırayı taşır — bu yüzden her hatada liste **sunucudan yeniden çekilir**, yerel tahmin
- * gösterilmez.
+ * **Sıralama kayıt başına `PATCH`**: sunucuda toplu sıralama ucu yok (Kural 1) ve
+ * sürükleme bitişik olmayan bir hedefe bırakılabildiği için, etkilenen aralık yeniden
+ * numaralanıp yalnız sırası değişen kayıtlar yazılır. Yazmalardan biri düşerse iki kategori
+ * aynı sırayı taşıyabilir — bu yüzden her hatada liste **sunucudan yeniden çekilir**.
  */
 class ServiceCategoryListViewModel(
     private val catalog: CatalogService,
@@ -112,32 +120,43 @@ class ServiceCategoryListViewModel(
 
     // --- Sıralama ---
 
-    fun move(
-        category: ServiceCategory,
-        offset: Int,
+    /**
+     * [from] indeksindeki kategoriyi [to] indeksine taşır.
+     *
+     * Komşuyla takas değil **yeniden numaralama**: sürükleme bitişik olmayan bir hedefe
+     * bırakılabiliyor ve art arda takas etmek, aradaki her kayda iki yazma demekti. Yalnız
+     * sırası gerçekten değişen kayıtlar `PATCH` edilir.
+     *
+     * Sıra önce **yerel olarak** uygulanır: sürüklenen satırın parmağın altından eski
+     * yerine geri zıplaması, işlemin başarısız olduğunu düşündürürdü. Sunucu cevabı
+     * geldiğinde liste yine de yeniden çekilir — ikinci yazma düşmüşse doğru sırayı
+     * sunucu söyler, yerel tahmin değil.
+     */
+    fun moveTo(
+        from: Int,
+        to: Int,
     ) {
         val current = _state.value
-        if (current.isSaving) return
-        val ordered = current.categories
-        val index = ordered.indexOfFirst { it.id == category.id }
-        val neighbour = ordered.getOrNull(index + offset) ?: return
-        _state.update { it.copy(isSaving = true, error = null) }
+        if (current.isSaving || current.isReordering || from == to) return
+        val ordered = current.categories.toMutableList()
+        if (from !in ordered.indices || to !in ordered.indices) return
+
+        ordered.add(to, ordered.removeAt(from))
+        val renumbered = ordered.mapIndexed { index, category -> category.copy(sortOrder = index) }
+        val previousOrder = current.categories.associate { it.id to it.sortOrder }
+        val changed = renumbered.filter { previousOrder[it.id] != it.sortOrder }
+        if (changed.isEmpty()) return
+
+        _state.update { it.copy(catalog = it.catalog.withCategories(renumbered), isReordering = true, error = null) }
         viewModelScope.launch {
             try {
-                // Eşit sortOrder'lı iki kategori (eski veri) takas edilince yine eşit kalır;
-                // o durumda sıra indeksten yeniden kurulur.
-                val (mine, theirs) =
-                    if (category.sortOrder == neighbour.sortOrder) {
-                        (index + offset) to index
-                    } else {
-                        neighbour.sortOrder to category.sortOrder
-                    }
-                catalog.updateCategory(category.id, UpdateServiceCategoryInput(sortOrder = mine))
-                catalog.updateCategory(neighbour.id, UpdateServiceCategoryInput(sortOrder = theirs))
-                _state.update { it.copy(isSaving = false) }
+                changed.forEach { category ->
+                    catalog.updateCategory(category.id, UpdateServiceCategoryInput(sortOrder = category.sortOrder))
+                }
+                _state.update { it.copy(isReordering = false) }
                 load()
             } catch (error: ApiError) {
-                _state.update { it.copy(isSaving = false, error = error.displayMessage) }
+                _state.update { it.copy(isReordering = false, error = error.displayMessage) }
                 load()
             }
         }
@@ -158,7 +177,9 @@ class ServiceCategoryListViewModel(
     fun confirmDeactivate() {
         val target = _state.value.pendingDeactivation ?: return
         if (_state.value.isSaving) return
-        _state.update { it.copy(pendingDeactivation = null, isSaving = true, error = null) }
+        // Panel de kapanır: pasife alınan kategorinin düzenleme formu açık kalırsa, kullanıcı
+        // az önce kapattığı kaydı hâlâ "Aktif" anahtarıyla görür. Vazgeçilirse panel durur.
+        _state.update { it.copy(pendingDeactivation = null, draft = null, isSaving = true, error = null) }
         viewModelScope.launch {
             try {
                 val updated = catalog.deactivateCategory(target.id)
@@ -177,6 +198,12 @@ class ServiceCategoryListViewModel(
                     ServiceCategoryListViewModel(container.catalog) as T
             }
     }
+}
+
+/** Sıralama sonrası tüm kategori kümesini değiştirir — tek tek `withCategory` çağırmak yerine. */
+private fun Loadable<CatalogSnapshot>.withCategories(categories: List<ServiceCategory>): Loadable<CatalogSnapshot> {
+    val snapshot = valueOrNull ?: return this
+    return Loadable.Loaded(snapshot.copy(categories = categories))
 }
 
 private fun Loadable<CatalogSnapshot>.withCategory(category: ServiceCategory): Loadable<CatalogSnapshot> {

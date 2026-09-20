@@ -26,6 +26,7 @@ struct BindPackageSheet: View {
         NavigationStack {
             KlinaraScreen(
                 state: entitlements,
+                skeleton: .rowsShort,
                 emptyCheck: { $0.isEmpty },
                 emptyTitle: "Kullanılabilir hak yok",
                 emptyMessage: "Müşterinin bu hizmet için aktif ve süresi dolmamış paketi bulunmuyor.",

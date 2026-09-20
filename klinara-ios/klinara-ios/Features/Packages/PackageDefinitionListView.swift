@@ -26,34 +26,40 @@ struct PackageDefinitionListView: View {
     /// `.task(id:)` anahtarı: şube değişimi de kapsamı değiştiriyor.
     private var scopeKey: String { scope ?? "*" }
 
-    /// Kapsam seçici. Tek şubeli kiracıda çizilmiyor: seçenek sunmayan bir
-    /// seçici, ekranda yer kaplayan bir yanıltmadır.
-    private var scopePicker: some View {
-        Picker("Kapsam", selection: $scopedToBranch) {
-            Text("Tüm şubeler").tag(false)
-            Text(session.selectedBranch?.name ?? "Seçili şube").tag(true)
+    /// Kapsam seçici — gövdede değil, üst çubuktaki seçenekler menüsünde.
+    ///
+    /// Segment seçici listenin üstünde kalıcı bir şerit kaplıyordu; oysa kapsam
+    /// bir kez ayarlanıp unutulan bir tercih. Menü, `Pasifleri göster` ile aynı
+    /// yerde duruyor çünkü ikisi de aynı soruyu soruyor: "listede ne görünsün?".
+    ///
+    /// Oturumun şube menüsüne KATILMADI: orası seçili şubeyi tüm uygulama için
+    /// değiştirir, burası yalnız bu listenin kapsamı.
+    @ViewBuilder
+    private var scopeMenu: some View {
+        if session.canSwitchBranch {
+            Picker("Kapsam", selection: $scopedToBranch) {
+                Text("Tüm şubeler").tag(false)
+                Text(session.selectedBranch?.name ?? "Seçili şube").tag(true)
+            }
         }
-        .pickerStyle(.segmented)
-        .padding(.bottom, KlinaraMetrics.xs)
     }
 
     var body: some View {
         KlinaraScreen(
             state: store.state,
+            skeleton: .cards,
             emptyCheck: { $0.isEmpty },
             emptyTitle: "Henüz paket yok",
             emptyMessage: canWrite
                 ? "İlk paketi tanımlayarak başlayın. Bir paket birden çok hizmet kalemi içerebilir."
                 : "Paket tanımlamak için yöneticinizle görüşün.",
             emptyIcon: "shippingbox",
+            emptyActionTitle: canWrite ? "Yeni paket" : nil,
+            emptyAction: canWrite ? { editing = .create } : nil,
             onRetry: { await store.reload() }
         ) { definitions in
             if let error, !error.isFieldScoped {
                 ErrorBanner(error: error)
-            }
-
-            if session.canSwitchBranch {
-                scopePicker
             }
 
             let visible = filtered(definitions)
@@ -82,13 +88,14 @@ struct PackageDefinitionListView: View {
         .navigationTitle("Paketler")
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $searchText, prompt: "Paket ara")
+        // Üst çubukta ŞUBE SEÇİCİ YOK: başlık, arama alanı, şube menüsü ve
+        // seçenekler menüsü aynı 44pt'lik şeride sığmıyordu — şube adı uzun
+        // olan kiracıda başlık kırpılıyordu. Kapsam zaten "…" menüsünde ve bu
+        // ekranın sorusu "hangi şubedeyim" değil, "listede ne görünsün".
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                BranchMenu(session: session)
-            }
-
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
+                    scopeMenu
                     Toggle("Pasifleri göster", isOn: $showsInactive)
                     if canWrite {
                         Button {
@@ -143,67 +150,73 @@ struct PackageDefinitionListView: View {
             editing = .edit(definition)
         } label: {
             VStack(alignment: .leading, spacing: KlinaraMetrics.sm) {
-                HStack(alignment: .top, spacing: KlinaraMetrics.md) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(definition.name)
-                            .klinaraText(.bodyEmphasis)
-                            .foregroundStyle(KlinaraColor.charcoal)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(alignment: .firstTextBaseline, spacing: KlinaraMetrics.md) {
+                    Text(definition.name)
+                        .klinaraText(.bodyEmphasis)
+                        .foregroundStyle(KlinaraColor.charcoal)
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
-                        Text(summary(definition))
+                    Text(Money.format(minor: definition.totalPriceMinor))
+                        .klinaraText(.bodyEmphasis)
+                        .foregroundStyle(KlinaraColor.charcoal)
+                        .monospacedDigit()
+
+                    // Üstü çizili liste fiyatı yalnız indirim varken: eşitken
+                    // göstermek "indirim yok" mesajını gürültüye çevirirdi.
+                    if definition.discountMinor != nil {
+                        Text(Money.format(minor: definition.listPriceMinor))
                             .klinaraText(.bodyM)
                             .font(.footnote)
+                            .strikethrough()
                             .foregroundStyle(KlinaraColor.charcoalMuted)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text(Money.format(minor: definition.totalPriceMinor))
-                            .klinaraText(.bodyEmphasis)
-                            .foregroundStyle(KlinaraColor.charcoal)
                             .monospacedDigit()
-
-                        // Üstü çizili liste fiyatı yalnız indirim varken:
-                        // eşitken göstermek "indirim yok" mesajını gürültüye çevirirdi.
-                        if definition.discountMinor != nil {
-                            Text(Money.format(minor: definition.listPriceMinor))
-                                .klinaraText(.bodyM)
-                                .font(.footnote)
-                                .strikethrough()
-                                .foregroundStyle(KlinaraColor.charcoalMuted)
-                                .monospacedDigit()
-                        }
                     }
-                    .fixedSize()
-                    .layoutPriority(1)
 
                     Image(systemName: "chevron.right")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(KlinaraColor.charcoalMuted)
-                        .padding(.top, 4)
                 }
 
-                HStack(spacing: KlinaraMetrics.xs) {
-                    if let percent = definition.discountPercent {
-                        KlinaraBadge(text: "%\(percent) indirim", tone: .positive, icon: "tag")
-                    }
-                    if definition.isArchived {
-                        KlinaraBadge(text: "Arşiv", tone: .muted)
-                    } else if !definition.isActive {
-                        KlinaraBadge(text: "Pasif", tone: .muted)
-                    }
-                    // Rozet artık şubenin ADINI taşıyor: "şubeye özel"
-                    // hangi şube olduğunu söylemiyordu ve çok şubeli bir
-                    // kiracıda tek başına bir işe yaramıyordu.
-                    if let scope = definition.branchId {
-                        KlinaraBadge(text: branchName(scope), tone: .neutral)
-                    }
-                    if definition.isOnlineSellable {
-                        KlinaraBadge(text: "Online", tone: .positive, icon: "globe")
-                    }
-                    if !definition.isTransferable {
-                        KlinaraBadge(text: "Devredilemez", tone: .warning)
+                // Kalem dökümü ile geçerlilik AYRI satırlarda: tek bir
+                // noktalı dizide ikisi de okunmuyordu ve hangisinin nerede
+                // bittiği belli olmuyordu.
+                Text(contents(definition))
+                    .klinaraText(.bodyM)
+                    .font(.footnote)
+                    .foregroundStyle(KlinaraColor.charcoalMuted)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                Text(validity(definition))
+                    .klinaraText(.bodyM)
+                    .font(.footnote)
+                    .foregroundStyle(KlinaraColor.charcoalMuted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                // Rozet sırası iki platformda SABİT: indirim → durum → şube →
+                // online → devredilemez. Sıra değişirse aynı paket iki
+                // uygulamada farklı okunur.
+                if hasBadges(definition) {
+                    HStack(spacing: KlinaraMetrics.xs) {
+                        if let percent = definition.discountPercent {
+                            KlinaraBadge(text: "%\(percent) indirim", tone: .positive, icon: "tag")
+                        }
+                        if definition.isArchived {
+                            KlinaraBadge(text: "Arşiv", tone: .muted)
+                        } else if !definition.isActive {
+                            KlinaraBadge(text: "Pasif", tone: .muted)
+                        }
+                        // Rozet şubenin ADINI taşıyor: "şubeye özel" hangi şube
+                        // olduğunu söylemiyordu.
+                        if let scope = definition.branchId {
+                            KlinaraBadge(text: branchName(scope), tone: .neutral)
+                        }
+                        if definition.isOnlineSellable {
+                            KlinaraBadge(text: "Online", tone: .positive, icon: "globe")
+                        }
+                        if !definition.isTransferable {
+                            KlinaraBadge(text: "Devredilemez", tone: .warning)
+                        }
                     }
                 }
             }
@@ -220,20 +233,43 @@ struct PackageDefinitionListView: View {
                 }
             }
         }
+        // Kaydırma jesti VoiceOver kullanıcısına hiç görünmüyor; aynı eylem
+        // bağlam menüsünde de duruyor (Android'de satır menüsü).
+        .contextMenu {
+            if canWrite, !definition.isArchived {
+                Button(role: .destructive) {
+                    pendingRetirement = definition
+                } label: {
+                    Label("Emekliye ayır", systemImage: "archivebox")
+                }
+            }
+        }
     }
 
-    /// "12 seans · 10 Bölgesel Lazer, 2 Hydrafacial · 365 gün geçerli".
-    /// Geçerlilik süresi burada duruyor çünkü paketin satılabilirliğini
-    /// belirleyen ikinci bilgi o.
-    private func summary(_ definition: PackageDefinition) -> String {
+    private func hasBadges(_ definition: PackageDefinition) -> Bool {
+        definition.discountPercent != nil
+            || definition.isArchived
+            || !definition.isActive
+            || definition.branchId != nil
+            || definition.isOnlineSellable
+            || !definition.isTransferable
+    }
+
+    /// "12 seans · 10 Bölgesel Lazer, 2 Hydrafacial" — paketin İÇİ.
+    private func contents(_ definition: PackageDefinition) -> String {
         var parts = ["\(definition.totalSessions) seans"]
         let items = definition.items
             .sorted { $0.sortOrder < $1.sortOrder }
             .map { "\($0.quantity) \($0.serviceName)" }
             .joined(separator: ", ")
         if !items.isEmpty { parts.append(items) }
-        parts.append(definition.validityDays.map { "\($0) gün geçerli" } ?? "Süresiz")
         return parts.joined(separator: " · ")
+    }
+
+    /// Geçerlilik kendi satırında: paketin satılabilirliğini belirleyen ikinci
+    /// bilgi o ve kalem dökümünün kuyruğunda kayboluyordu.
+    private func validity(_ definition: PackageDefinition) -> String {
+        definition.validityDays.map { "\($0) gün geçerli" } ?? "Süresiz"
     }
 
     // MARK: Eylem

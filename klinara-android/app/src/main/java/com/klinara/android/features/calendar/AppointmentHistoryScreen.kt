@@ -24,6 +24,8 @@ import com.klinara.android.designsystem.components.ErrorBanner
 import com.klinara.android.designsystem.components.KlinaraCard
 import com.klinara.android.designsystem.components.KlinaraDivider
 import com.klinara.android.designsystem.components.KlinaraScreen
+import com.klinara.android.designsystem.components.KlinaraSkeleton
+import com.klinara.android.designsystem.components.KlinaraSkeletonStyle
 import com.klinara.android.features.auth.AppSession
 import com.klinara.android.services.ServiceContainer
 import com.klinara.android.services.booking.AppointmentHistoryEntry
@@ -57,7 +59,7 @@ fun AppointmentHistoryScreen(
     KlinaraScreen(title = "Geçmiş", onBack = onBack, modifier = modifier) {
         when (val history = state) {
             Loadable.Loading ->
-                Text("Yükleniyor…", style = KlinaraType.bodyM, color = KlinaraTheme.colors.charcoalMuted)
+                KlinaraSkeleton(style = KlinaraSkeletonStyle.rows)
 
             is Loadable.Failed ->
                 ErrorBanner(

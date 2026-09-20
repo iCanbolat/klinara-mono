@@ -1,12 +1,12 @@
 package com.klinara.android.features.customers
 
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -22,6 +22,7 @@ import com.klinara.android.designsystem.components.KlinaraButton
 import com.klinara.android.designsystem.components.KlinaraButtonKind
 import com.klinara.android.designsystem.components.KlinaraCard
 import com.klinara.android.designsystem.components.KlinaraDivider
+import com.klinara.android.designsystem.components.KlinaraSkeletonSection
 import com.klinara.android.designsystem.components.klinaraClickable
 import com.klinara.android.services.crm.TimelineEntry
 import com.klinara.android.services.crm.TimelineKind
@@ -61,7 +62,7 @@ fun CustomerTimelineSection(
 
         when (val timeline = state.timeline) {
             Loadable.Loading ->
-                Text("Yükleniyor…", style = KlinaraType.bodyM, color = colors.charcoalMuted)
+                KlinaraSkeletonSection()
 
             is Loadable.Failed -> ErrorBanner(message = timeline.message)
 

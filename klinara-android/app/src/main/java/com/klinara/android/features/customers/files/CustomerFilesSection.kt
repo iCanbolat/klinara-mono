@@ -18,6 +18,7 @@ import com.klinara.android.designsystem.components.KlinaraButton
 import com.klinara.android.designsystem.components.KlinaraButtonKind
 import com.klinara.android.designsystem.components.KlinaraCard
 import com.klinara.android.designsystem.components.KlinaraNavigationRow
+import com.klinara.android.designsystem.components.KlinaraSkeletonSection
 import com.klinara.android.services.files.CustomerFile
 import com.klinara.android.services.files.ThumbnailCache
 import com.klinara.android.services.networking.Loadable
@@ -114,7 +115,7 @@ private fun PhotosCard(
     ) {
         when (val files = state.files) {
             Loadable.Loading ->
-                Text("Yükleniyor…", style = KlinaraType.bodyM, color = colors.charcoalMuted)
+                KlinaraSkeletonSection()
 
             is Loadable.Failed -> ErrorBanner(message = files.message)
 
@@ -169,7 +170,7 @@ private fun DocumentsCard(
     KlinaraCard(title = "Belgeler") {
         when (files) {
             Loadable.Loading ->
-                Text("Yükleniyor…", style = KlinaraType.bodyM, color = colors.charcoalMuted)
+                KlinaraSkeletonSection()
 
             is Loadable.Failed -> ErrorBanner(message = files.message)
 

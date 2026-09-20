@@ -14,6 +14,7 @@ struct OccupancyReportView: View {
     var body: some View {
         KlinaraScreen(
             state: store.occupancy,
+            skeleton: .report,
             emptyCheck: { $0.data.isEmpty },
             emptyTitle: "Bu dönemde veri yok",
             emptyMessage: "Seçilen aralıkta çalışma planı ya da randevu bulunmuyor.",

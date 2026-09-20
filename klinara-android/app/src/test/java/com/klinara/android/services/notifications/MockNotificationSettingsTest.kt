@@ -39,8 +39,10 @@ class MockNotificationSettingsTest {
             val templates = subject().templates()
             val reminder = templates.filter { it.event == NotificationEvent.AppointmentReminder }
 
+            // E-posta müşteri olaylarından çıktı: varsayılan gövde yalnız SMS'te duruyor,
+            // kiracının yazdığı WhatsApp şablonu yine sonda.
             assertEquals(
-                listOf(NotificationChannel.Sms, NotificationChannel.Email, NotificationChannel.WhatsApp),
+                listOf(NotificationChannel.Sms, NotificationChannel.WhatsApp),
                 reminder.map { it.channel },
             )
             assertTrue(reminder.last().templateId != null && !reminder.last().isDefault)

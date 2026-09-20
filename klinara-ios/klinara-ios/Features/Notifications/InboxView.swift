@@ -25,10 +25,7 @@ struct InboxView: View {
                     }
                     content(store)
                 } else {
-                    ProgressView()
-                        .tint(KlinaraColor.sage)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, KlinaraMetrics.xl)
+                    KlinaraSkeletonBody(style: .cardsLong)
                 }
             }
             .padding(.horizontal, KlinaraMetrics.screenInset)
@@ -63,10 +60,7 @@ struct InboxView: View {
     private func content(_ store: InboxStore) -> some View {
         switch store.state {
         case .loading:
-            ProgressView()
-                .tint(KlinaraColor.sage)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, KlinaraMetrics.xl)
+            KlinaraSkeletonBody(style: .cardsLong)
 
         case .failed(let error):
             ErrorBanner(error: error, onRetry: { Task { await store.load() } })

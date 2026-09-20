@@ -12,6 +12,7 @@ struct UsageReportView: View {
     var body: some View {
         KlinaraScreen(
             state: store.usage,
+            skeleton: .rows,
             emptyCheck: { $0.data.isEmpty },
             emptyTitle: "Bu dönemde hareket yok",
             emptyMessage: "Seçilen aralıkta defter satırı oluşmamış.",

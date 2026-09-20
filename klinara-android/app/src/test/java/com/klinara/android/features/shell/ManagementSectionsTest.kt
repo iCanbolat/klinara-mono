@@ -22,6 +22,16 @@ class ManagementSectionsTest {
     }
 
     @Test
+    @DisplayName("Her hedefin bir ikonu var ve ikonlar birbirinden farklı")
+    fun everyDestinationHasADistinctIcon() {
+        val icons = ManagementDestination.entries.associateWith { it.icon }
+        // 0, "kaynak bulunamadı" demek: eşleme bir hedefi atlarsa satır ikonsuz çizilir.
+        assertEquals(emptyList<ManagementDestination>(), icons.filterValues { it == 0 }.keys.toList())
+        // Aynı ikonu iki satıra vermek, ikon koymanın tek gerekçesini (ayırt edicilik) siler.
+        assertEquals(ManagementDestination.entries.size, icons.values.toSet().size)
+    }
+
+    @Test
     @DisplayName("Kart sırası iOS ile aynı: Katalog en üstte, Raporlar en sonda")
     fun order() {
         assertEquals(

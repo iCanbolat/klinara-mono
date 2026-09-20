@@ -35,10 +35,13 @@ import com.klinara.android.designsystem.components.KlinaraNavigationRow
 import com.klinara.android.designsystem.components.KlinaraRow
 import com.klinara.android.designsystem.components.KlinaraScreen
 import com.klinara.android.designsystem.components.KlinaraSelectableRow
+import com.klinara.android.designsystem.components.KlinaraSkeleton
+import com.klinara.android.designsystem.components.KlinaraSkeletonStyle
 import com.klinara.android.designsystem.components.KlinaraTextField
 import com.klinara.android.designsystem.components.KlinaraToggleRow
+import com.klinara.android.designsystem.components.KlinaraToolbarAction
+import com.klinara.android.designsystem.components.rememberUnsavedChangesGuard
 import com.klinara.android.features.auth.AppSession
-import com.klinara.android.features.scheduling.rememberUnsavedChangesGuard
 import com.klinara.android.services.ServiceContainer
 import com.klinara.android.services.branches.BranchDetail
 import com.klinara.android.services.contracts.Permissions
@@ -66,15 +69,28 @@ fun BranchListScreen(
 
     LaunchedEffect(Unit) { viewModel.load() }
 
-    KlinaraScreen(title = "Şubeler", modifier = modifier, onBack = onBack) {
+    KlinaraScreen(
+        title = "Şubeler",
+        modifier = modifier,
+        onBack = onBack,
+        trailing = {
+            if (canWrite) KlinaraToolbarAction(contentDescription = "Yeni şube", onClick = onCreate)
+        },
+    ) {
         when (val branches = state) {
             Loadable.Loading ->
-                Text("Yükleniyor…", style = KlinaraType.bodyM, color = KlinaraTheme.colors.charcoalMuted)
+                KlinaraSkeleton(style = KlinaraSkeletonStyle.cardsShort)
             is Loadable.Failed ->
                 ErrorBanner(message = branches.message, onRetry = if (branches.isRetryable) viewModel::load else null)
             is Loadable.Loaded ->
                 if (branches.value.isEmpty()) {
-                    EmptyStateView(title = "Şube yok", message = "Henüz şube eklenmemiş.", icon = Icons.Filled.Place)
+                    EmptyStateView(
+                        title = "Şube yok",
+                        message = "Henüz şube eklenmemiş.",
+                        icon = Icons.Filled.Place,
+                        actionTitle = if (canWrite) "Yeni şube" else null,
+                        onAction = if (canWrite) onCreate else null,
+                    )
                 } else {
                     KlinaraCard(
                         footnote =
@@ -94,15 +110,6 @@ fun BranchListScreen(
                         }
                     }
                 }
-        }
-
-        if (canWrite) {
-            KlinaraButton(
-                title = "Yeni şube",
-                onClick = onCreate,
-                kind = KlinaraButtonKind.Secondary,
-                modifier = Modifier.fillMaxWidth(),
-            )
         }
     }
 }
@@ -163,7 +170,7 @@ fun BranchEditorScreen(
         ) {
             state.error?.let { ErrorBanner(message = it, retryLabel = "Kapat", onRetry = viewModel::dismissError) }
             if (!state.loaded) {
-                Text("Yükleniyor…", style = KlinaraType.bodyM, color = KlinaraTheme.colors.charcoalMuted)
+                KlinaraSkeleton(style = KlinaraSkeletonStyle.formLong)
                 return@KlinaraScreen
             }
 

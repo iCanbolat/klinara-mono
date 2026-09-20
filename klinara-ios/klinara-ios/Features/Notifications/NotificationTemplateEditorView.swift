@@ -44,7 +44,7 @@ struct NotificationTemplateEditorView: View {
                     stateSection(form)
                 }
             } else {
-                ProgressView().tint(KlinaraColor.sage)
+                KlinaraSkeletonView(style: .formLong)
             }
         }
         .task {

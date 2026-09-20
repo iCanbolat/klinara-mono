@@ -13,6 +13,7 @@ struct StaffPerformanceReportView: View {
     var body: some View {
         KlinaraScreen(
             state: store.staffPerformance,
+            skeleton: .report,
             emptyCheck: { $0.data.isEmpty },
             emptyTitle: "Bu dönemde veri yok",
             emptyMessage: "Seçilen aralıkta tamamlanmış işlem ya da çalışma planı bulunmuyor.",

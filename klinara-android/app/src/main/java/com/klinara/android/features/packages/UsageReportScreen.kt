@@ -15,6 +15,8 @@ import com.klinara.android.designsystem.components.KlinaraDivider
 import com.klinara.android.designsystem.components.KlinaraRow
 import com.klinara.android.designsystem.components.KlinaraScreen
 import com.klinara.android.designsystem.components.KlinaraSegmentedPicker
+import com.klinara.android.designsystem.components.KlinaraSkeleton
+import com.klinara.android.designsystem.components.KlinaraSkeletonStyle
 import com.klinara.android.designsystem.components.ReportPeriodBar
 import com.klinara.android.services.networking.Loadable
 import com.klinara.android.services.packages.UsageGrouping
@@ -46,7 +48,7 @@ fun UsageReportScreen(
         )
         when (val report = state.usage) {
             Loadable.Loading ->
-                Text("Yükleniyor…", style = KlinaraType.bodyM, color = KlinaraTheme.colors.charcoalMuted)
+                KlinaraSkeleton(style = KlinaraSkeletonStyle.rows)
             is Loadable.Failed ->
                 ErrorBanner(message = report.message, onRetry = if (report.isRetryable) onRetry else null)
             is Loadable.Loaded ->

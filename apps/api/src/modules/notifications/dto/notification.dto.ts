@@ -183,7 +183,17 @@ export class UpsertNotificationPreferenceDto {
   @IsIn(ALL_EVENTS)
   event: NotificationEvent;
 
-  @ApiProperty({ type: [String], enum: ALL_CHANNELS, description: 'Boş dizi = olay kapalı' })
+  /**
+   * Kabul kümesi burada `ALL_CHANNELS`, çünkü geçerli kanal **olaya bağlı**:
+   * müşteri olaylarında yalnız `CUSTOMER_CHANNELS`, `staff_internal`'da e-posta.
+   * Bir dekoratör kardeş alanı (`event`) göremediğinden kural
+   * `NotificationSettingsService.upsertPreference` içinde duruyor.
+   */
+  @ApiProperty({
+    type: [String],
+    enum: ALL_CHANNELS,
+    description: 'Boş dizi = olay kapalı. Müşteri olaylarında yalnız whatsapp/sms kabul edilir.',
+  })
   @IsArray()
   @ArrayMaxSize(4)
   @IsIn(ALL_CHANNELS, { each: true })

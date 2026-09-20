@@ -235,6 +235,79 @@ async function seed(): Promise<void> {
       [tenantId],
     );
 
+    // --- Müşteri etiketleri -----------------------------------------------
+    // Etiket filtresi yalnız etiket VARKEN bir şey yapıyor: şerit boşken
+    // gizleniyor ve `?tagId=` yolu hiç denenmemiş kalıyordu. Demo veride
+    // etiketler olmadığı için ekran, olmayan bir özellik gibi görünüyordu.
+    //
+    // Kümenin şekli kasıtlı: her etiket FARKLI sayıda müşteri taşıyor (biri
+    // tek, biri çok, biri BOŞ), bir müşteri birden çok etiket alıyor ve bir
+    // müşteri hiç almıyor. Hepsi eşit dağılsaydı filtre "çalışıyor" görünür
+    // ama listeyi gerçekten daralttığı görülmezdi; boş etiket de boş durum
+    // metnini kimse görmeden geçerdi.
+    await client.query(
+      `insert into customers (tenant_id, full_name, phone, email, source)
+       values ($1, 'Elif Şahin', '+905331112200', 'elif@ornek.test', 'instagram'),
+              ($1, 'Burak Aydın', '+905331112201', null, 'referral'),
+              ($1, 'Selin Koç', '+905331112202', 'selin@ornek.test', 'google'),
+              ($1, 'Deniz Arslan', '+905331112203', null, 'walk_in'),
+              ($1, 'Merve Çelik', '+905331112204', 'merve@ornek.test', 'website')
+       on conflict do nothing`,
+      [tenantId],
+    );
+
+    await client.query(
+      // 'Arşiv' KASITLI olarak atamasız: filtrenin boş sonucu ve
+      // "Eşleşen müşteri yok" durumu, ancak hiçbir müşterisi olmayan bir
+      // etiket varken görülebiliyor.
+      `insert into customer_tags (tenant_id, name, color)
+       values ($1, 'VIP', '#B08968'),
+              ($1, 'Yeni Müşteri', '#6B8E5A'),
+              ($1, 'Paketli', '#4A6FA5'),
+              ($1, 'Takipte', '#C2703D'),
+              ($1, 'Hassas Cilt', '#8E6BA8'),
+              ($1, 'Arşiv', '#8A8F98')
+       on conflict (tenant_id, klinara_fold_tr(name)) do update set color = excluded.color`,
+      [tenantId],
+    );
+
+    // Atamalar telefon ve etiket ADIYLA kuruluyor: kimlikler her seed'de
+    // yeniden üretildiği için buraya sabit UUID yazmak ikinci çalıştırmada
+    // kırılırdı.
+    const TAG_ASSIGNMENTS: Array<[string, string]> = [
+      ['+905321112233', 'VIP'],
+      ['+905321112233', 'Paketli'],
+      ['+905324445566', 'Takipte'],
+      ['+905331112200', 'VIP'],
+      ['+905331112200', 'Hassas Cilt'],
+      ['+905331112201', 'Yeni Müşteri'],
+      ['+905331112202', 'VIP'],
+      ['+905331112202', 'Paketli'],
+      ['+905331112202', 'Takipte'],
+      ['+905331112203', 'Yeni Müşteri'],
+      // 'Merve Çelik' (+905331112204) ETİKETSİZ kalıyor: "Tümü" ile bir
+      // etiket arasındaki farkın listede görülebilmesi için etiketsiz en az
+      // bir kayıt gerekiyor.
+    ];
+
+    for (const [phone, tagName] of TAG_ASSIGNMENTS) {
+      await client.query(
+        `insert into customer_tag_assignments (tenant_id, customer_id, tag_id)
+         select $1,
+                (select id from customers
+                  where tenant_id = $1 and phone = $2 and deleted_at is null limit 1),
+                (select id from customer_tags
+                  where tenant_id = $1 and klinara_fold_tr(name) = klinara_fold_tr($3))
+         where exists (select 1 from customers
+                        where tenant_id = $1 and phone = $2 and deleted_at is null)
+         on conflict (customer_id, tag_id) do nothing`,
+        [tenantId, phone, tagName],
+      );
+    }
+    process.stdout.write(
+      `[seed] 6 müşteri etiketi ve ${TAG_ASSIGNMENTS.length} atama hazır\n`,
+    );
+
 
     // --- Faz 9/11 demo verisi: randevu sayfası ---------------------------------
     // Amaç: `pnpm db:seed` sonrası `apps/web-booking` TEK komutla açılabilsin.

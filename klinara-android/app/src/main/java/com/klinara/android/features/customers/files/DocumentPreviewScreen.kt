@@ -3,7 +3,6 @@ package com.klinara.android.features.customers.files
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.pdf.PdfRenderer
-import androidx.core.graphics.createBitmap
 import android.os.ParcelFileDescriptor
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
@@ -21,22 +20,25 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.graphics.createBitmap
 import com.klinara.android.designsystem.KlinaraMetrics
 import com.klinara.android.designsystem.KlinaraTheme
 import com.klinara.android.designsystem.KlinaraType
 import com.klinara.android.designsystem.components.ErrorBanner
 import com.klinara.android.designsystem.components.KlinaraCard
 import com.klinara.android.designsystem.components.KlinaraScreen
+import com.klinara.android.designsystem.components.KlinaraSkeleton
+import com.klinara.android.designsystem.components.KlinaraSkeletonStyle
 import com.klinara.android.services.files.CustomerFile
 import com.klinara.android.services.files.FileContentType
 import com.klinara.android.services.files.FileVariant
 import com.klinara.android.services.files.FilesService
 import com.klinara.android.services.networking.ApiError
+import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import java.io.File
 
 /**
  * Belge önizleme — **platform `PdfRenderer`** ile.
@@ -100,7 +102,7 @@ fun DocumentPreviewScreen(
         error?.let { ErrorBanner(message = it) }
 
         if (pages.isEmpty() && error == null) {
-            Text("Yükleniyor…", style = KlinaraType.bodyM, color = colors.charcoalMuted)
+            KlinaraSkeleton(style = KlinaraSkeletonStyle.cardsShort)
         }
 
         KlinaraCard {

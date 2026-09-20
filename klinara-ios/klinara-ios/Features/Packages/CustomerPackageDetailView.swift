@@ -41,10 +41,7 @@ struct CustomerPackageDetailView: View {
                         }
                         PackageLedgerView(session: session, store: store, packageId: packageId)
                     } else {
-                        ProgressView()
-                            .tint(KlinaraColor.sage)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, KlinaraMetrics.xl)
+                        KlinaraSkeletonBody(style: .detail)
                     }
                 }
                 .padding(.horizontal, KlinaraMetrics.screenInset)

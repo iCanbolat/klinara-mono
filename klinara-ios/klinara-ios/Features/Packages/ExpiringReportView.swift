@@ -16,6 +16,7 @@ struct ExpiringReportView: View {
     var body: some View {
         KlinaraScreen(
             state: store.expiring,
+            skeleton: .rows,
             emptyCheck: { $0.data.isEmpty },
             emptyTitle: "Bu dönemde süre dolumu yok",
             emptyMessage: "Seçilen aralıkta süresi dolacak paket bulunmuyor.",

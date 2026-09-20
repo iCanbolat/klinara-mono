@@ -51,10 +51,7 @@ struct CustomerFilesSection: View {
         switch record.files {
         case .loading:
             KlinaraCard(title: "Fotoğraflar ve belgeler") {
-                ProgressView()
-                    .tint(KlinaraColor.sage)
-                    .frame(maxWidth: .infinity)
-                    .padding(KlinaraMetrics.lg)
+                KlinaraSkeletonSection()
             }
 
         case .failed(let error):

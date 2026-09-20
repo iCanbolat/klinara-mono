@@ -35,6 +35,8 @@ import com.klinara.android.designsystem.components.KlinaraDivider
 import com.klinara.android.designsystem.components.KlinaraRow
 import com.klinara.android.designsystem.components.KlinaraScreen
 import com.klinara.android.designsystem.components.KlinaraSegmentedPicker
+import com.klinara.android.designsystem.components.KlinaraSkeleton
+import com.klinara.android.designsystem.components.KlinaraSkeletonStyle
 import com.klinara.android.designsystem.components.KlinaraTimeField
 import com.klinara.android.designsystem.components.KlinaraToggleRow
 import com.klinara.android.designsystem.components.klinaraClickable
@@ -65,7 +67,7 @@ fun NotificationPreferenceListScreen(
     KlinaraScreen(title = "Bildirim tercihleri", modifier = modifier, onBack = onBack, trailing = trailing) {
         when (preferences) {
             Loadable.Loading ->
-                Text("Yükleniyor…", style = KlinaraType.bodyM, color = KlinaraTheme.colors.charcoalMuted)
+                KlinaraSkeleton(style = KlinaraSkeletonStyle.rows)
             is Loadable.Failed ->
                 ErrorBanner(message = preferences.message, onRetry = if (preferences.isRetryable) onRetry else null)
             is Loadable.Loaded -> {

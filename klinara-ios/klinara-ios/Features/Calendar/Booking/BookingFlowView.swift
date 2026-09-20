@@ -256,10 +256,7 @@ struct BookingFlowView: View {
 
                 switch slots {
                 case .loading:
-                    ProgressView()
-                        .tint(KlinaraColor.sage)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, KlinaraMetrics.lg)
+                    KlinaraSkeletonChips()
 
                 case .failed(let failure):
                     ErrorBanner(error: failure, onRetry: { Task { await loadSlots() } })

@@ -12,6 +12,7 @@ struct NoShowReportView: View {
     var body: some View {
         KlinaraScreen(
             state: store.noShow,
+            skeleton: .report,
             emptyCheck: { $0.totals.total == 0 },
             emptyTitle: "Bu dönemde randevu yok",
             emptyMessage: "Seçilen aralıkta oran hesaplanacak randevu bulunmuyor.",

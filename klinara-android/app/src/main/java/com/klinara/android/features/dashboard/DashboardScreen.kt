@@ -44,8 +44,6 @@ import com.klinara.android.designsystem.KlinaraType
 import com.klinara.android.designsystem.components.EmptyStateView
 import com.klinara.android.designsystem.components.ErrorBanner
 import com.klinara.android.designsystem.components.KlinaraBadge
-import com.klinara.android.designsystem.components.KlinaraButton
-import com.klinara.android.designsystem.components.KlinaraButtonKind
 import com.klinara.android.designsystem.components.KlinaraCard
 import com.klinara.android.designsystem.components.KlinaraDivider
 import com.klinara.android.designsystem.components.KlinaraNavigationRow
@@ -129,7 +127,13 @@ fun DashboardScreen(
     modifier: Modifier = Modifier,
     trailing: @Composable (RowScope.() -> Unit)? = null,
 ) {
-    KlinaraScreen(title = "Dashboard", modifier = modifier, trailing = trailing) {
+    KlinaraScreen(
+        title = "Dashboard",
+        modifier = modifier,
+        trailing = trailing,
+        onRefresh = actions.onReload,
+        isRefreshing = state.isLoading,
+    ) {
         Column(verticalArrangement = Arrangement.spacedBy(KlinaraMetrics.xs)) {
             Text(greeting, style = KlinaraType.displayM, color = KlinaraTheme.colors.charcoal)
             Text(subtitle, style = KlinaraType.bodyM, color = KlinaraTheme.colors.charcoalMuted)
@@ -147,14 +151,6 @@ fun DashboardScreen(
         // İlk yüklemede şerit yer tutucularla duruyor: içerik geldiğinde sayfa aşağı zıplamasın.
         KlinaraStatStrip(stats = dashboardStats(data, access), isLoading = data == null)
         if (data == null) return@KlinaraScreen
-
-        KlinaraButton(
-            title = "Yenile",
-            onClick = actions.onReload,
-            kind = KlinaraButtonKind.Secondary,
-            isLoading = state.isLoading,
-            modifier = Modifier.fillMaxWidth(),
-        )
 
         val warning =
             listOfNotNull(

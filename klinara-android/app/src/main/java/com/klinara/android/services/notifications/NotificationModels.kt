@@ -30,19 +30,25 @@ enum class NotificationChannel(val wire: String) {
             }
 
     /**
-     * MVP'de yalnız WhatsApp ve e-posta gerçekten gönderim yapıyor; SMS ve push kanal
-     * soyutlamasında var ama sağlayıcısı yok (Ek M). Ekran bunu söylemeli, yoksa kullanıcı
+     * Müşteriye gerçekten gönderim yapan tek kanal WhatsApp. SMS kanal soyutlamasında var ama
+     * sağlayıcısı yok (Ek M); e-posta müşteriye kapatıldı. Ekran bunu söylemeli, yoksa kullanıcı
      * kanalı açıp mesajın neden gitmediğini arar.
      */
-    val isDeliverable: Boolean get() = this == WhatsApp || this == Email
+    val isDeliverable: Boolean get() = this == WhatsApp
 
     companion object {
         fun from(wire: String): NotificationChannel = entries.firstOrNull { it.wire == wire } ?: Unknown
 
-        /** İletişim izni kapsamı — push'a ticari ileti gitmiyor. */
-        val selectable: List<NotificationChannel> = listOf(WhatsApp, Sms, Email)
+        /**
+         * Müşteriye gidebilecek kanallar — sunucunun `CUSTOMER_CHANNELS`'ı.
+         *
+         * `Email` ve `Push` dışarıda: birincisi ürün kararı (klinik müşterisiyle yalnız WhatsApp
+         * yazışır), ikincisinin sağlayıcısı yok. Enum'da ikisi de DURUYOR: mesaj günlüğü geçmişte
+         * gerçekten gönderilmiş e-posta satırlarını çözebilmeli.
+         */
+        val customerSelectable: List<NotificationChannel> = listOf(WhatsApp, Sms)
 
-        /** Tercih editörünün kanal kümesi — sunucunun `ALL_CHANNELS`'ı. */
+        /** Wire düzeyi küme — sunucunun `ALL_CHANNELS`'ı; personele giden iç e-posta dahil. */
         val all: List<NotificationChannel> = listOf(WhatsApp, Sms, Email, Push)
     }
 }

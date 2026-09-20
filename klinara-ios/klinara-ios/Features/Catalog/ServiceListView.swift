@@ -12,7 +12,6 @@ struct ServiceListView: View {
     @State private var searchText = ""
     @State private var showsInactive = false
     @State private var editing: ServiceEditorView.Target?
-    @State private var pendingDeactivation: ClinicService?
 
     private var store: CatalogStore { session.catalogStore }
     private var canWrite: Bool { session.can(Permissions.serviceWrite) }
@@ -20,12 +19,15 @@ struct ServiceListView: View {
     var body: some View {
         KlinaraScreen(
             state: store.state,
+            skeleton: .rows,
             emptyCheck: { $0.services.isEmpty },
             emptyTitle: "Henüz hizmet yok",
             emptyMessage: canWrite
                 ? "İlk hizmeti ekleyerek başlayın. Süre ve hazırlık payı takvimde doğrudan kullanılır."
                 : "Hizmet eklemek için yöneticinizle görüşün.",
             emptyIcon: "list.bullet.rectangle",
+            emptyActionTitle: canWrite ? "Yeni hizmet" : nil,
+            emptyAction: canWrite ? { editing = .create } : nil,
             onRetry: { await store.reload() }
         ) { catalog in
             let visible = filtered(catalog.services)
@@ -47,6 +49,7 @@ struct ServiceListView: View {
                 }
             }
         }
+        .klinaraFAB(isVisible: canWrite, accessibilityLabel: "Yeni hizmet") { editing = .create }
         .navigationTitle("Hizmetler")
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $searchText, prompt: "Hizmet ara")
@@ -59,13 +62,6 @@ struct ServiceListView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Toggle("Pasifleri göster", isOn: $showsInactive)
-                    if canWrite {
-                        Button {
-                            editing = .create
-                        } label: {
-                            Label("Yeni hizmet", systemImage: "plus")
-                        }
-                    }
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
@@ -76,25 +72,6 @@ struct ServiceListView: View {
         .refreshable { await store.reload() }
         .sheet(item: $editing) { target in
             ServiceEditorView(session: session, target: target)
-        }
-        .confirmationDialog(
-            "Hizmet pasife alınsın mı?",
-            isPresented: .init(
-                get: { pendingDeactivation != nil },
-                set: { if !$0 { pendingDeactivation = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button("Pasife al", role: .destructive) {
-                guard let target = pendingDeactivation else { return }
-                pendingDeactivation = nil
-                Task { try? await store.deactivateService(id: target.id) }
-            }
-            Button("Vazgeç", role: .cancel) { pendingDeactivation = nil }
-        } message: {
-            // Kullanıcı "sil" beklerken "pasife al" olduğunu burada öğrenmeli:
-            // geçmiş randevular ve satılmış paketler bu hizmete bağlı kalır.
-            Text("Kayıt silinmez, pasife alınır. Geçmiş randevular ve paketler etkilenmez; hizmet yeni randevularda seçilemez.")
         }
     }
 
@@ -159,15 +136,6 @@ struct ServiceListView: View {
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .swipeActions(edge: .trailing) {
-            if canWrite, item.isActive {
-                Button(role: .destructive) {
-                    pendingDeactivation = item
-                } label: {
-                    Label("Pasife al", systemImage: "archivebox")
-                }
-            }
-        }
     }
 
     /// "1 sa 30 dk · takvimde 1 sa 55 dk". Takvimde işgal edilen süreyi

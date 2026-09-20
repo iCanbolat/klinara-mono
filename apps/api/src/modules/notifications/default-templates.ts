@@ -26,49 +26,38 @@ export interface EventDefinition {
  * /notification-templates` ile kendi metnini yazana kadar buradaki geçerlidir.
  *
  * WhatsApp metni buradan GİTMEZ: 24 saat penceresi dışında yalnız Meta'da
- * onaylı template gönderilebilir (mimari karar 4.6). Buradaki gövde e-posta ve
- * SMS içindir; WhatsApp için şablon satırındaki `whatsapp_template_name`
+ * onaylı template gönderilebilir (mimari karar 4.6). Buradaki gövde SMS
+ * içindir; WhatsApp için şablon satırındaki `whatsapp_template_name`
  * kullanılır (8.2).
+ *
+ * **E-posta müşteriye gitmez.** Klinik müşterisiyle yalnız WhatsApp üzerinden
+ * yazışır; e-posta kanalı bu yüzden müşteri olaylarının hiçbirinde yok.
+ * `staff_internal` bir istisna değil, farklı bir alıcı: personele giden iç
+ * bildirim ve e-posta orada tek makul kanal.
  */
 export const EVENT_DEFINITIONS: Record<NotificationEvent, EventDefinition> = {
   appointment_confirmation: {
     kind: 'transactional',
-    channels: ['whatsapp', 'sms', 'email'],
+    channels: ['whatsapp', 'sms'],
     variables: ['customerName', 'branchName', 'appointmentAt', 'serviceName'],
     templates: {
       sms: { body: 'Sayın {{customerName}}, {{appointmentAt}} randevunuz oluşturuldu. {{branchName}}' },
-      email: {
-        subject: 'Randevunuz oluşturuldu',
-        body:
-          'Sayın {{customerName}},\n\n' +
-          '{{appointmentAt}} tarihindeki {{serviceName}} randevunuz oluşturuldu.\n\n{{branchName}}',
-      },
     },
   },
   appointment_reminder: {
     kind: 'transactional',
-    channels: ['whatsapp', 'sms', 'email'],
+    channels: ['whatsapp', 'sms'],
     variables: ['customerName', 'branchName', 'appointmentAt', 'serviceName'],
     templates: {
       sms: { body: 'Sayın {{customerName}}, {{appointmentAt}} randevunuzu hatırlatırız. {{branchName}}' },
-      email: {
-        subject: 'Randevu hatırlatması',
-        body:
-          'Sayın {{customerName}},\n\n' +
-          '{{appointmentAt}} tarihindeki {{serviceName}} randevunuzu hatırlatırız.\n\n{{branchName}}',
-      },
     },
   },
   appointment_cancelled: {
     kind: 'transactional',
-    channels: ['whatsapp', 'sms', 'email'],
+    channels: ['whatsapp', 'sms'],
     variables: ['customerName', 'branchName', 'appointmentAt'],
     templates: {
       sms: { body: 'Sayın {{customerName}}, {{appointmentAt}} randevunuz iptal edilmiştir. {{branchName}}' },
-      email: {
-        subject: 'Randevunuz iptal edildi',
-        body: 'Sayın {{customerName}},\n\n{{appointmentAt}} tarihindeki randevunuz iptal edilmiştir.\n\n{{branchName}}',
-      },
     },
   },
   no_show_followup: {
@@ -83,29 +72,19 @@ export const EVENT_DEFINITIONS: Record<NotificationEvent, EventDefinition> = {
   },
   package_balance: {
     kind: 'transactional',
-    channels: ['whatsapp', 'sms', 'email'],
+    channels: ['whatsapp', 'sms'],
     variables: ['customerName', 'packageName', 'remainingSessions'],
     templates: {
       sms: { body: 'Sayın {{customerName}}, {{packageName}} paketinizde {{remainingSessions}} seans kaldı.' },
-      email: {
-        subject: 'Paket bakiyeniz',
-        body: 'Sayın {{customerName}},\n\n{{packageName}} paketinizde {{remainingSessions}} seans kalmıştır.',
-      },
     },
   },
   package_expiring: {
     kind: 'transactional',
-    channels: ['whatsapp', 'sms', 'email'],
+    channels: ['whatsapp', 'sms'],
     variables: ['customerName', 'packageName', 'expiresAt', 'remainingSessions'],
     templates: {
       sms: {
         body: 'Sayın {{customerName}}, {{packageName}} paketiniz {{expiresAt}} tarihinde sona eriyor ({{remainingSessions}} seans).',
-      },
-      email: {
-        subject: 'Paketinizin süresi doluyor',
-        body:
-          'Sayın {{customerName}},\n\n{{packageName}} paketiniz {{expiresAt}} tarihinde sona eriyor. ' +
-          'Kalan seans: {{remainingSessions}}.',
       },
     },
   },
@@ -130,6 +109,7 @@ export const EVENT_DEFINITIONS: Record<NotificationEvent, EventDefinition> = {
     },
   },
   // Personele giden iç bildirim: sessiz saat UYGULANMAZ (bkz. dispatcher).
+  // Alıcı müşteri değil, bu yüzden e-posta burada kalır.
   staff_internal: {
     kind: 'transactional',
     channels: ['email'],
@@ -141,4 +121,28 @@ export const EVENT_DEFINITIONS: Record<NotificationEvent, EventDefinition> = {
 };
 
 export const ALL_EVENTS = Object.keys(EVENT_DEFINITIONS) as NotificationEvent[];
+
+/**
+ * Kanal soyutlamasının tamamı — wire düzeyi küme.
+ *
+ * `email` burada duruyor çünkü `staff_internal` onu kullanıyor ve geçmiş
+ * `message_log` satırları e-posta taşıyor; enum'dan çıkarmak eski günlüğü
+ * çözülemez yapardı.
+ */
 export const ALL_CHANNELS: NotificationChannel[] = ['whatsapp', 'sms', 'email', 'push'];
+
+/**
+ * Müşteriye gidebilecek kanallar.
+ *
+ * Tercih listelerinin ve müşteri olaylarına yazılan şablonların doğrulama
+ * kümesi budur. `email` ve `push` dışarıda: birincisi ürün kararı (klinik
+ * müşterisiyle yalnız WhatsApp yazışır), ikincisinin sağlayıcısı yok.
+ */
+export const CUSTOMER_CHANNELS: NotificationChannel[] = ['whatsapp', 'sms'];
+
+/** Alıcısı personel olan olaylar — `CUSTOMER_CHANNELS` kısıtı bunlara UYGULANMAZ. */
+export const STAFF_EVENTS: NotificationEvent[] = ['staff_internal'];
+
+export function isCustomerEvent(event: NotificationEvent): boolean {
+  return !STAFF_EVENTS.includes(event);
+}

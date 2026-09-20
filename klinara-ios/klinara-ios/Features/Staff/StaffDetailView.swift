@@ -21,9 +21,7 @@ struct StaffDetailView: View {
             if let profile, let draft {
                 content(profile: profile, draft: draft)
             } else {
-                ProgressView()
-                    .tint(KlinaraColor.sage)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                KlinaraSkeletonView(style: .formLong)
             }
         }
         .navigationTitle(profile?.userFullName ?? "Personel")

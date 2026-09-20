@@ -1,5 +1,6 @@
 package com.klinara.android.features.shell
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
@@ -8,6 +9,8 @@ import androidx.compose.ui.Modifier
 import com.klinara.android.designsystem.KlinaraTheme
 import com.klinara.android.designsystem.KlinaraType
 import com.klinara.android.designsystem.components.KlinaraCard
+import com.klinara.android.designsystem.components.KlinaraDivider
+import com.klinara.android.designsystem.components.KlinaraIcons
 import com.klinara.android.designsystem.components.KlinaraNavigationRow
 import com.klinara.android.designsystem.components.KlinaraScreen
 import com.klinara.android.features.auth.AppSession
@@ -91,7 +94,7 @@ fun managementSections(session: AppSession): List<ManagementSection> =
             add(
                 section(
                     "Müşteriler",
-                    row(ManagementDestination.CustomerTags, "Müşteri etiketleri", "Kiracı genelinde tanımlı etiketler"),
+                    row(ManagementDestination.CustomerTags, "Müşteri etiketleri", "VIP, hassas cilt, kampanya…"),
                 ),
             )
         }
@@ -102,7 +105,7 @@ fun managementSections(session: AppSession): List<ManagementSection> =
                     row(
                         ManagementDestination.PackageDefinitions,
                         "Paket tanımları",
-                        "Satılabilir seans paketleri ve fiyatları",
+                        "Kalemler, fiyat, geçerlilik ve devir kuralı",
                     ),
                 ),
             )
@@ -258,6 +261,36 @@ private fun row(
 ) = ManagementRow(destination, label, detail)
 
 /**
+ * Satırın ikonu — iOS `ManagementHomeView`'daki SF Symbol seçiminin birebir karşılığı.
+ *
+ * Eşleme `when` ile yazıldı, haritayla değil: yeni bir hedef eklendiğinde derleyici
+ * ikonunu sorar. Satırların çoğunun ikonu, kartın başlığı okunmadan da ne olduğunu
+ * söyler — on yedi satırlık düz metin bir liste taranamıyordu.
+ */
+@get:DrawableRes
+val ManagementDestination.icon: Int
+    get() =
+        when (this) {
+            ManagementDestination.Services -> KlinaraIcons.services
+            ManagementDestination.ServiceCategories -> KlinaraIcons.categories
+            ManagementDestination.Staff -> KlinaraIcons.staff
+            ManagementDestination.Branches -> KlinaraIcons.branch
+            ManagementDestination.Invitations -> KlinaraIcons.invite
+            ManagementDestination.BranchHours -> KlinaraIcons.clock
+            ManagementDestination.ScheduleExceptions -> KlinaraIcons.calendarException
+            ManagementDestination.CustomerTags -> KlinaraIcons.tag
+            ManagementDestination.PackageDefinitions -> KlinaraIcons.packageBox
+            ManagementDestination.PackageReports -> KlinaraIcons.packageReports
+            ManagementDestination.Reports -> KlinaraIcons.reports
+            ManagementDestination.Inbox -> KlinaraIcons.inbox
+            ManagementDestination.MessageLog -> KlinaraIcons.messages
+            ManagementDestination.ReminderSettings -> KlinaraIcons.reminder
+            ManagementDestination.NotificationTemplates -> KlinaraIcons.template
+            ManagementDestination.NotificationPreferences -> KlinaraIcons.preferences
+            ManagementDestination.WhatsApp -> KlinaraIcons.link
+        }
+
+/**
  * Yönetim kökü — iOS `ManagementHomeView` paritesi.
  *
  * A2'de bir `ComingSoon`, A4.2–A5'te `AppShell.kt` içinde private bir ara çözümdü; A7.1'de
@@ -279,12 +312,14 @@ fun ManagementHomeScreen(
 
         managementSections(session).forEach { section ->
             KlinaraCard(title = section.title, footnote = section.footnote) {
-                section.rows.forEach { row ->
+                section.rows.forEachIndexed { index, row ->
+                    if (index > 0) KlinaraDivider()
                     KlinaraNavigationRow(
                         label = row.label,
                         value = row.detail,
                         onClick = { onOpen(row.destination) },
                         modifier = Modifier.fillMaxWidth(),
+                        icon = row.destination.icon,
                     )
                 }
             }

@@ -31,7 +31,7 @@ struct AppointmentDetailView: View {
 
     var body: some View {
         NavigationStack {
-            KlinaraScreen(state: state, onRetry: load) { appointment in
+            KlinaraScreen(state: state, skeleton: .detail, onRetry: load) { appointment in
                 if let error, !error.isFieldScoped {
                     ErrorBanner(error: error)
                 }

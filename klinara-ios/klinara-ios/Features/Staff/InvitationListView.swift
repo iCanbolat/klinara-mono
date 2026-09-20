@@ -17,10 +17,14 @@ struct InvitationListView: View {
     var body: some View {
         KlinaraScreen(
             state: state,
+            skeleton: .cardsShort,
             emptyCheck: \.isEmpty,
             emptyTitle: "Bekleyen davet yok",
             emptyMessage: "Davet edilen kişi e-postadaki bağlantıyla parolasını belirleyip katılır.",
             emptyIcon: "envelope.badge",
+            emptyActionTitle: "Personel davet et",
+            emptyActionIcon: "person.badge.plus",
+            emptyAction: { showsInvite = true },
             onRetry: { await load() }
         ) { invitations in
             if let actionError { ErrorBanner(error: actionError) }

@@ -5,12 +5,17 @@ import SwiftUI
 /// Sıra hizmet listesindeki grup düzenini belirlediği için sürükle-bırak ile
 /// değiştirilir; ayrı bir "sıra numarası" alanı kullanıcıyı üç kategoride bile
 /// hesap yapmaya zorlardı.
+///
+/// **Satırda aksiyon yok.** Daha önce her satırda yukarı/aşağı düğmeleri, chevron
+/// ve `List` dışında hiç çalışmayan bir `swipeActions` vardı; satır bir liste
+/// öğesi değil kontrol paneli gibi okunuyordu. Pasife alma artık kategorinin
+/// kendi sayfasında — yıkıcı bir aksiyon listede tek dokunuş uzaklıkta durmamalı
+/// (Android `ServiceCategoryListScreen` ile aynı karar).
 struct ServiceCategoryListView: View {
 
     let session: AppSession
 
     @State private var editing: CategoryEditorSheet.Target?
-    @State private var pendingDeactivation: ServiceCategory?
     @State private var reorderError: APIError?
 
     private var store: CatalogStore { session.catalogStore }
@@ -19,17 +24,20 @@ struct ServiceCategoryListView: View {
     var body: some View {
         KlinaraScreen(
             state: store.state,
+            skeleton: .rows,
             emptyCheck: { $0.categories.isEmpty },
             emptyTitle: "Kategori yok",
             emptyMessage: "Hizmetler kategori altında gruplanır. Önce bir kategori ekleyin.",
             emptyIcon: "folder",
+            emptyActionTitle: canWrite ? "Yeni kategori" : nil,
+            emptyAction: canWrite ? { editing = .create } : nil,
             onRetry: { await store.reload() }
         ) { catalog in
             if let reorderError {
                 ErrorBanner(error: reorderError)
             }
 
-            KlinaraCard(footnote: canWrite ? "Sıralamak için basılı tutup sürükleyin." : nil) {
+            KlinaraCard(footnote: canWrite ? "Sıralamak için satırı basılı tutup sürükleyin." : nil) {
                 let ordered = catalog.categories.sorted { $0.sortOrder < $1.sortOrder }
                 ForEach(Array(ordered.enumerated()), id: \.element.id) { index, category in
                     if index > 0 { KlinaraDivider() }
@@ -52,23 +60,6 @@ struct ServiceCategoryListView: View {
         .sheet(item: $editing) { target in
             CategoryEditorSheet(session: session, target: target)
         }
-        .confirmationDialog(
-            "Kategori pasife alınsın mı?",
-            isPresented: .init(
-                get: { pendingDeactivation != nil },
-                set: { if !$0 { pendingDeactivation = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button("Pasife al", role: .destructive) {
-                guard let target = pendingDeactivation else { return }
-                pendingDeactivation = nil
-                Task { try? await store.deactivateCategory(id: target.id) }
-            }
-            Button("Vazgeç", role: .cancel) { pendingDeactivation = nil }
-        } message: {
-            Text("Kayıt silinmez, pasife alınır. Bu kategorideki hizmetler listede kalır.")
-        }
     }
 
     private func row(for category: ServiceCategory, in ordered: [ServiceCategory]) -> some View {
@@ -88,9 +79,6 @@ struct ServiceCategoryListView: View {
                     if !category.isActive {
                         KlinaraBadge(text: "Pasif", tone: .muted)
                     }
-                    if canWrite {
-                        reorderButtons(for: category, in: ordered)
-                    }
                     Image(systemName: "chevron.right")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(KlinaraColor.charcoalMuted)
@@ -98,72 +86,72 @@ struct ServiceCategoryListView: View {
             }
         }
         .buttonStyle(.plain)
-        .swipeActions(edge: .trailing) {
-            if canWrite, category.isActive {
-                Button(role: .destructive) {
-                    pendingDeactivation = category
-                } label: {
-                    Label("Pasife al", systemImage: "archivebox")
-                }
+        .draggable(canWrite ? category.id : "")
+        .dropDestination(for: String.self) { items, _ in
+            guard canWrite, let sourceId = items.first, sourceId != category.id else { return false }
+            Task { await move(sourceId: sourceId, onto: category, in: ordered) }
+            return true
+        }
+        .accessibilityActions {
+            if canWrite {
+                reorderAccessibilityActions(for: category, in: ordered)
             }
         }
     }
 
-    /// Sürükle-bırak yerine yukarı/aşağı düğmeleri: `ForEach` bir `List`
-    /// içinde değil (kart düzeni gerektiği için), `onMove` burada çalışmaz.
-    /// Üç-beş kategoride bu yeterli ve erişilebilirlik açısından daha iyi.
-    private func reorderButtons(
+    /// Sürükleme motor beceri ister; sıralamanın tek yolu olamaz. Görsel oklar
+    /// kalktı, VoiceOver yolu kalkmadı.
+    @ViewBuilder
+    private func reorderAccessibilityActions(
         for category: ServiceCategory,
         in ordered: [ServiceCategory]
     ) -> some View {
         let index = ordered.firstIndex(of: category) ?? 0
-        return HStack(spacing: 2) {
-            Button {
-                Task { await move(category, in: ordered, by: -1) }
-            } label: {
-                Image(systemName: "chevron.up")
+        if index > 0 {
+            Button("Yukarı taşı") {
+                Task { await move(sourceId: category.id, onto: ordered[index - 1], in: ordered) }
             }
-            .disabled(index == 0)
-            .accessibilityLabel("Yukarı taşı")
-
-            Button {
-                Task { await move(category, in: ordered, by: 1) }
-            } label: {
-                Image(systemName: "chevron.down")
-            }
-            .disabled(index == ordered.count - 1)
-            .accessibilityLabel("Aşağı taşı")
         }
-        .font(.system(size: 12, weight: .semibold))
-        .foregroundStyle(KlinaraColor.sageDeep)
-        .buttonStyle(.plain)
+        if index < ordered.count - 1 {
+            Button("Aşağı taşı") {
+                Task { await move(sourceId: category.id, onto: ordered[index + 1], in: ordered) }
+            }
+        }
     }
 
-    private func move(_ category: ServiceCategory, in ordered: [ServiceCategory], by offset: Int) async {
+    /// [sourceId] kategorisini [target]'ın bulunduğu konuma taşır.
+    ///
+    /// Komşuyla takas değil **yeniden numaralama**: sürükleme bitişik olmayan bir
+    /// hedefe bırakılabiliyor ve art arda takas etmek aradaki her kayda iki yazma
+    /// demekti. Yalnız sırası gerçekten değişen kayıtlar yazılır.
+    private func move(
+        sourceId: String,
+        onto target: ServiceCategory,
+        in ordered: [ServiceCategory]
+    ) async {
         guard
-            let index = ordered.firstIndex(of: category),
-            ordered.indices.contains(index + offset)
+            let from = ordered.firstIndex(where: { $0.id == sourceId }),
+            let to = ordered.firstIndex(of: target),
+            from != to
         else { return }
 
-        let neighbour = ordered[index + offset]
+        var reordered = ordered
+        reordered.insert(reordered.remove(at: from), at: to)
+        let previous = Dictionary(uniqueKeysWithValues: ordered.map { ($0.id, $0.sortOrder) })
+
         reorderError = nil
         do {
-            // İki kaydın sırası takas edilir. Tüm listeyi yeniden numaralamak
-            // sunucuya N istek atmak demekti.
-            _ = try await store.updateCategory(
-                id: category.id,
-                UpdateServiceCategoryInput(sortOrder: neighbour.sortOrder)
-            )
-            _ = try await store.updateCategory(
-                id: neighbour.id,
-                UpdateServiceCategoryInput(sortOrder: category.sortOrder)
-            )
+            for (index, category) in reordered.enumerated() where previous[category.id] != index {
+                _ = try await store.updateCategory(
+                    id: category.id,
+                    UpdateServiceCategoryInput(sortOrder: index)
+                )
+            }
         } catch {
             reorderError = error as? APIError ?? .network
-            // İlk istek geçip ikincisi düşmüş olabilir; kesin doğru sırayı
-            // sunucudan yeniden okuyoruz.
-            await store.reload()
         }
+        // Yazmalardan biri düşmüş olabilir; kesin doğru sırayı sunucudan okuyoruz.
+        await store.reload()
     }
 }
 
@@ -196,6 +184,7 @@ struct CategoryEditorSheet: View {
     @State private var isActive: Bool
     @State private var slugIsCustom: Bool
     @State private var error: APIError?
+    @State private var isConfirmingDeactivation = false
 
     private var store: CatalogStore { session.catalogStore }
     private var isReadOnly: Bool { !session.can(Permissions.serviceWrite) }
@@ -248,6 +237,38 @@ struct CategoryEditorSheet: View {
                 KlinaraDivider()
                 KlinaraToggleRow(label: "Aktif", isOn: $isActive, isEnabled: !isReadOnly)
             }
+
+            if let existing = target.existing, existing.isActive, !isReadOnly {
+                Button("Pasife al", role: .destructive) { isConfirmingDeactivation = true }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, KlinaraMetrics.sm)
+
+                Text("Aktif hizmeti olan kategori pasife alınamaz.")
+                    .klinaraText(.bodyM)
+                    .foregroundStyle(KlinaraColor.charcoalMuted)
+            }
+        }
+        .confirmationDialog(
+            "Kategori pasife alınsın mı?",
+            isPresented: $isConfirmingDeactivation,
+            titleVisibility: .visible
+        ) {
+            Button("Pasife al", role: .destructive) {
+                guard let existing = target.existing else { return }
+                Task {
+                    do {
+                        _ = try await store.deactivateCategory(id: existing.id)
+                        dismiss()
+                    } catch {
+                        // Sunucu 409 veriyor (kategoride aktif hizmet var). Yutmak,
+                        // kullanıcının neden olmadığını hiç öğrenmemesi olurdu.
+                        self.error = error as? APIError ?? .network
+                    }
+                }
+            }
+            Button("Vazgeç", role: .cancel) {}
+        } message: {
+            Text("Kayıt silinmez, pasife alınır. Bu kategorideki hizmetler listede kalır.")
         }
     }
 

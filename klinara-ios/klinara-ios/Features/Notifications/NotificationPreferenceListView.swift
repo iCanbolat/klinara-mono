@@ -22,10 +22,7 @@ struct NotificationPreferenceListView: View {
                 if let store {
                     content(store)
                 } else {
-                    ProgressView()
-                        .tint(KlinaraColor.sage)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, KlinaraMetrics.xl)
+                    KlinaraSkeletonBody(style: .rows)
                 }
             }
             .padding(.horizontal, KlinaraMetrics.screenInset)
@@ -60,10 +57,7 @@ struct NotificationPreferenceListView: View {
     private func content(_ store: NotificationSettingsStore) -> some View {
         switch store.preferencesState {
         case .loading:
-            ProgressView()
-                .tint(KlinaraColor.sage)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, KlinaraMetrics.xl)
+            KlinaraSkeletonBody(style: .rows)
 
         case .failed(let error):
             ErrorBanner(error: error, onRetry: { Task { await store.loadPreferences() } })

@@ -25,10 +25,7 @@ struct WhatsAppSettingsView: View {
                     }
                     content(store)
                 } else {
-                    ProgressView()
-                        .tint(KlinaraColor.sage)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, KlinaraMetrics.xl)
+                    KlinaraSkeletonBody(style: .rowsShort)
                 }
             }
             .padding(.horizontal, KlinaraMetrics.screenInset)
@@ -65,10 +62,7 @@ struct WhatsAppSettingsView: View {
     private func content(_ store: WhatsAppStore) -> some View {
         switch store.accountState {
         case .loading:
-            ProgressView()
-                .tint(KlinaraColor.sage)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, KlinaraMetrics.xl)
+            KlinaraSkeletonBody(style: .rowsShort)
 
         case .failed(let failure):
             ErrorBanner(error: failure, onRetry: { Task { await store.loadAccount() } })

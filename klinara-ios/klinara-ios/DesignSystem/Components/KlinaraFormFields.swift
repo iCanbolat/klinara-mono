@@ -276,7 +276,22 @@ struct FlowLayout: Layout {
             lineHeight = max(lineHeight, size.height)
             maxWidth = max(maxWidth, origin.x - spacing)
         }
-        return CGSize(width: maxWidth, height: origin.y + lineHeight)
+
+        // Sonlu bir genişlik önerildiyse ÖNERİLEN genişlik döner, satırların
+        // gerçekte kapladığı `maxWidth` değil.
+        //
+        // Dönen boy bu görünümün boyu OLUYOR ve `placeSubviews` sarma
+        // kararlarını o boya göre yeniden veriyor. Daralmış bir genişlik
+        // döndürmek, ölçümü bir satırda biten çiplerin yerleştirmede iki
+        // satıra sarması demekti: kap tek satırlık yükseklikte kalıyor, ikinci
+        // satır alttaki satırın üstüne taşıyordu (müşteri listesinde üç
+        // etiketli kayıtlarda görüldü). İki geçiş aynı genişliği görünce
+        // karar da aynı oluyor. Genişlik önerilmemişse (yatay kaydırma gibi)
+        // ölçülen genişlik tek makul cevap.
+        return CGSize(
+            width: width.isFinite ? width : maxWidth,
+            height: origin.y + lineHeight
+        )
     }
 
     func placeSubviews(
@@ -299,5 +314,60 @@ struct FlowLayout: Layout {
             origin.x += size.width + spacing
             lineHeight = max(lineHeight, size.height)
         }
+    }
+}
+
+/// Menüden tek seçim — `KlinaraTextField` ile aynı etiket ve alan görünümü.
+///
+/// `Picker(.menu)` form içinde etiketini çizmiyor ve yalnız "Epilasyon ⌃" gibi
+/// çıplak bir metin bırakıyordu; kullanıcı bunun bir alan olduğunu anlamıyordu.
+struct KlinaraPickerField<Option: Identifiable>: View {
+
+    let label: String
+    let options: [Option]
+    @Binding var selection: Option.ID
+    let title: (Option) -> String
+    var placeholder = "Seçin"
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: KlinaraMetrics.sm) {
+            Text(label)
+                .klinaraText(.label)
+                .foregroundStyle(KlinaraColor.charcoalMuted)
+
+            Menu {
+                Picker(label, selection: $selection) {
+                    ForEach(options) { option in
+                        Text(title(option)).tag(option.id)
+                    }
+                }
+            } label: {
+                HStack(spacing: KlinaraMetrics.sm) {
+                    Text(selectedTitle ?? placeholder)
+                        .klinaraText(.bodyL)
+                        .foregroundStyle(selectedTitle == nil ? KlinaraColor.charcoalMuted : KlinaraColor.charcoal)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(KlinaraColor.charcoalMuted)
+                }
+                .padding(.horizontal, KlinaraMetrics.md)
+                .frame(height: KlinaraMetrics.fieldHeight)
+                .background(KlinaraColor.surfaceRaised)
+                .overlay(
+                    RoundedRectangle(cornerRadius: KlinaraMetrics.controlRadius)
+                        .stroke(KlinaraColor.border, lineWidth: KlinaraMetrics.borderWidth)
+                )
+                .clipShape(.rect(cornerRadius: KlinaraMetrics.controlRadius))
+                .contentShape(.rect)
+            }
+            .accessibilityLabel(label)
+            .accessibilityValue(selectedTitle ?? placeholder)
+        }
+    }
+
+    private var selectedTitle: String? {
+        options.first { $0.id == selection }.map(title)
     }
 }

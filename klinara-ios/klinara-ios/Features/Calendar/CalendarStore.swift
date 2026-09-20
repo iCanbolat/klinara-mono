@@ -52,6 +52,17 @@ final class CalendarStore {
     private(set) var state: LoadState<CalendarResponse> = .loading
     private(set) var isSaving = false
 
+    /// Elde veri VARKEN süren bir yeniden çekme.
+    ///
+    /// ``state``i `.loading`e düşürmek yerine bu bayrak kalkıyor: gün
+    /// değiştirmek, personel filtrelemek ve aşağı çekmek aynı ekranın *aynı*
+    /// düzenini yeniden dolduruyor, farklı bir ekran açmıyor. Yer tutucuya
+    /// geri dönmek o düzeni bir anlığına sökmek demekti — ekran zıplıyor,
+    /// kaydırma konumu sıfırlanıyor ve iskelet gelen veriden hızlı olduğu
+    /// için hepsi yanıp sönme olarak görülüyordu. İskelet yalnız gerçekten
+    /// hiçbir şeyin olmadığı ilk yüklemede.
+    private(set) var isRefreshing = false
+
     /// Görüntülenen gün — şube saat diliminde bir "an", gün başlangıcı.
     private(set) var selectedDate: Date
     var mode: Mode = .agenda
@@ -138,7 +149,10 @@ final class CalendarStore {
             )))
             return
         }
-        state = .loading
+        // İlk yüklemede iskelet; sonrasında eldeki gün ekranda kalır.
+        if state.value == nil { state = .loading }
+        isRefreshing = true
+        defer { isRefreshing = false }
         do {
             switch mode {
             case .week:
@@ -154,7 +168,16 @@ final class CalendarStore {
                     staffProfileId: staffFilter
                 )))
             }
+        } catch let error as APIError where error.isSilent {
+            // İptal hata DEĞİL: `.task(id:)` anahtarı değişince SwiftUI süren
+            // isteği iptal ediyor ve hemen yenisini başlatıyor. Bunu ekrana
+            // basmak, mesajı boş bir kırmızı bant çizmek ve devam eden doğru
+            // isteğin sonucunu da üstüne yazdırmamak demekti.
+            return
         } catch {
+            // İptal edilmiş bir görevin `state`i, yerine geçen görevin
+            // sonucunu ezmemeli.
+            guard !Task.isCancelled else { return }
             state = .failed(error as? APIError ?? .network)
         }
     }

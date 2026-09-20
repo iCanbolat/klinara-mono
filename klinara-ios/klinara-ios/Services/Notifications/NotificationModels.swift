@@ -97,10 +97,19 @@ nonisolated enum NotificationChannel: String, Codable, Sendable, CaseIterable, I
         }
     }
 
-    /// MVP'de yalnız WhatsApp ve e-posta gerçekten gönderim yapıyor; SMS ve push
-    /// kanal soyutlamasında var ama sağlayıcısı yok (Ek M). Ekran bunu söylemeli,
-    /// yoksa kullanıcı kanalı açıp mesajın neden gitmediğini arar.
-    var isDeliverable: Bool { self == .whatsapp || self == .email }
+    /// Müşteriye gerçekten gönderim yapan tek kanal WhatsApp. SMS kanal
+    /// soyutlamasında var ama sağlayıcısı yok (Ek M); e-posta müşteriye
+    /// kapatıldı. Ekran bunu söylemeli, yoksa kullanıcı kanalı açıp mesajın
+    /// neden gitmediğini arar.
+    var isDeliverable: Bool { self == .whatsapp }
+
+    /// Müşteriye gidebilecek kanallar — sunucunun `CUSTOMER_CHANNELS`\'ı.
+    ///
+    /// `email` ve `push` dışarıda: birincisi ürün kararı (klinik müşterisiyle
+    /// yalnız WhatsApp yazışır), ikincisinin sağlayıcısı yok. Enum\'da ikisi de
+    /// **duruyor**: mesaj günlüğü geçmişte gerçekten gönderilmiş e-posta
+    /// satırlarını çözebilmeli ve `staff_internal` personele e-posta atıyor.
+    static let customerSelectable: [NotificationChannel] = [.whatsapp, .sms]
 }
 
 /// İşlemsel / pazarlama ayrımı.
@@ -171,20 +180,23 @@ nonisolated enum NotificationEventCatalog {
         let variables: [String]
     }
 
+    // Müşteriye e-posta GİTMEZ: klinik müşterisiyle yalnız WhatsApp üzerinden
+    // yazışır. `staffInternal` bir istisna değil, farklı bir alıcı — personele
+    // giden iç bildirim.
     static let definitions: [NotificationEvent: Definition] = [
         .appointmentConfirmation: Definition(
             kind: .transactional,
-            channels: [.whatsapp, .sms, .email],
+            channels: [.whatsapp, .sms],
             variables: ["customerName", "branchName", "appointmentAt", "serviceName"]
         ),
         .appointmentReminder: Definition(
             kind: .transactional,
-            channels: [.whatsapp, .sms, .email],
+            channels: [.whatsapp, .sms],
             variables: ["customerName", "branchName", "appointmentAt", "serviceName"]
         ),
         .appointmentCancelled: Definition(
             kind: .transactional,
-            channels: [.whatsapp, .sms, .email],
+            channels: [.whatsapp, .sms],
             variables: ["customerName", "branchName", "appointmentAt"]
         ),
         .noShowFollowup: Definition(
@@ -194,12 +206,12 @@ nonisolated enum NotificationEventCatalog {
         ),
         .packageBalance: Definition(
             kind: .transactional,
-            channels: [.whatsapp, .sms, .email],
+            channels: [.whatsapp, .sms],
             variables: ["customerName", "packageName", "remainingSessions"]
         ),
         .packageExpiring: Definition(
             kind: .transactional,
-            channels: [.whatsapp, .sms, .email],
+            channels: [.whatsapp, .sms],
             variables: ["customerName", "packageName", "expiresAt", "remainingSessions"]
         ),
         .birthday: Definition(

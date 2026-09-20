@@ -7,7 +7,12 @@ import { TenantTxService } from '../../database/tenant-tx.service';
 import type { NotificationChannel } from '../../database/schema';
 import { BranchAccessService } from '../tenancy/branch-access.service';
 import type { Principal } from '../identity/principal';
-import { ALL_EVENTS, EVENT_DEFINITIONS } from './default-templates';
+import {
+  ALL_EVENTS,
+  CUSTOMER_CHANNELS,
+  EVENT_DEFINITIONS,
+  isCustomerEvent,
+} from './default-templates';
 import * as repo from './notifications.repository';
 import { templateVariables } from './template-renderer';
 import type {
@@ -64,6 +69,10 @@ export class NotificationSettingsService {
     // Kiracının varsayılanı olmayan bir kanal için yazdığı şablon (ör. WhatsApp)
     // listede kaybolmamalı.
     for (const row of rows) {
+      // Geçmişte yazılmış e-posta şablonları geri gelmesin: kanal artık
+      // müşteriye kapalı ve düzenlenemeyen bir satır göstermek, kullanıcıya
+      // yürürlükte olmayan bir metni yürürlükteymiş gibi okutmak olurdu.
+      if (row.channel === 'email' && isCustomerEvent(row.event)) continue;
       const known = result.some(
         (item) => item.event === row.event && item.channel === row.channel && item.id !== null,
       );
@@ -91,6 +100,17 @@ export class NotificationSettingsService {
   async upsertTemplate(
     input: UpsertNotificationTemplateDto,
   ): Promise<NotificationTemplateResponseDto> {
+    // Müşteriye e-posta gitmiyor: kanal yalnız personele giden iç bildirimde
+    // (`staff_internal`) geçerli. Kapıyı burada tutmak, DTO'daki `ALL_CHANNELS`
+    // kümesini wire düzeyinde bırakıp kuralı olayla birlikte ifade ediyor.
+    if (input.channel === 'email' && isCustomerEvent(input.event)) {
+      throw new AppError(
+        422,
+        ERROR_CODES.VALIDATION_FAILED,
+        'E-posta kanalı müşteri bildirimlerinde kullanılmıyor',
+      );
+    }
+
     if (input.channel !== 'email' && input.subject !== undefined) {
       throw new AppError(
         422,
@@ -178,6 +198,18 @@ export class NotificationSettingsService {
   ): Promise<NotificationPreferenceResponseDto> {
     if (input.branchId !== undefined) {
       await this.branchAccess.assertInput(principal, input.branchId);
+    }
+    // DTO da aynı kümeyi doğruluyor; buradaki ikinci kapı, servisi doğrudan
+    // çağıran iç yolların (seed, worker) kuralı atlamasını engelliyor.
+    const rejected = isCustomerEvent(input.event)
+      ? input.channels.filter((channel) => !CUSTOMER_CHANNELS.includes(channel))
+      : [];
+    if (rejected.length > 0) {
+      throw new AppError(
+        422,
+        ERROR_CODES.VALIDATION_FAILED,
+        `Müşteri bildirimlerinde kullanılamayan kanal: ${rejected.join(', ')}`,
+      );
     }
     if ((input.quietHoursStart === undefined) !== (input.quietHoursEnd === undefined)) {
       throw new AppError(

@@ -10,12 +10,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.klinara.android.features.auth.AppSession
-import com.klinara.android.services.ServiceContainer
-import com.klinara.android.services.contracts.Permissions
-import androidx.compose.ui.Modifier
 import com.klinara.android.designsystem.KlinaraMetrics
 import com.klinara.android.designsystem.KlinaraTheme
 import com.klinara.android.designsystem.KlinaraType
@@ -28,6 +25,10 @@ import com.klinara.android.designsystem.components.KlinaraCard
 import com.klinara.android.designsystem.components.KlinaraDivider
 import com.klinara.android.designsystem.components.KlinaraNavigationRow
 import com.klinara.android.designsystem.components.KlinaraRow
+import com.klinara.android.designsystem.components.KlinaraSkeletonSection
+import com.klinara.android.features.auth.AppSession
+import com.klinara.android.services.ServiceContainer
+import com.klinara.android.services.contracts.Permissions
 import com.klinara.android.services.formatting.BranchClock
 import com.klinara.android.services.networking.Loadable
 import com.klinara.android.services.packages.CustomerPackage
@@ -95,7 +96,7 @@ fun CustomerPackagesSection(
     when (val packages = state.packages) {
         Loadable.Loading ->
             KlinaraCard(title = "Paketler", modifier = modifier) {
-                Text("Yükleniyor…", style = KlinaraType.bodyM, color = KlinaraTheme.colors.charcoalMuted)
+                KlinaraSkeletonSection()
             }
 
         is Loadable.Failed ->

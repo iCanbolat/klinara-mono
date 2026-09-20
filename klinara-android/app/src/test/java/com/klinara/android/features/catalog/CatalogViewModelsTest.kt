@@ -107,15 +107,13 @@ class CatalogViewModelsTest {
         }
 
     @Test
-    @DisplayName("Aşağı taşıma iki PATCH ile sırayı takas ediyor")
+    @DisplayName("Aşağı taşıma sırayı değiştiriyor ve yalnız etkilenen kayıtları yazıyor")
     fun moveSwapsOrder() =
         runTest {
             val viewModel = ServiceCategoryListViewModel(MockCatalogService(latencyEnabled = false))
             viewModel.load()
             advanceUntilIdle()
-            val first = viewModel.state.value.categories.first()
-
-            viewModel.move(first, 1)
+            viewModel.moveTo(0, 1)
             advanceUntilIdle()
 
             assertEquals(
@@ -146,13 +144,14 @@ class CatalogViewModelsTest {
             viewModel.load()
             advanceUntilIdle()
 
-            viewModel.move(viewModel.state.value.categories.first(), 1)
+            viewModel.moveTo(0, 1)
             advanceUntilIdle()
 
             assertNotNull(viewModel.state.value.error)
             // Sunucunun gerçeği: ilk yazma geçti, iki kategori aynı sırayı taşıyor — gösterilen o.
+            // İyimser sıra ekranda bırakılsaydı kullanıcı, sunucuda olmayan bir düzen görürdü.
             val orders = viewModel.state.value.categories.map { it.sortOrder }
-            assertEquals(listOf(1, 1, 2), orders)
+            assertEquals(listOf(0, 0, 2), orders)
         }
 
     @Test

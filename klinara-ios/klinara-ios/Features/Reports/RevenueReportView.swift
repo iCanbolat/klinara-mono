@@ -12,6 +12,7 @@ struct RevenueReportView: View {
     var body: some View {
         KlinaraScreen(
             state: store.revenue,
+            skeleton: .report,
             emptyCheck: { $0.data.isEmpty },
             emptyTitle: "Bu dönemde ciro yok",
             emptyMessage: "Seçilen aralıkta tamamlanan hizmet ya da paket satışı yok.",

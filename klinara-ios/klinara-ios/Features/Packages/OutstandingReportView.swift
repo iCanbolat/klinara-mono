@@ -13,6 +13,7 @@ struct OutstandingReportView: View {
     var body: some View {
         KlinaraScreen(
             state: store.outstanding,
+            skeleton: .rows,
             emptyCheck: { $0.data.isEmpty },
             emptyTitle: "Açık paket yok",
             emptyMessage: "Kullanılmamış seans hakkı bulunmuyor.",

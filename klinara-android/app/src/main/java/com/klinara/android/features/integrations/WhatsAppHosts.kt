@@ -9,7 +9,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.klinara.android.features.auth.AppSession
 import com.klinara.android.features.notifications.rememberBranchClock
-import com.klinara.android.features.scheduling.rememberUnsavedChangesGuard
+import com.klinara.android.designsystem.components.rememberUnsavedChangesGuard
 import com.klinara.android.services.ServiceContainer
 import com.klinara.android.services.contracts.Permissions
 import com.klinara.android.services.networking.Loadable

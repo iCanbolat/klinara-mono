@@ -266,8 +266,8 @@ function UpcomingCard({
   );
 
   return (
-    <Card className={cn('flex flex-col gap-3', className)}>
-      <h2 className="text-title-m">{t('dashboard.upcoming')}</h2>
+    <Card className={cn('flex h-[420px] flex-col gap-3', className)}>
+      <h2 className="text-title-m shrink-0">{t('dashboard.upcoming')}</h2>
       {state.loading ? (
         <div className="flex flex-col gap-2" aria-busy="true">
           {[0, 1, 2].map((key) => (
@@ -275,11 +275,11 @@ function UpcomingCard({
           ))}
         </div>
       ) : upcoming.length === 0 ? (
-        <p className="py-6 text-center text-sm text-muted-foreground">
+        <p className="flex min-h-0 flex-1 items-center justify-center text-center text-sm text-muted-foreground">
           {t('dashboard.upcomingEmpty')}
         </p>
       ) : (
-        <ul className="flex flex-col divide-y divide-border">
+        <ul className="flex min-h-0 flex-1 flex-col divide-y divide-border overflow-y-auto">
           {upcoming.map((row) => {
             const status = isAppointmentStatus(row.entry.status) ? row.entry.status : 'scheduled';
             const services = row.entry.services.map((line) => line.serviceName).join(', ');
@@ -340,13 +340,13 @@ function StaffRevenueCard({
   const currency = report?.currency ?? 'TRY';
 
   return (
-    <Card className={cn('flex flex-col gap-3', className)}>
-      <div className="flex items-baseline justify-between gap-2">
+    <Card className={cn('flex h-[420px] flex-col gap-3', className)}>
+      <div className="flex shrink-0 items-baseline justify-between gap-2">
         <h2 className="text-title-m">{t('dashboard.staffRevenue')}</h2>
         <span className="text-xs text-muted-foreground">{t('dashboard.thisMonth')}</span>
       </div>
       {report?.scope === 'own' ? (
-        <p className="text-xs text-muted-foreground">{t('dashboard.staffRevenueOwn')}</p>
+        <p className="shrink-0 text-xs text-muted-foreground">{t('dashboard.staffRevenueOwn')}</p>
       ) : null}
       {state.loading ? (
         <div className="flex flex-col gap-2" aria-busy="true">
@@ -355,11 +355,11 @@ function StaffRevenueCard({
           ))}
         </div>
       ) : rows.length === 0 ? (
-        <p className="py-6 text-center text-sm text-muted-foreground">
+        <p className="flex min-h-0 flex-1 items-center justify-center text-center text-sm text-muted-foreground">
           {t('dashboard.staffRevenueEmpty')}
         </p>
       ) : (
-        <ol className="flex flex-col gap-3">
+        <ol className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
           {rows.map((row) => (
             <li key={row.staffProfileId} className="flex flex-col gap-1">
               <div className="flex items-baseline justify-between gap-2 text-sm">

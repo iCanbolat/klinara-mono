@@ -2448,8 +2448,8 @@ sunucu kusuru değil, iOS kusuru — sunucuya dokunulmadı.
 
 ### "Şablon yok" satırları — WhatsApp eşlemesi oluşturulabiliyor
 
-Sunucu şablon listesinde yalnız kod varsayılanı olan kanalları döndürüyor (çoğu olayda SMS +
-e-posta; WhatsApp yalnız otomatik yanıtta). iOS'ta "ekle" yok, yani randevu hatırlatmasının
+Sunucu şablon listesinde yalnız kod varsayılanı olan kanalları döndürüyor (çoğu olayda yalnız
+SMS; WhatsApp yalnız otomatik yanıtta; e-posta yalnız personele giden iç bildirimde). iOS'ta "ekle" yok, yani randevu hatırlatmasının
 **Meta template eşlemesi hiç oluşturulamıyordu** — WhatsApp birincil kanal olduğu hâlde. Liste
 olayın katalogdaki eksik kanallarını "Şablon yok" satırı olarak çiziyor; kaydetmek aynı
 `PUT notification-templates`'e gidiyor. iOS mock'u varsayılanı TÜM kanallardan ürettiği için
@@ -2457,7 +2457,8 @@ bunu gizliyordu; Android mock'u sunucunun gerçek kanallarını kullanıyor.
 
 ### Kanal bazlı iletişim izni (A4.2'den)
 
-Müşteri kartında WhatsApp / SMS / E-posta anahtarları (açık = izin veriliyor). Tüm kanallar
+Müşteri kartında WhatsApp / SMS anahtarları (açık = izin veriliyor). E-posta kanalı müşteriye
+kapatıldı: klinik müşterisiyle yalnız WhatsApp üzerinden yazışıyor. Tüm kanallar
 kapalıyken "İzni geri ver" — ve kanal kayıtları da varsa "kanal bazlı kapatmaları da kaldırır"
 notu: sunucu kanalsız `DELETE`'te kanal kayıtlarını da iptal ediyor.
 

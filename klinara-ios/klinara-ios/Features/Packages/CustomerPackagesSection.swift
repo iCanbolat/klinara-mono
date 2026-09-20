@@ -19,10 +19,7 @@ struct CustomerPackagesSection: View {
         switch store.state {
         case .loading:
             KlinaraCard(title: "Paketler") {
-                ProgressView()
-                    .tint(KlinaraColor.sage)
-                    .frame(maxWidth: .infinity)
-                    .padding(KlinaraMetrics.lg)
+                KlinaraSkeletonSection()
             }
 
         case .failed(let error):

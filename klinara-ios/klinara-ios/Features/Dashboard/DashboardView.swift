@@ -27,6 +27,8 @@ struct DashboardView: View {
                     header
                     if let store {
                         content(store)
+                    } else {
+                        KlinaraSkeletonBody(style: .report)
                     }
                 }
                 .padding(.horizontal, KlinaraMetrics.screenInset)
@@ -104,7 +106,14 @@ struct DashboardView: View {
             branchCard(snapshot)
         } else {
             // İlk yüklemede şerit yer tutucularla duruyor: içerik gelince sayfa zıplamasın.
+            // Şerit ETİKETLERİNİ koruyor — hangi sayıların geleceğini söylemek,
+            // gri bir kutudan daha çok şey anlatıyor; altındaki kartların ise
+            // söyleyecek bir şeyi yok, onlar iskelet.
             KlinaraStatStrip(stats: Self.stats(nil, access: store.access), isLoading: true)
+            if store.access.calendar {
+                KlinaraSkeletonBody(style: .rowsShort)
+            }
+            KlinaraSkeletonBody(style: .chart)
         }
     }
 

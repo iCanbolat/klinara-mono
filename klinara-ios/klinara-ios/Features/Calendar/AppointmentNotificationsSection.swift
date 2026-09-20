@@ -31,10 +31,7 @@ struct AppointmentNotificationsSection: View {
     private var content: some View {
         switch state {
         case .loading:
-            ProgressView()
-                .tint(KlinaraColor.sage)
-                .frame(maxWidth: .infinity)
-                .padding(KlinaraMetrics.lg)
+            KlinaraSkeletonSection()
 
         case .failed(let error):
             ErrorBanner(error: error, onRetry: { Task { await load() } })

@@ -57,6 +57,23 @@ nonisolated enum MessageStatus: String, Codable, Sendable, CaseIterable, Identif
         }
     }
 
+    /// Satır başındaki durum ikonu — listede gözün tarayacağı ilk şey.
+    ///
+    /// Rozetin yerini ALMAZ: ikon renk ve biçimle konuşur, rozet metinle. Ekran
+    /// okuyucu ikonu hiç görmez.
+    var icon: String {
+        switch self {
+        case .queued: return "clock"
+        case .sending: return "arrow.up.circle"
+        case .sent: return "checkmark.circle"
+        case .delivered: return "checkmark.circle.fill"
+        case .read: return "eye.fill"
+        case .failed: return "exclamationmark.triangle.fill"
+        case .skipped: return "slash.circle"
+        case .unknown: return "questionmark.circle"
+        }
+    }
+
     var badgeTone: KlinaraBadge.Tone {
         switch self {
         case .sent, .delivered, .read: return .positive
@@ -115,6 +132,14 @@ nonisolated struct MessageFilter: Sendable, Equatable {
     static let none = MessageFilter()
 
     var isActive: Bool { self != .none }
+
+    /// Kullanıcının EKRANDA seçtiği süzgeçler var mı?
+    ///
+    /// ``isActive``ten ayrı: müşteri kartından açılan liste `customerId`
+    /// taşıyor ama kullanıcı bir şey süzmüş değil. "Süzgeçleri temizle"
+    /// düğmesini ``isActive``e bağlamak, temizlenecek bir şey yokken düğme
+    /// çizmek olurdu.
+    var hasUserFilters: Bool { channel != nil || event != nil || status != nil }
 
     /// Yalnız bir müşterinin geçmişi — müşteri kartından açılan liste.
     static func customer(_ id: String) -> MessageFilter {

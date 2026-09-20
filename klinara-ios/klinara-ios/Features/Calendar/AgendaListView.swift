@@ -12,6 +12,8 @@ struct AgendaListView: View {
     let terminal: [CalendarEntry]
     let staffColor: (String) -> String?
     let onSelect: (CalendarEntry) -> Void
+    /// Boş gündeki birincil aksiyon. `nil` → yazma izni yok, düğme çizilmez.
+    var onCreate: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: KlinaraMetrics.lg) {
@@ -19,7 +21,11 @@ struct AgendaListView: View {
                 EmptyStateView(
                     icon: "calendar",
                     title: "Bu günde randevu yok",
-                    message: "Sağ üstteki artı ile yeni randevu oluşturabilirsiniz."
+                    // Mesaj artık FAB'ı tarif etmiyor: aksiyon boş durumun
+                    // kendisinde ve adı yazılı duruyor.
+                    message: "Başka bir gün seçebilir ya da bugüne yeni bir randevu ekleyebilirsiniz.",
+                    actionTitle: onCreate == nil ? nil : "Yeni randevu",
+                    action: onCreate
                 )
                 .frame(minHeight: 220)
             }

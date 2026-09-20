@@ -12,6 +12,8 @@ import com.klinara.android.designsystem.components.ErrorBanner
 import com.klinara.android.designsystem.components.KlinaraButton
 import com.klinara.android.designsystem.components.KlinaraCard
 import com.klinara.android.designsystem.components.KlinaraScreen
+import com.klinara.android.designsystem.components.KlinaraSkeleton
+import com.klinara.android.designsystem.components.KlinaraSkeletonStyle
 import com.klinara.android.designsystem.components.KlinaraTextEditor
 import com.klinara.android.services.networking.Loadable
 import com.klinara.android.services.packages.CustomerPackage
@@ -42,7 +44,7 @@ internal fun PackageOperationScaffold(
             state.error?.let { ErrorBanner(message = it, retryLabel = "Kapat", onRetry = onDismissError) }
             when (val pkg = state.pkg) {
                 Loadable.Loading ->
-                    Text("Yükleniyor…", style = KlinaraType.bodyM, color = KlinaraTheme.colors.charcoalMuted)
+                    KlinaraSkeleton(style = KlinaraSkeletonStyle.formShort)
                 is Loadable.Failed ->
                     ErrorBanner(message = pkg.message, onRetry = if (pkg.isRetryable) onRetry else null)
                 is Loadable.Loaded -> {

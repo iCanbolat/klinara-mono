@@ -110,10 +110,7 @@ struct CustomerMergeView: View {
 
         case .loading:
             KlinaraCard(title: "Birleştirilecek kayıt") {
-                ProgressView()
-                    .tint(KlinaraColor.sage)
-                    .frame(maxWidth: .infinity)
-                    .padding(KlinaraMetrics.lg)
+                KlinaraSkeletonSection(hasDetail: false)
             }
 
         case .failed(let failure):

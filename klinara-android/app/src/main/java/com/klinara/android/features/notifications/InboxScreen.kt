@@ -31,6 +31,8 @@ import com.klinara.android.designsystem.components.KlinaraCard
 import com.klinara.android.designsystem.components.KlinaraDivider
 import com.klinara.android.designsystem.components.KlinaraScreen
 import com.klinara.android.designsystem.components.KlinaraSegmentedPicker
+import com.klinara.android.designsystem.components.KlinaraSkeleton
+import com.klinara.android.designsystem.components.KlinaraSkeletonStyle
 import com.klinara.android.features.auth.AppSession
 import com.klinara.android.services.ServiceContainer
 import com.klinara.android.services.contracts.Permissions
@@ -73,7 +75,7 @@ fun InboxScreen(
 
             when (val items = state.items) {
                 Loadable.Loading ->
-                    Text("Yükleniyor…", style = KlinaraType.bodyM, color = KlinaraTheme.colors.charcoalMuted)
+                    KlinaraSkeleton(style = KlinaraSkeletonStyle.cardsLong)
                 is Loadable.Failed ->
                     ErrorBanner(message = items.message, onRetry = if (items.isRetryable) viewModel::load else null)
                 is Loadable.Loaded ->

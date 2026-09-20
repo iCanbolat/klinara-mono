@@ -1,15 +1,15 @@
 package com.klinara.android.features.calendar.booking
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -41,6 +41,8 @@ import com.klinara.android.designsystem.components.KlinaraButton
 import com.klinara.android.designsystem.components.KlinaraCard
 import com.klinara.android.designsystem.components.KlinaraDivider
 import com.klinara.android.designsystem.components.KlinaraScreen
+import com.klinara.android.designsystem.components.KlinaraSkeletonChips
+import com.klinara.android.designsystem.components.KlinaraSkeletonSection
 import com.klinara.android.designsystem.components.KlinaraTextField
 import com.klinara.android.designsystem.components.klinaraClickable
 import com.klinara.android.features.auth.AppSession
@@ -188,12 +190,7 @@ private fun ServicesSection(
 ) {
     KlinaraCard(title = "Hizmetler", footnote = "Sıra önemlidir: hizmetler seçtiğiniz sırayla uygulanır.") {
         when (state.services) {
-            Loadable.Loading ->
-                Text(
-                    "Yükleniyor…",
-                    style = KlinaraType.bodyM,
-                    color = KlinaraTheme.colors.charcoalMuted,
-                )
+            Loadable.Loading -> KlinaraSkeletonSection()
             is Loadable.Failed -> ErrorBanner(message = state.services.message)
             is Loadable.Loaded ->
                 state.activeServices.forEachIndexed { index, service ->
@@ -284,8 +281,7 @@ private fun SlotSection(
         }
 
         when (state.slots) {
-            Loadable.Loading ->
-                Text("Uygunluk hesaplanıyor…", style = KlinaraType.bodyM, color = KlinaraTheme.colors.charcoalMuted)
+            Loadable.Loading -> KlinaraSkeletonChips()
 
             is Loadable.Failed -> ErrorBanner(message = state.slots.message)
 

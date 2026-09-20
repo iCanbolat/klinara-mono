@@ -88,6 +88,6 @@ class MockOptOutTest {
         assertEquals(NotificationChannel.Unknown, NotificationChannel.from("telegram"))
         assertEquals(OptOutSource.Unknown, OptOutSource.from("robot"))
         // `Unknown` seçilebilir listede YOK: bir kurtarma dalıdır, bir seçenek değil.
-        assertTrue(NotificationChannel.Unknown !in NotificationChannel.selectable)
+        assertTrue(NotificationChannel.Unknown !in NotificationChannel.customerSelectable)
     }
 }

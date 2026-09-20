@@ -69,6 +69,15 @@ struct MockGraph {
         return clock.date(on: day, at: ClockTime(hour: hour, minute: minute))
     }
 
+    /// Tohum randevuların yazıldığı gün.
+    ///
+    /// ``MockBookingSeed`` takvimi ``workingTuesday()``e değil,
+    /// ``MockNow/reference``e göre kuruyor — mock uygulamada tohum veri
+    /// "bugün" görünmek zorunda. Tohumu okuyan testler store'un "bugün"ünü
+    /// buradan almalı; sabit salı, verinin bulunduğu haftaya ancak tesadüfen
+    /// denk gelir.
+    var seededDay: Date { clock.startOfDay(MockNow.reference) }
+
     func createInput(
         at start: Date,
         serviceIds: [String] = [MockCatalogSeed.serviceLazerBolgesel],

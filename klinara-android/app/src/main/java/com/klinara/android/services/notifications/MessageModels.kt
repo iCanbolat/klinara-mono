@@ -6,6 +6,14 @@ import com.klinara.android.services.networking.ApiError
 import com.klinara.android.services.networking.InstantSerializer
 import com.klinara.android.services.networking.ProblemDetails
 import com.klinara.android.services.networking.WireEnumSerializer
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.ui.graphics.vector.ImageVector
 import kotlinx.serialization.Serializable
 import java.time.Instant
 
@@ -138,6 +146,25 @@ enum class MessageStatus(
     ),
     ;
 
+    /**
+     * Satır başındaki durum ikonu — listede gözün tarayacağı ilk şey.
+     *
+     * Rozetin yerini ALMAZ: ikon renk ve biçimle **tonu** söyler (ulaştı / başarısız /
+     * atlandı), rozet kesin durumu metinle. Bu yüzden üç "olumlu" durum aynı glifi
+     * paylaşıyor: ayrımı yapan rozet ve `material-icons-extended` bir liste ikonu uğruna
+     * eklenmiyor (bkz. [KlinaraIcons]). Ekran okuyucu ikonu hiç görmez.
+     */
+    val icon: ImageVector
+        get() =
+            when (this) {
+                Queued -> Icons.Filled.Refresh
+                Sending -> Icons.AutoMirrored.Filled.Send
+                Sent, Delivered, Read -> Icons.Filled.CheckCircle
+                Failed -> Icons.Filled.Warning
+                Skipped -> Icons.Filled.Clear
+                Unknown -> Icons.Filled.Info
+            }
+
     companion object {
         fun from(wire: String): MessageStatus = entries.firstOrNull { it.wire == wire } ?: Unknown
     }
@@ -197,6 +224,15 @@ data class MessageFilter(
     val to: Instant? = null,
 ) {
     val isActive: Boolean get() = this != NONE
+
+    /**
+     * Kullanıcının EKRANDA seçtiği süzgeçler var mı?
+     *
+     * [isActive]'ten ayrı: müşteri kartından açılan liste `customerId` taşıyor ama kullanıcı
+     * bir şey süzmüş değil. "Süzgeçleri temizle" düğmesini [isActive]'e bağlamak, temizlenecek
+     * bir şey yokken düğme çizmek olurdu.
+     */
+    val hasUserFilters: Boolean get() = channel != null || event != null || status != null
 
     companion object {
         val NONE = MessageFilter()

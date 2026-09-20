@@ -245,4 +245,16 @@ struct BranchClock: Sendable {
     func isToday(_ date: Date, now: Date = Date()) -> Bool {
         isSameDay(date, now)
     }
+
+    /// Bir gün başlığının etiketi: "Bugün", "Dün", yoksa "11 Eylül 2026".
+    ///
+    /// Gruplanmış listelerde tarih satır satır tekrar etmez, başlıkta bir kez
+    /// durur; okuyanın aradığı ayrım da çoğunlukla "bugün mü, değil mi".
+    /// Yıl **her zaman** yazılır: "11 Eylül" bir yıl sonra okunduğunda hangi
+    /// eylül olduğunu söylemez.
+    func relativeDayLabel(_ date: Date, now: Date = Date()) -> String {
+        if isSameDay(date, now) { return "Bugün" }
+        if isSameDay(date, adding(days: -1, to: now)) { return "Dün" }
+        return pattern("d MMMM yyyy").string(from: date)
+    }
 }

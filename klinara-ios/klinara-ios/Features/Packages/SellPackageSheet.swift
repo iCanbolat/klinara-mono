@@ -50,10 +50,7 @@ struct SellPackageSheet: View {
 
                     switch definitionStore.state {
                     case .loading:
-                        ProgressView()
-                            .tint(KlinaraColor.sage)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, KlinaraMetrics.xl)
+                        KlinaraSkeletonBody(style: .rowsShort)
 
                     case .failed(let failure):
                         ErrorBanner(error: failure, onRetry: { Task { await definitionStore.reload() } })

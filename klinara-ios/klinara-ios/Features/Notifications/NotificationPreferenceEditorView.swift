@@ -42,7 +42,10 @@ struct NotificationPreferenceEditorView: View {
         }
         .task {
             guard !didLoad else { return }
-            channels = preference.channels
+            // Kapsam dışı kalmış kanal (e-posta, push) çizilmez: kullanıcıya
+            // taşıyamayacağı ve sunucunun reddedeceği bir satır göstermek,
+            // kaydetmeye çalıştığında açıklanamayan bir hata demekti.
+            channels = preference.channels.filter(NotificationChannel.customerSelectable.contains)
             scope = preference.branchId == nil ? .tenant : .branch
             if let start = ClockTime(preference.quietHoursStart),
                let end = ClockTime(preference.quietHoursEnd) {
@@ -137,7 +140,7 @@ struct NotificationPreferenceEditorView: View {
                 }
 
                 if canWrite {
-                    let available = NotificationChannel.allCases.filter { !channels.contains($0) }
+                    let available = NotificationChannel.customerSelectable.filter { !channels.contains($0) }
                     if !available.isEmpty {
                         KlinaraDivider()
                         KlinaraChipGrid(

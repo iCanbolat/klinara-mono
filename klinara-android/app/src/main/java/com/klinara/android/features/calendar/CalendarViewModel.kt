@@ -1,6 +1,8 @@
 package com.klinara.android.features.calendar
 
+import androidx.annotation.DrawableRes
 import androidx.lifecycle.ViewModel
+import com.klinara.android.R
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.klinara.android.services.ServiceContainer
@@ -23,10 +25,13 @@ import kotlinx.coroutines.launch
 import java.time.Instant
 
 /** Takvimin üç görünümü. Sıra ekranda görünen sıradır. */
-enum class CalendarMode(val turkishName: String) {
-    Agenda("Ajanda"),
-    Day("Gün"),
-    Week("Hafta"),
+enum class CalendarMode(
+    val turkishName: String,
+    @param:DrawableRes val iconRes: Int,
+) {
+    Agenda("Ajanda", R.drawable.ic_mode_agenda),
+    Day("Gün", R.drawable.ic_mode_day),
+    Week("Hafta", R.drawable.ic_mode_week),
     ;
 
     /** İleri/geri okları bu kadar atlar: ajanda ve gün bir gün, hafta yedi gün. */
@@ -48,6 +53,8 @@ data class CalendarUiState(
     val staffFilter: String? = null,
     val calendar: Loadable<CalendarResponse> = Loadable.Loading,
     val staff: Loadable<List<StaffProfile>> = Loadable.Loading,
+    /** Eski veri ekrandayken yenisi isteniyor: gövde sönük çizilir, dokunulamaz. */
+    val isRefreshing: Boolean = false,
 ) {
     private val entries: List<CalendarEntry> get() = calendar.valueOrNull?.appointments.orEmpty()
 
@@ -148,7 +155,12 @@ class CalendarViewModel(
             _state.update { it.copy(calendar = Loadable.failed(BRANCH_MISSING)) }
             return
         }
-        _state.update { it.copy(calendar = Loadable.Loading) }
+        // Önceki veri varsa yerinde KALIR: gün/hafta değişiminde gövdeyi "yükleniyor"
+        // metniyle değiştirmek her dokunuşta ekranı söndürüp yakıyordu. Yalnız ilk
+        // yüklemede (ya da hatadan sonra) Loading gösterilir.
+        _state.update {
+            if (it.calendar is Loadable.Loaded) it.copy(isRefreshing = true) else it.copy(calendar = Loadable.Loading)
+        }
         viewModelScope.launch {
             val current = _state.value
             val next =
@@ -173,7 +185,7 @@ class CalendarViewModel(
                             )
                     }
                 }
-            _state.update { it.copy(calendar = next) }
+            _state.update { it.copy(calendar = next, isRefreshing = false) }
         }
     }
 

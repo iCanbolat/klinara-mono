@@ -159,13 +159,30 @@ describe('bildirim çekirdeği (Batch 8.1)', () => {
       expect(sms().sent).toHaveLength(1);
     });
 
-    it('e-posta kanalı SMTP yapılandırılmamışken loga düşer', async () => {
-      const queued = await enqueue(reminder({ channels: ['email'] }));
+    it('personele giden iç bildirim e-postayla gider', async () => {
+      const queued = await enqueue({
+        event: 'staff_internal',
+        userId: clinic.owner.userId,
+        branchId: clinic.branch.id,
+        variables: { subject: 'Gönderilemeyen hatırlatma', message: 'Bir hatırlatma düştü.' },
+      });
       if (queued.status !== 'queued') throw new Error('kuyruğa yazılmalıydı');
       await runWorker(queued.messageId);
 
       expect(mail().sent).toHaveLength(1);
-      expect(mail().sent[0]?.subject).toBe('Randevu hatırlatması');
+      expect(mail().sent[0]?.subject).toBe('Gönderilemeyen hatırlatma');
+    });
+
+    it('müşteri olayında e-posta İSTENSE bile kanal listesinden düşer', async () => {
+      // Klinik müşterisiyle yalnız WhatsApp/SMS üzerinden yazışır; kayıtlı eski
+      // tercihler hâlâ e-posta taşıyabilir ve süzülmezse SMS'in önünü keserdi.
+      const queued = await enqueue(reminder({ channels: ['email', 'sms'] }));
+      if (queued.status !== 'queued') throw new Error('kuyruğa yazılmalıydı');
+      expect(queued.channel).toBe('sms');
+
+      await runWorker(queued.messageId);
+      expect(mail().sent).toHaveLength(0);
+      expect(sms().sent).toHaveLength(1);
     });
 
     it('adresi olmayan alıcı için mesaj kaydı HİÇ yazılmaz', async () => {
@@ -176,7 +193,7 @@ describe('bildirim çekirdeği (Batch 8.1)', () => {
         .expect(201);
 
       const result = await enqueue(
-        reminder({ customerId: (created.body as { id: string }).id, channels: ['sms', 'email'] }),
+        reminder({ customerId: (created.body as { id: string }).id, channels: ['sms', 'whatsapp'] }),
       );
       expect(result.status).toBe('skipped');
 
@@ -419,7 +436,7 @@ describe('bildirim çekirdeği (Batch 8.1)', () => {
 
     it('aynı kiracı tercihi ikinci kez yazıldığında TEK satır kalır', async () => {
       await setPreference({ event: 'birthday', channels: ['sms'] }).expect(200);
-      await setPreference({ event: 'birthday', channels: ['email'] }).expect(200);
+      await setPreference({ event: 'birthday', channels: ['whatsapp'] }).expect(200);
 
       const rows = await database.ownerPool.query<{ count: string }>(
         `select count(*)::text as count from notification_preferences where event = 'birthday'`,
@@ -430,7 +447,7 @@ describe('bildirim çekirdeği (Batch 8.1)', () => {
     it('tercih kanal sırasını belirler; adresi olmayan kanal atlanır', async () => {
       await setPreference({
         event: 'appointment_reminder',
-        channels: ['email', 'sms'],
+        channels: ['whatsapp', 'sms'],
       }).expect(200);
 
       // Kanal override'ı OLMADAN: seçim tamamen tercihe kalsın.
@@ -438,7 +455,36 @@ describe('bildirim çekirdeği (Batch 8.1)', () => {
       delete (base as { channels?: unknown }).channels;
       const queued = await enqueue(base);
       if (queued.status !== 'queued') throw new Error('kuyruğa yazılmalıydı');
-      expect(queued.channel).toBe('email');
+      expect(queued.channel).toBe('whatsapp');
+    });
+
+    it('müşteri olayının tercihine e-posta YAZILAMAZ', async () => {
+      const rejected = await setPreference({
+        event: 'appointment_reminder',
+        channels: ['email', 'whatsapp'],
+      }).expect(422);
+      expect((rejected.body as Problem).code).toBe('VALIDATION_FAILED');
+    });
+
+    it('müşteri olayına e-posta ŞABLONU yazılamaz', async () => {
+      const rejected = await http(app)
+        .put('/api/v1/notification-templates')
+        .set(ownerAuth())
+        .send({
+          event: 'appointment_reminder',
+          channel: 'email',
+          subject: 'Randevu hatırlatması',
+          body: 'Merhaba {{customerName}}',
+        })
+        .expect(422);
+      expect((rejected.body as Problem).code).toBe('VALIDATION_FAILED');
+    });
+
+    it('şablon listesi müşteri olaylarında e-posta satırı DÖNDÜRMEZ', async () => {
+      const listed = await http(app).get('/api/v1/notification-templates').set(ownerAuth()).expect(200);
+      const rows = listed.body as { event: string; channel: string }[];
+      expect(rows.some((row) => row.channel === 'email' && row.event !== 'staff_internal')).toBe(false);
+      expect(rows.some((row) => row.channel === 'email' && row.event === 'staff_internal')).toBe(true);
     });
   });
 

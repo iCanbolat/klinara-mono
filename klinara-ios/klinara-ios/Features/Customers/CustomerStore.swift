@@ -29,6 +29,16 @@ final class CustomerStore {
 
     private(set) var tagState: LoadState<[CustomerTag]> = .loading
 
+    /// Liste ekranının etiket filtresi. `nil` = tüm müşteriler.
+    ///
+    /// Filtrelenmiş liste ``state``'e YAZILMAZ: ``customers`` randevu akışının
+    /// müşteri seçicisini de besliyor ve bir etiket filtresinin orayı daraltması
+    /// "müşteri bulunamadı" hatası gibi görünürdü.
+    private(set) var selectedTagId: String?
+    private(set) var filteredState: LoadState<[Customer]>?
+    private var filteredCursor: String?
+    private var filterTask: Task<Void, Never>?
+
     init(service: any CustomerService) {
         self.service = service
     }
@@ -39,10 +49,22 @@ final class CustomerStore {
     func customer(id: String) -> Customer? { customers.first { $0.id == id } }
 
     /// Ekranın çizeceği liste: arama etkinse sonucu, değilse sayfalanmış liste.
-    var visible: LoadState<[Customer]> { searchState ?? state }
+    ///
+    /// Arama ucu `tagId` almıyor; etiket seçiliyken arama sonucu istemcide
+    /// daraltılır (arama sayfalanmadığı için eksik sonuç riski yok).
+    var visible: LoadState<[Customer]> {
+        if let searchState {
+            guard let tagId = selectedTagId, let found = searchState.value else { return searchState }
+            return .loaded(found.filter { $0.tags.contains { $0.id == tagId } })
+        }
+        return filteredState ?? state
+    }
 
     /// Arama etkinken "daha fazla yükle" gösterilmez — arama sayfalanmıyor.
-    var canLoadMore: Bool { searchState == nil && nextCursor != nil }
+    var canLoadMore: Bool {
+        guard searchState == nil else { return false }
+        return selectedTagId == nil ? nextCursor != nil : filteredCursor != nil
+    }
 
     // MARK: Okuma
 
@@ -65,6 +87,10 @@ final class CustomerStore {
     /// yapmaz — liste sonuna gelindiğinde görünen tetikleyici birden çok kez
     /// çizilebiliyor.
     func loadMore() async {
+        if let tagId = selectedTagId {
+            await loadMoreFiltered(tagId: tagId)
+            return
+        }
         guard let cursor = nextCursor, !isLoadingMore else { return }
         isLoadingMore = true
         defer { isLoadingMore = false }
@@ -81,6 +107,51 @@ final class CustomerStore {
             // Sayfa hatası TÜM listeyi düşürmez: elde olan kayıtlar duruyor,
             // kullanıcı tekrar deneyebilir.
             nextCursor = cursor
+        }
+    }
+
+    /// Etiket filtresi. Aynı etikete tekrar dokunmak filtreyi temizler.
+    func selectTag(_ tagId: String?) {
+        let next = selectedTagId == tagId ? nil : tagId
+        guard next != selectedTagId else { return }
+        selectedTagId = next
+        filterTask?.cancel()
+        filteredCursor = nil
+        guard let next else {
+            filteredState = nil
+            return
+        }
+        filteredState = .loading
+        filterTask = Task { [service] in
+            do {
+                let page = try await service.customers(cursor: nil, limit: nil, tagId: next, source: nil)
+                guard !Task.isCancelled, self.selectedTagId == next else { return }
+                self.filteredState = .loaded(page.data)
+                self.filteredCursor = page.pageInfo.nextCursor
+            } catch {
+                guard !Task.isCancelled, self.selectedTagId == next else { return }
+                self.filteredState = .failed(error as? APIError ?? .network)
+            }
+        }
+    }
+
+    func reloadFiltered() {
+        let tagId = selectedTagId
+        selectedTagId = nil
+        selectTag(tagId)
+    }
+
+    private func loadMoreFiltered(tagId: String) async {
+        guard let cursor = filteredCursor, !isLoadingMore, let loaded = filteredState?.value else { return }
+        isLoadingMore = true
+        defer { isLoadingMore = false }
+        do {
+            let page = try await service.customers(cursor: cursor, limit: nil, tagId: tagId, source: nil)
+            guard selectedTagId == tagId else { return }
+            filteredState = .loaded(loaded + page.data)
+            filteredCursor = page.pageInfo.nextCursor
+        } catch {
+            filteredCursor = cursor
         }
     }
 
@@ -233,6 +304,9 @@ final class CustomerStore {
 
     private func replace(_ customer: Customer) {
         state = .loaded(customers.map { $0.id == customer.id ? customer : $0 })
+        if let filtered = filteredState?.value {
+            filteredState = .loaded(filtered.map { $0.id == customer.id ? customer : $0 })
+        }
         if let found = searchState?.value {
             searchState = .loaded(found.map { $0.id == customer.id ? customer : $0 })
         }
@@ -240,6 +314,9 @@ final class CustomerStore {
 
     private func remove(_ id: String) {
         state = .loaded(customers.filter { $0.id != id })
+        if let filtered = filteredState?.value {
+            filteredState = .loaded(filtered.filter { $0.id != id })
+        }
         if let found = searchState?.value {
             searchState = .loaded(found.filter { $0.id != id })
         }

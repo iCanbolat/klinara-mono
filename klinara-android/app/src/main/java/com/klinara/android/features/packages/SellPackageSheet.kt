@@ -17,6 +17,8 @@ import com.klinara.android.designsystem.components.KlinaraDivider
 import com.klinara.android.designsystem.components.KlinaraRow
 import com.klinara.android.designsystem.components.KlinaraScreen
 import com.klinara.android.designsystem.components.KlinaraSearchablePicker
+import com.klinara.android.designsystem.components.KlinaraSkeleton
+import com.klinara.android.designsystem.components.KlinaraSkeletonStyle
 import com.klinara.android.designsystem.components.KlinaraTextEditor
 import com.klinara.android.services.formatting.Money
 import com.klinara.android.services.networking.Loadable
@@ -47,7 +49,7 @@ fun SellPackageSheet(
 
             when (val options = state.options) {
                 Loadable.Loading ->
-                    Text("Yükleniyor…", style = KlinaraType.bodyM, color = KlinaraTheme.colors.charcoalMuted)
+                    KlinaraSkeleton(style = KlinaraSkeletonStyle.rowsShort)
                 is Loadable.Failed ->
                     ErrorBanner(message = options.message, onRetry = if (options.isRetryable) onRetry else null)
                 is Loadable.Loaded ->

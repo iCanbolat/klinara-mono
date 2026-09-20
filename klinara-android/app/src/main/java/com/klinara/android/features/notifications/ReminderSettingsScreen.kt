@@ -34,6 +34,8 @@ import com.klinara.android.designsystem.components.KlinaraButtonKind
 import com.klinara.android.designsystem.components.KlinaraCard
 import com.klinara.android.designsystem.components.KlinaraDivider
 import com.klinara.android.designsystem.components.KlinaraScreen
+import com.klinara.android.designsystem.components.KlinaraSkeleton
+import com.klinara.android.designsystem.components.KlinaraSkeletonStyle
 import com.klinara.android.designsystem.components.KlinaraStepperRow
 import com.klinara.android.designsystem.components.KlinaraTextField
 import com.klinara.android.designsystem.components.KlinaraToggleRow
@@ -64,7 +66,7 @@ fun ReminderSettingsScreen(
             state.error?.let { ErrorBanner(message = it, retryLabel = "Kapat", onRetry = actions.onDismissError) }
             when (val settings = state.settings) {
                 Loadable.Loading ->
-                    Text("Yükleniyor…", style = KlinaraType.bodyM, color = KlinaraTheme.colors.charcoalMuted)
+                    KlinaraSkeleton(style = KlinaraSkeletonStyle.form)
                 is Loadable.Failed ->
                     ErrorBanner(
                         message = settings.message,

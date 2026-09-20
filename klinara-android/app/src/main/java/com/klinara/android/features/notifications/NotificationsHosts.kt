@@ -12,7 +12,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.klinara.android.designsystem.components.KlinaraScreen
 import com.klinara.android.features.auth.AppSession
 import com.klinara.android.features.scheduling.NoBranchState
-import com.klinara.android.features.scheduling.rememberUnsavedChangesGuard
+import com.klinara.android.designsystem.components.rememberUnsavedChangesGuard
 import com.klinara.android.services.contracts.Permissions
 import com.klinara.android.services.ServiceContainer
 import com.klinara.android.services.formatting.BranchClock
@@ -41,10 +41,12 @@ fun MessageLogHost(
         state = state,
         clock = clock,
         onStatus = viewModel::setStatus,
-        onChannel = viewModel::setChannel,
+        onToggleStatus = viewModel::toggleStatus,
         onEvent = viewModel::toggleEvent,
+        onClearFilters = viewModel::clearFilters,
         onRetry = viewModel::load,
         onLoadMore = viewModel::loadMore,
+        onRetryLoadMore = viewModel::retryLoadMore,
         onOpen = onOpen,
         onBack = onBack,
         modifier = modifier,
