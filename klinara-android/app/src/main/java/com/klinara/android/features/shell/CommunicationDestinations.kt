@@ -8,6 +8,8 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
 import com.klinara.android.features.auth.AppSession
+import com.klinara.android.features.conversations.ConversationListScreen
+import com.klinara.android.features.conversations.ConversationThreadScreen
 import com.klinara.android.features.integrations.WhatsAppEditorHost
 import com.klinara.android.features.integrations.WhatsAppSettingsHost
 import com.klinara.android.features.integrations.WhatsAppTemplatesHost
@@ -36,12 +38,33 @@ internal fun NavGraphBuilder.communicationDestinations(
     trailing: @Composable RowScope.() -> Unit,
     openCustomer: ((String) -> Unit)?,
 ) {
+    composable<ShellRoutes.Conversations> {
+        ConversationListScreen(
+            session = session,
+            container = container,
+            onOpen = { navController.navigate(ShellRoutes.ConversationDetail(it)) },
+            onBack = { navController.popBackStack() },
+        )
+    }
+
+    composable<ShellRoutes.ConversationDetail> { entry ->
+        val route = entry.toRoute<ShellRoutes.ConversationDetail>()
+        ConversationThreadScreen(
+            session = session,
+            container = container,
+            conversationId = route.conversationId,
+            onBack = { navController.popBackStack() },
+            onOpenCustomer = openCustomer,
+        )
+    }
+
     composable<ShellRoutes.Inbox> {
         InboxScreen(
             session = session,
             container = container,
             onBack = { navController.popBackStack() },
             onOpenCustomer = openCustomer,
+            onOpenConversations = { navController.navigate(ShellRoutes.Conversations) },
         )
     }
 

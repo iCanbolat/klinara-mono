@@ -1,0 +1,20 @@
+{
+  "data": [
+    {
+      "id": "30aba20b-a68e-442a-948a-98a4e5985e33",
+      "phone": "+905559998877",
+      "customer": null,
+      "status": "open",
+      "lastMessageAt": "2026-09-22T10:31:38.690Z",
+      "lastMessagePreview": "Merhaba",
+      "lastMessageDirection": "out",
+      "unread": false,
+      "windowOpen": true,
+      "windowExpiresAt": "2026-09-23T10:31:38.000Z"
+    }
+  ],
+  "pageInfo": {
+    "hasMore": true,
+    "nextCursor": "MjAyNi0wOS0yMlQxMDozMTozOC42OTBafDMwYWJhMjBiLWE2OGUtNDQyYS05NDhhLTk4YTRlNTk4NWUzMw"
+  }
+}

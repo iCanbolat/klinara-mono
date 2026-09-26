@@ -30,6 +30,7 @@ enum class ManagementDestination {
     PackageDefinitions,
     PackageReports,
     Reports,
+    Conversations,
     Inbox,
     MessageLog,
     ReminderSettings,
@@ -195,6 +196,10 @@ private fun reportsSection(session: AppSession): ManagementSection? {
 private fun communicationSection(session: AppSession): ManagementSection? {
     val rows =
         buildList {
+            // Sohbetler `notification:send` — resepsiyon, `:read`'i olmasa da yazışabilmeli.
+            if (session.can(Permissions.NOTIFICATION_SEND)) {
+                add(row(ManagementDestination.Conversations, "Sohbetler", "Müşterilerle WhatsApp yazışmaları"))
+            }
             if (session.can(Permissions.NOTIFICATION_READ)) {
                 add(row(ManagementDestination.Inbox, "Gelen kutusu", "Müşterilerin WhatsApp'tan yazdığı mesajlar"))
                 add(
@@ -239,13 +244,7 @@ private fun communicationSection(session: AppSession): ManagementSection? {
             }
         }
     if (rows.isEmpty()) return null
-    return ManagementSection(
-        title = "İletişim",
-        rows = rows,
-        footnote =
-            "Randevu hatırlatması ticari ileti değildir; iletişim izni iptali yalnız pazarlama " +
-                "mesajlarını durdurur.",
-    )
+    return ManagementSection(title = "İletişim", rows = rows)
 }
 
 private fun section(
@@ -282,6 +281,7 @@ val ManagementDestination.icon: Int
             ManagementDestination.PackageDefinitions -> KlinaraIcons.packageBox
             ManagementDestination.PackageReports -> KlinaraIcons.packageReports
             ManagementDestination.Reports -> KlinaraIcons.reports
+            ManagementDestination.Conversations -> KlinaraIcons.conversations
             ManagementDestination.Inbox -> KlinaraIcons.inbox
             ManagementDestination.MessageLog -> KlinaraIcons.messages
             ManagementDestination.ReminderSettings -> KlinaraIcons.reminder

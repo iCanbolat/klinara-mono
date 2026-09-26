@@ -313,8 +313,68 @@ data class AvailabilityResponse(
     val branchId: String,
     val timezone: String,
     val slotGranularityMinutes: Int = 0,
+    /**
+     * Penceredeki her yerel gün. Boş [slots] tek başına "kapalı" ile "dolu"yu ayırt
+     * edemiyordu; neden buradan okunur. Eski sunucuda alan yok → boş liste.
+     */
+    val days: List<AvailabilityDay> = emptyList(),
     val slots: List<AvailabilitySlot> = emptyList(),
+) {
+    /** `yyyy-MM-dd` gün anahtarının durumu. */
+    fun day(localDate: String): AvailabilityDay? = days.firstOrNull { it.date == localDate }
+}
+
+/** `GET availability/days` — hizmet bilmeden yalnız gün durumları (tarih seçici). */
+@Serializable
+data class AvailabilityDaysResponse(
+    val branchId: String,
+    val timezone: String,
+    val days: List<AvailabilityDay> = emptyList(),
 )
+
+/** Bir günün durumu — `packages/shared` `AvailabilityDay`. */
+@Serializable
+data class AvailabilityDay(
+    /** `yyyy-MM-dd`, şube saat diliminde. */
+    val date: String,
+    val status: AvailabilityDayStatus = AvailabilityDayStatus.Unknown,
+    val holidayName: String? = null,
+    /** `HH:mm`, yalnız açık günde. */
+    val opensAt: String? = null,
+    val closesAt: String? = null,
+)
+
+/** Bilinmeyen bir durum çözümlemeyi düşürmemeli; [Unknown] o dalı taşır. */
+@Serializable(with = AvailabilityDayStatusSerializer::class)
+enum class AvailabilityDayStatus(val wire: String) {
+    /** Çalışma saatleri var; slot yoksa gün DOLU. */
+    Open("open"),
+    /** Haftalık kapalı gün. */
+    Closed("closed"),
+    /** Tam gün tatil; `holidayName` dolu. */
+    Holiday("holiday"),
+    /** Çalışma saatleri geçti. */
+    Past("past"),
+    /** İleri rezervasyon sınırının ötesinde. */
+    BeyondWindow("beyond_window"),
+    Unknown("unknown"),
+    ;
+
+    companion object {
+        fun from(wire: String): AvailabilityDayStatus = entries.firstOrNull { it.wire == wire } ?: Unknown
+    }
+}
+
+internal object AvailabilityDayStatusSerializer : KSerializer<AvailabilityDayStatus> {
+    override val descriptor = PrimitiveSerialDescriptor("AvailabilityDayStatus", PrimitiveKind.STRING)
+
+    override fun deserialize(decoder: Decoder): AvailabilityDayStatus = AvailabilityDayStatus.from(decoder.decodeString())
+
+    override fun serialize(
+        encoder: Encoder,
+        value: AvailabilityDayStatus,
+    ) = encoder.encodeString(value.wire)
+}
 
 /**
  * Uygun bir başlangıç. [staffProfileIds] o slotu verebilecek **adayların** listesidir,
@@ -362,6 +422,8 @@ data class CreateAppointmentInput(
     val startsAt: String,
     val services: List<AppointmentServiceInput>,
     val notes: String? = null,
+    /** `false` → müşteriye onay mesajı gitmez. `null` gövdeye yazılmaz (sunucu varsayılanı: gider). */
+    val notifyCustomer: Boolean? = null,
 )
 
 /** `POST appointments/:id/reschedule` gövdesi. [services] atlanırsa mevcut dizilim korunur. */

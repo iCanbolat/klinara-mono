@@ -18,6 +18,7 @@ struct AppointmentDetailView: View {
     @State private var pendingStatus: AppointmentStatus?
     @State private var isCancelling = false
     @State private var cancelReason = ""
+    @State private var notifyOnCancel = true
     @State private var isRescheduling = false
     @State private var isEditingNotes = false
     /// Paket bağlama sayfası — bir hizmet kalemi için açılır.
@@ -289,6 +290,16 @@ struct AppointmentDetailView: View {
                 )
                 .padding(KlinaraMetrics.md)
             }
+            // Geçmiş randevuya sunucu zaten bildirim göndermiyor; seçenek yanıltmasın.
+            if let appointment = state.value, appointment.startsAt > Date() {
+                KlinaraFormSection(title: "Bildirim") {
+                    KlinaraToggleRow(
+                        label: "Müşteriye bildir",
+                        detail: "Müşteriye WhatsApp ile iptal bildirimi gönderilir.",
+                        isOn: $notifyOnCancel
+                    )
+                }
+            }
         }
     }
 
@@ -324,7 +335,8 @@ struct AppointmentDetailView: View {
             let reason = cancelReason.trimmingCharacters(in: .whitespacesAndNewlines)
             state = .loaded(try await store.cancel(
                 appointment,
-                reason: reason.isEmpty ? nil : reason
+                reason: reason.isEmpty ? nil : reason,
+                notifyCustomer: notifyOnCancel || appointment.startsAt <= Date()
             ))
             isCancelling = false
         } catch {

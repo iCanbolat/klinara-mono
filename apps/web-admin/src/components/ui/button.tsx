@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
+import { Loader2 } from 'lucide-react';
 import { Slot } from 'radix-ui';
 import { cn } from '@/lib/cn';
 
@@ -22,7 +23,7 @@ import { cn } from '@/lib/cn';
  */
 const button = cva(
   [
-    'inline-flex shrink-0 items-center justify-center gap-2 rounded-lg',
+    'inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg',
     'font-semibold whitespace-nowrap transition-colors',
     'disabled:pointer-events-none disabled:opacity-50',
     "[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
@@ -55,6 +56,18 @@ const button = cva(
   },
 );
 
+// Yüklemede metin `text-transparent`; spinner rengini `currentColor`dan alamaz.
+const spinnerColor: Record<NonNullable<VariantProps<typeof button>['variant']>, string> = {
+  primary: 'text-primary-foreground',
+  default: 'text-primary-foreground',
+  danger: 'text-white',
+  destructive: 'text-white',
+  secondary: 'text-foreground',
+  outline: 'text-foreground',
+  ghost: 'text-foreground',
+  link: 'text-secondary-foreground',
+};
+
 export interface ButtonProps
   extends React.ComponentProps<'button'>,
     VariantProps<typeof button> {
@@ -81,7 +94,8 @@ export function Button({
 }: ButtonProps): React.ReactNode {
   const className_ = cn(
     button({ variant, size }),
-    loading && 'relative text-transparent',
+    // Düğme soluklaşmıyor; içerik gizlenip yerine spinner geliyor.
+    loading && 'relative text-transparent disabled:opacity-100 [&>*:not([data-spinner])]:invisible',
     className,
   );
 
@@ -112,10 +126,14 @@ export function Button({
       {children}
       {loading ? (
         <span
+          data-spinner
           aria-hidden="true"
-          className="absolute inset-0 flex items-center justify-center text-current"
+          className={cn(
+            'absolute inset-0 flex items-center justify-center',
+            spinnerColor[variant ?? 'primary'],
+          )}
         >
-          <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+          <Loader2 className="size-5 animate-spin" />
         </span>
       ) : null}
     </button>

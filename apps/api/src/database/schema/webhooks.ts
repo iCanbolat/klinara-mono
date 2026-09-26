@@ -1,5 +1,6 @@
 import { index, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { appointments } from './appointments';
+import { conversations } from './conversations';
 import { customers } from './crm';
 import { users } from './identity';
 import { messageLog } from './notifications';
@@ -42,6 +43,9 @@ export const inboundMessages = pgTable(
     receivedAt: timestamp('received_at', { withTimezone: true }).notNull().defaultNow(),
     handledBy: uuid('handled_by').references(() => users.id, { onDelete: 'set null' }),
     handledAt: timestamp('handled_at', { withTimezone: true }),
+    conversationId: uuid('conversation_id').references(() => conversations.id, {
+      onDelete: 'set null',
+    }),
   },
   (table) => [
     uniqueIndex('inbound_messages_wa_key').on(table.tenantId, table.waMessageId),

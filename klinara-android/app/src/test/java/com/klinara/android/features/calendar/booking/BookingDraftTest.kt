@@ -98,6 +98,24 @@ class BookingDraftTest {
     }
 
     @Test
+    @DisplayName("Müşteriyi bırakmak seçimi ve paket bağlarını temizler")
+    fun clearingCustomerDropsSelectionAndBindings() {
+        val subject = draft().selectCustomer("ayşe").copy(packageItemIds = mapOf("a" to "item-1"))
+
+        val cleared = subject.clearCustomer()
+        assertNull(cleared.customerId)
+        assertTrue(cleared.packageItemIds.isEmpty())
+    }
+
+    @Test
+    @DisplayName("Eksik adımlar form sırasıyla listelenir")
+    fun missingStepsFollowFormOrder() {
+        assertEquals(listOf("müşteri", "hizmet", "saat"), draft().missingSteps)
+        assertEquals(listOf("hizmet", "saat"), draft().selectCustomer("c").missingSteps)
+        assertEquals("Devam etmek için müşteri, hizmet ve saat seçin.", draft().missingStepsHint)
+    }
+
+    @Test
     @DisplayName("Aynı müşteriye tekrar dokunmak paket bağlarını KORUR")
     fun reselectingTheSameCustomerKeepsBindings() {
         val subject = draft().selectCustomer("ayşe").copy(packageItemIds = mapOf("a" to "item-1"))

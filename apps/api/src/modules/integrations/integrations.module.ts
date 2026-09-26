@@ -1,6 +1,8 @@
 import { forwardRef, Module } from '@nestjs/common';
 import { FieldEncryptionService } from '../../common/crypto/field-encryption.service';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { ConversationsController } from './conversations.controller';
+import { ConversationsService } from './conversations.service';
 import { InboxController } from './inbox.controller';
 import { MessageActionsService } from './message-actions.service';
 import { InboxService } from './inbox.service';
@@ -24,12 +26,18 @@ import { WhatsAppWebhookService } from './whatsapp-webhook.service';
   // gönderiyor. İki yön de gerçek ve `forwardRef` bunun bedeli; kanalı
   // bildirim modülüne taşımak Graph API'yi çekirdeğe sokardı.
   imports: [forwardRef(() => NotificationsModule)],
-  controllers: [WhatsAppController, WhatsAppWebhookController, InboxController],
+  controllers: [
+    WhatsAppController,
+    WhatsAppWebhookController,
+    InboxController,
+    ConversationsController,
+  ],
   providers: [
     WhatsAppService,
     WhatsAppSenderService,
     WhatsAppWebhookService,
     InboxService,
+    ConversationsService,
     MessageActionsService,
     FieldEncryptionService,
   ],

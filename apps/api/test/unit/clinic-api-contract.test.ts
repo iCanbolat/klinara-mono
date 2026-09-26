@@ -14,6 +14,8 @@ import {
   type Appointment,
   type AppointmentHistoryEntry,
   type AppointmentServiceLine,
+  type AvailabilityDay,
+  type AvailabilityDaysResponse,
   type AvailabilityResponse,
   type AvailabilitySlot,
   type BranchHour,
@@ -64,6 +66,8 @@ import {
   DensityBucketDto,
 } from '../../src/modules/booking/dto/calendar.dto';
 import {
+  AvailabilityDayDto,
+  AvailabilityDaysResponseDto,
   AvailabilityResponseDto,
   AvailabilitySlotDto,
 } from '../../src/modules/booking/dto/availability.dto';
@@ -153,6 +157,8 @@ const _keysCalendarLine: SameKeys<CalendarServiceDto, CalendarServiceLine> = tru
 const _keysDensity: SameKeys<DensityBucketDto, DensityBucket> = true;
 const _keysAvailability: SameKeys<AvailabilityResponseDto, AvailabilityResponse> = true;
 const _keysSlot: SameKeys<AvailabilitySlotDto, AvailabilitySlot> = true;
+const _keysDay: SameKeys<AvailabilityDayDto, AvailabilityDay> = true;
+const _keysDays: SameKeys<AvailabilityDaysResponseDto, AvailabilityDaysResponse> = true;
 
 // Müşteri ve not
 const _keysCustomer: SameKeys<CustomerResponseDto, Customer> = true;
@@ -186,6 +192,7 @@ const _appointmentToShared: Appointment = new AppointmentResponseDto();
 const _historyToShared: AppointmentHistoryEntry = new AppointmentHistoryEntryDto();
 const _calendarToShared: CalendarResponse = new CalendarResponseDto();
 const _availabilityToShared: AvailabilityResponse = new AvailabilityResponseDto();
+const _daysToShared: AvailabilityDaysResponse = new AvailabilityDaysResponseDto();
 const _customerToShared: Customer = new CustomerResponseDto();
 const _noteToShared: CustomerNote = new CustomerNoteResponseDto();
 const _serviceToShared: Service = new ServiceResponseDto();
@@ -239,6 +246,9 @@ void [
   _keysCalendarLine,
   _keysDensity,
   _keysAvailability,
+  _keysDay,
+  _keysDays,
+  _daysToShared,
   _keysSlot,
   _keysCustomer,
   _keysTag,

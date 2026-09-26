@@ -7,6 +7,7 @@ import com.klinara.android.services.ServiceContainer
 import com.klinara.android.services.crm.Customer
 import com.klinara.android.services.crm.CustomerListQuery
 import com.klinara.android.services.crm.CustomerService
+import com.klinara.android.services.crm.CustomerSummary
 import com.klinara.android.services.crm.CustomerTag
 import com.klinara.android.services.networking.Loadable
 import kotlinx.coroutines.Job
@@ -42,6 +43,8 @@ data class CustomerListUiState(
     val tags: List<CustomerTag> = emptyList(),
     /** null = tüm müşteriler. Gezinme listesinde sunucuya `tagId` olarak gider. */
     val selectedTagId: String? = null,
+    /** Liste üstündeki özet şeridi. Gelmezse şerit çizilmez; liste yine çalışır. */
+    val summary: CustomerSummary? = null,
 ) {
     /**
      * Ekranın çizeceği liste: arama varsa o, yoksa gezinme listesi.
@@ -118,6 +121,14 @@ class CustomerListViewModel(
                     )
                 }
             }
+    }
+
+    /** Özet süs niteliğinde: hata sessizdir, önceki değer (varsa) yerinde kalır. */
+    fun loadSummary() {
+        viewModelScope.launch {
+            val summary = runCatching { customers.summary() }.getOrNull() ?: return@launch
+            _state.update { it.copy(summary = summary) }
+        }
     }
 
     /** Etiketler bir kez çekilir; hata sessizdir — filtre satırı yalnızca görünmez. */

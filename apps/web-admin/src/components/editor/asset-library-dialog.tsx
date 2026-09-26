@@ -10,6 +10,7 @@ import { cn } from '@/lib/cn';
 import { Alert } from '@/components/ui/alert';
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogHeader,
@@ -69,90 +70,92 @@ export function AssetLibraryDialog({
           <DialogDescription>{t('asset.libraryDescription')}</DialogDescription>
         </DialogHeader>
 
-        <label
-          htmlFor={inputId}
-          onDragOver={(event) => {
-            event.preventDefault();
-            setDragOver(true);
-          }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={onDrop}
-          className={cn(
-            'flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed px-4 py-5 text-center transition-colors',
-            dragOver ? 'border-primary bg-accent' : 'border-border hover:border-primary/40 hover:bg-muted/40',
-            library.uploading && 'pointer-events-none opacity-60',
-          )}
-        >
-          {library.uploading ? (
-            <Loader2 aria-hidden="true" className="size-5 animate-spin text-muted-foreground" />
-          ) : (
-            <ImagePlus aria-hidden="true" className="size-5 text-muted-foreground" />
-          )}
-          <span className="text-sm font-medium text-foreground">
-            {library.uploading ? t('asset.uploading') : t('asset.dropzone')}
-          </span>
-          <span className="text-xs text-muted-foreground">
-            {t('asset.dropzoneHint', { mb: MAX_MEGABYTES })}
-          </span>
-          <input
-            id={inputId}
-            type="file"
-            accept={ACCEPT_ATTRIBUTE}
-            className="sr-only"
-            aria-label={t('asset.upload')}
-            disabled={library.uploading}
-            onChange={(event) => {
-              void upload(event.target.files?.[0]);
-              event.target.value = '';
+        <DialogBody className="flex flex-col gap-4">
+          <label
+            htmlFor={inputId}
+            onDragOver={(event) => {
+              event.preventDefault();
+              setDragOver(true);
             }}
-          />
-        </label>
+            onDragLeave={() => setDragOver(false)}
+            onDrop={onDrop}
+            className={cn(
+              'flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed px-4 py-5 text-center transition-colors',
+              dragOver ? 'border-primary bg-accent' : 'border-border hover:border-primary/40 hover:bg-muted/40',
+              library.uploading && 'pointer-events-none opacity-60',
+            )}
+          >
+            {library.uploading ? (
+              <Loader2 aria-hidden="true" className="size-5 animate-spin text-muted-foreground" />
+            ) : (
+              <ImagePlus aria-hidden="true" className="size-5 text-muted-foreground" />
+            )}
+            <span className="text-sm font-medium text-foreground">
+              {library.uploading ? t('asset.uploading') : t('asset.dropzone')}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {t('asset.dropzoneHint', { mb: MAX_MEGABYTES })}
+            </span>
+            <input
+              id={inputId}
+              type="file"
+              accept={ACCEPT_ATTRIBUTE}
+              className="sr-only"
+              aria-label={t('asset.upload')}
+              disabled={library.uploading}
+              onChange={(event) => {
+                void upload(event.target.files?.[0]);
+                event.target.value = '';
+              }}
+            />
+          </label>
 
-        {library.error !== null ? <Alert tone="danger">{library.error}</Alert> : null}
+          {library.error !== null ? <Alert tone="danger">{library.error}</Alert> : null}
 
-        {library.assets.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">{t('asset.libraryEmpty')}</p>
-        ) : (
-          <ul className="grid max-h-[50vh] grid-cols-2 gap-3 overflow-y-auto p-0.5 sm:grid-cols-3">
-            {library.assets.map((asset) => {
-              const selected = asset.id === selectedId;
-              const name = assetLabel(asset);
-              return (
-                <li key={asset.id}>
-                  <button
-                    type="button"
-                    aria-pressed={selected}
-                    aria-label={t('asset.select', { name })}
-                    onClick={() => {
-                      onSelect(asset.id);
-                      onOpenChange(false);
-                    }}
-                    className={cn(
-                      'group relative block w-full overflow-hidden rounded-lg border-2 bg-muted text-left outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                      selected ? 'border-primary' : 'border-transparent hover:border-primary/40',
-                    )}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element -- kütüphane küçük resmi; optimize edici katmanı gereksiz. */}
-                    <img
-                      src={asset.url}
-                      alt=""
-                      loading="lazy"
-                      className="aspect-[4/3] w-full object-cover transition-transform group-hover:scale-[1.02]"
-                    />
-                    <span className="block truncate bg-card px-2 py-1.5 text-xs text-muted-foreground">
-                      {name}
-                    </span>
-                    {selected ? (
-                      <span className="absolute top-1.5 right-1.5 flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground shadow">
-                        <Check aria-hidden="true" className="size-3.5" />
+          {library.assets.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">{t('asset.libraryEmpty')}</p>
+          ) : (
+            <ul className="grid grid-cols-2 gap-3 overflow-y-auto p-0.5 sm:grid-cols-3">
+              {library.assets.map((asset) => {
+                const selected = asset.id === selectedId;
+                const name = assetLabel(asset);
+                return (
+                  <li key={asset.id}>
+                    <button
+                      type="button"
+                      aria-pressed={selected}
+                      aria-label={t('asset.select', { name })}
+                      onClick={() => {
+                        onSelect(asset.id);
+                        onOpenChange(false);
+                      }}
+                      className={cn(
+                        'group relative block w-full overflow-hidden rounded-lg border-2 bg-muted text-left outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                        selected ? 'border-primary' : 'border-transparent hover:border-primary/40',
+                      )}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element -- kütüphane küçük resmi; optimize edici katmanı gereksiz. */}
+                      <img
+                        src={asset.url}
+                        alt=""
+                        loading="lazy"
+                        className="aspect-[4/3] w-full object-cover transition-transform group-hover:scale-[1.02]"
+                      />
+                      <span className="block truncate bg-card px-2 py-1.5 text-xs text-muted-foreground">
+                        {name}
                       </span>
-                    ) : null}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+                      {selected ? (
+                        <span className="absolute top-1.5 right-1.5 flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground shadow">
+                          <Check aria-hidden="true" className="size-3.5" />
+                        </span>
+                      ) : null}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </DialogBody>
       </DialogContent>
     </Dialog>
   );

@@ -227,10 +227,10 @@ private fun todayDetail(totals: DashboardTotals): String? {
 private fun deltaDetail(value: Double?): String? = ReportFormat.delta(value)?.let { "Geçen aya göre $it" }
 
 /**
- * Bugün bekleyen randevular — önizleme [DashboardSummaries.PREVIEW_LIMIT] kadar.
+ * Tarihi en yakın randevular — bugünle sınırlı değil, en fazla [DashboardSummaries.UPCOMING_LIMIT].
  *
- * Kart SINIRLI: her satır tek yükseklikte (ad ve hizmet tek satıra kırpılır) ve en fazla beş satır.
- * Başlık toplamı söyler; fazlası varsa son satır takvime götürür. Liste kaydırılabilir bir iç alan
+ * Kart SINIRLI: her satır tek yükseklikte (ad ve hizmet tek satıra kırpılır). Fazlası varsa son
+ * satır takvime götürür. Liste kaydırılabilir bir iç alan
  * DEĞİL — sayfa zaten kayıyor ve iç içe kaydırma parmağın altında hangi listenin kaydığını belirsiz
  * kılar.
  */
@@ -239,24 +239,19 @@ private fun UpcomingCard(
     data: DashboardData,
     onOpenCalendar: () -> Unit,
 ) {
-    val upcoming = remember(data.summaries) { DashboardSummaries.upcoming(data.summaries) }
-    val total = remember(data.summaries) { DashboardSummaries.pendingTotal(data.summaries) }
+    val upcoming = data.upcoming
     val multiBranch = data.summaries.size > 1
-    KlinaraCard(title = listTitle("Sıradaki randevular", total)) {
+    KlinaraCard(title = "Sıradaki randevular") {
         if (upcoming.isEmpty()) {
-            EmptyLine("Bugün için bekleyen randevu yok.")
+            EmptyLine("Yaklaşan randevu yok.")
         }
         upcoming.forEachIndexed { index, item ->
             if (index > 0) KlinaraDivider()
-            UpcomingRow(item, multiBranch)
+            UpcomingRow(item, multiBranch, data.fetchedAt)
         }
-        if (total > upcoming.size) {
+        if (data.upcomingHasMore) {
             KlinaraDivider()
-            KlinaraNavigationRow(
-                label = "Tümünü takvimde gör",
-                value = "+${total - upcoming.size} randevu",
-                onClick = onOpenCalendar,
-            )
+            KlinaraNavigationRow(label = "Tümünü takvimde gör", onClick = onOpenCalendar)
         }
     }
 }
@@ -265,6 +260,7 @@ private fun UpcomingCard(
 private fun UpcomingRow(
     item: UpcomingItem,
     multiBranch: Boolean,
+    now: Instant,
 ) {
     val colors = KlinaraTheme.colors
     val detail =
@@ -272,6 +268,7 @@ private fun UpcomingRow(
             .filter { it.isNotBlank() }
             .joinToString(" · ")
     val time = BranchClock(item.timezone).formatTime(item.entry.startsAt)
+    val day = DashboardSummaries.upcomingDayLabel(item.entry.startsAt, item.timezone, now)
     Row(
         modifier =
             Modifier
@@ -281,7 +278,10 @@ private fun UpcomingRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(KlinaraMetrics.sm),
     ) {
-        Text(time, style = KlinaraType.bodyEmphasis, color = colors.charcoal, modifier = Modifier.width(TIME_WIDTH))
+        Column(modifier = Modifier.width(TIME_WIDTH)) {
+            Text(time, style = KlinaraType.bodyEmphasis, color = colors.charcoal)
+            Text(day, style = KlinaraType.bodyM, color = colors.charcoalMuted, maxLines = 1)
+        }
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 item.entry.customerName,
@@ -538,4 +538,4 @@ private fun BarRow(
 
 private val BAR_HEIGHT = 10.dp
 private val DETAIL_WIDTH = 72.dp
-private val TIME_WIDTH = 48.dp
+private val TIME_WIDTH = 56.dp

@@ -2,8 +2,11 @@ import SwiftUI
 
 /// Marka metin alanı: uppercase-tracked etiket + alan + hata satırı.
 ///
-/// Hata satırı **her zaman** yer kaplar (`reservesErrorSpace`), böylece hata
-/// belirdiğinde altındaki buton yer değiştirmez — kullanıcı yanlış yere basmaz.
+/// Hata satırı varsayılan olarak **her zaman** yer kaplar (`reservesErrorSpace`),
+/// böylece hata belirdiğinde altındaki buton yer değiştirmez — kullanıcı yanlış
+/// yere basmaz. Alanların art arda dizildiği uzun formlarda bu boş satır
+/// alanlar arasını gereğinden fazla açıyor; orada `false` verilir ve satır
+/// yalnız hata varken görünür.
 struct KlinaraTextField: View {
 
     let label: String
@@ -15,8 +18,12 @@ struct KlinaraTextField: View {
     var keyboardType: UIKeyboardType = .default
     var submitLabel: SubmitLabel = .continue
     var autocapitalization: TextInputAutocapitalization = .never
+    /// `nil` → ortamdaki ``EnvironmentValues/klinaraReservesFieldErrorSpace``
+    /// (form sheet'lerinde `false`, diğer yerlerde `true`).
+    var reservesErrorSpace: Bool?
     var onSubmit: (() -> Void)?
 
+    @Environment(\.klinaraReservesFieldErrorSpace) private var reservesByDefault
     @FocusState private var isFocused: Bool
     @State private var isRevealed = false
 
@@ -59,7 +66,9 @@ struct KlinaraTextField: View {
             )
             .clipShape(.rect(cornerRadius: KlinaraMetrics.controlRadius))
 
-            FieldErrorText(message: error)
+            if (reservesErrorSpace ?? reservesByDefault) || hasError {
+                FieldErrorText(message: error)
+            }
         }
         .animation(KlinaraMetrics.feedback, value: hasError)
         .animation(KlinaraMetrics.feedback, value: isFocused)
@@ -85,6 +94,15 @@ struct KlinaraTextField: View {
 }
 
 /// Alan altındaki hata satırı. Metin yokken de yüksekliği korur.
+extension EnvironmentValues {
+    /// Alan bileşenleri (metin, telefon, çok satırlı) hata satırına boşken de
+    /// yer ayırsın mı. Tek alanlı ekranlarda (giriş, doğrulama) `true`: hata
+    /// belirince altındaki buton kaymamalı. Art arda alan dizilen form
+    /// sheet'lerinde ``KlinaraFormScaffold`` bunu `false` yapar — boş satır
+    /// alan aralarını her formda farklı ve gereğinden geniş açıyordu.
+    @Entry var klinaraReservesFieldErrorSpace = true
+}
+
 struct FieldErrorText: View {
     let message: String?
 

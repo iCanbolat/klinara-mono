@@ -42,6 +42,9 @@ object KlinaraIcons {
     /** iOS: `shippingbox` */
     @DrawableRes val packageBox: Int = R.drawable.ic_klinara_package
 
+    /** iOS: `bubble.left.and.bubble.right` */
+    @DrawableRes val conversations: Int = R.drawable.ic_klinara_conversations
+
     /** iOS: `tray.and.arrow.down` */
     @DrawableRes val inbox: Int = R.drawable.ic_klinara_inbox
 

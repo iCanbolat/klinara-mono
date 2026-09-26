@@ -25,7 +25,6 @@ final class MockNotificationsService: NotificationsService, @unchecked Sendable 
     private var branchReminderHours: [String: [Int]] = [:]
     private var branchFollowupEnabled: [String: Bool] = [:]
     private var branchFollowupDelay: [String: Int] = [:]
-    private var optOutRecords: [OptOutRecord] = []
 
     init(booking: any BookingService) {
         self.booking = booking
@@ -42,7 +41,6 @@ final class MockNotificationsService: NotificationsService, @unchecked Sendable 
         branchReminderHours = MockNotificationsSeed.branchReminderOverrides()
         branchFollowupEnabled = [:]
         branchFollowupDelay = [:]
-        optOutRecords = MockNotificationsSeed.optOuts(at: Date())
     }
 
     private func withLock<T>(_ body: () throws -> T) rethrows -> T {
@@ -122,7 +120,6 @@ final class MockNotificationsService: NotificationsService, @unchecked Sendable 
                 event: input.event,
                 channel: input.channel,
                 locale: locale,
-                kind: NotificationEventCatalog.kind(for: input.event),
                 subject: input.subject,
                 body: input.body,
                 whatsappTemplateName: input.whatsappTemplateName,
@@ -174,7 +171,6 @@ final class MockNotificationsService: NotificationsService, @unchecked Sendable 
                 preferenceId: MockIDs.uuid(),
                 branchId: input.branchId,
                 event: input.event,
-                kind: NotificationEventCatalog.kind(for: input.event),
                 channels: input.channels,
                 quietHoursStart: input.quietHoursStart,
                 quietHoursEnd: input.quietHoursEnd,
@@ -280,49 +276,5 @@ final class MockNotificationsService: NotificationsService, @unchecked Sendable 
 
     private func cancelledStatus(for appointment: Appointment) -> ScheduledNotificationStatus? {
         appointment.status == .cancelled ? .cancelled : nil
-    }
-
-    // MARK: İletişim izni
-
-    func optOuts(customerId: String) async throws -> [OptOutRecord] {
-        await latency(0.2)
-        return withLock { optOutRecords.filter { $0.customerId == customerId } }
-    }
-
-    func createOptOut(
-        customerId: String,
-        _ input: CreateOptOutInput
-    ) async throws -> OptOutRecord {
-        await latency()
-        return withLock {
-            // Sunucu bunu idempotent tutuyor: aynı kapsamda ikinci kayıt hata
-            // değil, var olanı döndürür.
-            if let existing = optOutRecords.first(where: {
-                $0.customerId == customerId && $0.channel == input.channel
-            }) {
-                return existing
-            }
-            let created = OptOutRecord(
-                id: MockIDs.uuid(),
-                customerId: customerId,
-                channel: input.channel,
-                // Sunucu `kind`'ı sabit `marketing` yazıyor: işlemsel mesaj
-                // zaten opt-out'tan etkilenmiyor.
-                kind: .marketing,
-                source: input.source ?? .customerRequest,
-                createdAt: Date()
-            )
-            optOutRecords.append(created)
-            return created
-        }
-    }
-
-    func revokeOptOut(customerId: String, channel: NotificationChannel?) async throws {
-        await latency()
-        withLock {
-            optOutRecords.removeAll {
-                $0.customerId == customerId && (channel == nil || $0.channel == channel)
-            }
-        }
     }
 }

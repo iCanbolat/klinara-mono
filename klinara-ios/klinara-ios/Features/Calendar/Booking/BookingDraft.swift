@@ -21,6 +21,8 @@ struct BookingDraft: Equatable {
     var slot: AvailabilitySlot?
     var notes = ""
     var reason = ""
+    /// Yeni randevuda müşteriye onay mesajı gitsin mi — varsayılan evet.
+    var notifyCustomer = true
     /// `serviceId` → `customerPackageItemId`. Bir hizmet en fazla bir paket
     /// kaleminden düşer; sözlük olması "hangi hizmet hangi paketten" sorusunu
     /// tek yerde cevaplıyor.
@@ -86,6 +88,24 @@ struct BookingDraft: Equatable {
         customerId != nil && !serviceIds.isEmpty && slot != nil && staffProfileId != nil
     }
 
+    /// Kaydetmek için eksik kalan adımlar, form sırasıyla. Pasif "Oluştur"
+    /// tek başına NEDEN pasif olduğunu söylemiyor; bu liste söylüyor.
+    var missingSteps: [String] {
+        var steps: [String] = []
+        if customerId == nil { steps.append("müşteri") }
+        if serviceIds.isEmpty { steps.append("hizmet") }
+        if slot == nil || staffProfileId == nil { steps.append("saat") }
+        return steps
+    }
+
+    /// "Devam etmek için hizmet ve saat seçin." — eksik yoksa `nil`.
+    var missingStepsHint: String? {
+        guard let last = missingSteps.last else { return nil }
+        let head = missingSteps.dropLast()
+        let list = head.isEmpty ? last : "\(head.joined(separator: ", ")) ve \(last)"
+        return "Devam etmek için \(list) seçin."
+    }
+
     /// Uygunluk sorgusu için yeterli bilgi var mı — slot henüz seçilmemiş olabilir.
     var canQueryAvailability: Bool { !serviceIds.isEmpty }
 
@@ -146,7 +166,8 @@ struct BookingDraft: Equatable {
                     customerPackageItemId: packageItemIds[$0]
                 )
             },
-            notes: trimmed.isEmpty ? nil : trimmed
+            notes: trimmed.isEmpty ? nil : trimmed,
+            notifyCustomer: notifyCustomer ? nil : false
         )
     }
 

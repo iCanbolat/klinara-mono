@@ -21,6 +21,7 @@ final class ServiceContainer {
     let notifications: any NotificationsService
     let messages: any MessagesService
     let whatsapp: any WhatsAppService
+    let conversations: any ConversationsService
     let reports: any ReportsService
 
     /// Mock kullanılıyorsa geliştirici senaryo menüsü açılır.
@@ -43,6 +44,7 @@ final class ServiceContainer {
         notifications: any NotificationsService,
         messages: any MessagesService,
         whatsapp: any WhatsAppService,
+        conversations: any ConversationsService,
         reports: any ReportsService,
         mockAuth: MockAuthService?,
         mockDataScenario: MockDataScenario? = nil
@@ -61,6 +63,7 @@ final class ServiceContainer {
         self.notifications = notifications
         self.messages = messages
         self.whatsapp = whatsapp
+        self.conversations = conversations
         self.reports = reports
         self.mockAuth = mockAuth
         self.mockDataScenario = mockDataScenario
@@ -84,6 +87,7 @@ final class ServiceContainer {
             notifications: LiveNotificationsService(client: client),
             messages: LiveMessagesService(client: client),
             whatsapp: LiveWhatsAppService(client: client),
+            conversations: LiveConversationsService(client: client),
             reports: LiveReportsService(client: client),
             mockAuth: nil
         )
@@ -137,6 +141,7 @@ final class ServiceContainer {
             notifications: notifications,
             messages: messages,
             whatsapp: whatsapp,
+            conversations: MockConversationsService(),
             reports: MockReportsService(),
             mockAuth: mockAuth,
             mockDataScenario: data
@@ -161,6 +166,7 @@ final class ServiceContainer {
         (notifications as? MockNotificationsService)?.reseed()
         (messages as? MockMessagesService)?.reseed()
         (whatsapp as? MockWhatsAppService)?.reseed()
+        (conversations as? MockConversationsService)?.reseed()
         mockDataScenario = scenario
     }
 

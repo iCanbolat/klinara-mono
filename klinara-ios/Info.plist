@@ -32,7 +32,7 @@
 	  (örn. http://192.168.1.20:3000/api/v1) bakmalıdır.
 	-->
 	<key>KlinaraAPIBaseURL</key>
-	<string>http://localhost:3000/api/v1</string>
+	<string>https://pleasing-poodle-alive.ngrok-free.app/api/v1</string>
 
 	<!--
 	  ATS istisnası YALNIZ localhost için. Üretim kökü https'tir ve bu

@@ -27,6 +27,7 @@ struct BookingFlowView: View {
     @State private var error: APIError?
     @State private var conflict: APIError?
     @State private var isCreatingCustomer = false
+    @State private var isPickingDay = false
     /// Seçili müşterinin kullanılabilir paket hakları. Store'lanmıyor: sorgu
     /// bu sayfaya özgü, kısa ömürlü ve müşteri değişince baştan çekiliyor.
     @State private var entitlements: [PackageEntitlement] = []
@@ -63,6 +64,7 @@ struct BookingFlowView: View {
             isDirty: draft.isDirty,
             isSaving: store.isSaving,
             error: error,
+            invalidSaveMessage: draft.missingStepsHint,
             onSave: save
         ) {
             if draft.branchId.isEmpty {
@@ -92,6 +94,15 @@ struct BookingFlowView: View {
                 draft.select(customerId: created.id)
             }
         }
+        .sheet(isPresented: $isPickingDay) {
+            BookingDayPickerSheet(
+                session: session,
+                branchId: draft.branchId,
+                initialDay: day
+            ) { picked in
+                day = picked
+            }
+        }
         .sheet(item: $conflict) { problem in
             SlotConflictSheet(
                 clock: clock,
@@ -115,7 +126,12 @@ struct BookingFlowView: View {
 
     @ViewBuilder
     private var customerSection: some View {
-        if draft.canEditLineup {
+        if draft.canEditLineup, let customerId = draft.customerId {
+            // Seçimden sonra liste KAPANIR: müşteri listesinin tamamı açık kalınca
+            // hizmet ve saat bölümleri ekranın çok altına itiliyor ve kullanıcı
+            // formun bittiğini sanıp pasif "Oluştur"a basıyordu.
+            selectedCustomer(id: customerId)
+        } else if draft.canEditLineup {
             KlinaraSearchablePicker(
                 title: "Müşteri",
                 options: session.customerStore.customers,
@@ -136,6 +152,23 @@ struct BookingFlowView: View {
                     } ?? "Müşteri",
                     detail: "Erteleme müşteriyi değiştirmez."
                 )
+            }
+        }
+    }
+
+    private func selectedCustomer(id: String) -> some View {
+        let customer = session.customerStore.customer(id: id)
+        return KlinaraFormSection(title: "Müşteri") {
+            KlinaraRow(
+                label: customer?.fullName ?? "Müşteri",
+                detail: customer?.phone.map(PhoneNumberField.pretty)
+            ) {
+                Button("Değiştir") {
+                    draft.select(customerId: nil)
+                }
+                .klinaraText(.bodyEmphasis)
+                .foregroundStyle(KlinaraColor.sageDeep)
+                .frame(minHeight: 44)
             }
         }
     }
@@ -263,21 +296,24 @@ struct BookingFlowView: View {
 
                 case .loaded(let response):
                     let visible = response.slots.filter { $0.supports(staffProfileId: draft.staffProfileId) }
-                    if visible.isEmpty {
-                        Text("Bu günde uygun saat yok. Başka bir gün veya personel deneyin.")
+                    let dayInfo = response.day(clock.localDateString(day))
+                    if let note = BookingAvailabilityPresentation.openDayNote(for: dayInfo) {
+                        Label(note, systemImage: "info.circle")
                             .klinaraText(.bodyM)
+                            .font(.footnote)
                             .foregroundStyle(KlinaraColor.charcoalMuted)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    if visible.isEmpty {
+                        BookingEmptyDayView(
+                            notice: BookingAvailabilityPresentation.emptyNotice(for: dayInfo)
+                        ) {
+                            day = clock.adding(days: 1, to: day)
+                        }
                     } else {
-                        KlinaraChipGrid(
-                            options: visible,
-                            title: { clock.formatTime($0.startsAt) },
+                        BookingSlotGrid(
+                            groups: BookingAvailabilityPresentation.group(visible, clock: clock),
+                            clock: clock,
                             isSelected: { $0.startsAt == draft.slot?.startsAt },
-                            badge: { slot in
-                                slot.staffProfileIds.count > 1
-                                    ? "\(slot.staffProfileIds.count) kişi"
-                                    : nil
-                            },
                             onTap: { draft.select(slot: $0) }
                         )
                     }
@@ -296,9 +332,31 @@ struct BookingFlowView: View {
             }
             .frame(width: 44, height: 44)
 
-            Text(clock.formatDate(day))
-                .klinaraText(.bodyEmphasis)
-                .frame(maxWidth: .infinity)
+            // Başlık takvimi açıyor: haftalar sonrası için ok tuşuyla gün gün
+            // ilerlemek zahmetliydi. Oklar yakın günler için duruyor.
+            let label = clock.dayPickerLabel(day)
+            Button {
+                isPickingDay = true
+            } label: {
+                VStack(spacing: 0) {
+                    if let prefix = label.prefix {
+                        Text(prefix)
+                            .klinaraText(.label)
+                            .foregroundStyle(KlinaraColor.charcoalMuted)
+                    }
+                    HStack(spacing: 6) {
+                        Text(label.title)
+                            .klinaraText(.bodyEmphasis)
+                        Image(systemName: "calendar")
+                            .font(.system(size: 14, weight: .medium))
+                    }
+                }
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(label.prefix.map { "\($0), " } ?? "")\(label.title)")
+            .accessibilityHint("Takvimden gün seçin")
 
             Button {
                 day = clock.adding(days: 1, to: day)
@@ -348,6 +406,14 @@ struct BookingFlowView: View {
                 autocapitalization: .sentences
             )
             .padding(KlinaraMetrics.md)
+            if !draft.isRescheduling {
+                KlinaraDivider()
+                KlinaraToggleRow(
+                    label: "Müşteriye bildir",
+                    detail: "Müşteriye WhatsApp ile randevu onayı gönderilir.",
+                    isOn: $draft.notifyCustomer
+                )
+            }
         }
     }
 
@@ -387,6 +453,11 @@ struct BookingFlowView: View {
                 staffProfileId: draft.staffProfileId
             )))
         } catch {
+            // Gün hızlı değiştirilince `.task(id:)` önceki sorguyu iptal ediyor.
+            // İptal bir hata değil: yeni sorgu zaten yolda; banner basılsaydı
+            // metinsiz, kırmızı bir kutu olarak görünüyordu.
+            if error is CancellationError || Task.isCancelled { return }
+            if case .cancelled = error as? APIError { return }
             slots = .failed(error as? APIError ?? .network)
         }
     }

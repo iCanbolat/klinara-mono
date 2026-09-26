@@ -86,6 +86,22 @@ class MockCustomerService(
         return rows.firstOrNull { it.id == id } ?: throw MockErrors.notFound("Müşteri")
     }
 
+    /**
+     * Mock'ta randevu geçmişi yok: aktif/geri kazanılacak sabit bir dağılımdan
+     * türetiliyor; toplam ve yeni kayıt kayıtlardan sayılıyor.
+     */
+    override suspend fun summary(): CustomerSummary {
+        settle()
+        val newest = rows.mapNotNull { it.createdAt }.maxOrNull() ?: Instant.EPOCH
+        val cutoff = newest.minusSeconds(30L * 86_400)
+        return CustomerSummary(
+            total = rows.size,
+            newLast30Days = rows.count { (it.createdAt ?: Instant.EPOCH) >= cutoff },
+            activeLast90Days = rows.size * 3 / 5,
+            lapsed = rows.size / 5,
+        )
+    }
+
     override suspend fun search(
         query: String,
         limit: Int?,

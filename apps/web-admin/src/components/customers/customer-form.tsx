@@ -9,14 +9,16 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldSelect } from '@/components/ui/field';
+import { Field, FieldDate, FieldSelect } from '@/components/ui/field';
 import { errorFor, toFormErrors, type FormErrors } from '@/lib/forms/field-errors';
+import { GENDER_LABEL, SOURCE_LABEL } from './customer-profile';
 
 const NO_ERRORS: FormErrors = { message: null, fields: {}, requestId: null };
 
@@ -137,86 +139,90 @@ export function CustomerFormDialog({
           <DialogDescription className="sr-only">{t('customers.title')}</DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field
-            label={t('customers.name')}
-            value={draft.fullName}
-            disabled={busy}
-            error={errorFor(errors, 'fullName')}
-            onChange={(event) => set('fullName', event.target.value)}
-          />
-          <Field
-            label={t('customers.phone')}
-            value={draft.phone}
-            disabled={busy}
-            error={errorFor(errors, 'phone')}
-            onChange={(event) => set('phone', event.target.value)}
-          />
-          <Field
-            label={t('customers.email')}
-            type="email"
-            value={draft.email}
-            disabled={busy}
-            error={errorFor(errors, 'email')}
-            onChange={(event) => set('email', event.target.value)}
-          />
-          <Field
-            label="Doğum tarihi"
-            type="date"
-            value={draft.birthDate}
-            disabled={busy}
-            error={errorFor(errors, 'birthDate')}
-            onChange={(event) => set('birthDate', event.target.value)}
-          />
-          <FieldSelect
-            label="Cinsiyet"
-            value={draft.gender}
-            disabled={busy}
-            error={errorFor(errors, 'gender')}
-            onChange={(event) => set('gender', event.target.value)}
-          >
-            <option value="">—</option>
-            {CUSTOMER_GENDERS.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </FieldSelect>
-          <FieldSelect
-            label={t('customers.source')}
-            value={draft.source}
-            disabled={busy}
-            error={errorFor(errors, 'source')}
-            onChange={(event) => set('source', event.target.value)}
-          >
-            <option value="">—</option>
-            {CUSTOMER_SOURCES.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </FieldSelect>
-          <Field
-            label="Adres"
-            value={draft.addressLine}
-            disabled={busy}
-            error={errorFor(errors, 'addressLine')}
-            onChange={(event) => set('addressLine', event.target.value)}
-          />
-          <Field
-            label="Şehir"
-            value={draft.city}
-            disabled={busy}
-            error={errorFor(errors, 'city')}
-            onChange={(event) => set('city', event.target.value)}
-          />
-        </div>
+        <DialogBody className="flex flex-col gap-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field
+              label={t('customers.name')}
+              value={draft.fullName}
+              disabled={busy}
+              error={errorFor(errors, 'fullName')}
+              onChange={(event) => set('fullName', event.target.value)}
+            />
+            <Field
+              label={t('customers.phone')}
+              value={draft.phone}
+              disabled={busy}
+              error={errorFor(errors, 'phone')}
+              onChange={(event) => set('phone', event.target.value)}
+            />
+            <Field
+              label={t('customers.email')}
+              type="email"
+              value={draft.email}
+              disabled={busy}
+              error={errorFor(errors, 'email')}
+              onChange={(event) => set('email', event.target.value)}
+            />
+            <FieldDate
+              label="Doğum tarihi"
+              value={draft.birthDate}
+              max={new Date().toLocaleDateString('en-CA')}
+              captionLayout="dropdown"
+              clearable
+              disabled={busy}
+              error={errorFor(errors, 'birthDate')}
+              onChange={(value) => set('birthDate', value)}
+            />
+            <FieldSelect
+              label={t('customers.profile.gender')}
+              value={draft.gender}
+              disabled={busy}
+              error={errorFor(errors, 'gender')}
+              onChange={(event) => set('gender', event.target.value)}
+            >
+              <option value="">—</option>
+              {CUSTOMER_GENDERS.map((value) => (
+                <option key={value} value={value}>
+                  {t(GENDER_LABEL[value])}
+                </option>
+              ))}
+            </FieldSelect>
+            <FieldSelect
+              label={t('customers.source')}
+              value={draft.source}
+              disabled={busy}
+              error={errorFor(errors, 'source')}
+              onChange={(event) => set('source', event.target.value)}
+            >
+              <option value="">—</option>
+              {CUSTOMER_SOURCES.map((value) => (
+                <option key={value} value={value}>
+                  {t(SOURCE_LABEL[value])}
+                </option>
+              ))}
+            </FieldSelect>
+            <Field
+              label="Adres"
+              value={draft.addressLine}
+              disabled={busy}
+              error={errorFor(errors, 'addressLine')}
+              onChange={(event) => set('addressLine', event.target.value)}
+            />
+            <Field
+              label="Şehir"
+              value={draft.city}
+              disabled={busy}
+              error={errorFor(errors, 'city')}
+              onChange={(event) => set('city', event.target.value)}
+            />
+          </div>
 
-        {errors.message !== null ? (
-          <Alert tone="danger">
-            <span role="alert">{errors.message}</span>
-          </Alert>
-        ) : null}
+          {errors.message !== null ? (
+            <Alert tone="danger">
+              <span role="alert">{errors.message}</span>
+            </Alert>
+          ) : null}
+        </DialogBody>
 
         <DialogFooter>
           <Button type="button" variant="ghost" onClick={onClose} disabled={busy}>

@@ -26,6 +26,9 @@ protocol CustomerService: Sendable {
     /// kendisini döndürüyor).
     func search(_ term: String, limit: Int?) async throws -> [Customer]
 
+    /// `GET /customers/summary` — kiracı kapsamlı sayılar, kimlik taşımaz.
+    func summary() async throws -> CustomerSummary
+
     /// `GET /customers/:id`
     func customer(id: String) async throws -> Customer
 
@@ -88,6 +91,10 @@ struct LiveCustomerService: CustomerService {
         var query = [URLQueryItem(name: "q", value: term)]
         if let limit { query.append(URLQueryItem(name: "limit", value: String(limit))) }
         return try await client.send(APIRequest.get("customers/search", query: query))
+    }
+
+    func summary() async throws -> CustomerSummary {
+        try await client.send(APIRequest.get("customers/summary"))
     }
 
     func customer(id: String) async throws -> Customer {

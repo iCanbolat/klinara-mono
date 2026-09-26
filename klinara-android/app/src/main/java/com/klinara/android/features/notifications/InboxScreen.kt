@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material3.Text
@@ -33,6 +34,7 @@ import com.klinara.android.designsystem.components.KlinaraScreen
 import com.klinara.android.designsystem.components.KlinaraSegmentedPicker
 import com.klinara.android.designsystem.components.KlinaraSkeleton
 import com.klinara.android.designsystem.components.KlinaraSkeletonStyle
+import com.klinara.android.designsystem.components.KlinaraToolbarAction
 import com.klinara.android.features.auth.AppSession
 import com.klinara.android.services.ServiceContainer
 import com.klinara.android.services.contracts.Permissions
@@ -43,7 +45,7 @@ import com.klinara.android.services.networking.Loadable
 /**
  * Gelen kutusu (A8.1) — iOS `InboxView` paritesi.
  *
- * Uygulamadan **yanıt yazılamaz** (sunucuda giden serbest metin ucu yok) ve ekran bunu saklamaz.
+ * Cevap Sohbetler ekranından yazılır; `notification:send` taşıyana üst çubukta oraya bağlantı var.
  * "İşlendi olarak işaretle" yalnız `notification:send`; müşteri kartı bağlantısı sekmeler arası
  * gezinmeyle Müşteriler sekmesinde açılır ([onOpenCustomer] `null`sa — sekme yoksa — çizilmez).
  */
@@ -54,6 +56,7 @@ fun InboxScreen(
     onBack: () -> Unit,
     onOpenCustomer: ((String) -> Unit)?,
     modifier: Modifier = Modifier,
+    onOpenConversations: (() -> Unit)? = null,
 ) {
     val viewModel: InboxViewModel = viewModel(key = "inbox", factory = InboxViewModel.factory(container))
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -63,7 +66,20 @@ fun InboxScreen(
     LaunchedEffect(Unit) { viewModel.load() }
 
     Box {
-        KlinaraScreen(title = "Gelen kutusu", modifier = modifier, onBack = onBack) {
+        KlinaraScreen(
+            title = "Gelen kutusu",
+            modifier = modifier,
+            onBack = onBack,
+            trailing = {
+                if (canHandle && onOpenConversations != null) {
+                    KlinaraToolbarAction(
+                        contentDescription = "Sohbetler",
+                        onClick = onOpenConversations,
+                        icon = Icons.AutoMirrored.Filled.Send,
+                    )
+                }
+            },
+        ) {
             KlinaraSegmentedPicker(
                 options = InboxFilter.entries,
                 selected = state.filter,
@@ -97,8 +113,11 @@ fun InboxScreen(
                             // Sunucu bu uçta cursor VERMİYOR; "daha fazlası var" izlenimi vermemek için
                             // sınır açıkça söyleniyor.
                             footnote =
-                                "En yeni mesajlar gösterilir. Uygulamadan yanıt yazılamaz; " +
-                                    "müşteriye WhatsApp'tan dönün.",
+                                if (canHandle) {
+                                    "En yeni mesajlar gösterilir. Yanıt yazmak için Sohbetler ekranını kullanın."
+                                } else {
+                                    "En yeni mesajlar gösterilir."
+                                },
                         ) {
                             items.value.forEachIndexed { index, item ->
                                 if (index > 0) KlinaraDivider()

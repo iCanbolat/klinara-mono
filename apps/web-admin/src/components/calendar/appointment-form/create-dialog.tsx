@@ -10,13 +10,14 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { FieldTextarea } from '@/components/ui/field';
+import { FieldCheckbox, FieldTextarea } from '@/components/ui/field';
 import type { ComboboxOption } from '@/components/ui/combobox';
 import { CustomerPicker } from '@/components/pickers/customer-picker';
 import { toFormErrors, type FormErrors } from '@/lib/forms/field-errors';
@@ -50,6 +51,7 @@ export function CreateAppointmentDialog({
   timezone,
   services,
   staff,
+  initialCustomer = null,
   onClose,
   onCreated,
 }: {
@@ -58,6 +60,8 @@ export function CreateAppointmentDialog({
   timezone: string;
   services: readonly Service[];
   staff: readonly StaffProfile[];
+  /** Önceden seçili müşteri — Mesajlar ekranı sohbetin müşterisiyle açıyor. */
+  initialCustomer?: ComboboxOption | null;
   onClose: () => void;
   onCreated: () => void;
 }): ReactNode {
@@ -76,11 +80,17 @@ export function CreateAppointmentDialog({
     void (async () => {
       await Promise.resolve();
       dispatch({ type: 'reset' });
-      setCustomer(null);
+      setCustomer(initialCustomer);
+      if (initialCustomer !== null) {
+        dispatch({ type: 'customer', customerId: initialCustomer.id });
+      }
       setErrors(NO_ERRORS);
       setConflict(null);
       setBusy(false);
     })();
+    // `initialCustomer` bilerek bağımlılık DEĞİL: diyalog açıkken üst bileşenin
+    // yeniden render'ı kullanıcının değiştirdiği seçimi ezmesin.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const serviceIds = state.rows.flatMap((row) => (row.serviceId === null ? [] : [row.serviceId]));
@@ -122,13 +132,13 @@ export function CreateAppointmentDialog({
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{t('calendar.create.title')}</DialogTitle>
           <DialogDescription className="sr-only">{t('calendar.create.title')}</DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col gap-5">
+        <DialogBody className="flex flex-col gap-5">
           <CustomerPicker
             value={customer}
             error={errors.fields['customerId']}
@@ -174,6 +184,14 @@ export function CreateAppointmentDialog({
             onChange={(event) => dispatch({ type: 'notes', notes: event.target.value })}
           />
 
+          <FieldCheckbox
+            label={t('calendar.notify.label')}
+            hint={t('calendar.notify.createHint')}
+            checked={state.notifyCustomer}
+            disabled={busy}
+            onCheckedChange={(notifyCustomer) => dispatch({ type: 'notify', notifyCustomer })}
+          />
+
           {conflict !== null ? (
             <Alert tone="warn" title={t('calendar.conflict.title')}>
               {conflict.suggestions.length > 0 ? (
@@ -210,7 +228,7 @@ export function CreateAppointmentDialog({
               <span role="alert">{errors.message}</span>
             </Alert>
           ) : null}
-        </div>
+        </DialogBody>
 
         <DialogFooter>
           <Button type="button" variant="ghost" onClick={onClose} disabled={busy}>

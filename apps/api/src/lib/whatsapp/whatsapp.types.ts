@@ -16,6 +16,32 @@ export interface WhatsAppTemplateMessage {
    * token'ı buradan gider (8.3 çözer).
    */
   buttonPayloads?: string[];
+  /**
+   * Kimlik doğrulama (AUTHENTICATION) template'inin "Kodu kopyala" butonu.
+   * Meta kodu HEM gövdede HEM bu butonda ister; biri eksikse gönderim
+   * parametre uyuşmazlığıyla reddedilir.
+   */
+  copyCode?: string;
+}
+
+/** Meta'da oluşturulacak bir template'in tanımı (`POST /{waba}/message_templates`). */
+export interface WhatsAppTemplateDraft {
+  name: string;
+  language: string;
+  /** Klinara yalnız işlemsel ve kimlik doğrulama template'i yazar; pazarlama yok. */
+  category: 'UTILITY' | 'AUTHENTICATION';
+  /** Konumsal gövde (`{{1}}`…). AUTHENTICATION'da Meta metni kendisi üretir. */
+  body?: string;
+  /** Her değişken için örnek değer — Meta değişkenli gövdeyi örneksiz reddeder. */
+  bodyExamples?: string[];
+  quickReplies?: string[];
+  /** Yalnız AUTHENTICATION: kodun geçerlilik süresi (dakika). */
+  codeExpirationMinutes?: number;
+}
+
+export interface WhatsAppTemplateCreated {
+  id: string | null;
+  status: 'pending' | 'approved' | 'rejected';
 }
 
 export interface WhatsAppTextMessage {
@@ -34,6 +60,8 @@ export interface WhatsAppTemplateInfo {
   category: string | null;
   status: 'pending' | 'approved' | 'rejected';
   bodyVariableCount: number;
+  /** BODY metni, `{{1}}` yer tutucularıyla. */
+  bodyText: string | null;
   buttons: { type: string; text: string }[];
 }
 
@@ -57,6 +85,13 @@ export interface WhatsAppClient {
     credentials: WhatsAppCredentials,
     wabaId: string,
   ): Promise<WhatsAppTemplateInfo[]>;
+  createTemplate(
+    credentials: WhatsAppCredentials,
+    wabaId: string,
+    draft: WhatsAppTemplateDraft,
+  ): Promise<WhatsAppTemplateCreated>;
+  /** Uygulamayı WABA'ya abone eder; abone olunmadan Meta o hesabın webhook'larını göndermez. */
+  subscribeApp(credentials: WhatsAppCredentials, wabaId: string): Promise<void>;
 }
 
 export const WHATSAPP_CLIENT = Symbol('WHATSAPP_CLIENT');

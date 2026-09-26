@@ -20,7 +20,11 @@ class ApiProblemError extends Error {
   }
 }
 
-vi.mock('@/lib/api/client', () => ({ api: { get, post, patch }, ApiProblemError, SessionExpiredError }));
+vi.mock('@/lib/api/client', () => ({
+  api: { get, post, patch },
+  ApiProblemError,
+  SessionExpiredError,
+}));
 
 let permissions: string[] = [PERMISSIONS.CUSTOMER_READ, PERMISSIONS.CUSTOMER_WRITE];
 vi.mock('@/components/session/session-provider', () => ({
@@ -107,7 +111,9 @@ describe('müşteri defteri', () => {
     expect(await screen.findByText('Ayşe Yılmaz')).toBeInTheDocument();
     expect(screen.queryByText('Mehmet Demir')).not.toBeInTheDocument();
     // İlk sayfa cursor'SUZ yeniden istendi.
-    const listCalls = get.mock.calls.map((c) => String(c[0])).filter((c) => c.startsWith('customers?'));
+    const listCalls = get.mock.calls
+      .map((c) => String(c[0]))
+      .filter((c) => c.startsWith('customers?'));
     expect(listCalls.at(-1)).not.toContain('cursor=');
   });
 
@@ -173,9 +179,12 @@ describe('not paneli — tıbbi sessizliğin telafisi', () => {
     // "Tedavi" seçeneği göstermek, resepsiyona "bu müşterinin tedavi notu
     // yok" der — kliniğin en hassas verisi hakkında YANLIŞ BİLGİ.
     permissions = [PERMISSIONS.CUSTOMER_READ, PERMISSIONS.CUSTOMER_WRITE];
+    const user = userEvent.setup();
     render(<NotesPanel customerId="c1" />);
 
     expect(await screen.findByText(/yetkiniz dâhilinde değil/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Not ekle' }));
+    await screen.findByRole('option', { name: 'Genel' });
     expect(screen.queryByRole('option', { name: 'Tedavi' })).not.toBeInTheDocument();
     expect(screen.queryByRole('option', { name: 'İç not' })).not.toBeInTheDocument();
   });
@@ -187,8 +196,10 @@ describe('not paneli — tıbbi sessizliğin telafisi', () => {
       PERMISSIONS.CUSTOMER_MEDICAL_READ,
       PERMISSIONS.CUSTOMER_MEDICAL_WRITE,
     ];
+    const user = userEvent.setup();
     render(<NotesPanel customerId="c1" />);
 
+    await user.click(await screen.findByRole('button', { name: 'Not ekle' }));
     expect(await screen.findByRole('option', { name: 'Tedavi' })).toBeInTheDocument();
     expect(screen.queryByText(/yetkiniz dâhilinde değil/i)).not.toBeInTheDocument();
   });
@@ -201,8 +212,10 @@ describe('not paneli — tıbbi sessizliğin telafisi', () => {
       PERMISSIONS.CUSTOMER_WRITE,
       PERMISSIONS.CUSTOMER_MEDICAL_READ,
     ];
+    const user = userEvent.setup();
     render(<NotesPanel customerId="c1" />);
 
+    await user.click(await screen.findByRole('button', { name: 'Not ekle' }));
     await screen.findByRole('option', { name: 'Genel' });
     expect(screen.queryByRole('option', { name: 'Tedavi' })).not.toBeInTheDocument();
     // Ama açıklama satırı da YOK: notları görebiliyor.
@@ -240,8 +253,9 @@ describe('not paneli — tıbbi sessizliğin telafisi', () => {
     expect(screen.queryByText(/biri değiştirdi/i)).not.toBeInTheDocument();
 
     // Not ekleyerek yeniden yüklemeyi tetikle; sürüm 1 → 4.
-    await user.type(screen.getByLabelText('Not'), 'x');
     await user.click(screen.getByRole('button', { name: 'Not ekle' }));
+    await user.type(await screen.findByLabelText('Not'), 'x');
+    await user.click(screen.getByRole('button', { name: 'Kaydet' }));
     rerender(<NotesPanel customerId="c1" />);
 
     expect(await screen.findByText(/biri değiştirdi/i)).toBeInTheDocument();

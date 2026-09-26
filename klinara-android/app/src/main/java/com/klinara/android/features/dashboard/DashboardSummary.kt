@@ -4,6 +4,7 @@ import com.klinara.android.services.auth.BranchSummary
 import com.klinara.android.services.booking.AppointmentStatus
 import com.klinara.android.services.booking.CalendarEntry
 import com.klinara.android.services.contracts.Permissions
+import com.klinara.android.services.formatting.BranchClock
 import com.klinara.android.services.formatting.TrLocale
 import com.klinara.android.services.reports.NoShowReport
 import com.klinara.android.services.reports.OccupancyReport
@@ -12,6 +13,7 @@ import com.klinara.android.services.reports.StaffPerformanceReport
 import com.klinara.android.services.reports.StaffPerformanceRow
 import java.text.Collator
 import java.time.Instant
+import java.time.format.DateTimeFormatter
 
 /**
  * Genel bakışın özeti — **saf**, Compose'suz. Web `lib/dashboard/summary.ts` paritesi.
@@ -51,10 +53,6 @@ data class DaySummary(
     /** Slot kaplayanlar — iptal ve gelmedi hariç. */
     val active: Int,
     val completed: Int,
-    /** Henüz başlamamış, slot kaplayan randevular; başlangıca göre sıralı, önizleme kadar kırpılmış. */
-    val upcoming: List<CalendarEntry>,
-    /** Kırpılmadan önceki bekleyen randevu sayısı — "Tümünü gör (14)" bu sayıdan. */
-    val pending: Int = upcoming.size,
 )
 
 data class BranchDashboardSummary(
@@ -106,25 +104,66 @@ object DashboardSummaries {
     /** Pasif şubeler dışarıda: kapanmış bir şubenin "bugün 0 randevu" satırı bilgi değil gürültü. */
     fun activeBranches(branches: List<BranchSummary>): List<BranchSummary> = branches.filter { it.isActive }
 
-    fun summarizeDay(
-        entries: List<CalendarEntry>,
-        now: Instant,
-        upcomingLimit: Int = PREVIEW_LIMIT,
-    ): DaySummary {
-        val active = entries.filter { occupiesSlot(it.status) }
-        val pending =
-            active
-                .filter { it.status != AppointmentStatus.Completed && !it.startsAt.isBefore(now) }
-                .sortedBy { it.startsAt }
-        return DaySummary(
+    fun summarizeDay(entries: List<CalendarEntry>): DaySummary =
+        DaySummary(
             total = entries.size,
-            active = active.size,
+            active = entries.count { occupiesSlot(it.status) },
             completed = entries.count { it.status == AppointmentStatus.Completed },
-            // Şube başına önizleme kadarı yeter: birleşik listenin ilk N'i her şubenin ilk N'inden.
-            upcoming = pending.take(upcomingLimit),
-            pending = pending.size,
         )
+
+    /**
+     * Sıradaki randevular BUGÜNLE SINIRLI DEĞİL: tarihi en yakın N randevu. Gün özetinden
+     * türetilemiyor — akşam ya da boş bir günde kart "bekleyen randevu yok" diyordu, oysa yarın
+     * sabah dolu. Şube başına `GET appointments` (şimdiden itibaren, bitmemiş durumlar, `limit=N`)
+     * atılıyor; sunucu başlangıca göre sıralı döndürdüğü için birleşik listenin ilk N'i her şubenin
+     * ilk N'inden gelir.
+     */
+    const val UPCOMING_LIMIT = 10
+
+    /** Sunucunun liste ucundaki azami aralık (`MAX_RANGE_DAYS`). */
+    const val UPCOMING_HORIZON_DAYS = 92L
+
+    /** Slot kaplayan ve henüz bitmemiş durumlar. */
+    val UPCOMING_STATUSES =
+        listOf(
+            AppointmentStatus.Scheduled,
+            AppointmentStatus.Confirmed,
+            AppointmentStatus.Arrived,
+            AppointmentStatus.InProgress,
+        )
+
+    /** Şube başına gelen listeleri tek, başlangıca göre sıralı listeye indirir. */
+    fun mergeUpcoming(
+        branches: List<BranchSummary>,
+        lists: Map<String, List<CalendarEntry>>,
+        now: Instant,
+        limit: Int = UPCOMING_LIMIT,
+    ): List<UpcomingItem> =
+        branches
+            .flatMap { branch ->
+                lists[branch.id].orEmpty().map { UpcomingItem(it, branch.name, branch.timezone) }
+            }.filter {
+                occupiesSlot(it.entry.status) &&
+                    it.entry.status != AppointmentStatus.Completed &&
+                    !it.entry.startsAt.isBefore(now)
+            }.sortedBy { it.entry.startsAt }
+            .take(limit)
+
+    /** Satırın gün etiketi: "Bugün", "Yarın", yoksa "28 Eyl". Gün ŞUBENİN saat diliminde. */
+    fun upcomingDayLabel(
+        instant: Instant,
+        timezone: String,
+        now: Instant,
+    ): String {
+        val clock = BranchClock(timezone)
+        return when {
+            clock.isSameDay(instant, now) -> "Bugün"
+            clock.isSameDay(instant, clock.adding(1L, now)) -> "Yarın"
+            else -> DAY_SHORT.format(instant.atZone(clock.zone))
+        }
     }
+
+    private val DAY_SHORT: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM", TrLocale)
 
     /**
      * Rapor geldiyse ama şubenin satırı yoksa o dönemde veri YOK demektir — sıfır. Rapor hiç
@@ -136,7 +175,6 @@ object DashboardSummaries {
         occupancy: OccupancyReport?,
         revenue: RevenueReport?,
         noShow: NoShowReport?,
-        now: Instant,
     ): List<BranchDashboardSummary> {
         val occupancyRows = occupancy?.data.orEmpty().filter { it.groupId != null }.associateBy { it.groupId }
         val revenueRows = revenue?.data.orEmpty().filter { it.groupId != null }.associateBy { it.groupId }
@@ -145,7 +183,7 @@ object DashboardSummaries {
             val day = days[branch.id]
             BranchDashboardSummary(
                 branch = branch,
-                today = day?.let { summarizeDay(it.first, now) },
+                today = day?.let { summarizeDay(it.first) },
                 timezone = day?.second ?: branch.timezone,
                 occupancyRate = occupancy?.let { occupancyRows[branch.id]?.occupancyRate ?: 0.0 },
                 revenueMinor = revenue?.let { revenueRows[branch.id]?.accruedMinor ?: 0L },
@@ -176,19 +214,6 @@ object DashboardSummaries {
             noShowRate = noShow?.totals?.noShowRate,
         )
     }
-
-    /** Tüm şubelerde bugün bekleyen randevu sayısı (önizlemeden bağımsız). */
-    fun pendingTotal(summaries: List<BranchDashboardSummary>): Int = summaries.sumOf { it.today?.pending ?: 0 }
-
-    fun upcoming(
-        summaries: List<BranchDashboardSummary>,
-        limit: Int = PREVIEW_LIMIT,
-    ): List<UpcomingItem> =
-        summaries
-            .flatMap { summary ->
-                summary.today?.upcoming.orEmpty().map { UpcomingItem(it, summary.branch.name, summary.timezone) }
-            }.sortedBy { it.entry.startsAt }
-            .take(limit)
 
     /**
      * Grafikte seçilebilir göstergeler, sabit sırayla. Rapor göstergesi ya tüm şubelerde bilinir

@@ -1,7 +1,7 @@
 import Foundation
 
-/// Bildirim **yapılandırması**: şablonlar, tercihler, hatırlatma ayarları ve
-/// iletişim izni (Faz 8.1 / 8.4).
+/// Bildirim **yapılandırması**: şablonlar, tercihler ve hatırlatma ayarları
+/// (Faz 8.1 / 8.4).
 ///
 /// ``MessagesService`` ve ``WhatsAppService``den ayrı, çünkü izin ailesi farklı.
 /// Burası ağırlıklı `notification:manage`; mesaj günlüğü salt `notification:read`,
@@ -51,16 +51,6 @@ protocol NotificationsService: Sendable {
     /// `superseded` satırları da gelir, bilerek.
     func appointmentNotifications(appointmentId: String) async throws -> [ScheduledNotification]
 
-    /// `GET /customers/:id/opt-out` — **çıplak dizi**, yalnız yürürlükteki kayıtlar.
-    func optOuts(customerId: String) async throws -> [OptOutRecord]
-
-    /// `POST /customers/:id/opt-out` — aynı kapsamda ikinci kayıt hata değil,
-    /// var olan kaydı döndürür (sunucu bunu idempotent tutuyor).
-    func createOptOut(customerId: String, _ input: CreateOptOutInput) async throws -> OptOutRecord
-
-    /// `DELETE /customers/:id/opt-out` — `channel` verilmezse tüm kapsamı kaldırır.
-    /// Kayıt silinmez, `revoked_at` damgalanır; yanıt gövdesiz (`204`).
-    func revokeOptOut(customerId: String, channel: NotificationChannel?) async throws
 }
 
 struct LiveNotificationsService: NotificationsService {
@@ -104,26 +94,5 @@ struct LiveNotificationsService: NotificationsService {
 
     func appointmentNotifications(appointmentId: String) async throws -> [ScheduledNotification] {
         try await client.send(APIRequest.get("appointments/\(appointmentId)/notifications"))
-    }
-
-    func optOuts(customerId: String) async throws -> [OptOutRecord] {
-        try await client.send(APIRequest.get("customers/\(customerId)/opt-out"))
-    }
-
-    func createOptOut(
-        customerId: String,
-        _ input: CreateOptOutInput
-    ) async throws -> OptOutRecord {
-        try await client.send(APIRequest.post("customers/\(customerId)/opt-out", body: input))
-    }
-
-    func revokeOptOut(customerId: String, channel: NotificationChannel?) async throws {
-        var query: [URLQueryItem] = []
-        if let channel { query.append(URLQueryItem(name: "channel", value: channel.rawValue)) }
-        try await client.send(APIRequest(
-            method: .delete,
-            path: "customers/\(customerId)/opt-out",
-            query: query
-        ))
     }
 }

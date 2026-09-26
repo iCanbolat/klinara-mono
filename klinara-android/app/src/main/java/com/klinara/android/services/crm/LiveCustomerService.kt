@@ -32,6 +32,8 @@ class LiveCustomerService internal constructor(
 
     override suspend fun get(id: String): Customer = client.send(ApiRequest.get("customers/$id"))
 
+    override suspend fun summary(): CustomerSummary = client.send(ApiRequest.get("customers/summary"))
+
     // Zarf YOK: yanıt doğrudan bir dizi.
     override suspend fun search(
         query: String,

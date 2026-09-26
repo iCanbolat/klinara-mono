@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import {
   isAppointmentStatus,
   type Appointment,
   type AppointmentHistoryEntry,
+  type Service,
 } from '@klinara/shared';
 import { t } from '@/i18n/tr';
 import { api } from '@/lib/api/client';
@@ -50,11 +51,22 @@ import { RescheduleDialog } from './reschedule-dialog';
 export function AppointmentSheet({
   appointmentId,
   timezone,
+  services,
   onClose,
   onChanged,
 }: {
   appointmentId: string | null;
   timezone: string;
+  /**
+   * Hizmet kataloğu — satırlarda `serviceId` yerine AD göstermek için.
+   *
+   * `GET /appointments/:id` satırlarında (`AppointmentServiceLine`) ad YOK;
+   * takvimin `CalendarServiceLine`ında var ama o başka uç. Paneli açan iki
+   * sayfa (/takvim, /mesajlar) kataloğu randevu oluşturma diyaloğu için
+   * ZATEN yüklüyor; panelin ayrıca `GET services` çekmesi aynı listeyi
+   * ikinci kez indirmek olurdu. O yüzden prop olarak geliyor.
+   */
+  services: Service[];
   onClose: () => void;
   onChanged: () => void;
 }): ReactNode {
@@ -67,6 +79,18 @@ export function AppointmentSheet({
   const [nonce, setNonce] = useState(0);
   const [rescheduling, setRescheduling] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+
+  const serviceNames = useMemo(
+    () => new Map(services.map((service) => [service.id, service.name])),
+    [services],
+  );
+  // Katalog listesi silinmiş hizmetleri DÖNMÜYOR; eski randevuda öyle bir
+  // satır varsa UUID yerine açık bir etiket. Ama BOŞ katalog "henüz
+  // yüklenmedi" ya da "yüklenemedi" de olabilir (takvim sayfası hatayı
+  // bilerek yutuyor) — o durumda "silinmiş" demek yalan olurdu, nötr tire.
+  const serviceLabel = (serviceId: string): string =>
+    serviceNames.get(serviceId) ??
+    (serviceNames.size === 0 ? '—' : t('calendar.detail.serviceRemoved'));
 
   useEffect(() => {
     if (appointmentId === null) return;
@@ -181,7 +205,7 @@ export function AppointmentSheet({
                 <ul className="flex flex-col gap-1 text-sm">
                   {appointment.services.map((line) => (
                     <li key={line.id} className="flex justify-between gap-2">
-                      <span className="truncate">{line.serviceId}</span>
+                      <span className="truncate">{serviceLabel(line.serviceId)}</span>
                       <span className="tabular-nums text-muted-foreground">
                         {line.durationMinutes} dk
                       </span>

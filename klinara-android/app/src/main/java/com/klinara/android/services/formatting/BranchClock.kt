@@ -101,6 +101,27 @@ class BranchClock(timeZoneIdentifier: String?) {
             "${formatDateTime(from)} – ${formatDateTime(to)}"
         }
 
+    /**
+     * Gün seçici başlığı: "29 Eylül Salı" + bugün/yarın öneki. Randevu alırken haftanın
+     * günü tarihten daha belirleyici (iOS `dayPickerLabel` paritesi).
+     */
+    fun dayPickerLabel(
+        instant: Instant,
+        now: Instant = Instant.now(),
+    ): Pair<String, String?> {
+        val title = DAY_PICKER.format(instant.atZone(zone))
+        val prefix =
+            when {
+                isSameDay(instant, now) -> "Bugün"
+                isSameDay(instant, adding(1, now)) -> "Yarın"
+                else -> null
+            }
+        return title to prefix
+    }
+
+    /** Şube saatinde saat (0–23). */
+    fun hour(instant: Instant): Int = instant.atZone(zone).hour
+
     /** Tarih şeridi için tek harf: P S Ç P C C P. */
     fun weekdayInitial(instant: Instant): String = WEEKDAY_INITIAL.format(instant.atZone(zone))
 
@@ -237,6 +258,7 @@ class BranchClock(timeZoneIdentifier: String?) {
         val TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm", TrLocale)
         val WEEKDAY_INITIAL: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEEE", TrLocale)
         val DAY_NUMBER: DateTimeFormatter = DateTimeFormatter.ofPattern("d", TrLocale)
+        val DAY_PICKER: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMMM EEEE", TrLocale)
         val WIRE: DateTimeFormatter = DateTimeFormatter.ISO_OFFSET_DATE_TIME
 
         fun resolveZone(identifier: String?): ZoneId {

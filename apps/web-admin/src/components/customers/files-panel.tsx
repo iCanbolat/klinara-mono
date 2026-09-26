@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Download, FileImage, FileText, FolderOpen, Trash2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { t } from '@/i18n/tr';
 import { api } from '@/lib/api/client';
@@ -8,6 +9,8 @@ import { toMessage } from '@/lib/reports/errors';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { ConfirmButton } from '@/components/ui/confirm-button';
+import { EmptyState } from '@/components/ui/empty-state';
+import { formatBytes, formatDate } from '@/lib/customers/format';
 import {
   ALLOWED_MIME_TYPES,
   cacheUntil,
@@ -16,6 +19,7 @@ import {
   kindOf,
   shouldFallbackToOriginal,
 } from '@/lib/customers/upload';
+import { PanelSkeleton } from './panel-skeleton';
 
 interface CustomerFile {
   id: string;
@@ -183,6 +187,9 @@ export function FilesPanel({
     }
   }
 
+  const uploading = busy === 'upload';
+  const pickFile = (): void => inputRef.current?.click();
+
   return (
     <div className="flex flex-col gap-4">
       {error !== null ? (
@@ -192,7 +199,10 @@ export function FilesPanel({
       ) : null}
 
       {canWrite ? (
-        <div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs text-muted-foreground">{t('customers.files.accepted')}</p>
+          {/* Yerel giriş görünmez; tarayıcının "Dosya Seç / seçilmedi" metni
+              arayüzle uyumsuz ve çevrilemiyor. Erişilebilir adı korunuyor. */}
           <input
             ref={inputRef}
             type="file"
@@ -203,53 +213,89 @@ export function FilesPanel({
               const file = event.target.files?.[0];
               if (file !== undefined) void upload(file);
             }}
-            className="text-sm"
+            className="sr-only"
+            tabIndex={-1}
           />
-          {busy === 'upload' ? (
-            <p className="mt-1 text-sm text-muted-foreground">{t('customers.files.uploading')}</p>
-          ) : null}
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            loading={uploading}
+            disabled={busy !== null}
+            onClick={pickFile}
+          >
+            <Upload aria-hidden="true" />
+            {uploading ? t('customers.files.uploading') : t('customers.files.upload')}
+          </Button>
         </div>
       ) : null}
 
+      {files === null && error === null ? <PanelSkeleton /> : null}
+
       {files !== null && files.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t('customers.files.empty')}</p>
+        <EmptyState
+          icon={FolderOpen}
+          title={t('customers.files.empty')}
+          message={t(canWrite ? 'customers.files.emptyHint' : 'customers.files.emptyReadOnly')}
+          className="py-10"
+        />
       ) : null}
 
-      <ul className="flex flex-col gap-2">
-        {(files ?? []).map((file) => (
-          <li
-            key={file.id}
-            className="flex items-center justify-between gap-3 rounded-lg border border-border p-2 text-sm"
-          >
-            <span className="truncate">{file.fileName ?? file.mimeType}</span>
-            <span className="flex gap-2">
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                loading={busy === file.id}
-                disabled={busy !== null}
-                onClick={() => void download(file.id)}
-              >
-                {t('customers.files.download')}
-              </Button>
-              {canWrite ? (
-                <ConfirmButton
-                  variant="danger"
-                  size="sm"
-                  disabled={busy !== null}
-                  title={t('customers.files.delete')}
-                  description={file.fileName ?? file.mimeType}
-                  destructive
-                  onConfirm={() => void remove(file.id)}
-                >
-                  {t('customers.files.delete')}
-                </ConfirmButton>
-              ) : null}
-            </span>
-          </li>
-        ))}
-      </ul>
+      {files !== null && files.length > 0 ? (
+        <ul className="flex flex-col divide-y divide-border rounded-lg border border-border">
+          {files.map((file) => {
+            const document = file.mimeType === 'application/pdf';
+            const Icon = document ? FileText : FileImage;
+            return (
+              <li key={file.id} className="flex items-center gap-3 px-4 py-3">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                  <Icon aria-hidden="true" className="size-5" />
+                </span>
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="truncate text-body-emphasis text-foreground">
+                    {file.fileName ?? file.mimeType}
+                  </span>
+                  <span className="text-xs tabular-nums text-muted-foreground">
+                    {[
+                      t(document ? 'customers.files.document' : 'customers.files.photo'),
+                      formatBytes(file.sizeBytes),
+                      formatDate(file.createdAt),
+                    ].join(' · ')}
+                  </span>
+                </div>
+                <span className="flex shrink-0 gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`${t('customers.files.download')}: ${file.fileName ?? file.mimeType}`}
+                    title={t('customers.files.download')}
+                    loading={busy === file.id}
+                    disabled={busy !== null}
+                    onClick={() => void download(file.id)}
+                  >
+                    <Download aria-hidden="true" />
+                  </Button>
+                  {canWrite ? (
+                    <ConfirmButton
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={`${t('customers.files.delete')}: ${file.fileName ?? file.mimeType}`}
+                      disabled={busy !== null}
+                      title={t('customers.files.delete')}
+                      description={file.fileName ?? file.mimeType}
+                      destructive
+                      onConfirm={() => void remove(file.id)}
+                    >
+                      <Trash2 aria-hidden="true" className="text-destructive" />
+                    </ConfirmButton>
+                  ) : null}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
     </div>
   );
 }

@@ -10,13 +10,14 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field } from '@/components/ui/field';
+import { Field, FieldCheckbox } from '@/components/ui/field';
 
 /**
  * Randevu iptali.
@@ -42,6 +43,9 @@ export function CancelDialog({
   onDone: () => void;
 }): ReactNode {
   const [reason, setReason] = useState('');
+  const [notifyCustomer, setNotifyCustomer] = useState(true);
+  // Geçmiş randevu için sunucu zaten bildirim göndermiyor; kutu yanıltmasın.
+  const [upcoming] = useState(() => new Date(appointment.startsAt).getTime() > Date.now());
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -52,6 +56,7 @@ export function CancelDialog({
       const trimmed = reason.trim();
       await api.post(`appointments/${appointment.id}/cancel`, {
         ...(trimmed === '' ? {} : { reason: trimmed }),
+        ...(upcoming && !notifyCustomer ? { notifyCustomer: false } : {}),
       });
       toast.success(t('calendar.cancelled'));
       onDone();
@@ -70,18 +75,30 @@ export function CancelDialog({
           <DialogDescription>{t('calendar.cancel.warning')}</DialogDescription>
         </DialogHeader>
 
-        <Field
-          label={t('calendar.cancel.reason')}
-          value={reason}
-          disabled={busy}
-          onChange={(event) => setReason(event.target.value)}
-        />
+        <DialogBody className="flex flex-col gap-4">
+          <Field
+            label={t('calendar.cancel.reason')}
+            value={reason}
+            disabled={busy}
+            onChange={(event) => setReason(event.target.value)}
+          />
 
-        {error !== null ? (
-          <Alert tone="danger">
-            <span role="alert">{error}</span>
-          </Alert>
-        ) : null}
+          {upcoming ? (
+            <FieldCheckbox
+              label={t('calendar.notify.label')}
+              hint={t('calendar.notify.cancelHint')}
+              checked={notifyCustomer}
+              disabled={busy}
+              onCheckedChange={setNotifyCustomer}
+            />
+          ) : null}
+
+          {error !== null ? (
+            <Alert tone="danger">
+              <span role="alert">{error}</span>
+            </Alert>
+          ) : null}
+        </DialogBody>
 
         <DialogFooter>
           <Button type="button" variant="ghost" onClick={onClose} disabled={busy}>

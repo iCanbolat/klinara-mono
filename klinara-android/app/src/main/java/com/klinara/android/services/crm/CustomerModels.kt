@@ -176,3 +176,13 @@ data class Customer(
     fun matches(term: String): Boolean =
         SearchText.matches(fullName, term) || SearchText.matchesDigits(phone, term)
 }
+
+/** `GET customers/summary` — Müşteriler ekranının üstündeki özet şeridi. */
+@Serializable
+data class CustomerSummary(
+    val total: Int,
+    val newLast30Days: Int,
+    val activeLast90Days: Int,
+    /** Daha önce gelmiş, 90 gündür gelmeyen ve ileri tarihli randevusu olmayan. */
+    val lapsed: Int,
+)

@@ -19,6 +19,8 @@ export interface WhatsAppOutbound {
   /** Meta'nın konumsal parametreleri, sırayla. */
   parameters?: string[] | undefined;
   buttonPayloads?: string[] | undefined;
+  /** AUTHENTICATION template'inin kopyalama butonuna giden kod. */
+  copyCode?: string | undefined;
 }
 
 /**
@@ -65,6 +67,7 @@ export class WhatsAppSenderService {
         ...(message.buttonPayloads !== undefined
           ? { buttonPayloads: message.buttonPayloads }
           : {}),
+        ...(message.copyCode !== undefined ? { copyCode: message.copyCode } : {}),
       });
     }
 
@@ -90,15 +93,15 @@ export class WhatsAppSenderService {
     if (account === undefined) return { ok: false, error: 'Hesap yapılandırılmamış' };
 
     const accessToken = this.encryption.decrypt(account.accessTokenEncrypted);
+    const credentials = {
+      phoneNumberId: account.phoneNumberId,
+      accessToken,
+      apiVersion: account.apiVersion,
+    };
     try {
-      const templates = await this.client.listTemplates(
-        {
-          phoneNumberId: account.phoneNumberId,
-          accessToken,
-          apiVersion: account.apiVersion,
-        },
-        account.wabaId,
-      );
+      const templates = await this.client.listTemplates(credentials, account.wabaId);
+      // İdempotent; her doğrulamada tekrarlanması abonelik düşerse onu da onarır.
+      await this.client.subscribeApp(credentials, account.wabaId);
       await repo.replaceTemplates(tx, tenantId, templates);
       await repo.markVerified(tx, tenantId, { ok: true });
       return { ok: true };

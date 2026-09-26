@@ -134,7 +134,7 @@ data class WhatsAppAccountDraft(
             }
 
     val apiVersionError: String?
-        get() = "'v21.0' biçiminde olmalı.".takeUnless { WhatsAppAccountUpsert.API_VERSION.matches(apiVersion) }
+        get() = "'v26.0' biçiminde olmalı.".takeUnless { WhatsAppAccountUpsert.API_VERSION.matches(apiVersion) }
 
     val isValid: Boolean
         get() =

@@ -22,8 +22,8 @@ import kotlinx.coroutines.launch
 /**
  * Şablon listesinin satırı. [isMissing] — sunucunun listesinde HİÇ olmayan (olay, kanal) çifti.
  *
- * **iOS'tan sapma:** sunucu yalnız kod varsayılanı olan kanalları listeliyor ve varsayılanların
- * çoğu SMS + e-posta; randevu hatırlatmasının WhatsApp eşlemesi (Meta template adı) listede hiç
+ * **iOS'tan sapma:** sunucu yalnız kod varsayılanı ya da standart template'i olan kanalları
+ * listeliyor; ör. paket süre dolumunun WhatsApp eşlemesi (Meta template adı) listede hiç
  * görünmüyor ve iOS'ta oluşturulamıyor. Olayın kataloğundaki eksik kanallar burada "Şablon yok"
  * satırı olarak çiziliyor; kaydetmek aynı `PUT` ile kiracı satırı açıyor — yeni uç YOK.
  */
@@ -70,7 +70,6 @@ class NotificationTemplatesViewModel(
                                 NotificationTemplate(
                                     event = event,
                                     channel = channel,
-                                    kind = NotificationEventCatalog.kind(event),
                                     isDefault = true,
                                 ),
                                 isMissing = true,

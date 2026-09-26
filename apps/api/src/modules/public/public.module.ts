@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { InternalDomainsController } from './internal-domains.controller';
 import { PublicResolveController } from './public-resolve.controller';
 import { PublicSiteController } from './public-site.controller';
@@ -28,7 +29,7 @@ import { BookingModule } from '../booking/booking.module';
 import { IntegrationsModule } from '../integrations/integrations.module';
 
 @Module({
-  imports: [BookingModule, IntegrationsModule],
+  imports: [BookingModule, IntegrationsModule, NotificationsModule],
   controllers: [
     PublicResolveController,
     PublicSiteController,

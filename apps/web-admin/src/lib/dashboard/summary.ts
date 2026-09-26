@@ -1,5 +1,6 @@
 import {
   isAppointmentStatus,
+  type AppointmentStatus,
   type Branch,
   type CalendarEntry,
   type Me,
@@ -9,6 +10,8 @@ import {
   type StaffPerformanceReport,
   type StaffPerformanceRow,
 } from '@klinara/shared';
+import { t } from '@/i18n/tr';
+import { addDays, dayKeyOf } from '@/lib/calendar/date';
 import { occupiesSlot } from '@/lib/calendar/status';
 
 /**
@@ -36,8 +39,6 @@ export interface DaySummary {
   completed: number;
   noShow: number;
   cancelled: number;
-  /** Henüz başlamamış, slot kaplayan randevular; başlangıca göre sıralı. */
-  upcoming: CalendarEntry[];
 }
 
 export interface BranchSummary {
@@ -81,16 +82,11 @@ export function accessibleBranches(
   return active.filter((branch) => allowed.has(branch.id));
 }
 
-export function summarizeDay(
-  entries: readonly CalendarEntry[],
-  nowMs: number,
-  upcomingLimit = 5,
-): DaySummary {
+export function summarizeDay(entries: readonly CalendarEntry[]): DaySummary {
   let active = 0;
   let completed = 0;
   let noShow = 0;
   let cancelled = 0;
-  const upcoming: CalendarEntry[] = [];
 
   for (const entry of entries) {
     const status = isAppointmentStatus(entry.status) ? entry.status : 'scheduled';
@@ -98,21 +94,79 @@ export function summarizeDay(
     if (status === 'completed') completed += 1;
     if (status === 'no_show') noShow += 1;
     if (status === 'cancelled') cancelled += 1;
-    if (occupiesSlot(status) && status !== 'completed' && Date.parse(entry.startsAt) >= nowMs) {
-      upcoming.push(entry);
-    }
   }
 
-  upcoming.sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt));
+  return { total: entries.length, active, completed, noShow, cancelled };
+}
 
-  return {
-    total: entries.length,
-    active,
-    completed,
-    noShow,
-    cancelled,
-    upcoming: upcoming.slice(0, upcomingLimit),
-  };
+/**
+ * Sıradaki randevular — BUGÜNLE SINIRLI DEĞİL, tarihi en yakın N randevu.
+ *
+ * Gün özetinden türetilemiyor: akşam saatlerinde ya da boş bir günde kart
+ * "bekleyen randevu yok" diyordu, oysa yarın sabah dolu. Bu yüzden şube başına
+ * `GET appointments` (şimdiden itibaren, slot kaplayan ve bitmemiş durumlar,
+ * `limit=N`) atılıyor; sunucu `starts_at`e göre sıralı döndürdüğü için
+ * birleşik listenin ilk N'i her şubenin ilk N'inden gelir.
+ */
+export const UPCOMING_LIMIT = 10;
+
+/** Sunucunun liste ucundaki azami aralık (`MAX_RANGE_DAYS`). */
+export const UPCOMING_HORIZON_DAYS = 92;
+
+/** Slot kaplayan ve henüz bitmemiş durumlar — iptal, gelmedi, tamamlandı hariç. */
+export const UPCOMING_STATUSES: readonly AppointmentStatus[] = [
+  'scheduled',
+  'confirmed',
+  'arrived',
+  'in_progress',
+];
+
+export interface UpcomingRow {
+  entry: CalendarEntry;
+  branchId: string;
+  branchName: string;
+  timezone: string;
+}
+
+/** Şube başına gelen listeleri tek, başlangıca göre sıralı listeye indiriyor. */
+export function mergeUpcoming(
+  branches: readonly Branch[],
+  lists: ReadonlyMap<string, readonly CalendarEntry[]>,
+  nowMs: number,
+  limit = UPCOMING_LIMIT,
+): UpcomingRow[] {
+  return branches
+    .flatMap((branch) =>
+      (lists.get(branch.id) ?? []).map((entry) => ({
+        entry,
+        branchId: branch.id,
+        branchName: branch.name,
+        timezone: branch.timezone,
+      })),
+    )
+    .filter((row) => {
+      const status = isAppointmentStatus(row.entry.status) ? row.entry.status : 'scheduled';
+      return (
+        occupiesSlot(status) && status !== 'completed' && Date.parse(row.entry.startsAt) >= nowMs
+      );
+    })
+    .sort((a, b) => Date.parse(a.entry.startsAt) - Date.parse(b.entry.startsAt))
+    .slice(0, limit);
+}
+
+/**
+ * Satırın gün etiketi: `'Bugün'`, `'Yarın'`, yoksa `'28 Eyl'`. Gün ŞUBENİN
+ * saat diliminde — gece yarısına yakın bir randevu tarayıcının gününe göre
+ * yanlış güne yazılmasın.
+ */
+export function upcomingDayLabel(iso: string, timeZone: string, nowMs: number): string {
+  const day = dayKeyOf(iso, timeZone);
+  const today = dayKeyOf(new Date(nowMs).toISOString(), timeZone);
+  if (day === today) return t('calendar.today');
+  if (day === addDays(today, 1)) return t('dashboard.tomorrow');
+  return new Intl.DateTimeFormat('tr-TR', { timeZone, day: 'numeric', month: 'short' }).format(
+    new Date(iso),
+  );
 }
 
 export interface SummarySources {
@@ -126,7 +180,6 @@ export interface SummarySources {
 export function mergeBranchSummaries(
   branches: readonly Branch[],
   sources: SummarySources,
-  nowMs: number,
 ): BranchSummary[] {
   const occupancy = rowsById(sources.occupancy?.data);
   const revenue = rowsById(sources.revenue?.data);
@@ -139,7 +192,7 @@ export function mergeBranchSummaries(
     const revenueRow = revenue.get(branch.id);
     return {
       branch,
-      today: day === undefined ? null : summarizeDay(day.entries, nowMs),
+      today: day === undefined ? null : summarizeDay(day.entries),
       timezone: day?.timezone ?? branch.timezone,
       occupancyRate:
         sources.occupancy === null ? null : (occupancy.get(branch.id)?.occupancyRate ?? 0),

@@ -21,12 +21,13 @@ import java.time.Instant
 // iOS `MessageModels.swift`, `ReminderModels.swift`, `NotificationModels.swift` paritesi.
 //
 // Ek M kararı ekranı doğrudan biçimlendiriyor: ham adres saklanmıyor (`to` maskeli gelir) ve
-// engellenen mesaj atılmıyor, `skipped` yazılıyor. Mesaj günlüğü "ne gitti" değil "ne oldu"
+// gönderilmeyen mesaj atılmıyor, `skipped` yazılıyor. Mesaj günlüğü "ne gitti" değil "ne oldu"
 // defteridir; `skipped` satırları gizlenmez.
 
 /**
  * Bildirim olayı — **açık** küme: sunucu yeni bir olay tanımladığında eski bir istemci mesaj
- * günlüğünü çözemeyip patlamamalı.
+ * günlüğünü çözemeyip patlamamalı. Kaldırılmış olayların (doğum günü) geçmiş satırları da
+ * [Unknown] olarak çözülür.
  */
 @Serializable(with = NotificationEventSerializer::class)
 enum class NotificationEvent(
@@ -56,11 +57,6 @@ enum class NotificationEvent(
     ),
     PackageBalance("package_balance", "Paket bakiyesi", "Paket hakkı azaldığında müşteriye gider."),
     PackageExpiring("package_expiring", "Paket süre dolumu", "Paketin süresi dolmadan önce müşteriye gider."),
-    Birthday(
-        "birthday",
-        "Doğum günü",
-        "Doğum gününde gider. Tek pazarlama olayı: iletişim izni iptalinden etkilenir.",
-    ),
     AutoReply("auto_reply", "Otomatik yanıt", "Müşterinin WhatsApp yanıtına verilen otomatik karşılık."),
     StaffInternal("staff_internal", "Personel bildirimi", "Müşteriye değil, personele giden iç bildirim."),
     Unknown("unknown", "Bilinmeyen olay", "Bu sürümde tanınmayan bir olay. Uygulamayı güncelleyin."),
@@ -76,42 +72,6 @@ enum class NotificationEvent(
 
 internal object NotificationEventSerializer :
     WireEnumSerializer<NotificationEvent>("NotificationEvent", NotificationEvent::from, { it.wire })
-
-/**
- * İşlemsel / pazarlama ayrımı — olayın TANIMINDA, kiracı ayarında değil.
- *
- * iOS'ta kapalı küme; burada `Unknown` kolu var (A4.2'deki `NotificationChannel` gerekçesi):
- * sunucunun ekleyeceği tek bir tür bütün şablon listesini çözülemez hâle getirmemeli.
- */
-@Serializable(with = NotificationKindSerializer::class)
-enum class NotificationKind(
-    val wire: String,
-    val turkishName: String,
-    val explanation: String,
-    val badgeTone: KlinaraBadgeTone,
-) {
-    Transactional(
-        "transactional",
-        "İşlemsel",
-        "Müşterinin kendi işlemiyle ilgili; iletişim izni iptalinden etkilenmez.",
-        KlinaraBadgeTone.Neutral,
-    ),
-    Marketing(
-        "marketing",
-        "Pazarlama",
-        "Ticari ileti; iletişim izni iptal edilmişse gönderilmez.",
-        KlinaraBadgeTone.Warning,
-    ),
-    Unknown("unknown", "Bilinmeyen tür", "Bu sürümde tanınmayan bir tür.", KlinaraBadgeTone.Muted),
-    ;
-
-    companion object {
-        fun from(wire: String): NotificationKind = entries.firstOrNull { it.wire == wire } ?: Unknown
-    }
-}
-
-internal object NotificationKindSerializer :
-    WireEnumSerializer<NotificationKind>("NotificationKind", NotificationKind::from, { it.wire })
 
 /** Gönderim durumu — açık küme (sunucu ileride `expired` gibi bir durum ekleyebilir). */
 @Serializable(with = MessageStatusSerializer::class)
@@ -135,7 +95,7 @@ enum class MessageStatus(
     Skipped(
         "skipped",
         "Gönderilmedi",
-        "Üretildi ama gönderilmedi — iletişim izni kapalı ya da kanal yapılandırılmamış.",
+        "Üretildi ama gönderilmedi — şablon pasif ya da kanal yapılandırılmamış.",
         KlinaraBadgeTone.Muted,
     ),
     Unknown(

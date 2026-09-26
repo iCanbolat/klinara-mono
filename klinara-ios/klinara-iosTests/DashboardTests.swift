@@ -44,39 +44,54 @@ struct DashboardTests {
 
     // MARK: Saf birleştirme
 
-    @Test("Gün özeti: slot kaplayan, tamamlanan ve sıradakiler")
+    @Test("Gün özeti: toplam, slot kaplayan ve tamamlanan")
     func summarizesDay() {
-        let day = DashboardSummaries.summarizeDay(
-            [
-                entry("done", minutesFromNow: -180, .completed),
-                entry("later", minutesFromNow: 120, .scheduled),
-                entry("soon", minutesFromNow: 60, .confirmed),
-                entry("gone", minutesFromNow: 180, .cancelled),
-                entry("past", minutesFromNow: -120, .scheduled),
+        let day = DashboardSummaries.summarizeDay([
+            entry("done", minutesFromNow: -180, .completed),
+            entry("later", minutesFromNow: 120, .scheduled),
+            entry("soon", minutesFromNow: 60, .confirmed),
+            entry("gone", minutesFromNow: 180, .cancelled),
+            entry("past", minutesFromNow: -120, .scheduled),
+        ])
+        #expect(day == DaySummary(total: 5, active: 4, completed: 1))
+    }
+
+    @Test("Sıradakiler bugünle sınırlı değil: şubeler birleşiyor, başlangıca göre, bitmemiş olanlar")
+    func mergesUpcoming() {
+        let items = DashboardSummaries.mergeUpcoming(
+            branches: [kadikoy, nisantasi],
+            lists: [
+                "b1": [
+                    entry("past", minutesFromNow: -30, .scheduled),
+                    entry("nextWeek", minutesFromNow: 7 * 24 * 60, .confirmed),
+                ],
+                "b2": [
+                    entry("soon", minutesFromNow: 60, .scheduled),
+                    entry("void", minutesFromNow: 90, .cancelled),
+                    entry("tomorrow", minutesFromNow: 24 * 60, .scheduled),
+                ],
             ],
             now: now
         )
-        #expect(day.total == 5)
-        #expect(day.active == 4)
-        #expect(day.completed == 1)
-        #expect(day.upcoming.map(\.id) == ["soon", "later"])
-        #expect(day.pending == 2)
+        #expect(items.map(\.id) == ["soon", "tomorrow", "nextWeek"])
+        #expect(items.first?.branchName == "Nişantaşı")
     }
 
-    @Test("Önizleme sınırlı ama toplam korunuyor: 8 bekleyen → 5 satır, 'Tümünü gör' için 8")
-    func previewIsBounded() {
-        let entries = (1...8).map { entry("e\($0)", minutesFromNow: Double($0 * 30), .scheduled) }
-        let day = DashboardSummaries.summarizeDay(entries, now: now)
-        #expect(day.upcoming.count == DashboardSummaries.previewLimit)
-        #expect(day.pending == 8)
+    @Test("Sıradakiler en fazla 10")
+    func upcomingIsBounded() {
+        let entries = (1...12).map { entry("e\($0)", minutesFromNow: Double($0 * 24 * 60), .scheduled) }
+        let items = DashboardSummaries.mergeUpcoming(branches: [kadikoy], lists: ["b1": entries], now: now)
+        #expect(items.count == DashboardSummaries.upcomingLimit)
+        #expect(DashboardSummaries.upcomingLimit == 10)
+    }
 
-        let summaries = DashboardSummaries.merge(
-            branches: [kadikoy],
-            days: ["b1": (entries: entries, timezone: "Europe/Istanbul")],
-            occupancy: nil, revenue: nil, noShow: nil, now: now
-        )
-        #expect(DashboardSummaries.upcoming(summaries).count == DashboardSummaries.previewLimit)
-        #expect(DashboardSummaries.pendingTotal(summaries) == 8)
+    @Test("Gün etiketi şubenin saat diliminde: Bugün, Yarın, sonra tarih")
+    func upcomingDayLabel() {
+        let tz = "Europe/Istanbul"
+        // now = 12:00 İstanbul
+        #expect(DashboardSummaries.upcomingDayLabel(now.addingTimeInterval(11 * 3600), timezone: tz, now: now) == "Bugün")
+        #expect(DashboardSummaries.upcomingDayLabel(now.addingTimeInterval(13 * 3600), timezone: tz, now: now) == "Yarın")
+        #expect(DashboardSummaries.upcomingDayLabel(now.addingTimeInterval(14 * 86_400), timezone: tz, now: now) == "28 Eyl")
     }
 
     @Test("Rapor geldiyse satırı olmayan şube SIFIR, rapor yoksa NIL; oran sunucu toplamından")
@@ -86,8 +101,7 @@ struct DashboardTests {
             days: ["b1": (entries: [entry("soon", minutesFromNow: 60, .scheduled)], timezone: "Europe/Istanbul")],
             occupancy: occupancy,
             revenue: revenue,
-            noShow: nil,
-            now: now
+            noShow: nil
         )
         #expect(summaries[0].occupancyRate == 72)
         #expect(summaries[1].occupancyRate == 0)

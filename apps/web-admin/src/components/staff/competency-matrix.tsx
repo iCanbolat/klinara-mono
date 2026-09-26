@@ -3,8 +3,8 @@
 import { useState, type ReactNode } from 'react';
 import type { Service, StaffProfile } from '@klinara/shared';
 import { t } from '@/i18n/tr';
-import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
+import { DialogBody, DialogFooter } from '@/components/ui/dialog';
 import { FieldCheckbox } from '@/components/ui/field';
 
 /**
@@ -25,19 +25,20 @@ import { FieldCheckbox } from '@/components/ui/field';
  * ---------------------------------------------------------------------------
  * `category-picker.tsx`in aynı kararı: seçili bir kaydı listeden gizlemek,
  * kaldırılamayan bir seçim demek.
+ *
+ * Yalnız diyalog içinde kullanılıyor; gövde ve eylem satırını ayrı
+ * `DialogBody`/`DialogFooter` olarak veriyor ki uzun listede düğmeler sabit kalsın.
  */
 export function CompetencyMatrix({
   profile,
   services,
   onCancel,
   onSave,
-  className,
 }: {
   profile: StaffProfile;
   services: readonly Service[];
   onCancel: () => void;
   onSave: (serviceIds: string[]) => void;
-  className?: string;
 }): ReactNode {
   // MEVCUT TAM liste — bkz. dosya başlığı.
   const [selected, setSelected] = useState<Set<string>>(
@@ -48,7 +49,8 @@ export function CompetencyMatrix({
   const visible = services.filter((service) => service.isActive || selected.has(service.id));
 
   return (
-    <div className={cn('mt-3 flex flex-col gap-3 rounded-lg border border-border p-3', className)}>
+    <>
+      <DialogBody className="flex flex-col gap-3">
       <p className="text-xs text-muted-foreground">{t('staff.competencyHint')}</p>
 
       <div className="grid gap-1 sm:grid-cols-2">
@@ -68,15 +70,16 @@ export function CompetencyMatrix({
           />
         ))}
       </div>
+      </DialogBody>
 
-      <div className="flex gap-2">
-        <Button type="button" size="sm" onClick={() => onSave([...selected])}>
-          {t('customers.save')}
-        </Button>
-        <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
+      <DialogFooter>
+        <Button type="button" variant="ghost" onClick={onCancel}>
           {t('calendar.detail.close')}
         </Button>
-      </div>
-    </div>
+        <Button type="button" onClick={() => onSave([...selected])}>
+          {t('customers.save')}
+        </Button>
+      </DialogFooter>
+    </>
   );
 }

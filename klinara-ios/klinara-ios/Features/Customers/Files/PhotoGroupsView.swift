@@ -177,23 +177,22 @@ struct FileGroupEditorView: View {
                 title: "Grup",
                 footnote: "Fotoğraflar yüklenirken bu gruba bağlanır."
             ) {
-                KlinaraTextField(
-                    label: "Başlık",
-                    text: $title,
-                    placeholder: "Sağ kol — 3. seans",
-                    error: error?.fieldErrors["title"],
-                    autocapitalization: .sentences
-                )
-                .padding(KlinaraMetrics.md)
+                VStack(alignment: .leading, spacing: KlinaraMetrics.md) {
+                    KlinaraTextField(
+                        label: "Başlık",
+                        text: $title,
+                        placeholder: "Sağ kol — 3. seans",
+                        error: error?.fieldErrors["title"],
+                        autocapitalization: .sentences
+                    )
 
-                KlinaraDivider()
-
-                KlinaraTextField(
-                    label: "Vücut bölgesi",
-                    text: $bodyArea,
-                    placeholder: "sağ kol",
-                    error: error?.fieldErrors["bodyArea"]
-                )
+                    KlinaraTextField(
+                        label: "Vücut bölgesi",
+                        text: $bodyArea,
+                        placeholder: "sağ kol",
+                        error: error?.fieldErrors["bodyArea"]
+                    )
+                }
                 .padding(KlinaraMetrics.md)
 
                 KlinaraDivider()

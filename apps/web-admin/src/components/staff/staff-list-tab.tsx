@@ -318,7 +318,7 @@ export function StaffListTab(): ReactNode {
           open={competencyFor !== null}
           onOpenChange={(next) => !next && setCompetencyFor(null)}
         >
-          <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+          <DialogContent className="sm:max-w-2xl">
             {competencyFor === null ? null : (
               <>
                 <DialogHeader>
@@ -328,7 +328,6 @@ export function StaffListTab(): ReactNode {
                 <CompetencyMatrix
                   // Başka bir personel açılınca seçim sıfırdan okunmalı.
                   key={competencyFor.id}
-                  className="mt-0 border-0 p-0"
                   profile={competencyFor}
                   services={services}
                   onCancel={() => setCompetencyFor(null)}

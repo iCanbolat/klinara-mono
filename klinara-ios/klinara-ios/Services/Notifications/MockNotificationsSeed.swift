@@ -4,7 +4,7 @@ import Foundation
 ///
 /// Tohum kasıtlı olarak **kurulumu yarım kalmış bir klinik**i temsil eder:
 /// WhatsApp bağlı ama bir şablon Meta'da hâlâ onay bekliyor, bir hatırlatma
-/// gönderilmiş, bir tanesi iletişim izni yüzünden `skipped` yazılmış, gelen
+/// gönderilmiş, bir gelmedi takibi pasif şablon yüzünden `skipped` yazılmış, gelen
 /// kutusunda okunmamış iki mesaj var. Her şeyin yolunda olduğu bir tohum,
 /// ekranların asıl zor durumlarını (başarısız gönderim, atlanmış mesaj,
 /// tanınmayan numara) hiç göstermezdi.
@@ -12,15 +12,13 @@ enum MockNotificationsSeed {
 
     static let messageReminderSent = "e1000000-0000-4000-8000-000000000001"
     static let messageConfirmationDelivered = "e1000000-0000-4000-8000-000000000002"
-    static let messageBirthdaySkipped = "e1000000-0000-4000-8000-000000000003"
+    static let messageNoShowSkipped = "e1000000-0000-4000-8000-000000000003"
     static let messageReminderFailed = "e1000000-0000-4000-8000-000000000004"
     static let messageStaffInternal = "e1000000-0000-4000-8000-000000000005"
 
     static let inboxAyse = "e2000000-0000-4000-8000-000000000001"
     static let inboxUnknown = "e2000000-0000-4000-8000-000000000002"
     static let inboxHandled = "e2000000-0000-4000-8000-000000000003"
-
-    static let optOutMehmet = "e3000000-0000-4000-8000-000000000001"
 
     /// Kiracının kendi metnini yazdığı **tek** şablon. Kalanlar kod
     /// varsayılanıyla (`isDefault: true`, `id: nil`) döner — sunucunun
@@ -37,7 +35,6 @@ enum MockNotificationsSeed {
                 event: .appointmentReminder,
                 channel: .whatsapp,
                 locale: "tr",
-                kind: .transactional,
                 subject: nil,
                 body: "Sayın {{customerName}}, {{appointmentAt}} tarihli {{serviceName}} randevunuzu hatırlatırız.",
                 whatsappTemplateName: "randevu_hatirlatma",
@@ -61,11 +58,9 @@ enum MockNotificationsSeed {
                     event: event,
                     channel: channel,
                     locale: "tr",
-                    kind: definition.kind,
                     subject: channel == .email ? "\(event.turkishName)" : nil,
-                    // WhatsApp kanalının kod varsayılanı SMS gövdesine düşüyor
-                    // (Ek M, düzeltilen hata #3): gerçek gönderimde zaten Meta'da
-                    // onaylı template adı kullanılıyor.
+                    // Gerçek gönderimde Meta'da onaylı template adı kullanılıyor;
+                    // gövde yalnız önizleme ve kayıt metni.
                     body: defaultBody(for: event),
                     whatsappTemplateName: nil,
                     whatsappTemplateLanguage: nil,
@@ -92,8 +87,6 @@ enum MockNotificationsSeed {
             return "Sayın {{customerName}}, {{packageName}} paketinizde {{remainingSessions}} seans hakkınız kaldı."
         case .packageExpiring:
             return "Sayın {{customerName}}, {{packageName}} paketiniz {{expiresAt}} tarihinde doluyor; {{remainingSessions}} seans hakkınız var."
-        case .birthday:
-            return "Sayın {{customerName}}, doğum gününüzü {{branchName}} olarak kutlarız."
         case .autoReply:
             return "{{message}}"
         case .staffInternal:
@@ -105,7 +98,7 @@ enum MockNotificationsSeed {
 
     // MARK: Tercihler
 
-    /// Kiracı, doğum günü mesajını kapatmış (`channels: []`) ve randevu
+    /// Kiracı, paket süre dolumu mesajını kapatmış (`channels: []`) ve randevu
     /// hatırlatmasında sessiz saati daraltmış. Kalan olaylar varsayılanda.
     static func tenantPreferences() -> [NotificationPreference] {
         [
@@ -113,8 +106,7 @@ enum MockNotificationsSeed {
                 preferenceId: MockIDs.uuid(),
                 branchId: nil,
                 event: .appointmentReminder,
-                kind: .transactional,
-                channels: [.whatsapp, .sms],
+                channels: [.whatsapp],
                 quietHoursStart: "22:00",
                 quietHoursEnd: "08:00",
                 isDefault: false
@@ -122,8 +114,7 @@ enum MockNotificationsSeed {
             NotificationPreference(
                 preferenceId: MockIDs.uuid(),
                 branchId: nil,
-                event: .birthday,
-                kind: .marketing,
+                event: .packageExpiring,
                 channels: [],
                 quietHoursStart: nil,
                 quietHoursEnd: nil,
@@ -139,7 +130,6 @@ enum MockNotificationsSeed {
             preferenceId: nil,
             branchId: nil,
             event: event,
-            kind: definition?.kind ?? .transactional,
             channels: definition?.channels ?? [],
             quietHoursStart: "21:00",
             quietHoursEnd: "09:00",
@@ -190,17 +180,16 @@ enum MockNotificationsSeed {
                 deliveredAt: now.addingTimeInterval(-8 * 3_600 + 9),
                 createdAt: now.addingTimeInterval(-8 * 3_600)
             ),
-            // Ek M: engellenen mesaj ATILMIYOR, `skipped` yazılıyor. "Gitmedi mi,
-            // hiç denendi mi?" sorusu cevaplanabilir kalmalı.
+            // Atlanan mesaj ATILMIYOR, `skipped` yazılıyor. "Gitmedi mi, hiç
+            // denendi mi?" sorusu cevaplanabilir kalmalı.
             message(
-                id: messageBirthdaySkipped,
+                id: messageNoShowSkipped,
                 customerId: MockCustomerSeed.mehmet,
                 channel: .whatsapp,
-                event: .birthday,
+                event: .noShowFollowup,
                 status: .skipped,
                 to: "+90**********02",
-                body: "Sayın Mehmet Demir, doğum gününüzü kutlarız.",
-                errorCode: APIErrorCode.optOut.rawValue,
+                body: "Sayın Mehmet Demir, randevunuza katılamadınız.",
                 attempt: 0,
                 scheduledFor: now.addingTimeInterval(-3 * 86_400),
                 createdAt: now.addingTimeInterval(-3 * 86_400)
@@ -309,24 +298,6 @@ enum MockNotificationsSeed {
         ]
     }
 
-    // MARK: İletişim izni
-
-    static func optOuts(at now: Date) -> [OptOutRecord] {
-        [
-            // Mehmet tüm kanallarda ticari ileti almıyor — `messageBirthdaySkipped`
-            // satırının sebebi bu. İki tohum birbirini AÇIKLAMALI, yoksa mock
-            // veri gerçekte olamayacak bir durumu temsil eder.
-            OptOutRecord(
-                id: optOutMehmet,
-                customerId: MockCustomerSeed.mehmet,
-                channel: nil,
-                kind: .marketing,
-                source: .inboundStop,
-                createdAt: now.addingTimeInterval(-10 * 86_400)
-            )
-        ]
-    }
-
     // MARK: WhatsApp hesabı
 
     static func account(at now: Date) -> WhatsAppAccount {
@@ -334,7 +305,7 @@ enum MockNotificationsSeed {
             wabaId: "1029384756",
             phoneNumberId: "5647382910",
             businessPhone: "+902121234567",
-            apiVersion: "v21.0",
+            apiVersion: "v26.0",
             status: .active,
             accessTokenMasked: "••••••••aF3k",
             hasAppSecret: true,
@@ -368,11 +339,11 @@ enum MockNotificationsSeed {
                 syncedAt: now.addingTimeInterval(-6 * 3_600)
             ),
             WhatsAppTemplate(
-                name: "dogum_gunu",
+                name: "klinara_paket_bakiye",
                 language: "tr",
-                category: "MARKETING",
+                category: "UTILITY",
                 status: .pending,
-                bodyVariableCount: 2,
+                bodyVariableCount: 3,
                 buttons: [],
                 syncedAt: now.addingTimeInterval(-6 * 3_600)
             ),

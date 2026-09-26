@@ -1,8 +1,4 @@
-import type {
-  NotificationChannel,
-  NotificationEvent,
-  NotificationKind,
-} from '../../database/schema';
+import type { NotificationChannel, NotificationEvent } from '../../database/schema';
 
 export interface TemplateDefinition {
   subject?: string;
@@ -10,7 +6,6 @@ export interface TemplateDefinition {
 }
 
 export interface EventDefinition {
-  kind: NotificationKind;
   /** Denenecek kanallar, öncelik sırasında. */
   channels: NotificationChannel[];
   /** Şablonun beklediği değişkenler — çağıranın sözleşmesi. */
@@ -26,9 +21,13 @@ export interface EventDefinition {
  * /notification-templates` ile kendi metnini yazana kadar buradaki geçerlidir.
  *
  * WhatsApp metni buradan GİTMEZ: 24 saat penceresi dışında yalnız Meta'da
- * onaylı template gönderilebilir (mimari karar 4.6). Buradaki gövde SMS
- * içindir; WhatsApp için şablon satırındaki `whatsapp_template_name`
- * kullanılır (8.2).
+ * onaylı template gönderilebilir (mimari karar 4.6). Müşteri olaylarının
+ * metni standart template setindedir (`whatsapp-standard-templates.ts`);
+ * kiracı başka bir template eşlediyse şablon satırındaki
+ * `whatsapp_template_name` kullanılır (8.2).
+ *
+ * Yalnız işlemsel iletiler var: ürün pazarlama iletisi göndermez. SMS kanalı
+ * da müşteriye kapalı — klinik müşterisiyle yalnız WhatsApp yazışır.
  *
  * **E-posta müşteriye gitmez.** Klinik müşterisiyle yalnız WhatsApp üzerinden
  * yazışır; e-posta kanalı bu yüzden müşteri olaylarının hiçbirinde yok.
@@ -37,81 +36,57 @@ export interface EventDefinition {
  */
 export const EVENT_DEFINITIONS: Record<NotificationEvent, EventDefinition> = {
   appointment_confirmation: {
-    kind: 'transactional',
-    channels: ['whatsapp', 'sms'],
+    channels: ['whatsapp'],
     variables: ['customerName', 'branchName', 'appointmentAt', 'serviceName'],
-    templates: {
-      sms: { body: 'Sayın {{customerName}}, {{appointmentAt}} randevunuz oluşturuldu. {{branchName}}' },
-    },
+    templates: {},
   },
   appointment_reminder: {
-    kind: 'transactional',
-    channels: ['whatsapp', 'sms'],
+    channels: ['whatsapp'],
     variables: ['customerName', 'branchName', 'appointmentAt', 'serviceName'],
-    templates: {
-      sms: { body: 'Sayın {{customerName}}, {{appointmentAt}} randevunuzu hatırlatırız. {{branchName}}' },
-    },
+    templates: {},
   },
   appointment_cancelled: {
-    kind: 'transactional',
-    channels: ['whatsapp', 'sms'],
+    channels: ['whatsapp'],
     variables: ['customerName', 'branchName', 'appointmentAt'],
-    templates: {
-      sms: { body: 'Sayın {{customerName}}, {{appointmentAt}} randevunuz iptal edilmiştir. {{branchName}}' },
-    },
+    templates: {},
   },
   no_show_followup: {
-    kind: 'transactional',
-    channels: ['whatsapp', 'sms'],
+    channels: ['whatsapp'],
     variables: ['customerName', 'branchName'],
-    templates: {
-      sms: {
-        body: 'Sayın {{customerName}}, randevunuza gelemediğinizi gördük. Yeni randevu için bize ulaşabilirsiniz. {{branchName}}',
-      },
-    },
+    templates: {},
   },
   package_balance: {
-    kind: 'transactional',
-    channels: ['whatsapp', 'sms'],
+    channels: ['whatsapp'],
     variables: ['customerName', 'packageName', 'remainingSessions'],
-    templates: {
-      sms: { body: 'Sayın {{customerName}}, {{packageName}} paketinizde {{remainingSessions}} seans kaldı.' },
-    },
+    templates: {},
   },
   package_expiring: {
-    kind: 'transactional',
-    channels: ['whatsapp', 'sms'],
+    channels: ['whatsapp'],
     variables: ['customerName', 'packageName', 'expiresAt', 'remainingSessions'],
-    templates: {
-      sms: {
-        body: 'Sayın {{customerName}}, {{packageName}} paketiniz {{expiresAt}} tarihinde sona eriyor ({{remainingSessions}} seans).',
-      },
-    },
-  },
-  // Doğum günü PAZARLAMA iletisidir: opt-out eden müşteriye gitmez.
-  birthday: {
-    kind: 'marketing',
-    channels: ['whatsapp', 'sms'],
-    variables: ['customerName', 'branchName'],
-    templates: {
-      sms: { body: 'Sayın {{customerName}}, doğum gününüzü kutlarız! {{branchName}}' },
-    },
+    templates: {},
   },
   // Gelen bir buton yanıtına ANINDA verilen cevap (8.3). Pencere açıktır
   // (müşteri az önce yazdı), bu yüzden serbest metin gider.
   auto_reply: {
-    kind: 'transactional',
-    channels: ['whatsapp', 'sms'],
+    channels: ['whatsapp'],
     variables: ['message'],
     templates: {
       whatsapp: { body: '{{message}}' },
-      sms: { body: '{{message}}' },
+    },
+  },
+  // Resepsiyonun sohbet ekranından elle yazdığı cevap. Kuyruktan GEÇMEZ —
+  // `ConversationsService` senkron gönderir; tanım yalnız kayıt ve tip
+  // bütünlüğü için var ve ayar ekranlarında listelenmez (`CONFIGURABLE_EVENTS`).
+  staff_reply: {
+    channels: ['whatsapp'],
+    variables: ['message'],
+    templates: {
+      whatsapp: { body: '{{message}}' },
     },
   },
   // Personele giden iç bildirim: sessiz saat UYGULANMAZ (bkz. dispatcher).
   // Alıcı müşteri değil, bu yüzden e-posta burada kalır.
   staff_internal: {
-    kind: 'transactional',
     channels: ['email'],
     variables: ['subject', 'message'],
     templates: {
@@ -123,13 +98,23 @@ export const EVENT_DEFINITIONS: Record<NotificationEvent, EventDefinition> = {
 export const ALL_EVENTS = Object.keys(EVENT_DEFINITIONS) as NotificationEvent[];
 
 /**
+ * Şablon ve tercih ekranlarında görünen olaylar.
+ *
+ * `staff_reply` dışarıda: metni resepsiyon her seferinde kendisi yazıyor,
+ * kanal tercihi de yok (sohbet WhatsApp'ta).
+ */
+export const CONFIGURABLE_EVENTS: NotificationEvent[] = ALL_EVENTS.filter(
+  (event) => event !== 'staff_reply',
+);
+
+/**
  * Kanal soyutlamasının tamamı — wire düzeyi küme.
  *
  * `email` burada duruyor çünkü `staff_internal` onu kullanıyor ve geçmiş
  * `message_log` satırları e-posta taşıyor; enum'dan çıkarmak eski günlüğü
  * çözülemez yapardı.
  */
-export const ALL_CHANNELS: NotificationChannel[] = ['whatsapp', 'sms', 'email', 'push'];
+export const ALL_CHANNELS: NotificationChannel[] = ['whatsapp', 'email', 'push'];
 
 /**
  * Müşteriye gidebilecek kanallar.
@@ -138,7 +123,7 @@ export const ALL_CHANNELS: NotificationChannel[] = ['whatsapp', 'sms', 'email', 
  * kümesi budur. `email` ve `push` dışarıda: birincisi ürün kararı (klinik
  * müşterisiyle yalnız WhatsApp yazışır), ikincisinin sağlayıcısı yok.
  */
-export const CUSTOMER_CHANNELS: NotificationChannel[] = ['whatsapp', 'sms'];
+export const CUSTOMER_CHANNELS: NotificationChannel[] = ['whatsapp'];
 
 /** Alıcısı personel olan olaylar — `CUSTOMER_CHANNELS` kısıtı bunlara UYGULANMAZ. */
 export const STAFF_EVENTS: NotificationEvent[] = ['staff_internal'];

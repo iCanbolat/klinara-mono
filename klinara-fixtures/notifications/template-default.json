@@ -1,19 +1,24 @@
 {
   "id": null,
   "event": "appointment_confirmation",
-  "channel": "sms",
+  "channel": "whatsapp",
   "locale": "tr",
-  "kind": "transactional",
   "subject": null,
-  "body": "Sayın {{customerName}}, {{appointmentAt}} randevunuz oluşturuldu. {{branchName}}",
-  "whatsappTemplateName": null,
-  "whatsappTemplateLanguage": null,
-  "whatsappVariables": [],
+  "body": "Merhaba {{customerName}}, {{appointmentAt}} tarihindeki {{serviceName}} randevunuz oluşturuldu. Sizi {{branchName}} şubemizde bekliyoruz.",
+  "whatsappTemplateName": "klinara_randevu_olusturuldu",
+  "whatsappTemplateLanguage": "tr",
+  "whatsappVariables": [
+    "customerName",
+    "appointmentAt",
+    "serviceName",
+    "branchName"
+  ],
   "isActive": true,
   "isDefault": true,
   "variables": [
     "customerName",
     "appointmentAt",
+    "serviceName",
     "branchName"
   ]
 }

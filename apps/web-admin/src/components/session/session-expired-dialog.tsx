@@ -8,6 +8,7 @@ import { t } from '@/i18n/tr';
 import { Alert } from '@/components/ui/alert';
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogHeader,
@@ -90,6 +91,7 @@ export function SessionExpiredDialog({
           <DialogDescription>{t('auth.expired.description')}</DialogDescription>
         </DialogHeader>
 
+        <DialogBody>
         <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-3">
           <Field
             label={t('auth.login.email')}
@@ -115,6 +117,7 @@ export function SessionExpiredDialog({
             {t('auth.expired.submit')}
           </Button>
         </form>
+        </DialogBody>
       </DialogContent>
     </Dialog>
   );

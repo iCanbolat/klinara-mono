@@ -131,6 +131,16 @@ describe('randevu formu durum makinesi', () => {
     expect(toCreateBody(state, BRANCH)?.notes).toBe('ilk seans');
   });
 
+  it('bildirim varsayılan açık ve gövdeye girmiyor; kapatınca `false` gider ve anahtar yenilenir', () => {
+    const state = filled();
+    expect(state.notifyCustomer).toBe(true);
+    expect(toCreateBody(state, BRANCH)).not.toHaveProperty('notifyCustomer');
+
+    const off = reduce(state, { type: 'notify', notifyCustomer: false });
+    expect(off.idempotencyKey).not.toBe(state.idempotencyKey);
+    expect(toCreateBody(off, BRANCH)?.notifyCustomer).toBe(false);
+  });
+
   it('gönderilemeyen formda gövde NULL', () => {
     // Kısmi gövde kurup sunucudan 400 beklemek yerine çağıranı düğmeyi
     // etkisiz tutmaya zorluyor.

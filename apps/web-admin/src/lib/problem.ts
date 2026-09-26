@@ -42,6 +42,14 @@ const MESSAGE_BY_CODE: Partial<Record<string, MessageKey>> = {
   [ERROR_CODES.BRANCH_FORBIDDEN]: 'error.branchForbidden',
   [ERROR_CODES.ROLE_ESCALATION]: 'error.roleEscalation',
   [ERROR_CODES.IDEMPOTENCY_CONFLICT]: 'error.idempotencyConflict',
+
+  // WhatsApp: sunucunun metni Meta'nın hata metnini taşıyabiliyor (İngilizce,
+  // teknik). Kullanıcıya kurtarma adımını söyleyen metin burada.
+  [ERROR_CODES.WHATSAPP_WINDOW_CLOSED]: 'error.whatsappWindowClosed',
+  [ERROR_CODES.WHATSAPP_NOT_CONFIGURED]: 'error.whatsappNotConfigured',
+  [ERROR_CODES.WHATSAPP_TEMPLATE_NOT_APPROVED]: 'error.whatsappTemplateNotApproved',
+  [ERROR_CODES.WHATSAPP_INVALID_RECIPIENT]: 'error.whatsappInvalidRecipient',
+  [ERROR_CODES.WHATSAPP_RATE_LIMITED]: 'error.whatsappRateLimited',
 };
 
 export function isProblem(value: unknown): value is ProblemDetails {

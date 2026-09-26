@@ -8,6 +8,7 @@ import type { Tx } from '../../database/tenant-tx';
 import { AppointmentsService } from '../booking/appointments.service';
 import * as pageRepo from '../booking-page/booking-page.repository';
 import { loadTenantDefaults, resolveSettings } from '../booking-page/booking-page.service';
+import { StaffNotificationsService } from '../notifications/staff-notifications.service';
 import { SlotTokenService } from './slot-token.service';
 import type { PublicSiteContext } from './public-site-resolver.service';
 
@@ -42,6 +43,7 @@ export class SelfServiceService {
     private readonly tx: TenantTxService,
     private readonly appointments: AppointmentsService,
     private readonly slotTokens: SlotTokenService,
+    private readonly staffNotifications: StaffNotificationsService,
   ) {}
 
   async view(
@@ -73,6 +75,7 @@ export class SelfServiceService {
     });
 
     await this.appointments.cancelUnauthorized(payload.row.appointmentId, reason);
+    await this.notifyStaff(site.tenantId, payload.row.appointmentId, 'appointment_cancelled');
     return this.view(site, token, now);
   }
 
@@ -105,7 +108,19 @@ export class SelfServiceService {
       claim.startsAt,
       'Müşteri self-servis ertelemesi',
     );
+    await this.notifyStaff(site.tenantId, payload.appointmentId, 'appointment_rescheduled');
     return this.view(site, token, now);
+  }
+
+  /** Müşterinin kendi yaptığı değişiklik panele düşer; personelinki düşmez. */
+  private async notifyStaff(
+    tenantId: string,
+    appointmentId: string,
+    kind: 'appointment_cancelled' | 'appointment_rescheduled',
+  ): Promise<void> {
+    await this.tx.run((tx) =>
+      this.staffNotifications.emitAppointmentEvent(tx, tenantId, appointmentId, kind),
+    );
   }
 
   /** Takvime ekle dosyası. Süreç içinde üretiliyor; bir kütüphane gerektirmiyor. */

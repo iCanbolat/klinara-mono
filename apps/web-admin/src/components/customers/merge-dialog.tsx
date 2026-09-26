@@ -10,6 +10,7 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -80,35 +81,37 @@ export function MergeDialog({
           <DialogDescription>{t('customers.merge.description')}</DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col gap-4">
-          <Alert tone="warn">
-            <strong>{survivor.fullName}</strong> hayatta kalır; aşağıda seçilen kayıt arşivlenir.
-          </Alert>
-
-          <CustomerPicker
-            value={source}
-            onSelect={setSource}
-            canCreate={false}
-            error={
-              source !== null && source.id === survivor.id
-                ? 'Bir kaydı kendisiyle birleştiremezsiniz.'
-                : undefined
-            }
-          />
-
-          <Field
-            label={t('customers.merge.confirmLabel')}
-            value={confirmation}
-            disabled={busy || source === null}
-            onChange={(event) => setConfirmation(event.target.value)}
-          />
-
-          {error !== null ? (
-            <Alert tone="danger">
-              <span role="alert">{error}</span>
+        <DialogBody className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4">
+            <Alert tone="warn">
+              <strong>{survivor.fullName}</strong> hayatta kalır; aşağıda seçilen kayıt arşivlenir.
             </Alert>
-          ) : null}
-        </div>
+
+            <CustomerPicker
+              value={source}
+              onSelect={setSource}
+              canCreate={false}
+              error={
+                source !== null && source.id === survivor.id
+                  ? 'Bir kaydı kendisiyle birleştiremezsiniz.'
+                  : undefined
+              }
+            />
+
+            <Field
+              label={t('customers.merge.confirmLabel')}
+              value={confirmation}
+              disabled={busy || source === null}
+              onChange={(event) => setConfirmation(event.target.value)}
+            />
+
+            {error !== null ? (
+              <Alert tone="danger">
+                <span role="alert">{error}</span>
+              </Alert>
+            ) : null}
+          </div>
+        </DialogBody>
 
         <DialogFooter>
           <Button type="button" variant="ghost" onClick={onClose} disabled={busy}>

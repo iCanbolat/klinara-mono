@@ -29,6 +29,10 @@ final class CustomerStore {
 
     private(set) var tagState: LoadState<[CustomerTag]> = .loading
 
+    /// Liste üstündeki özet şeridi. Süs niteliğinde: hata sessizce yutulur
+    /// ve şerit gizli kalır — listeyi okumayı engellememeli.
+    private(set) var summary: CustomerSummary?
+
     /// Liste ekranının etiket filtresi. `nil` = tüm müşteriler.
     ///
     /// Filtrelenmiş liste ``state``'e YAZILMAZ: ``customers`` randevu akışının
@@ -81,7 +85,15 @@ final class CustomerStore {
         }
     }
 
-    func reload() async { await load(force: true) }
+    func reload() async {
+        async let list: Void = load(force: true)
+        async let stats: Void = loadSummary()
+        _ = await (list, stats)
+    }
+
+    func loadSummary() async {
+        if let fresh = try? await service.summary() { summary = fresh }
+    }
 
     /// Sonraki sayfa. Cursor yoksa ya da bir sayfa zaten yolda ise hiçbir şey
     /// yapmaz — liste sonuna gelindiğinde görünen tetikleyici birden çok kez
@@ -217,6 +229,7 @@ final class CustomerStore {
             let created = try await service.create(input)
             // Sunucu listeyi en yeniden eskiye sıralıyor; yeni kayıt başa girer.
             state = .loaded([created] + customers)
+            Task { await loadSummary() }
             return created
         }
     }
@@ -235,6 +248,7 @@ final class CustomerStore {
         try await mutating {
             let archived = try await service.archive(id: id)
             remove(id)
+            Task { await loadSummary() }
             return archived
         }
     }

@@ -44,7 +44,6 @@ import com.klinara.android.features.customers.SelectableChip
 import com.klinara.android.services.auth.BranchSummary
 import com.klinara.android.services.formatting.ClockTime
 import com.klinara.android.services.networking.Loadable
-import com.klinara.android.services.notifications.NotificationKind
 import com.klinara.android.services.notifications.NotificationPreference
 import java.time.LocalTime
 
@@ -124,9 +123,6 @@ private fun PreferenceRow(
             verticalArrangement = Arrangement.spacedBy(KlinaraMetrics.xs),
         ) {
             Text(preference.event.turkishName, style = KlinaraType.bodyEmphasis, color = colors.charcoal)
-            if (preference.kind == NotificationKind.Marketing) {
-                KlinaraBadge("Pazarlama", tone = KlinaraBadgeTone.Warning)
-            }
             if (preference.isDefault) KlinaraBadge("Varsayılan", tone = KlinaraBadgeTone.Muted)
         }
         // Boş kanal listesi "olay kapalı" — bunu bir tireyle geçmek kapalıyı açık sandırırdı.
@@ -173,8 +169,6 @@ fun NotificationPreferenceEditorScreen(
                 footnote = "Şubeye özel bir satır, kiracı varsayılanını yalnız o şubede ezer.",
             ) {
                 KlinaraRow(label = "Olay", value = preference.event.turkishName, detail = preference.event.explanation)
-                KlinaraDivider()
-                KlinaraRow(label = "Tür", value = preference.kind.turkishName, detail = preference.kind.explanation)
                 if (branch != null && canWrite) {
                     KlinaraDivider()
                     KlinaraSegmentedPicker(

@@ -212,6 +212,34 @@ final class MockBookingService: BookingService, @unchecked Sendable {
 
     // MARK: - Uygunluk
 
+    func availabilityDays(branchId: String, from: Date, to: Date) async throws -> AvailabilityDaysResponse {
+        await latency(0.15)
+        let clock = BranchClock(timeZoneIdentifier: MockBookingSeed.timezone)
+        let now = Date()
+        var days: [AvailabilityDay] = []
+        var day = clock.startOfDay(from)
+        while day < to {
+            let windows = openWindows(on: day, branchId: branchId, clock: clock)
+            let status: AvailabilityDay.Status
+            if let last = windows.last, last.end <= now {
+                status = .past
+            } else if windows.isEmpty {
+                status = clock.adding(days: 1, to: day) <= now ? .past : .closed
+            } else {
+                status = .open
+            }
+            days.append(AvailabilityDay(
+                date: clock.localDateString(day),
+                status: status,
+                holidayName: nil,
+                opensAt: status == .open ? windows.first.map { clock.formatTime($0.start) } : nil,
+                closesAt: status == .open ? windows.last.map { clock.formatTime($0.end) } : nil
+            ))
+            day = clock.adding(days: 1, to: day)
+        }
+        return AvailabilityDaysResponse(branchId: branchId, timezone: MockBookingSeed.timezone, days: days)
+    }
+
     func availability(_ query: AvailabilityQuery) async throws -> AvailabilityResponse {
         await latency(0.35)
         let clock = BranchClock(timeZoneIdentifier: MockBookingSeed.timezone)
@@ -239,8 +267,16 @@ final class MockBookingService: BookingService, @unchecked Sendable {
         var slots: [AvailabilitySlot] = []
 
         var day = clock.startOfDay(query.from)
+        var days: [AvailabilityDay] = []
         while day < query.to {
             let windows = openWindows(on: day, branchId: query.branchId, clock: clock)
+            days.append(AvailabilityDay(
+                date: clock.localDateString(day),
+                status: windows.isEmpty ? .closed : .open,
+                holidayName: nil,
+                opensAt: windows.first.map { clock.formatTime($0.start) },
+                closesAt: windows.last.map { clock.formatTime($0.end) }
+            ))
             for window in windows {
                 // Izgara GÖRÜNEN başlangıç üzerinde ilerler; kullanıcıya
                 // gösterilen ve sunucuya gönderilen saat budur.
@@ -284,6 +320,7 @@ final class MockBookingService: BookingService, @unchecked Sendable {
             branchId: query.branchId,
             timezone: MockBookingSeed.timezone,
             slotGranularityMinutes: step,
+            days: days,
             slots: slots.sorted { $0.startsAt < $1.startsAt }
         )
     }
@@ -409,7 +446,7 @@ final class MockBookingService: BookingService, @unchecked Sendable {
         }
     }
 
-    func cancel(id: String, reason: String?) async throws -> Appointment {
+    func cancel(id: String, reason: String?, notifyCustomer: Bool) async throws -> Appointment {
         await latency()
         return try withLock {
             let old = try record(id)

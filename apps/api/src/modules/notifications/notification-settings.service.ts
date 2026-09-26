@@ -8,12 +8,13 @@ import type { NotificationChannel } from '../../database/schema';
 import { BranchAccessService } from '../tenancy/branch-access.service';
 import type { Principal } from '../identity/principal';
 import {
-  ALL_EVENTS,
+  CONFIGURABLE_EVENTS,
   CUSTOMER_CHANNELS,
   EVENT_DEFINITIONS,
   isCustomerEvent,
 } from './default-templates';
 import * as repo from './notifications.repository';
+import { STANDARD_TEMPLATE_BY_EVENT } from '../integrations/whatsapp-standard-templates';
 import { templateVariables } from './template-renderer';
 import type {
   NotificationPreferenceResponseDto,
@@ -43,22 +44,37 @@ export class NotificationSettingsService {
     const byKey = new Map(rows.map((row) => [`${row.event}:${row.channel}:${row.locale}`, row]));
 
     const result: NotificationTemplateResponseDto[] = [];
-    for (const event of ALL_EVENTS) {
+    for (const event of CONFIGURABLE_EVENTS) {
       const definition = EVENT_DEFINITIONS[event];
-      for (const channel of Object.keys(definition.templates) as NotificationChannel[]) {
+      // Standart WhatsApp template'i olan olayda WhatsApp satırı da listelenir:
+      // eşleme kodda varsayılan olarak duruyor ve kiracı onu burada görmeli.
+      const standard = STANDARD_TEMPLATE_BY_EVENT.get(event);
+      const channels = new Set(Object.keys(definition.templates) as NotificationChannel[]);
+      if (standard !== undefined) channels.add('whatsapp');
+
+      for (const channel of channels) {
         const override = byKey.get(`${event}:${channel}:tr`);
-        const fallback = definition.templates[channel];
+        const standardFor = channel === 'whatsapp' ? standard : undefined;
+        const fallback =
+          definition.templates[channel] ??
+          (standardFor?.body === undefined ? undefined : { body: standardFor.body });
+        const overridesMapping = override?.whatsappTemplateName != null;
         result.push({
           id: override?.id ?? null,
           event,
           channel,
           locale: 'tr',
-          kind: definition.kind,
           subject: override?.subject ?? fallback?.subject ?? null,
           body: override?.body ?? fallback?.body ?? '',
-          whatsappTemplateName: override?.whatsappTemplateName ?? null,
-          whatsappTemplateLanguage: override?.whatsappTemplateLanguage ?? null,
-          whatsappVariables: override?.whatsappVariables ?? [],
+          whatsappTemplateName: overridesMapping
+            ? (override?.whatsappTemplateName ?? null)
+            : (standardFor?.name ?? null),
+          whatsappTemplateLanguage: overridesMapping
+            ? (override?.whatsappTemplateLanguage ?? null)
+            : (standardFor?.language ?? null),
+          whatsappVariables: overridesMapping
+            ? (override?.whatsappVariables ?? [])
+            : (standardFor?.variables ?? []),
           isActive: override?.isActive ?? true,
           isDefault: override === undefined,
           variables: templateVariables(override?.body ?? fallback?.body ?? ''),
@@ -69,10 +85,11 @@ export class NotificationSettingsService {
     // Kiracının varsayılanı olmayan bir kanal için yazdığı şablon (ör. WhatsApp)
     // listede kaybolmamalı.
     for (const row of rows) {
-      // Geçmişte yazılmış e-posta şablonları geri gelmesin: kanal artık
-      // müşteriye kapalı ve düzenlenemeyen bir satır göstermek, kullanıcıya
-      // yürürlükte olmayan bir metni yürürlükteymiş gibi okutmak olurdu.
-      if (row.channel === 'email' && isCustomerEvent(row.event)) continue;
+      // Geçmişte yazılmış e-posta ve SMS şablonları geri gelmesin: kanallar
+      // artık müşteriye kapalı ve düzenlenemeyen bir satır göstermek,
+      // kullanıcıya yürürlükte olmayan bir metni yürürlükteymiş gibi okutmak
+      // olurdu. (DB enum'u `sms`'i geçmiş için taşıyor, tip taşımıyor.)
+      if (isCustomerEvent(row.event) && !CUSTOMER_CHANNELS.includes(row.channel)) continue;
       const known = result.some(
         (item) => item.event === row.event && item.channel === row.channel && item.id !== null,
       );
@@ -82,7 +99,6 @@ export class NotificationSettingsService {
         event: row.event,
         channel: row.channel,
         locale: row.locale,
-        kind: EVENT_DEFINITIONS[row.event].kind,
         subject: row.subject,
         body: row.body,
         whatsappTemplateName: row.whatsappTemplateName,
@@ -160,7 +176,6 @@ export class NotificationSettingsService {
       event: row.event,
       channel: row.channel,
       locale: row.locale,
-      kind: EVENT_DEFINITIONS[row.event].kind,
       subject: row.subject,
       body: row.body,
       whatsappTemplateName: row.whatsappTemplateName,
@@ -177,11 +192,10 @@ export class NotificationSettingsService {
     const stored = rows.map((row) => this.toPreferenceResponse(row));
 
     const covered = new Set(rows.filter((row) => row.branchId === null).map((row) => row.event));
-    const defaults = ALL_EVENTS.filter((event) => !covered.has(event)).map((event) => ({
+    const defaults = CONFIGURABLE_EVENTS.filter((event) => !covered.has(event)).map((event) => ({
       id: null,
       branchId: null,
       event,
-      kind: EVENT_DEFINITIONS[event].kind,
       channels: EVENT_DEFINITIONS[event].channels,
       quietHoursStart: this.defaultQuietHours().start,
       quietHoursEnd: this.defaultQuietHours().end,
@@ -240,7 +254,6 @@ export class NotificationSettingsService {
       id: row.id,
       branchId: row.branchId,
       event: row.event,
-      kind: EVENT_DEFINITIONS[row.event].kind,
       channels: row.channels,
       quietHoursStart: start,
       quietHoursEnd: end,

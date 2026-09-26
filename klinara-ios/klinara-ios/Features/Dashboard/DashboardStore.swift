@@ -19,6 +19,12 @@ final class DashboardStore {
 
     nonisolated struct Snapshot: Sendable {
         let summaries: [BranchDashboardSummary]
+        /// Tüm şubelerde tarihi en yakın randevular — bugünle sınırlı değil.
+        let upcoming: [UpcomingItem]
+        /// Listenin ötesinde de bekleyen randevu var; "Tümünü takvimde gör".
+        let upcomingHasMore: Bool
+        /// Verinin çekildiği an; "Bugün/Yarın" etiketleri buna göre.
+        let fetchedAt: Date
         let totals: DashboardTotals
         let occupancyDelta: Double?
         let revenueDelta: Double?
@@ -93,6 +99,44 @@ final class DashboardStore {
             }
         }
 
+        // Sıradaki randevular gün isteğinden AYRI: gün yalnız bugünü taşıyor,
+        // kart ise tarihi en yakın N randevuyu istiyor (bkz. `mergeUpcoming`).
+        var upcomingLists: [String: [CalendarEntry]] = [:]
+        var upcomingHasMore = false
+        if access.calendar {
+            let horizon = at.addingTimeInterval(TimeInterval(DashboardSummaries.upcomingHorizonDays) * 86_400)
+            await withTaskGroup(of: (String, Result<Page<CalendarEntry>, APIError>).self) { group in
+                for branch in active {
+                    let id = branch.id
+                    group.addTask {
+                        do {
+                            let page = try await booking.appointments(
+                                AppointmentListQuery(
+                                    branchId: id,
+                                    from: at,
+                                    to: horizon,
+                                    status: DashboardSummaries.upcomingStatuses,
+                                    limit: DashboardSummaries.upcomingLimit
+                                )
+                            )
+                            return (id, .success(page))
+                        } catch {
+                            return (id, .failure(error as? APIError ?? .network))
+                        }
+                    }
+                }
+                for await (id, result) in group {
+                    switch result {
+                    case .success(let page):
+                        upcomingLists[id] = page.data
+                        upcomingHasMore = upcomingHasMore || page.pageInfo.hasMore
+                    case .failure(let error):
+                        calendarError = calendarError ?? error
+                    }
+                }
+            }
+        }
+
         // Ay sınırı ilk şubenin saatinde — web de tek bir "bu ay" aralığı gönderiyor.
         let clock = BranchClock(branch: active.first)
         let from = clock.startOfMonth(at)
@@ -131,11 +175,15 @@ final class DashboardStore {
             days: days,
             occupancy: occupancyResult.value,
             revenue: revenueResult.value,
-            noShow: noShowResult.value,
-            now: at
+            noShow: noShowResult.value
         )
+        let upcoming = DashboardSummaries.mergeUpcoming(branches: active, lists: upcomingLists, now: at)
+        let upcomingTotal = upcomingLists.values.reduce(0) { $0 + $1.count }
         snapshot = Snapshot(
             summaries: summaries,
+            upcoming: upcoming,
+            upcomingHasMore: upcomingHasMore || upcomingTotal > upcoming.count,
+            fetchedAt: at,
             totals: DashboardSummaries.totals(
                 summaries,
                 occupancy: occupancyResult.value,

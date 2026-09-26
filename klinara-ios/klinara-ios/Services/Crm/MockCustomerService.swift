@@ -100,6 +100,21 @@ final class MockCustomerService: CustomerService, @unchecked Sendable {
         }
     }
 
+    /// Mock'ta randevu geçmişi yok: aktif/geri kazanılacak sabit, gerçekçi bir
+    /// dağılımdan türetiliyor; toplam ve yeni kayıt ise kayıtlardan sayılıyor.
+    func summary() async throws -> CustomerSummary {
+        await latency(0.2)
+        let cutoff = MockNow.reference.addingTimeInterval(-30 * 86_400)
+        return withLock {
+            CustomerSummary(
+                total: records.count,
+                newLast30Days: records.filter { $0.createdAt >= cutoff }.count,
+                activeLast90Days: records.count * 3 / 5,
+                lapsed: records.count / 5
+            )
+        }
+    }
+
     func customer(id: String) async throws -> Customer {
         await latency(0.2)
         return try withLock {

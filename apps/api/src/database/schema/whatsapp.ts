@@ -22,7 +22,7 @@ export const whatsappAccounts = pgTable(
     accessTokenEncrypted: text('access_token_encrypted').notNull(),
     /** Webhook imzası (8.3) bu sırla doğrulanır. */
     appSecretEncrypted: text('app_secret_encrypted'),
-    apiVersion: text('api_version').notNull().default('v21.0'),
+    apiVersion: text('api_version').notNull().default('v26.0'),
     status: text('status').$type<WhatsAppAccountStatus>().notNull().default('unconfigured'),
     lastVerifiedAt: timestamp('last_verified_at', { withTimezone: true }),
     lastError: text('last_error'),
@@ -44,6 +44,8 @@ export const whatsappTemplates = pgTable(
     category: text('category'),
     status: text('status').$type<WhatsAppTemplateStatus>().notNull().default('pending'),
     bodyVariableCount: integer('body_variable_count').notNull().default(0),
+    /** Meta'daki BODY metni, `{{1}}` yer tutucularıyla (0049). */
+    bodyText: text('body_text'),
     buttons: jsonb('buttons').$type<WhatsAppTemplateButton[]>().notNull().default([]),
     syncedAt: timestamp('synced_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

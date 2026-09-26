@@ -26,6 +26,8 @@ data class BookingDraft(
     val staffProfileId: String? = null,
     val slot: AvailabilitySlot? = null,
     val notes: String = "",
+    /** Yeni randevuda müşteriye onay mesajı gitsin mi — varsayılan evet. */
+    val notifyCustomer: Boolean = true,
     val reason: String = "",
     /** `serviceId` → `customerPackageItemId` (A5.2'de gerçek seçim gelir). */
     val packageItemIds: Map<String, String> = emptyMap(),
@@ -40,6 +42,28 @@ data class BookingDraft(
 
     val isValid: Boolean
         get() = customerId != null && serviceIds.isNotEmpty() && slot != null && staffProfileId != null
+
+    /**
+     * Kaydetmek için eksik kalan adımlar, form sırasıyla. Pasif "Oluştur" düğmesi tek
+     * başına NEDEN pasif olduğunu söylemiyor; kullanıcı müşteriyi seçip düğmeye basıyor
+     * ve hiçbir şey olmuyor. Bu liste düğmenin altında gösteriliyor.
+     */
+    val missingSteps: List<String>
+        get() =
+            buildList {
+                if (customerId == null) add("müşteri")
+                if (serviceIds.isEmpty()) add("hizmet")
+                if (slot == null || staffProfileId == null) add("saat")
+            }
+
+    /** "Devam etmek için hizmet ve saat seçin." — eksik yoksa `null`. */
+    val missingStepsHint: String?
+        get() {
+            val last = missingSteps.lastOrNull() ?: return null
+            val head = missingSteps.dropLast(1)
+            val list = if (head.isEmpty()) last else "${head.joinToString(", ")} ve $last"
+            return "Devam etmek için $list seçin."
+        }
 
     // --- Yan etkileri olan mutasyonlar ---
 
@@ -67,6 +91,9 @@ data class BookingDraft(
      */
     fun selectCustomer(id: String): BookingDraft =
         if (customerId == id) this else copy(customerId = id, packageItemIds = emptyMap())
+
+    /** "Değiştir": seçim bırakılır, paket bağları da (müşteriye özeldir). */
+    fun clearCustomer(): BookingDraft = copy(customerId = null, packageItemIds = emptyMap())
 
     /** Personel değişince slot düşer — o personelin uygunluğu farklı. */
     fun selectStaff(id: String?): BookingDraft = copy(staffProfileId = id, slot = null)
@@ -118,6 +145,7 @@ data class BookingDraft(
             startsAt = clock.wireValue(picked.startsAt),
             services = serviceIds.map { AppointmentServiceInput(it, staff, packageItemIds[it]) },
             notes = notes.trim().takeIf { it.isNotEmpty() },
+            notifyCustomer = notifyCustomer.takeIf { !it },
         )
     }
 

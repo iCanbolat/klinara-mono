@@ -6,6 +6,7 @@ import { WhatsAppService } from './whatsapp.service';
 import {
   UpsertWhatsAppAccountDto,
   WhatsAppAccountResponseDto,
+  WhatsAppProvisionResultDto,
   WhatsAppTemplateResponseDto,
   WhatsAppTestResultDto,
   WhatsAppTestSendDto,
@@ -61,6 +62,20 @@ export class WhatsAppController {
   @ApiOkResponse({ type: [WhatsAppTemplateResponseDto] })
   templates(): Promise<WhatsAppTemplateResponseDto[]> {
     return this.whatsapp.listTemplates();
+  }
+
+  @Post('templates/provision')
+  @RequirePermission(PERMISSIONS.NOTIFICATION_MANAGE)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Klinara'nın standart template setini WABA'ya yaz",
+    description:
+      'Eksik template’ler Meta’da oluşturulur ve onaya düşer; mevcut olanlara dokunulmaz. ' +
+      'İdempotenttir — tekrar çağrılabilir.',
+  })
+  @ApiOkResponse({ type: WhatsAppProvisionResultDto })
+  provision(): Promise<WhatsAppProvisionResultDto> {
+    return this.whatsapp.provisionTemplates();
   }
 
   @Post('test')

@@ -24,7 +24,6 @@ extension Fixtures {
       "event": "appointment_reminder",
       "channel": "whatsapp",
       "locale": "tr",
-      "kind": "transactional",
       "subject": null,
       "body": "Sayın {{customerName}}, {{appointmentAt}} randevunuzu hatırlatırız.",
       "whatsappTemplateName": "randevu_hatirlatma",
@@ -49,9 +48,8 @@ extension Fixtures {
     {
       "id": null,
       "event": "appointment_confirmation",
-      "channel": "sms",
+      "channel": "whatsapp",
       "locale": "tr",
-      "kind": "transactional",
       "subject": null,
       "body": "Sayın {{customerName}}, {{appointmentAt}} randevunuz oluşturuldu. {{branchName}}",
       "whatsappTemplateName": null,
@@ -79,7 +77,6 @@ extension Fixtures {
       "event": "appointment_confirmation",
       "channel": "email",
       "locale": "tr",
-      "kind": "transactional",
       "subject": "Randevunuz oluşturuldu",
       "body": "Sayın {{customerName}},\\n\\n{{appointmentAt}} tarihindeki {{serviceName}} randevunuz oluşturuldu.\\n\\n{{branchName}}",
       "whatsappTemplateName": null,
@@ -103,11 +100,8 @@ extension Fixtures {
       "id": null,
       "branchId": null,
       "event": "appointment_cancelled",
-      "kind": "transactional",
       "channels": [
-        "whatsapp",
-        "sms",
-        "email"
+        "whatsapp"
       ],
       "quietHoursStart": "21:00",
       "quietHoursEnd": "09:00",
@@ -122,10 +116,8 @@ extension Fixtures {
       "id": "5c11e229-1a38-425a-92a2-aee85bb7427f",
       "branchId": null,
       "event": "appointment_reminder",
-      "kind": "transactional",
       "channels": [
-        "whatsapp",
-        "sms"
+        "whatsapp"
       ],
       "quietHoursStart": "22:00",
       "quietHoursEnd": "08:00",
@@ -194,7 +186,7 @@ extension Fixtures {
           "id": "cde431f8-13be-4a88-9303-dd27b369f570",
           "customerId": "070b8993-8adf-44ab-852d-123b5e72dcc2",
           "userId": null,
-          "channel": "sms",
+          "channel": "whatsapp",
           "event": "appointment_reminder",
           "status": "queued",
           "to": "+90********67",
@@ -215,19 +207,6 @@ extension Fixtures {
     }
     """
 
-    /// `POST /customers/:id/opt-out` → 201. `channel: null` TÜM kanallar
-    /// demek; `kind` sunucuda sabit `marketing`.
-    static let optOutRecord = """
-    {
-      "id": "0cc636e1-59e6-4cb1-b215-c5a7dbd082d6",
-      "customerId": "070b8993-8adf-44ab-852d-123b5e72dcc2",
-      "channel": null,
-      "kind": "marketing",
-      "source": "customer_request",
-      "createdAt": "2026-08-28T22:36:45.328Z"
-    }
-    """
-
     /// `GET /integrations/whatsapp` — doğrulanmış hesap. Ham token yanıtta
     /// YOK; yalnız maskeli hâli var.
     static let whatsappAccountActive = """
@@ -235,7 +214,7 @@ extension Fixtures {
       "wabaId": "1029384756",
       "phoneNumberId": "5647382910",
       "businessPhone": "+902121234567",
-      "apiVersion": "v21.0",
+      "apiVersion": "v26.0",
       "status": "active",
       "accessTokenMasked": "••••••••a91f",
       "hasAppSecret": true,

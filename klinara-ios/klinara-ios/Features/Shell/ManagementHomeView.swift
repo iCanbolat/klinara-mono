@@ -9,6 +9,9 @@ struct ManagementHomeView: View {
 
     let session: AppSession
 
+    /// Sohbetler satırındaki rozet; hub'a her dönüşte tazelenir.
+    @State private var unreadConversations: Int?
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -32,7 +35,8 @@ struct ManagementHomeView: View {
                     }
                     if session.canAny(
                         Permissions.notificationRead,
-                        Permissions.notificationManage
+                        Permissions.notificationManage,
+                        Permissions.notificationSend
                     ) {
                         communicationCard
                     }
@@ -51,13 +55,21 @@ struct ManagementHomeView: View {
             .background(KlinaraColor.surface)
             .navigationTitle("Yönetim")
             .navigationBarTitleDisplayMode(.inline)
+            .task { await loadUnreadConversations() }
             .toolbar {
+                RootToolbarTitle(title: "Yönetim")
                 ToolbarItem(placement: .topBarTrailing) {
                     BranchMenu(session: session)
                 }
             }
         }
         .tint(KlinaraColor.sage)
+    }
+
+    private func loadUnreadConversations() async {
+        guard session.can(Permissions.notificationSend) else { return }
+        // Rozet süs: hata sessizce yutulur, satır rozetsiz kalır.
+        unreadConversations = try? await session.services.conversations.unreadCount()
     }
 
     private var header: some View {
@@ -168,14 +180,21 @@ struct ManagementHomeView: View {
     /// İletişim ayrı bir kart, kasa gibi: gelen kutusu günlük bir resepsiyon
     /// işi ama sekme kümesi Faz 3'te donduruldu ve bilgi mimarisini her fazda
     /// yeniden kurmak kullanıcının kas hafızasını sıfırlamak demek.
-    ///
-    /// Dipnot Ek M'in en çok yanlış anlaşılan kararını görünür kılıyor:
-    /// işlemsel/pazarlama ayrımı olayın tanımında, kiracı ayarında değil.
     private var communicationCard: some View {
-        KlinaraCard(
-            title: "İletişim",
-            footnote: "Randevu hatırlatması ticari ileti değildir; iletişim izni iptali yalnız pazarlama mesajlarını durdurur."
-        ) {
+        KlinaraCard(title: "İletişim") {
+            if session.can(Permissions.notificationSend) {
+                KlinaraNavigationRow(
+                    label: "Sohbetler",
+                    value: unreadConversations.flatMap { $0 > 0 ? "\($0) okunmamış" : nil },
+                    detail: "Müşterilerle WhatsApp yazışmaları",
+                    icon: "bubble.left.and.bubble.right"
+                ) {
+                    ConversationListView(session: session)
+                }
+                if session.canAny(Permissions.notificationRead, Permissions.notificationManage) {
+                    KlinaraDivider()
+                }
+            }
             if session.can(Permissions.notificationRead) {
                 KlinaraNavigationRow(
                     label: "Gelen kutusu",

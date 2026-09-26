@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useMemo, type ReactNode } from 'react';
 import { Building2, CalendarCheck, RefreshCw, TrendingUp, UserX, Wallet } from 'lucide-react';
-import { PERMISSIONS, isAppointmentStatus, type CalendarEntry } from '@klinara/shared';
+import { PERMISSIONS, isAppointmentStatus } from '@klinara/shared';
 import { t } from '@/i18n/tr';
 import { cn } from '@/lib/cn';
 import { formatTime } from '@/lib/calendar/date';
@@ -12,6 +12,7 @@ import {
   availableBranchMetrics,
   branchChartRows,
   topStaffByRevenue,
+  upcomingDayLabel,
 } from '@/lib/dashboard/summary';
 import { formatDelta, formatMoney, formatNumber, formatPercent } from '@/lib/reports/format';
 import { useSession } from '@/components/session/session-provider';
@@ -229,13 +230,6 @@ function BranchesSection({ state }: { state: State }): ReactNode {
   );
 }
 
-interface UpcomingRow {
-  entry: CalendarEntry;
-  branchId: string;
-  branchName: string;
-  timezone: string;
-}
-
 function UpcomingCard({
   state,
   className,
@@ -246,24 +240,9 @@ function UpcomingCard({
   const router = useRouter();
   const { setBranchId } = useBranch();
   const multiBranch = state.summaries.length > 1;
-
-  // Tüm şubelerin sıradaki randevuları TEK listede: çok şubeli bir klinikte
-  // yönetici "sıradaki kim" sorusunu şube şube sormuyor.
-  const upcoming = useMemo<UpcomingRow[]>(
-    () =>
-      state.summaries
-        .flatMap((summary) =>
-          (summary.today?.upcoming ?? []).map((entry) => ({
-            entry,
-            branchId: summary.branch.id,
-            branchName: summary.branch.name,
-            timezone: summary.timezone,
-          })),
-        )
-        .sort((a, b) => Date.parse(a.entry.startsAt) - Date.parse(b.entry.startsAt))
-        .slice(0, 8),
-    [state.summaries],
-  );
+  // Tüm şubelerin sıradaki randevuları TEK listede (bkz. `mergeUpcoming`):
+  // çok şubeli bir klinikte yönetici "sıradaki kim" sorusunu şube şube sormuyor.
+  const { upcoming, fetchedAt } = state;
 
   return (
     <Card className={cn('flex h-[420px] flex-col gap-3', className)}>
@@ -293,8 +272,15 @@ function UpcomingCard({
                   }}
                   className="grid w-full grid-cols-[3.5rem_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-1 py-2.5 text-left transition-colors hover:bg-accent/50"
                 >
-                  <span className="text-sm font-semibold tabular-nums">
-                    {formatTime(row.entry.startsAt, row.timezone)}
+                  <span className="flex flex-col">
+                    <span className="text-sm font-semibold tabular-nums">
+                      {formatTime(row.entry.startsAt, row.timezone)}
+                    </span>
+                    <span className="truncate text-xs text-muted-foreground">
+                      {fetchedAt === null
+                        ? null
+                        : upcomingDayLabel(row.entry.startsAt, row.timezone, fetchedAt)}
+                    </span>
                   </span>
                   <span className="flex min-w-0 flex-col">
                     <span className="truncate font-medium">{row.entry.customerName}</span>

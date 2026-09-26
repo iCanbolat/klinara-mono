@@ -5,6 +5,8 @@ import type {
   WhatsAppClient,
   WhatsAppCredentials,
   WhatsAppSendResult,
+  WhatsAppTemplateCreated,
+  WhatsAppTemplateDraft,
   WhatsAppTemplateInfo,
   WhatsAppTemplateMessage,
   WhatsAppTextMessage,
@@ -16,6 +18,11 @@ interface GraphError {
 
 interface GraphSendResponse {
   messages?: { id?: string }[];
+}
+
+interface GraphTemplateCreateResponse {
+  id?: string;
+  status?: string;
 }
 
 interface GraphTemplateResponse {
@@ -91,6 +98,16 @@ export class GraphWhatsAppClient implements WhatsAppClient {
         parameters: [{ type: 'payload', payload }],
       });
     });
+    if (message.copyCode !== undefined) {
+      // Kimlik doğrulama template'inin kopyalama butonu Meta'da bir URL
+      // butonu olarak modellenmiş; parametresi kodun kendisi.
+      components.push({
+        type: 'button',
+        sub_type: 'url',
+        index: '0',
+        parameters: [{ type: 'text', text: message.copyCode }],
+      });
+    }
 
     const response = await this.post<GraphSendResponse>(credentials, {
       messaging_product: 'whatsapp',
@@ -138,12 +155,74 @@ export class GraphWhatsAppClient implements WhatsAppClient {
         category: row.category ?? null,
         status: GraphWhatsAppClient.templateStatus(row.status),
         bodyVariableCount: GraphWhatsAppClient.countVariables(body?.text ?? ''),
+        bodyText: body?.text ?? null,
         buttons: (buttons?.buttons ?? []).map((button) => ({
           type: button.type ?? 'QUICK_REPLY',
           text: button.text ?? '',
         })),
       };
     });
+  }
+
+  async createTemplate(
+    credentials: WhatsAppCredentials,
+    wabaId: string,
+    draft: WhatsAppTemplateDraft,
+  ): Promise<WhatsAppTemplateCreated> {
+    const url = `${this.config.baseUrl}/${credentials.apiVersion}/${wabaId}/message_templates`;
+    const response = await this.request<GraphTemplateCreateResponse>(url, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${credentials.accessToken}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: draft.name,
+        language: draft.language,
+        category: draft.category,
+        components: GraphWhatsAppClient.componentsOf(draft),
+      }),
+    });
+    return {
+      id: response.id ?? null,
+      status: GraphWhatsAppClient.templateStatus(response.status),
+    };
+  }
+
+  async subscribeApp(credentials: WhatsAppCredentials, wabaId: string): Promise<void> {
+    const url = `${this.config.baseUrl}/${credentials.apiVersion}/${wabaId}/subscribed_apps`;
+    await this.request<unknown>(url, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${credentials.accessToken}` },
+    });
+  }
+
+  /** Taslak → Meta bileşen dizisi. AUTHENTICATION'ın biçimi ötekilerden farklı. */
+  private static componentsOf(draft: WhatsAppTemplateDraft): unknown[] {
+    if (draft.category === 'AUTHENTICATION') {
+      return [
+        { type: 'BODY', add_security_recommendation: true },
+        { type: 'FOOTER', code_expiration_minutes: draft.codeExpirationMinutes ?? 10 },
+        { type: 'BUTTONS', buttons: [{ type: 'OTP', otp_type: 'COPY_CODE', text: 'Kodu kopyala' }] },
+      ];
+    }
+
+    const components: unknown[] = [
+      {
+        type: 'BODY',
+        text: draft.body ?? '',
+        ...(draft.bodyExamples !== undefined && draft.bodyExamples.length > 0
+          ? { example: { body_text: [draft.bodyExamples] } }
+          : {}),
+      },
+    ];
+    if (draft.quickReplies !== undefined && draft.quickReplies.length > 0) {
+      components.push({
+        type: 'BUTTONS',
+        buttons: draft.quickReplies.map((text) => ({ type: 'QUICK_REPLY', text })),
+      });
+    }
+    return components;
   }
 
   private post<T>(credentials: WhatsAppCredentials, body: unknown): Promise<T> {

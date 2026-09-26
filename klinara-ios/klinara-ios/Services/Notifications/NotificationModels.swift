@@ -4,7 +4,7 @@ import Foundation
 // `apps/api/src/modules/notifications/default-templates.ts`.
 //
 // Faz 8'in tek giriş noktası kararı (Ek M) istemciyi de biçimlendiriyor: ekranlar
-// "şu olay, şu kanal, şu metin" der; opt-out, sessiz saat ve kanal seçimi
+// "şu olay, şu kanal, şu metin" der; sessiz saat ve kanal seçimi
 // sunucudaki `NotificationDispatcherService`te uygulanır. Burada yalnız o
 // ayarların **yönetimi** modellenir, gönderim mantığı değil.
 
@@ -12,8 +12,9 @@ import Foundation
 
 /// Bildirim olayı.
 ///
-/// **Açık** küme: sunucu yeni bir olay tanımladığında (doğum günü süpürücüsü,
-/// paket bakiyesi…) eski bir istemci mesaj günlüğünü çözemeyip patlamamalı.
+/// **Açık** küme: sunucu yeni bir olay tanımladığında eski bir istemci mesaj
+/// günlüğünü çözemeyip patlamamalı. Kaldırılmış olayların geçmiş satırları da
+/// (ör. doğum günü) buraya düşer.
 /// Form içinde seçilen kapalı kümelerden farkı bu:
 /// olay listesi sunucudan gelen bir veriyi **okur**, kullanıcı onu üretmez.
 nonisolated enum NotificationEvent: String, Codable, Sendable, CaseIterable, Identifiable {
@@ -23,7 +24,6 @@ nonisolated enum NotificationEvent: String, Codable, Sendable, CaseIterable, Ide
     case noShowFollowup = "no_show_followup"
     case packageBalance = "package_balance"
     case packageExpiring = "package_expiring"
-    case birthday
     case autoReply = "auto_reply"
     case staffInternal = "staff_internal"
     case unknown = "UNKNOWN"
@@ -46,7 +46,6 @@ nonisolated enum NotificationEvent: String, Codable, Sendable, CaseIterable, Ide
         case .noShowFollowup: return "Gelmedi takibi"
         case .packageBalance: return "Paket bakiyesi"
         case .packageExpiring: return "Paket süre dolumu"
-        case .birthday: return "Doğum günü"
         case .autoReply: return "Otomatik yanıt"
         case .staffInternal: return "Personel bildirimi"
         case .unknown: return "Bilinmeyen olay"
@@ -61,7 +60,6 @@ nonisolated enum NotificationEvent: String, Codable, Sendable, CaseIterable, Ide
         case .noShowFollowup: return "Müşteri gelmediğinde, ayarlanan gecikmeden sonra gider."
         case .packageBalance: return "Paket hakkı azaldığında müşteriye gider."
         case .packageExpiring: return "Paketin süresi dolmadan önce müşteriye gider."
-        case .birthday: return "Doğum gününde gider. Tek pazarlama olayı: iletişim izni iptalinden etkilenir."
         case .autoReply: return "Müşterinin WhatsApp yanıtına verilen otomatik karşılık."
         case .staffInternal: return "Müşteriye değil, personele giden iç bildirim."
         case .unknown: return "Bu sürümde tanınmayan bir olay. Uygulamayı güncelleyin."
@@ -69,96 +67,57 @@ nonisolated enum NotificationEvent: String, Codable, Sendable, CaseIterable, Ide
     }
 }
 
-/// Gönderim kanalı — **kapalı** küme: kullanıcı bunu formdan seçiyor ve sunucu
-/// gövde doğrulamasında `IsIn(ALL_CHANNELS)` ile sınırlıyor.
+/// Gönderim kanalı.
+///
+/// **Açık** küme: mesaj günlüğü geçmişte yazılmış, artık desteklenmeyen
+/// kanalların (SMS) satırlarını taşıyabilir; onları çözemeyip listeyi
+/// patlatmak yerine `unknown` olarak gösteriyoruz. Formda seçilebilenler
+/// ``customerSelectable`` ve ``selectable``.
 nonisolated enum NotificationChannel: String, Codable, Sendable, CaseIterable, Identifiable {
     case whatsapp
-    case sms
     case email
     case push
+    case unknown = "UNKNOWN"
+
+    init(from decoder: any Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = NotificationChannel(rawValue: raw) ?? .unknown
+    }
 
     var id: String { rawValue }
+
+    /// Süzgeç ve seçim listelerinde `unknown` gösterilmez.
+    static var selectable: [NotificationChannel] { allCases.filter { $0 != .unknown } }
 
     var turkishName: String {
         switch self {
         case .whatsapp: return "WhatsApp"
-        case .sms: return "SMS"
         case .email: return "E-posta"
         case .push: return "Uygulama bildirimi"
+        case .unknown: return "Diğer kanal"
         }
     }
 
     var icon: String {
         switch self {
         case .whatsapp: return "bubble.left.and.bubble.right"
-        case .sms: return "message"
         case .email: return "envelope"
         case .push: return "iphone.gen3.radiowaves.left.and.right"
+        case .unknown: return "questionmark.circle"
         }
     }
 
-    /// Müşteriye gerçekten gönderim yapan tek kanal WhatsApp. SMS kanal
-    /// soyutlamasında var ama sağlayıcısı yok (Ek M); e-posta müşteriye
+    /// Müşteriye gerçekten gönderim yapan tek kanal WhatsApp; e-posta müşteriye
     /// kapatıldı. Ekran bunu söylemeli, yoksa kullanıcı kanalı açıp mesajın
     /// neden gitmediğini arar.
     var isDeliverable: Bool { self == .whatsapp }
 
     /// Müşteriye gidebilecek kanallar — sunucunun `CUSTOMER_CHANNELS`\'ı.
     ///
-    /// `email` ve `push` dışarıda: birincisi ürün kararı (klinik müşterisiyle
-    /// yalnız WhatsApp yazışır), ikincisinin sağlayıcısı yok. Enum\'da ikisi de
-    /// **duruyor**: mesaj günlüğü geçmişte gerçekten gönderilmiş e-posta
-    /// satırlarını çözebilmeli ve `staff_internal` personele e-posta atıyor.
-    static let customerSelectable: [NotificationChannel] = [.whatsapp, .sms]
-}
-
-/// İşlemsel / pazarlama ayrımı.
-///
-/// Ek M kararı: ayrım **olayın tanımında**, kiracı ayarında değil. Randevu
-/// hatırlatması ticari ileti değildir ve iletişim izni iptalinden etkilenmez.
-nonisolated enum NotificationKind: String, Codable, Sendable, CaseIterable, Identifiable {
-    case transactional
-    case marketing
-
-    var id: String { rawValue }
-
-    var turkishName: String {
-        switch self {
-        case .transactional: return "İşlemsel"
-        case .marketing: return "Pazarlama"
-        }
-    }
-
-    var explanation: String {
-        switch self {
-        case .transactional: return "Müşterinin kendi işlemiyle ilgili; iletişim izni iptalinden etkilenmez."
-        case .marketing: return "Ticari ileti; iletişim izni iptal edilmişse gönderilmez."
-        }
-    }
-
-    var badgeTone: KlinaraBadge.Tone {
-        switch self {
-        case .transactional: return .neutral
-        case .marketing: return .warning
-        }
-    }
-}
-
-/// İletişim izni iptalinin kaynağı.
-nonisolated enum OptOutSource: String, Codable, Sendable, CaseIterable, Identifiable {
-    case customerRequest = "customer_request"
-    case inboundStop = "inbound_stop"
-    case staff
-
-    var id: String { rawValue }
-
-    var turkishName: String {
-        switch self {
-        case .customerRequest: return "Müşteri talebi"
-        case .inboundStop: return "Gelen \"DUR\" mesajı"
-        case .staff: return "Personel kaydı"
-        }
-    }
+    /// Klinik müşterisiyle yalnız WhatsApp yazışır. `email` enum\'da **duruyor**:
+    /// mesaj günlüğü geçmişte gerçekten gönderilmiş e-posta satırlarını
+    /// çözebilmeli ve `staff_internal` personele e-posta atıyor.
+    static let customerSelectable: [NotificationChannel] = [.whatsapp]
 }
 
 // MARK: - Olay kataloğu
@@ -173,7 +132,6 @@ nonisolated enum OptOutSource: String, Codable, Sendable, CaseIterable, Identifi
 nonisolated enum NotificationEventCatalog {
 
     nonisolated struct Definition: Sendable, Equatable {
-        let kind: NotificationKind
         /// Varsayılan kanal önceliği.
         let channels: [NotificationChannel]
         /// Şablon gövdesinde ve `whatsappVariables` içinde kullanılabilecek adlar.
@@ -185,47 +143,34 @@ nonisolated enum NotificationEventCatalog {
     // giden iç bildirim.
     static let definitions: [NotificationEvent: Definition] = [
         .appointmentConfirmation: Definition(
-            kind: .transactional,
-            channels: [.whatsapp, .sms],
+            channels: [.whatsapp],
             variables: ["customerName", "branchName", "appointmentAt", "serviceName"]
         ),
         .appointmentReminder: Definition(
-            kind: .transactional,
-            channels: [.whatsapp, .sms],
+            channels: [.whatsapp],
             variables: ["customerName", "branchName", "appointmentAt", "serviceName"]
         ),
         .appointmentCancelled: Definition(
-            kind: .transactional,
-            channels: [.whatsapp, .sms],
+            channels: [.whatsapp],
             variables: ["customerName", "branchName", "appointmentAt"]
         ),
         .noShowFollowup: Definition(
-            kind: .transactional,
-            channels: [.whatsapp, .sms],
+            channels: [.whatsapp],
             variables: ["customerName", "branchName"]
         ),
         .packageBalance: Definition(
-            kind: .transactional,
-            channels: [.whatsapp, .sms],
+            channels: [.whatsapp],
             variables: ["customerName", "packageName", "remainingSessions"]
         ),
         .packageExpiring: Definition(
-            kind: .transactional,
-            channels: [.whatsapp, .sms],
+            channels: [.whatsapp],
             variables: ["customerName", "packageName", "expiresAt", "remainingSessions"]
         ),
-        .birthday: Definition(
-            kind: .marketing,
-            channels: [.whatsapp, .sms],
-            variables: ["customerName", "branchName"]
-        ),
         .autoReply: Definition(
-            kind: .transactional,
-            channels: [.whatsapp, .sms],
+            channels: [.whatsapp],
             variables: ["message"]
         ),
         .staffInternal: Definition(
-            kind: .transactional,
             channels: [.email],
             variables: ["subject", "message"]
         ),
@@ -233,10 +178,6 @@ nonisolated enum NotificationEventCatalog {
 
     static func variables(for event: NotificationEvent) -> [String] {
         definitions[event]?.variables ?? []
-    }
-
-    static func kind(for event: NotificationEvent) -> NotificationKind {
-        definitions[event]?.kind ?? .transactional
     }
 
     /// Metindeki `{{ad}}` yer tutucuları, göründükleri sırada ve tekrarsız.
@@ -279,7 +220,6 @@ nonisolated struct NotificationTemplate: Decodable, Sendable, Identifiable, Equa
     let event: NotificationEvent
     let channel: NotificationChannel
     let locale: String
-    let kind: NotificationKind
     /// Yalnız e-posta kanalında anlamlı; sunucu diğer kanallarda 422 veriyor.
     let subject: String?
     let body: String
@@ -301,7 +241,7 @@ nonisolated struct NotificationTemplate: Decodable, Sendable, Identifiable, Equa
 
     private enum CodingKeys: String, CodingKey {
         case templateId = "id"
-        case event, channel, locale, kind, subject, body
+        case event, channel, locale, subject, body
         case whatsappTemplateName, whatsappTemplateLanguage, whatsappVariables
         case isActive, isDefault, variables
     }
@@ -332,7 +272,6 @@ nonisolated struct NotificationPreference: Decodable, Sendable, Identifiable, Eq
     /// `nil` = kiracı varsayılanı.
     let branchId: String?
     let event: NotificationEvent
-    let kind: NotificationKind
     /// Öncelik sırasında denenecek kanallar. **Boş dizi = olay kapalı.**
     let channels: [NotificationChannel]
     /// `"HH:MM"`. Ek M: pencere gece yarısını aşar (21:00–09:00) ve şube saat
@@ -355,7 +294,7 @@ nonisolated struct NotificationPreference: Decodable, Sendable, Identifiable, Eq
 
     private enum CodingKeys: String, CodingKey {
         case preferenceId = "id"
-        case branchId, event, kind, channels, quietHoursStart, quietHoursEnd, isDefault
+        case branchId, event, channels, quietHoursStart, quietHoursEnd, isDefault
     }
 }
 
@@ -368,25 +307,4 @@ nonisolated struct UpsertNotificationPreferenceInput: Encodable, Sendable, Equat
     /// form ikisini birlikte üretir.
     var quietHoursStart: String?
     var quietHoursEnd: String?
-}
-
-// MARK: - İletişim izni
-
-/// `OptOutResponseDto`. `channel == nil` tüm kanalları kapsar.
-nonisolated struct OptOutRecord: Decodable, Sendable, Identifiable, Equatable {
-    let id: String
-    let customerId: String
-    let channel: NotificationChannel?
-    let kind: NotificationKind
-    let source: OptOutSource
-    let createdAt: Date
-
-    var channelLabel: String { channel?.turkishName ?? "Tüm kanallar" }
-}
-
-nonisolated struct CreateOptOutInput: Encodable, Sendable, Equatable {
-    /// Verilmezse TÜM kanallar kapatılır.
-    var channel: NotificationChannel?
-    var source: OptOutSource?
-    var note: String?
 }

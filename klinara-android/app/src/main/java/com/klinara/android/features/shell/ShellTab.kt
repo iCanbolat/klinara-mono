@@ -350,6 +350,16 @@ object ShellRoutes {
         val staffId: String? = null,
     )
 
+    /** WhatsApp sohbetleri — liste. */
+    @Serializable
+    data object Conversations
+
+    /** Tek sohbetin akışı. */
+    @Serializable
+    data class ConversationDetail(
+        val conversationId: String,
+    )
+
     /** Gelen kutusu (A8.1). */
     @Serializable
     data object Inbox

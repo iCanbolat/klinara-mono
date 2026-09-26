@@ -139,6 +139,41 @@ describe('randevu oluşturma', () => {
     post.mockResolvedValue({ id: 'a1' });
   });
 
+  it('tatil gününde "uygun saat yok" değil, TATİL deniyor', async () => {
+    get.mockImplementation((path: string) => {
+      if (path.startsWith('customers/search')) {
+        return Promise.resolve([{ id: 'c1', fullName: 'Ayşe Yılmaz', phone: '+905321112233' }]);
+      }
+      if (path.startsWith('availability')) {
+        return Promise.resolve({
+          branchId: 'b1',
+          timezone: 'Europe/Istanbul',
+          slotGranularityMinutes: 30,
+          days: [
+            {
+              // Bileşen bugünün gününü soruyor; durum eşleşsin diye aynı anahtar.
+              date: new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' }),
+              status: 'holiday',
+              holidayName: 'Cumhuriyet Bayramı',
+              opensAt: null,
+              closesAt: null,
+            },
+          ],
+          slots: [],
+        });
+      }
+      return Promise.resolve({ data: [] });
+    });
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.selectOptions(screen.getByLabelText('Hizmet'), 's1');
+    await user.selectOptions(screen.getByLabelText('Personel'), 'p1');
+
+    expect(await screen.findByText('Tatil · Cumhuriyet Bayramı')).toBeInTheDocument();
+    expect(screen.queryByText('Bu gün boş saat kalmadı')).not.toBeInTheDocument();
+  });
+
   it('gönderim `Idempotency-Key` TAŞIYOR', async () => {
     // Projede bu başlığın İLK gerçek çağrı yeri; çift tıklamanın tek randevu
     // üretmesi buna bağlı.

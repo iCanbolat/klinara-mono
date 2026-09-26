@@ -244,7 +244,71 @@ nonisolated struct AvailabilityResponse: Codable, Sendable, Equatable {
     let branchId: String
     let timezone: String
     let slotGranularityMinutes: Int
+    /// Penceredeki her yerel gün. Boş `slots` tek başına "kapalı" ile "dolu"yu
+    /// ayırt edemiyordu; neden buradan okunur.
+    var days: [AvailabilityDay] = []
     let slots: [AvailabilitySlot]
+
+    /// `yyyy-MM-dd` gün anahtarının durumu.
+    func day(_ localDate: String) -> AvailabilityDay? {
+        days.first { $0.date == localDate }
+    }
+}
+
+nonisolated extension AvailabilityResponse {
+    private enum CodingKeys: String, CodingKey {
+        case branchId, timezone, slotGranularityMinutes, days, slots
+    }
+
+    /// `days` eski sunucuda yok; alan eksikse boş kabul edilir (gün "dolu"
+    /// sayılır — en az şaşırtan varsayım).
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        branchId = try container.decode(String.self, forKey: .branchId)
+        timezone = try container.decode(String.self, forKey: .timezone)
+        slotGranularityMinutes = try container.decode(Int.self, forKey: .slotGranularityMinutes)
+        days = try container.decodeIfPresent([AvailabilityDay].self, forKey: .days) ?? []
+        slots = try container.decode([AvailabilitySlot].self, forKey: .slots)
+    }
+}
+
+/// `GET /availability/days` — hizmet bilmeden yalnız gün durumları (tarih seçici).
+nonisolated struct AvailabilityDaysResponse: Codable, Sendable, Equatable {
+    let branchId: String
+    let timezone: String
+    let days: [AvailabilityDay]
+}
+
+/// Bir günün durumu — `packages/shared` `AvailabilityDay`.
+nonisolated struct AvailabilityDay: Codable, Sendable, Hashable {
+
+    enum Status: String, Codable, Sendable {
+        /// Çalışma saatleri var; slot yoksa gün DOLU.
+        case open
+        /// Haftalık kapalı gün.
+        case closed
+        /// Tam gün tatil; `holidayName` dolu.
+        case holiday
+        /// Çalışma saatleri geçti.
+        case past
+        /// İleri rezervasyon sınırının ötesinde.
+        case beyondWindow = "beyond_window"
+        /// Sunucu yeni bir durum eklerse çözümleme kırılmasın.
+        case unknown
+
+        init(from decoder: Decoder) throws {
+            let raw = try decoder.singleValueContainer().decode(String.self)
+            self = Status(rawValue: raw) ?? .unknown
+        }
+    }
+
+    /// `yyyy-MM-dd`, şube saat diliminde.
+    let date: String
+    let status: Status
+    let holidayName: String?
+    /// `HH:mm`, yalnız açık günde.
+    let opensAt: String?
+    let closesAt: String?
 }
 
 nonisolated struct AvailabilitySlot: Codable, Sendable, Hashable, Identifiable {
@@ -306,6 +370,8 @@ nonisolated struct CreateAppointmentInput: Encodable, Sendable, Equatable {
     /// Sıra anlamlıdır: hizmetler gönderilen sırayla ardışık uygulanır.
     let services: [AppointmentServiceInput]
     var notes: String?
+    /// `false` → müşteriye onay mesajı gitmez. `nil` gövdeye yazılmaz (sunucu varsayılanı: gider).
+    var notifyCustomer: Bool?
 }
 
 /// `PATCH /appointments/:id` — **yalnız not** günceller.
@@ -325,6 +391,8 @@ nonisolated struct RescheduleAppointmentInput: Encodable, Sendable, Equatable {
 
 nonisolated struct CancelAppointmentInput: Encodable, Sendable, Equatable {
     var reason: String?
+    /// `false` → müşteriye iptal bildirimi gitmez. `nil` gövdeye yazılmaz.
+    var notifyCustomer: Bool?
 }
 
 nonisolated struct ChangeAppointmentStatusInput: Encodable, Sendable, Equatable {

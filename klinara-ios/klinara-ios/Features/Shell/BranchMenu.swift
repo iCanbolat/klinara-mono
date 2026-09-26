@@ -50,3 +50,32 @@ struct BranchMenu: View {
         .foregroundStyle(KlinaraColor.sageDeep)
     }
 }
+
+/// Sekme köklerinin sol üst başlığı.
+///
+/// Sistem başlığı yerine baş kenarda kendi metnimiz: `.inline` başlık ortaya
+/// oturuyordu. Boyut ve kalınlık Android üst çubuğuyla aynı
+/// (``KlinaraFont/toolbarTitle``). iOS 26'nın toolbar kapsülü kapatılıyor:
+/// başlık bir düğme değil.
+struct RootToolbarTitle: ToolbarContent {
+
+    let title: String
+
+    var body: some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) {
+            Text(title)
+                .font(KlinaraFont.toolbarTitle)
+                .foregroundStyle(KlinaraColor.charcoal)
+                .lineLimit(1)
+                .fixedSize()
+                .accessibilityAddTraits(.isHeader)
+        }
+        .sharedBackgroundVisibility(.hidden)
+
+        // Boş `.principal`: `.inline` sistem başlığı ortada ikinci kez
+        // çizilmesin. `navigationTitle` geri düğmesi/VoiceOver için yerinde.
+        ToolbarItem(placement: .principal) {
+            Color.clear.frame(width: 0, height: 0).accessibilityHidden(true)
+        }
+    }
+}

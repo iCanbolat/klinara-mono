@@ -11,7 +11,7 @@ export class WhatsAppAccountResponseDto {
   @ApiPropertyOptional({ nullable: true, example: '+905321234567' })
   businessPhone: string | null;
 
-  @ApiProperty({ example: 'v21.0' })
+  @ApiProperty({ example: 'v26.0' })
   apiVersion: string;
 
   @ApiProperty({ enum: ['unconfigured', 'active', 'error'] })
@@ -65,9 +65,9 @@ export class UpsertWhatsAppAccountDto {
   @MaxLength(200)
   appSecret?: string;
 
-  @ApiPropertyOptional({ example: 'v21.0' })
+  @ApiPropertyOptional({ example: 'v26.0' })
   @IsOptional()
-  @Matches(/^v\d+\.\d+$/, { message: "'v21.0' biçiminde olmalı" })
+  @Matches(/^v\d+\.\d+$/, { message: "'v26.0' biçiminde olmalı" })
   apiVersion?: string;
 }
 
@@ -107,6 +107,9 @@ export class WhatsAppTemplateResponseDto {
   @ApiProperty()
   bodyVariableCount: number;
 
+  @ApiPropertyOptional({ nullable: true, description: 'BODY metni, `{{1}}` yer tutucularıyla' })
+  bodyText: string | null;
+
   @ApiProperty({ type: 'array', items: { type: 'object' } })
   buttons: { type: string; text: string }[];
 
@@ -131,6 +134,31 @@ export class WhatsAppTestResultDto {
 
   @ApiPropertyOptional({ nullable: true, description: "Meta'nın mesaj kimliği" })
   providerMessageId: string | null;
+}
+
+export class WhatsAppProvisionItemDto {
+  @ApiProperty({ example: 'klinara_randevu_hatirlatma' })
+  name: string;
+
+  @ApiProperty({ enum: ['created', 'exists', 'failed'] })
+  outcome: 'created' | 'exists' | 'failed';
+
+  @ApiPropertyOptional({ enum: ['pending', 'approved', 'rejected'], nullable: true })
+  status: 'pending' | 'approved' | 'rejected' | null;
+
+  @ApiPropertyOptional({ nullable: true, description: "Meta'nın hata metni (token maskeli)" })
+  error: string | null;
+}
+
+export class WhatsAppProvisionResultDto {
+  @ApiProperty({ type: [WhatsAppProvisionItemDto] })
+  results: WhatsAppProvisionItemDto[];
+
+  @ApiProperty()
+  created: number;
+
+  @ApiProperty()
+  failed: number;
 }
 
 /** Yalnız `/docs` üzerinde geçerli değerleri göstermek için. */

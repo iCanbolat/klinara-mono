@@ -180,6 +180,8 @@ export function Combobox({
 
   const tooShort = open && query.trim().length > 0 && query.trim().length < minQueryLength;
   const showEmpty = open && searched && !loading && options.length === 0;
+  // Odakta henüz yazılmamışken liste boş bir çerçeve olarak görünmesin.
+  const showList = open && (options.length > 0 || loading || tooShort || showEmpty);
 
   return (
     <div className="flex flex-col gap-1.5" ref={rootRef}>
@@ -193,7 +195,7 @@ export function Combobox({
         // başladığında seçimin hâlâ geçerli olup olmadığı belirsizleşir.
         <div
           className={cn(
-            'flex h-11 items-center justify-between gap-2 rounded-lg border border-input px-3',
+            'flex h-11 items-center justify-between gap-2 rounded-lg border border-input bg-card px-3',
             disabled && 'opacity-50',
           )}
         >
@@ -221,15 +223,16 @@ export function Combobox({
           <Input
             id={inputId}
             role="combobox"
-            aria-expanded={open}
+            aria-expanded={showList}
             aria-controls={listId}
             aria-autocomplete="list"
             aria-activedescendant={
-              open && options[active] !== undefined ? `${listId}-${String(active)}` : undefined
+              showList && options[active] !== undefined ? `${listId}-${String(active)}` : undefined
             }
             aria-describedby={describedBy === '' ? undefined : describedBy}
             aria-invalid={error !== undefined}
             autoComplete="off"
+            className="bg-card"
             disabled={disabled}
             placeholder={placeholder}
             value={query}
@@ -241,7 +244,7 @@ export function Combobox({
             onKeyDown={onKeyDown}
           />
 
-          {open ? (
+          {showList ? (
             <div className="absolute z-50 mt-1 w-full rounded-lg border border-input bg-card">
               <ul id={listId} role="listbox" aria-label={label} className="max-h-64 overflow-y-auto py-1">
                 {options.map((option, index) => (

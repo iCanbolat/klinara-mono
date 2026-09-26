@@ -60,12 +60,6 @@ struct NotificationTemplateEditorView: View {
             KlinaraRow(label: "Olay", value: template.event.turkishName)
             KlinaraDivider()
             KlinaraRow(label: "Kanal", value: template.channel.turkishName)
-            KlinaraDivider()
-            KlinaraRow(
-                label: "Tür",
-                value: template.kind.turkishName,
-                detail: template.kind.explanation
-            )
             if template.isDefault {
                 KlinaraDivider()
                 note("Şu anda kod içindeki varsayılan metin geçerli. Kaydettiğinizde bu kiracıya özel bir şablon oluşur.")

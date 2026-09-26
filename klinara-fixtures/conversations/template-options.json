@@ -1,0 +1,30 @@
+[
+  {
+    "name": "klinara_gelmedi_takip",
+    "language": "tr",
+    "category": "UTILITY",
+    "bodyText": "Merhaba {{1}}, bugünkü randevunuza gelemediğinizi gördük. Yeni bir randevu için {{2}} şubemize bu mesajı yanıtlayarak ulaşabilirsiniz.",
+    "bodyVariableCount": 2,
+    "variableNames": [
+      "customerName",
+      "branchName"
+    ],
+    "suggestedParameters": [
+      "Ayşe Yılmaz",
+      "Merkez Şube"
+    ]
+  },
+  {
+    "name": "klinik_bilgilendirme",
+    "language": "tr",
+    "category": "UTILITY",
+    "bodyText": "Bilgilendirme: {{1}}",
+    "bodyVariableCount": 1,
+    "variableNames": [
+      null
+    ],
+    "suggestedParameters": [
+      ""
+    ]
+  }
+]

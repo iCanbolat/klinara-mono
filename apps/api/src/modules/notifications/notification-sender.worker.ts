@@ -5,7 +5,10 @@ import { TenantTxService } from '../../database/tenant-tx.service';
 import { QUEUES } from '../../lib/queue/queue.constants';
 import { QueueService } from '../../lib/queue/queue.service';
 import { MetricsService } from '../../observability/metrics.service';
-import { ChannelRegistryService } from './channel-registry.service';
+import { MessageActionsService } from '../integrations/message-actions.service';
+import { STANDARD_TEMPLATE_BY_EVENT } from '../integrations/whatsapp-standard-templates';
+import { ChannelRegistryService, type OutboundMessage } from './channel-registry.service';
+import { StaffNotificationsService } from './staff-notifications.service';
 import * as repo from './notifications.repository';
 import { PermanentSendError, TransientSendError } from './send-errors';
 
@@ -28,8 +31,10 @@ export class NotificationSenderWorker implements OnModuleInit {
     private readonly queue: QueueService,
     private readonly tx: TenantTxService,
     private readonly channels: ChannelRegistryService,
+    private readonly actions: MessageActionsService,
     private readonly metrics: MetricsService,
     private readonly logger: PinoLogger,
+    private readonly staffNotifications: StaffNotificationsService,
   ) {}
 
   onModuleInit(): void {
@@ -60,12 +65,61 @@ export class NotificationSenderWorker implements OnModuleInit {
           : ChannelRegistryService.addressFor(message.channel, contact);
 
       // WhatsApp'ta metin BİZDEN gitmez: Meta'da onaylı template adı ve onun
-      // KONUMSAL parametreleri gerekir. Eşlemeyi şablon satırı taşıyor
-      // (`whatsapp_variables`), değerleri mesaj satırı (`template_variables`).
-      const whatsapp =
-        message.channel === 'whatsapp' && message.templateId !== null
-          ? await repo.findTemplateById(tx, message.templateId)
-          : undefined;
+      // KONUMSAL parametreleri gerekir. Eşleme ÖNCE kiracının şablon
+      // satırından (`whatsapp_variables`), yoksa Klinara'nın standart setinden
+      // gelir; değerler mesaj satırında (`template_variables`).
+      let whatsapp: OutboundMessage['whatsapp'];
+      if (message.channel === 'whatsapp') {
+        const row =
+          message.templateId === null
+            ? undefined
+            : await repo.findTemplateById(tx, message.templateId);
+        const standard =
+          row?.whatsappTemplateName == null
+            ? STANDARD_TEMPLATE_BY_EVENT.get(message.event)
+            : undefined;
+        const templateName = row?.whatsappTemplateName ?? standard?.name;
+        const variables = row?.whatsappTemplateName != null
+          ? row.whatsappVariables
+          : (standard?.variables ?? []);
+
+        // Onayla/İptal butonları: token DÜZ METİN yalnız burada, gönderimden
+        // hemen önce üretiliyor (veritabanında sha256'sı duruyor). Yeniden
+        // denemede yeni token üretilir; eskisi süresi dolana kadar geçerli
+        // kalır ve tek kullanımlık olduğu için ikisinden biri yeter.
+        const buttonPayloads =
+          standard?.quickReplies !== undefined && message.appointmentId !== null
+            ? await Promise.all(
+                standard.quickReplies.map((reply) =>
+                  this.actions.issue(tx, job.tenantId, {
+                    appointmentId: message.appointmentId as string,
+                    messageLogId: message.id,
+                    action: reply.action,
+                  }),
+                ),
+              )
+            : undefined;
+
+        // Onay bekleyen template'le gönderim Meta tarafından reddedilir; bu
+        // noktaya yalnız geliştirme ortamında ve pencere açıkken gelinir
+        // (dispatcher üretimde WhatsApp'ı hiç seçmez). Template düşürülüp
+        // metin gönderilir.
+        const templateLanguage = row?.whatsappTemplateLanguage ?? standard?.language ?? 'tr';
+        const unapproved =
+          templateName !== undefined &&
+          ((await repo.whatsAppTemplateStatus(tx, templateName, templateLanguage)) ??
+            'approved') !== 'approved';
+
+        whatsapp =
+          templateName === undefined || unapproved
+            ? undefined
+            : {
+                templateName,
+                templateLanguage,
+                parameters: variables.map((name) => message.templateVariables?.[name] ?? ''),
+                buttonPayloads,
+              };
+      }
 
       await repo.updateMessage(tx, message.id, {
         status: 'sending',
@@ -93,17 +147,7 @@ export class NotificationSenderWorker implements OnModuleInit {
         to: address,
         subject: message.renderedSubject ?? undefined,
         body: message.renderedBody ?? '',
-        ...(whatsapp === undefined
-          ? {}
-          : {
-              whatsapp: {
-                templateName: whatsapp.whatsappTemplateName ?? undefined,
-                templateLanguage: whatsapp.whatsappTemplateLanguage ?? undefined,
-                parameters: whatsapp.whatsappVariables.map(
-                  (name) => message.templateVariables?.[name] ?? '',
-                ),
-              },
-            }),
+        ...(whatsapp === undefined ? {} : { whatsapp }),
       });
 
       await this.tx.runForTenant(job.tenantId, (tx) =>
@@ -148,14 +192,26 @@ export class NotificationSenderWorker implements OnModuleInit {
     message: repo.MessageLogRow,
     error: { code: string; detail: string },
   ): Promise<void> {
-    await this.tx.runForTenant(tenantId, (tx) =>
-      repo.updateMessage(tx, message.id, {
+    await this.tx.runForTenant(tenantId, async (tx) => {
+      await repo.updateMessage(tx, message.id, {
         status: 'failed',
         failedAt: new Date(),
         errorCode: error.code,
         errorDetail: error.detail,
-      }),
-    );
+      });
+
+      // Personel telafi edebilsin diye panele düşer: müşteriye ulaşamadığımızı
+      // yalnız log satırından öğrenmek, kimsenin öğrenmemesi demekti.
+      await this.staffNotifications.emit(tx, {
+        tenantId,
+        branchId: message.branchId,
+        kind: 'delivery_failed',
+        title: 'Mesaj müşteriye iletilemedi',
+        body: `${message.channel.toUpperCase()} · ${message.toMasked ?? ''} · ${error.code}`,
+        link: '/mesajlar',
+        appointmentId: message.appointmentId,
+      });
+    });
     this.metrics.notificationsSent.inc({ channel: message.channel, status: 'failed' });
     this.logger.warn({ messageId: message.id, code: error.code }, 'Bildirim gönderilemedi');
   }

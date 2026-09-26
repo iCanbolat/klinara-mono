@@ -18,13 +18,14 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldSwitch } from '@/components/ui/field';
+import { Field, FieldDate, FieldSwitch } from '@/components/ui/field';
 import { Label } from '@/components/ui/label';
 import { SegmentButton, Segmented } from '@/components/ui/segmented';
 
@@ -121,7 +122,7 @@ function HolidayForm({
   return (
     <form
       noValidate
-      className="flex flex-col gap-5"
+      className="flex min-h-0 flex-1 flex-col"
       onSubmit={(event) => {
         event.preventDefault();
         void submit();
@@ -134,77 +135,78 @@ function HolidayForm({
         </DialogDescription>
       </DialogHeader>
 
-      {error !== null ? <Alert tone="danger">{error}</Alert> : null}
+      <DialogBody className="flex flex-col gap-5">
+        {error !== null ? <Alert tone="danger">{error}</Alert> : null}
 
-      <div className="grid gap-3 sm:grid-cols-[11rem_1fr]">
-        <Field
-          label={t('schedule.holidayDate')}
-          type="date"
-          value={draft.holidayDate}
-          disabled={editing}
-          error={shown.holidayDate}
-          onChange={(event) => patch({ holidayDate: event.target.value })}
-        />
-        <Field
-          label={t('schedule.holidayName')}
-          value={draft.name}
-          maxLength={200}
-          error={shown.name}
-          onChange={(event) => patch({ name: event.target.value })}
-        />
-      </div>
-
-      {canWriteTenant || editing ? (
-        <div className="flex flex-col gap-2">
-          <Label>{t('schedule.holidayScope')}</Label>
-          <Segmented label={t('schedule.holidayScope')}>
-            <SegmentButton
-              pressed={draft.scope === 'branch'}
-              onClick={() => !editing && patch({ scope: 'branch' })}
-            >
-              {t('schedule.holidayScopeBranch')}
-            </SegmentButton>
-            <SegmentButton
-              pressed={draft.scope === 'tenant'}
-              onClick={() => !editing && patch({ scope: 'tenant' })}
-            >
-              {t('schedule.holidayScopeTenant')}
-            </SegmentButton>
-          </Segmented>
-          {draft.scope === 'tenant' ? (
-            <p className="text-xs text-muted-foreground">{t('schedule.holidayOverrideHint')}</p>
-          ) : null}
+        <div className="grid gap-3 sm:grid-cols-[11rem_1fr]">
+          <FieldDate
+            label={t('schedule.holidayDate')}
+            value={draft.holidayDate}
+            disabled={editing}
+            error={shown.holidayDate}
+            onChange={(value) => patch({ holidayDate: value })}
+          />
+          <Field
+            label={t('schedule.holidayName')}
+            value={draft.name}
+            maxLength={200}
+            error={shown.name}
+            onChange={(event) => patch({ name: event.target.value })}
+          />
         </div>
-      ) : null}
 
-      <div className="flex flex-col gap-3 rounded-lg border border-border p-3">
-        <FieldSwitch
-          label={t('schedule.holidayClosedAllDay')}
-          checked={draft.isClosed}
-          onCheckedChange={(isClosed) => patch({ isClosed })}
-          className="py-0"
-        />
-        {draft.isClosed ? null : (
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field
-              label={t('schedule.open')}
-              type="time"
-              step={300}
-              value={draft.openTime}
-              error={shown.openTime}
-              onChange={(event) => patch({ openTime: event.target.value })}
-            />
-            <Field
-              label={t('schedule.close')}
-              type="time"
-              step={300}
-              value={draft.closeTime}
-              error={shown.closeTime}
-              onChange={(event) => patch({ closeTime: event.target.value })}
-            />
+        {canWriteTenant || editing ? (
+          <div className="flex flex-col gap-2">
+            <Label>{t('schedule.holidayScope')}</Label>
+            <Segmented label={t('schedule.holidayScope')}>
+              <SegmentButton
+                pressed={draft.scope === 'branch'}
+                onClick={() => !editing && patch({ scope: 'branch' })}
+              >
+                {t('schedule.holidayScopeBranch')}
+              </SegmentButton>
+              <SegmentButton
+                pressed={draft.scope === 'tenant'}
+                onClick={() => !editing && patch({ scope: 'tenant' })}
+              >
+                {t('schedule.holidayScopeTenant')}
+              </SegmentButton>
+            </Segmented>
+            {draft.scope === 'tenant' ? (
+              <p className="text-xs text-muted-foreground">{t('schedule.holidayOverrideHint')}</p>
+            ) : null}
           </div>
-        )}
-      </div>
+        ) : null}
+
+        <div className="flex flex-col gap-3 rounded-lg border border-border p-3">
+          <FieldSwitch
+            label={t('schedule.holidayClosedAllDay')}
+            checked={draft.isClosed}
+            onCheckedChange={(isClosed) => patch({ isClosed })}
+            className="py-0"
+          />
+          {draft.isClosed ? null : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field
+                label={t('schedule.open')}
+                type="time"
+                step={300}
+                value={draft.openTime}
+                error={shown.openTime}
+                onChange={(event) => patch({ openTime: event.target.value })}
+              />
+              <Field
+                label={t('schedule.close')}
+                type="time"
+                step={300}
+                value={draft.closeTime}
+                error={shown.closeTime}
+                onChange={(event) => patch({ closeTime: event.target.value })}
+              />
+            </div>
+          )}
+        </div>
+      </DialogBody>
 
       <DialogFooter>
         <Button type="button" variant="ghost" disabled={saving} onClick={onClose}>

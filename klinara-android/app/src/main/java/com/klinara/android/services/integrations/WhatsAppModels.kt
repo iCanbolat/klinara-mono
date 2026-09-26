@@ -125,7 +125,7 @@ data class WhatsAppAccountUpsert(
         val ACCESS_TOKEN_LENGTH = 10..500
         val APP_SECRET_LENGTH = 8..200
         const val MIN_ID_LENGTH = 3
-        const val DEFAULT_API_VERSION = "v21.0"
+        const val DEFAULT_API_VERSION = "v26.0"
         val API_VERSION = Regex("""v\d+\.\d+""")
     }
 }

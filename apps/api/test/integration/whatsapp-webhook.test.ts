@@ -238,12 +238,14 @@ describe('WhatsApp gelen webhook (Batch 8.3)', () => {
   // -------------------------------------------------------------------------
   describe('teslim durumu', () => {
     it('`delivered` bildirimi mesaj kaydını günceller', async () => {
+      // Dispatcher doğrulanmamış hesapta WhatsApp'ı atlıyor.
+      await database.ownerPool.query(`update whatsapp_accounts set status = 'active'`);
       const queued = await app.get(TenantTxService).runForTenant(clinic.tenant.id, (tx) =>
         app.get(NotificationDispatcherService).enqueue(tx, clinic.tenant.id, {
           event: 'appointment_reminder',
           customerId: clinic.customer.id,
           branchId: clinic.branch.id,
-          channels: ['sms'],
+          channels: ['whatsapp'],
           variables: {
             customerName: 'Ayşe',
             branchName: 'Merkez',
@@ -316,6 +318,13 @@ describe('WhatsApp gelen webhook (Batch 8.3)', () => {
       await post(body, sign(body)).expect(200);
 
       expect((await readAppointment(appointmentId)).status).toBe('cancelled');
+
+      // Bekleyen hatırlatmalar da kapanır — iptal edilmiş randevuya hatırlatma gitmez.
+      const pending = await database.ownerPool.query(
+        `select 1 from scheduled_notifications where appointment_id = $1 and status = 'pending'`,
+        [appointmentId],
+      );
+      expect(pending.rowCount).toBe(0);
     });
 
     it('token TEK KULLANIMLIKTIR — ikinci kullanım randevuyu değiştirmez', async () => {
@@ -405,16 +414,12 @@ describe('WhatsApp gelen webhook (Batch 8.3)', () => {
       expect((inbox.body as InboxItem[])[0]?.customerId).toBeNull();
     });
 
-    it('"STOP" mesajı pazarlama iletilerini durdurur', async () => {
+    it('"STOP" gibi bir mesaj yalnız gelen kutusuna düşer; ticari ileti reddi kaydı yok', async () => {
       const body = messageEvent({ text: { body: 'STOP' } });
       await post(body, sign(body)).expect(200);
 
-      const optOuts = await http(app)
-        .get(`/api/v1/customers/${clinic.customer.id}/opt-out`)
-        .set(ownerAuth())
-        .expect(200);
-      expect(optOuts.body).toHaveLength(1);
-      expect((optOuts.body as { source: string }[])[0]?.source).toBe('inbound_stop');
+      const inbox = await http(app).get('/api/v1/inbox').set(ownerAuth()).expect(200);
+      expect(inbox.body).toHaveLength(1);
     });
 
     it('mesaj işlendi olarak işaretlenebilir', async () => {

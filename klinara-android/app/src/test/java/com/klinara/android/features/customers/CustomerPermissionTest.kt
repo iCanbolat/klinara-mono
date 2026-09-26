@@ -57,32 +57,6 @@ class CustomerPermissionTest {
     }
 
     @Test
-    @DisplayName("Opt-out bölümü `notification:*` ister — `customer:write` YETMEZ")
-    fun optOutFollowsNotificationPermissions() {
-        val receptionist = ShellSessions.forRole("receptionist")
-
-        // Bölüm müşteri kartında duruyor ama kayıt bir iletişim kaydı; izni de öyle.
-        // İkisini karıştırmak, yazma izni olan herkese ileti tercihini açmak olurdu.
-        //
-        // Resepsiyon bu ayrımın canlı örneği: müşteriyi YAZABİLİR, ileti tercihini
-        // GÖREBİLİR ama DEĞİŞTİREMEZ. Ekran bu üçlüyü ayrı ayrı çiziyor.
-        assertTrue(receptionist.can(Permissions.CUSTOMER_WRITE))
-        assertTrue(receptionist.can(Permissions.NOTIFICATION_READ))
-        assertFalse(receptionist.can(Permissions.NOTIFICATION_MANAGE))
-
-        // Yönetim izni olan rollerde okuma da olmalı: yazıp okuyamamak anlamsız bir kapı.
-        roles.forEach { role ->
-            val session = ShellSessions.forRole(role)
-            if (session.can(Permissions.NOTIFICATION_MANAGE)) {
-                assertTrue(
-                    session.can(Permissions.NOTIFICATION_READ),
-                    "$role: yönetebiliyor ama okuyamıyor",
-                )
-            }
-        }
-    }
-
-    @Test
     @DisplayName("Klinik not izni yazmaya BİNMEZ — A4.3'ün kapısı bugünden doğru")
     fun medicalPermissionsAreSeparate() {
         roles.forEach { role ->

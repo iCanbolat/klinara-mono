@@ -1,6 +1,13 @@
 package com.klinara.android.features.calendar.booking
 
 import androidx.compose.foundation.background
+import com.klinara.android.services.formatting.TrLocale
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.heading
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -21,8 +28,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -44,6 +54,7 @@ import com.klinara.android.designsystem.components.KlinaraScreen
 import com.klinara.android.designsystem.components.KlinaraSkeletonChips
 import com.klinara.android.designsystem.components.KlinaraSkeletonSection
 import com.klinara.android.designsystem.components.KlinaraTextField
+import com.klinara.android.designsystem.components.KlinaraToggleRow
 import com.klinara.android.designsystem.components.klinaraClickable
 import com.klinara.android.features.auth.AppSession
 import com.klinara.android.services.ServiceContainer
@@ -141,6 +152,14 @@ fun BookingFlowScreen(
                 enabled = state.draft.isValid && !state.isSaving,
                 isLoading = state.isSaving,
             )
+            state.draft.missingStepsHint?.takeIf { !state.isSaving }?.let { hint ->
+                Text(
+                    hint,
+                    style = KlinaraType.bodyM,
+                    color = KlinaraTheme.colors.charcoalMuted,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
 
         if (state.isSaving) AuthLoadingOverlay(message = "Kaydediliyor…")
@@ -153,6 +172,7 @@ private fun CustomerSection(
     viewModel: BookingFlowViewModel,
 ) {
     val selected = state.customers.firstOrNull { it.id == state.draft.customerId }
+    val focusManager = LocalFocusManager.current
 
     KlinaraCard(title = "Müşteri") {
         if (!state.draft.canEditLineup) {
@@ -165,21 +185,85 @@ private fun CustomerSection(
             return@KlinaraCard
         }
 
+        // Seçim yapıldıysa arama alanı yerine seçili müşteri gösterilir (web paneli ve
+        // iOS ile aynı desen). Alanı seçili adla doldurmak kötü olurdu: kullanıcı yazmaya
+        // başladığında seçimin hâlâ geçerli olup olmadığı belirsizleşir.
+        if (selected != null) {
+            SelectedCustomerRow(
+                name = selected.fullName,
+                phone = selected.phone,
+                onChange = viewModel::clearCustomer,
+            )
+            return@KlinaraCard
+        }
+
         KlinaraTextField(
             label = "Müşteri ara",
             value = state.customerQuery,
             onValueChange = viewModel::searchCustomers,
             placeholder = "Ad ya da telefon",
         )
-        state.customers.forEachIndexed { index, customer ->
-            if (index > 0) KlinaraDivider()
-            SelectableRow(
-                title = customer.fullName,
-                detail = customer.phone,
-                isSelected = customer.id == state.draft.customerId,
-                onClick = { viewModel.selectCustomer(customer.id) },
+        if (state.customerQuery.isNotBlank()) {
+            state.customers.forEachIndexed { index, customer ->
+                if (index > 0) KlinaraDivider()
+                SelectableRow(
+                    title = customer.fullName,
+                    detail = customer.phone,
+                    isSelected = false,
+                    onClick = {
+                        // Arama alanı seçimle kalkıyor; klavye açık kalmasın.
+                        focusManager.clearFocus()
+                        viewModel.selectCustomer(customer.id)
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SelectedCustomerRow(
+    name: String,
+    phone: String?,
+    onChange: () -> Unit,
+) {
+    val colors = KlinaraTheme.colors
+    val interaction = remember { MutableInteractionSource() }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(KlinaraMetrics.sm),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(40.dp)
+                    .background(colors.sageSoft, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                name.split(" ").filter { it.isNotBlank() }.take(2).joinToString("") { it.take(1) }.uppercase(),
+                style = KlinaraType.bodyEmphasis,
+                color = colors.sageDeep,
             )
         }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(name, style = KlinaraType.bodyEmphasis, color = colors.charcoal)
+            phone?.let { Text(it, style = KlinaraType.bodyM, color = colors.charcoalMuted) }
+        }
+        Text(
+            "Değiştir",
+            style = KlinaraType.bodyEmphasis,
+            color = colors.sageDeep,
+            modifier =
+                Modifier
+                    .klinaraClickable(
+                        enabled = true,
+                        role = Role.Button,
+                        interactionSource = interaction,
+                        onClick = onChange,
+                    ).padding(horizontal = KlinaraMetrics.xs, vertical = KlinaraMetrics.sm),
+        )
     }
 }
 
@@ -271,12 +355,53 @@ private fun SlotSection(
             horizontalArrangement = Arrangement.spacedBy(KlinaraMetrics.xs),
         ) {
             DayStep(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Önceki gün") { viewModel.stepDay(-1) }
-            Text(
-                clock.formatDate(state.day),
-                style = KlinaraType.bodyEmphasis,
-                color = KlinaraTheme.colors.charcoal,
-                modifier = Modifier.weight(1f),
-            )
+            // Başlık takvimi açıyor: haftalar sonrası için ok tuşuyla gün gün ilerlemek
+            // zahmetliydi. Oklar yakın günler için duruyor.
+            var picking by remember { mutableStateOf(false) }
+            val (title, prefix) = clock.dayPickerLabel(state.day)
+            val dayInteraction = remember { MutableInteractionSource() }
+            Column(
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .heightIn(min = 44.dp)
+                        .klinaraClickable(
+                            enabled = true,
+                            role = Role.Button,
+                            interactionSource = dayInteraction,
+                            onClick = { picking = true },
+                        ).semantics(mergeDescendants = true) {
+                            contentDescription = listOfNotNull(prefix, title, "takvimden gün seçin").joinToString(", ")
+                        },
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                prefix?.let {
+                    Text(it, style = KlinaraType.label, color = KlinaraTheme.colors.charcoalMuted)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(title, style = KlinaraType.bodyEmphasis, color = KlinaraTheme.colors.charcoal)
+                    Icon(
+                        imageVector = Icons.Filled.DateRange,
+                        contentDescription = null,
+                        tint = KlinaraTheme.colors.sageDeep,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            }
+            if (picking) {
+                BookingDayPickerDialog(
+                    initial = clock.localDate(state.day),
+                    today = clock.localDate(java.time.Instant.now()),
+                    days = state.calendarDays,
+                    onMonth = viewModel::loadCalendarMonth,
+                    onPick = { date ->
+                        viewModel.selectDay(date)
+                        picking = false
+                    },
+                    onDismiss = { picking = false },
+                )
+            }
             DayStep(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Sonraki gün") { viewModel.stepDay(1) }
         }
 
@@ -285,20 +410,78 @@ private fun SlotSection(
 
             is Loadable.Failed -> ErrorBanner(message = state.slots.message)
 
-            is Loadable.Loaded ->
+            is Loadable.Loaded -> {
+                AvailabilityPresentation.openDayNote(state.dayInfo)?.let { note ->
+                    Text(note, style = KlinaraType.bodyM, color = KlinaraTheme.colors.charcoalMuted)
+                }
                 if (state.visibleSlots.isEmpty()) {
-                    Text(
-                        "Bu günde uygun saat yok. Başka bir gün deneyin.",
-                        style = KlinaraType.bodyM,
-                        color = KlinaraTheme.colors.charcoalMuted,
-                    )
+                    EmptyDay(AvailabilityPresentation.emptyNotice(state.dayInfo)) { viewModel.stepDay(1) }
                 } else {
                     SlotGrid(state, viewModel, clock)
                 }
+            }
         }
     }
 }
 
+@Composable
+private fun EmptyDay(
+    notice: AvailabilityPresentation.Notice,
+    onNextDay: () -> Unit,
+) {
+    val colors = KlinaraTheme.colors
+    val interaction = remember { MutableInteractionSource() }
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .border(KlinaraMetrics.borderWidth, colors.border, RoundedCornerShape(KlinaraMetrics.controlRadius))
+                .padding(vertical = KlinaraMetrics.lg, horizontal = KlinaraMetrics.md),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(KlinaraMetrics.xs),
+    ) {
+        Icon(
+            imageVector = Icons.Filled.DateRange,
+            contentDescription = null,
+            tint = colors.charcoalMuted,
+        )
+        Text(
+            notice.title,
+            style = KlinaraType.bodyEmphasis,
+            color = colors.charcoal,
+            textAlign = TextAlign.Center,
+        )
+        Text(
+            notice.detail,
+            style = KlinaraType.bodyM,
+            color = colors.charcoalMuted,
+            textAlign = TextAlign.Center,
+        )
+        if (notice.suggestsNextDay) {
+            Text(
+                "Sonraki gün →",
+                style = KlinaraType.bodyEmphasis,
+                color = colors.sageDeep,
+                modifier =
+                    Modifier
+                        .klinaraClickable(
+                            enabled = true,
+                            role = Role.Button,
+                            interactionSource = interaction,
+                            onClick = onNextDay,
+                        ).padding(vertical = KlinaraMetrics.sm, horizontal = KlinaraMetrics.md),
+            )
+        }
+    }
+}
+
+/**
+ * Uygun saatler — sabah / öğleden sonra / akşam gruplarında, EŞİT sütunlu ızgara.
+ *
+ * Eskiden `FlowRow` + yuvarlak çip vardı: çiplerin genişliği metne göre değiştiği için
+ * satırlar düzensiz sarıyor, sağda boşluk kalıyordu. Saatler aynı uzunlukta metinler;
+ * eşit sütun hem kenardan kenara dolduruyor hem de sütun boyunca taramayı kolaylaştırıyor.
+ */
 @Composable
 private fun SlotGrid(
     state: BookingUiState,
@@ -306,52 +489,79 @@ private fun SlotGrid(
     clock: BranchClock,
 ) {
     val colors = KlinaraTheme.colors
-    // Basit bir sarmalayan ızgara: `KlinaraChipGrid` A0.3'te yazılmadı ve tek çağıranı
-    // burası; genel bir bileşen kurmak için ikinci bir çağıran beklenir.
-    androidx.compose.foundation.layout.FlowRow(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(KlinaraMetrics.xs),
-        verticalArrangement = Arrangement.spacedBy(KlinaraMetrics.xs),
-    ) {
-        state.visibleSlots.forEach { slot ->
-            val isSelected = state.draft.slot?.startsAt == slot.startsAt
-            val interaction = remember(slot.startsAt) { MutableInteractionSource() }
-            val label =
-                buildString {
-                    append(clock.formatTime(slot.startsAt))
-                    if (slot.staffProfileIds.size > 1) append(", ${slot.staffProfileIds.size} kişi uygun")
-                }
-            Row(
-                modifier =
-                    Modifier
-                        .background(if (isSelected) colors.sageDeep else colors.surfaceRaised, CircleShape)
-                        .border(
-                            if (isSelected) KlinaraMetrics.focusBorderWidth else KlinaraMetrics.borderWidth,
-                            if (isSelected) colors.sageDeep else colors.border,
-                            CircleShape,
-                        ).klinaraClickable(
-                            enabled = true,
-                            role = Role.Button,
-                            interactionSource = interaction,
-                            onClick = { viewModel.selectSlot(slot) },
-                        ).clearAndSetSemantics {
-                            contentDescription = label
-                            selected = isSelected
-                            role = Role.Button
-                        }.padding(horizontal = KlinaraMetrics.sm, vertical = CHIP_PADDING),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(KlinaraMetrics.xs),
-            ) {
+    Column(verticalArrangement = Arrangement.spacedBy(KlinaraMetrics.md)) {
+        AvailabilityPresentation.group(state.visibleSlots, clock).forEach { group ->
+            Column(verticalArrangement = Arrangement.spacedBy(KlinaraMetrics.xs)) {
                 Text(
-                    clock.formatTime(slot.startsAt),
-                    style = KlinaraType.bodyM,
-                    color = if (isSelected) colors.surfaceRaised else colors.charcoal,
-                    maxLines = 1,
+                    "${group.period.title.uppercase(TrLocale)} · ${group.slots.size}",
+                    style = KlinaraType.label,
+                    color = colors.charcoalMuted,
+                    modifier = Modifier.semantics { heading() },
                 )
-                if (slot.staffProfileIds.size > 1) {
-                    KlinaraBadge(text = "${slot.staffProfileIds.size}")
+                // Kaydırılan sayfanın içinde: Lazy ızgara iç içe kaydırma çakışması
+                // yaratırdı; slot sayısı bir günde en fazla birkaç düzine.
+                group.slots.chunked(SLOT_COLUMNS).forEach { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(KlinaraMetrics.xs)) {
+                        row.forEach { slot -> SlotChip(slot, state, viewModel, clock, Modifier.weight(1f)) }
+                        repeat(SLOT_COLUMNS - row.size) { Box(Modifier.weight(1f)) }
+                    }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SlotChip(
+    slot: AvailabilitySlot,
+    state: BookingUiState,
+    viewModel: BookingFlowViewModel,
+    clock: BranchClock,
+    modifier: Modifier,
+) {
+    val colors = KlinaraTheme.colors
+    val isSelected = state.draft.slot?.startsAt == slot.startsAt
+    val interaction = remember(slot.startsAt) { MutableInteractionSource() }
+    val shape = RoundedCornerShape(KlinaraMetrics.controlRadius)
+    val label =
+        buildString {
+            append(clock.formatTime(slot.startsAt))
+            if (slot.staffProfileIds.size > 1) append(", ${slot.staffProfileIds.size} kişi uygun")
+        }
+    Column(
+        modifier =
+            modifier
+                .heightIn(min = 44.dp)
+                .background(if (isSelected) colors.sageDeep else colors.surfaceRaised, shape)
+                .border(
+                    KlinaraMetrics.borderWidth,
+                    if (isSelected) colors.sageDeep else colors.border,
+                    shape,
+                ).klinaraClickable(
+                    enabled = true,
+                    role = Role.Button,
+                    interactionSource = interaction,
+                    onClick = { viewModel.selectSlot(slot) },
+                ).clearAndSetSemantics {
+                    contentDescription = label
+                    selected = isSelected
+                    role = Role.Button
+                },
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            clock.formatTime(slot.startsAt),
+            style = KlinaraType.bodyEmphasis,
+            color = if (isSelected) colors.surfaceRaised else colors.charcoal,
+            maxLines = 1,
+        )
+        if (slot.staffProfileIds.size > 1) {
+            Text(
+                "${slot.staffProfileIds.size} kişi",
+                style = KlinaraType.bodyM.copy(fontSize = 11.sp, lineHeight = 13.sp),
+                color = if (isSelected) colors.surfaceRaised.copy(alpha = 0.8f) else colors.charcoalMuted,
+            )
         }
     }
 }
@@ -400,6 +610,13 @@ private fun NotesSection(
                 value = state.draft.notes,
                 onValueChange = viewModel::setNotes,
                 placeholder = "Bu randevuya dair not…",
+            )
+            KlinaraDivider()
+            KlinaraToggleRow(
+                label = "Müşteriye bildir",
+                detail = "Müşteriye WhatsApp ile randevu onayı gönderilir.",
+                isOn = state.draft.notifyCustomer,
+                onToggle = viewModel::setNotifyCustomer,
             )
         }
     }
@@ -480,4 +697,4 @@ internal val BOOKING_PERMISSION = Permissions.APPOINTMENT_WRITE
 private const val NARROWED_STAFF_NOTE =
     "Yalnız seçtiğiniz hizmetlerin HEPSİNDE yetkin personel listeleniyor."
 
-private val CHIP_PADDING = 6.dp
+private const val SLOT_COLUMNS = 4

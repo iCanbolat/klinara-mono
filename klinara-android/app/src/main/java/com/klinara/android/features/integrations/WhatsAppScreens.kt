@@ -313,7 +313,7 @@ fun WhatsAppSettingsEditorScreen(
                     label = "Graph API sürümü",
                     value = draft.apiVersion,
                     onValueChange = { text -> onUpdate { it.copy(apiVersion = text) } },
-                    placeholder = "v21.0",
+                    placeholder = "v26.0",
                     error = state.fieldErrors["apiVersion"] ?: draft.apiVersionError,
                 )
             }

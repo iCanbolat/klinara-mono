@@ -163,6 +163,7 @@ class MockBookingService(
     override suspend fun cancel(
         id: String,
         reason: String?,
+        notifyCustomer: Boolean,
     ): Appointment {
         simulateLatency()
         failure()?.let { throw it }
@@ -255,12 +256,56 @@ class MockBookingService(
             cursor = clock.addingMinutes(SLOT_GRANULARITY_MINUTES.toLong(), cursor)
         }
 
+        // Gün durumu: kimsenin çalışma penceresi yoksa şube o gün kapalı sayılır.
+        val allWindows = windows.values.flatten()
+        val dayStatus =
+            AvailabilityDay(
+                date = clock.localDateString(day),
+                status = if (allWindows.isEmpty()) AvailabilityDayStatus.Closed else AvailabilityDayStatus.Open,
+                opensAt = allWindows.minOfOrNull { it.start }?.let(clock::formatTime),
+                closesAt = allWindows.maxOfOrNull { it.endInclusive }?.let(clock::formatTime),
+            )
+
         return AvailabilityResponse(
             branchId = query.branchId,
             timezone = clock.zone.id,
             slotGranularityMinutes = SLOT_GRANULARITY_MINUTES,
+            days = listOf(dayStatus),
             slots = slots,
         )
+    }
+
+    override suspend fun availabilityDays(
+        branchId: String,
+        from: Instant,
+        to: Instant,
+    ): AvailabilityDaysResponse {
+        simulateLatency()
+        failure()?.let { throw it }
+        val now = Instant.now()
+        val days = mutableListOf<AvailabilityDay>()
+        var day = clock.startOfDay(from)
+        while (day < to) {
+            // Şube saati mock'ta personel pencerelerinin birleşimi: kimse çalışmıyorsa kapalı.
+            val windows = staff().filter { it.isActive }.flatMap { workingWindows(it.id, branchId, day) }
+            val lastEnd = windows.maxOfOrNull { it.endInclusive }
+            val status =
+                when {
+                    lastEnd != null && lastEnd <= now -> AvailabilityDayStatus.Past
+                    windows.isEmpty() && clock.adding(1L, day) <= now -> AvailabilityDayStatus.Past
+                    windows.isEmpty() -> AvailabilityDayStatus.Closed
+                    else -> AvailabilityDayStatus.Open
+                }
+            days +=
+                AvailabilityDay(
+                    date = clock.localDateString(day),
+                    status = status,
+                    opensAt = windows.minOfOrNull { it.start }?.takeIf { status == AvailabilityDayStatus.Open }?.let(clock::formatTime),
+                    closesAt = lastEnd?.takeIf { status == AvailabilityDayStatus.Open }?.let(clock::formatTime),
+                )
+            day = clock.adding(1L, day)
+        }
+        return AvailabilityDaysResponse(branchId = branchId, timezone = clock.zone.id, days = days)
     }
 
     override suspend fun create(

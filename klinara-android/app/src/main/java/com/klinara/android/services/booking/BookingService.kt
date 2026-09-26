@@ -1,6 +1,7 @@
 package com.klinara.android.services.booking
 
 import com.klinara.android.services.networking.Page
+import java.time.Instant
 
 /**
  * Takvim ve randevu uçları. Uç yolları doc yorumlarında; `API_DEVELOPMENT.md` Faz 3.
@@ -66,6 +67,7 @@ interface BookingService {
     suspend fun cancel(
         id: String,
         reason: String?,
+        notifyCustomer: Boolean = true,
     ): Appointment
 
     /**
@@ -84,6 +86,16 @@ interface BookingService {
 
     /** `GET availability` — verilen hizmet dizisi için uygun başlangıçlar. */
     suspend fun availability(query: AvailabilityQuery): AvailabilityResponse
+
+    /**
+     * `GET availability/days` — gün durumları (açık / kapalı / tatil…), [to] dışlayıcı.
+     * Tarih seçicinin seçilemez günleri işaretlemesi için; hizmet gerekmiyor.
+     */
+    suspend fun availabilityDays(
+        branchId: String,
+        from: Instant,
+        to: Instant,
+    ): AvailabilityDaysResponse
 
     /**
      * `POST appointments`

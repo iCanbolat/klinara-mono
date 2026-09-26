@@ -185,7 +185,8 @@ const RULES: readonly Rule[] = [
     methods: ['POST'],
     pattern: new RegExp(`^appointments/${UUID}/(reschedule|cancel|status)$`),
   },
-  { methods: ['GET'], pattern: /^availability$/ },
+  // `availability/days`: tarih seçicinin kapalı/tatil günleri işaretlemesi.
+  { methods: ['GET'], pattern: /^availability(\/days)?$/ },
   { methods: ['GET'], pattern: /^calendar\/(day|week|staff)$/ },
 
   // Randevu formunun OKUMA yüzeyi. Yazma metotları 12.4'te, kendi
@@ -258,6 +259,38 @@ const RULES: readonly Rule[] = [
   // değişemez — başka bir gün, başka bir kayıttır.
   { methods: ['GET', 'POST'], pattern: /^holidays$/ },
   { methods: ['PATCH', 'DELETE'], pattern: new RegExp(`^holidays/${UUID}$`) },
+
+  // --- WhatsApp kurulumu (mobildeki akışın panel karşılığı) ---
+  // Hepsi `notification:manage` (test gönderimi `notification:send`). Token
+  // YAZILIR ama hiçbir yanıtta dönmez — sunucu yalnız maskesini veriyor, yani
+  // bu kapı token'ı tarayıcıya indirmiyor. `webhooks/*` KAPALI kalıyor: o yol
+  // Meta'nın, kullanıcının değil.
+  { methods: ['GET', 'PUT'], pattern: /^integrations\/whatsapp$/ },
+  { methods: ['GET'], pattern: /^integrations\/whatsapp\/templates$/ },
+  {
+    methods: ['POST'],
+    pattern: /^integrations\/whatsapp\/(verify|test|templates\/provision)$/,
+  },
+
+  // --- Sohbetler (resepsiyonun Mesajlar ekranı) — `notification:send` ---
+  // `messages` (ham mesaj kaydı) hâlâ KAPALI: sohbet ekranı kaydın yalnız
+  // WhatsApp yazışmasını, sohbet başına ve yetkiyle süzülmüş hâlini okuyor.
+  { methods: ['GET'], pattern: /^conversations$/ },
+  { methods: ['GET'], pattern: /^conversations\/unread-count$/ },
+  { methods: ['GET'], pattern: new RegExp(`^conversations/${UUID}$`) },
+  // Pencere kapalıyken gönderilebilecek onaylı şablonlar ve gönderimi.
+  { methods: ['GET'], pattern: new RegExp(`^conversations/${UUID}/templates$`) },
+  {
+    methods: ['POST'],
+    pattern: new RegExp(`^conversations/${UUID}/(messages|template|read|close|reopen)$`),
+  },
+  { methods: ['PUT'], pattern: new RegExp(`^conversations/${UUID}/customer$`) },
+
+  // --- Personel bildirim merkezi (zil ikonu) — `notification:read` ---
+  // Akış panelin KENDİ bildirimleri; müşteriye giden ileti kaydı (`messages`)
+  // burada da kapalı kalıyor.
+  { methods: ['GET'], pattern: /^staff-notifications$/ },
+  { methods: ['POST'], pattern: /^staff-notifications\/read$/ },
 ];
 
 /**

@@ -51,6 +51,34 @@ class CustomerListViewModelTest {
         }
 
     @Test
+    @DisplayName("Özet yükleniyor; toplam kayıt sayısıyla tutarlı")
+    fun loadsSummary() =
+        runTest {
+            val service = MockCustomerService(latencyEnabled = false)
+            val viewModel = subject(service)
+            viewModel.loadSummary()
+            advanceUntilIdle()
+
+            val summary = viewModel.state.value.summary
+            assertNotNull(summary)
+            assertEquals(service.snapshot().size, summary!!.total)
+        }
+
+    @Test
+    @DisplayName("Özet hatası sessiz: şerit çizilmez, liste etkilenmez")
+    fun summaryFailureIsSilent() =
+        runTest {
+            val counting = CountingCustomers(MockCustomerService(latencyEnabled = false)).apply { failSummary = true }
+            val viewModel = subject(counting)
+            viewModel.load()
+            viewModel.loadSummary()
+            advanceUntilIdle()
+
+            assertNull(viewModel.state.value.summary)
+            assertTrue(viewModel.state.value.list is Loadable.Loaded)
+        }
+
+    @Test
     @DisplayName("`loadMore` sayfayı EKLER, listeyi değiştirmez")
     fun loadMoreAppends() =
         runTest {
@@ -251,6 +279,10 @@ private class CountingCustomers(
     }
 
     override suspend fun get(id: String): Customer = delegate.get(id)
+
+    var failSummary: Boolean = false
+
+    override suspend fun summary() = if (failSummary) error("özet alınamadı") else delegate.summary()
 
     override suspend fun search(
         query: String,

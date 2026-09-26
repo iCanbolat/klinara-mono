@@ -10,6 +10,8 @@ import {
   Globe,
   LayoutDashboard,
   LayoutPanelTop,
+  MessageCircle,
+  MessagesSquare,
   Scissors,
   Users,
   UserCog,
@@ -44,6 +46,7 @@ const ICONS: Record<string, LucideIcon> = {
   '/dashboard': LayoutDashboard,
   '/takvim': CalendarDays,
   '/musteriler': Users,
+  '/mesajlar': MessagesSquare,
   '/katalog': Scissors,
   '/personel': UsersRound,
   '/calisma-saatleri': Clock,
@@ -51,6 +54,7 @@ const ICONS: Record<string, LucideIcon> = {
   '/icerik': FileText,
   '/alan-adlari': Globe,
   '/raporlar': BarChart3,
+  '/whatsapp': MessageCircle,
   '/hesap': UserCog,
 };
 
@@ -69,7 +73,10 @@ export function Sidebar(): ReactNode {
   return (
     <SidebarRoot collapsible="icon">
       <SidebarHeader className="h-16 justify-center border-b border-sidebar-border px-3">
-        <Link href="/dashboard" className="flex items-center gap-2.5 overflow-hidden rounded-lg py-1">
+        <Link
+          href="/dashboard"
+          className="flex items-center gap-2.5 overflow-hidden rounded-lg py-1"
+        >
           <KlinaraMark size={26} />
           <span className="text-title-m leading-none tracking-[0.28em] text-sidebar-foreground group-data-[collapsible=icon]:hidden">
             KLINARA
@@ -108,8 +115,6 @@ export function Sidebar(): ReactNode {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-
     </SidebarRoot>
   );
 }
-

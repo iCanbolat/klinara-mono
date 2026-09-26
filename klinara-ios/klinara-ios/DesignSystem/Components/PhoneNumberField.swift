@@ -14,6 +14,7 @@ struct PhoneNumberField: View {
     var error: String?
     var onSubmit: (() -> Void)?
 
+    @Environment(\.klinaraReservesFieldErrorSpace) private var reservesErrorSpace
     @State private var isFocused = false
 
     private var hasError: Bool { error?.isEmpty == false }
@@ -54,7 +55,9 @@ struct PhoneNumberField: View {
             .accessibilityElement(children: .combine)
             .accessibilityLabel("\(label), Türkiye, artı doksan")
 
-            FieldErrorText(message: error)
+            if reservesErrorSpace || hasError {
+                FieldErrorText(message: error)
+            }
         }
         .animation(KlinaraMetrics.feedback, value: hasError)
         .animation(KlinaraMetrics.feedback, value: isFocused)

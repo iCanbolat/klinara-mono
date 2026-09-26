@@ -107,7 +107,7 @@ struct NotificationTemplateListView: View {
                     if !template.isActive {
                         KlinaraBadge(text: "Pasif", tone: .warning)
                     }
-                    // Sağlayıcısı olmayan kanallar (SMS, push) kaydedilebilir
+                    // Sağlayıcısı olmayan kanallar (push) kaydedilebilir
                     // ama gönderim yapmaz; şablonu düzenleyip mesajın neden
                     // gitmediğini aramak kullanıcının işi olmamalı.
                     if !template.channel.isDeliverable {

@@ -9,6 +9,7 @@ import type { Tx } from '../../database/tenant-tx';
 import type { Principal } from '../identity/principal';
 import * as repo from './crm.repository';
 import type {
+  CustomerSummaryDto,
   CreateCustomerDto,
   CustomerMergeResponseDto,
   CustomerResponseDto,
@@ -60,6 +61,10 @@ export class CrmService {
     });
 
     return rows.map((row) => CrmService.toResponse(row, tags.get(row.id) ?? []));
+  }
+
+  async customerSummary(): Promise<CustomerSummaryDto> {
+    return this.tx.run((tx) => repo.customerSummary(tx));
   }
 
   async getCustomer(id: string): Promise<CustomerResponseDto> {

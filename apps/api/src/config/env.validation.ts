@@ -573,8 +573,8 @@ export class EnvironmentVariables {
   WHATSAPP_API_BASE_URL: string = 'https://graph.facebook.com';
 
   @Expose()
-  @Matches(/^v\d+\.\d+$/, { message: "'v21.0' biçiminde olmalı" })
-  WHATSAPP_API_VERSION: string = 'v21.0';
+  @Matches(/^v\d+\.\d+$/, { message: "'v26.0' biçiminde olmalı" })
+  WHATSAPP_API_VERSION: string = 'v26.0';
 
   @Expose()
   @Type(() => Number)

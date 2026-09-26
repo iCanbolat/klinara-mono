@@ -1,0 +1,12 @@
+{
+  "id": "171269b8-a4a6-4457-87c7-d29d7b9046b8",
+  "direction": "out",
+  "type": "text",
+  "body": "Merhaba",
+  "createdAt": "2026-09-22T10:31:38.690Z",
+  "status": "failed",
+  "event": "staff_reply",
+  "sentByName": "Klinik Sahibi",
+  "errorDetail": "Recipient is not a WhatsApp user",
+  "appointmentId": null
+}

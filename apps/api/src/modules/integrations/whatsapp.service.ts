@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ERROR_CODES } from '@klinara/shared';
 import { AppError } from '../../common/errors/app-error';
@@ -7,11 +7,19 @@ import type { EnvironmentVariables } from '../../config/env.validation';
 import { TenantTxService } from '../../database/tenant-tx.service';
 import { normalizePhone } from '../../common/phone';
 import { PermanentSendError, TransientSendError } from '../notifications/send-errors';
+import {
+  WHATSAPP_CLIENT,
+  type WhatsAppClient,
+  type WhatsAppCredentials,
+} from '../../lib/whatsapp/whatsapp.types';
 import * as repo from './whatsapp.repository';
-import { WhatsAppSenderService } from './whatsapp-sender.service';
+import { redactToken, WhatsAppSenderService } from './whatsapp-sender.service';
+import { STANDARD_TEMPLATES, toDraft } from './whatsapp-standard-templates';
 import type {
   UpsertWhatsAppAccountDto,
   WhatsAppAccountResponseDto,
+  WhatsAppProvisionItemDto,
+  WhatsAppProvisionResultDto,
   WhatsAppTemplateResponseDto,
   WhatsAppTestResultDto,
   WhatsAppTestSendDto,
@@ -32,6 +40,7 @@ export class WhatsAppService {
     private readonly encryption: FieldEncryptionService,
     private readonly sender: WhatsAppSenderService,
     private readonly config: ConfigService<EnvironmentVariables, true>,
+    @Inject(WHATSAPP_CLIENT) private readonly client: WhatsAppClient,
   ) {}
 
   async get(): Promise<WhatsAppAccountResponseDto | null> {
@@ -89,9 +98,99 @@ export class WhatsAppService {
       category: row.category,
       status: row.status,
       bodyVariableCount: row.bodyVariableCount,
+      bodyText: row.bodyText,
       buttons: row.buttons,
       syncedAt: row.syncedAt?.toISOString() ?? null,
     }));
+  }
+
+  /**
+   * Klinara'nın standart template setini kiracının WABA'sına yazar.
+   *
+   * İDEMPOTENT: Meta'da aynı ad + dilde bulunan template'e dokunulmaz (onaylı
+   * bir template'i yeniden göndermek onu onaya düşürmezdi ama gereksiz bir
+   * istek ve bir "zaten var" hatası olurdu). Bir template'in başarısız olması
+   * ötekileri durdurmaz — sonuç satır satır döner.
+   *
+   * Ağ çağrıları transaction DIŞINDA: Meta'yı beklerken bir DB bağlantısını
+   * açık tutmanın sebebi yok. Sonunda yansıma (`whatsapp_templates`) tazelenir.
+   */
+  async provisionTemplates(): Promise<WhatsAppProvisionResultDto> {
+    const account = await this.tx.run((tx) => repo.findAccount(tx));
+    if (account === undefined) {
+      throw new AppError(
+        422,
+        ERROR_CODES.WHATSAPP_NOT_CONFIGURED,
+        'Önce WhatsApp hesabının kimlik bilgilerini kaydedin',
+      );
+    }
+
+    const credentials: WhatsAppCredentials = {
+      phoneNumberId: account.phoneNumberId,
+      accessToken: this.encryption.decrypt(account.accessTokenEncrypted),
+      apiVersion: account.apiVersion,
+    };
+
+    const existing = await this.callMeta(credentials.accessToken, () =>
+      this.client.listTemplates(credentials, account.wabaId),
+    );
+    const byKey = new Map(existing.map((row) => [`${row.name}:${row.language}`, row]));
+
+    const results: WhatsAppProvisionItemDto[] = [];
+    for (const template of STANDARD_TEMPLATES) {
+      const found = byKey.get(`${template.name}:${template.language}`);
+      if (found !== undefined) {
+        results.push({ name: template.name, outcome: 'exists', status: found.status, error: null });
+        continue;
+      }
+      try {
+        const created = await this.client.createTemplate(
+          credentials,
+          account.wabaId,
+          toDraft(template),
+        );
+        results.push({ name: template.name, outcome: 'created', status: created.status, error: null });
+      } catch (error) {
+        const detail = redactToken(
+          error instanceof Error ? error.message : String(error),
+          credentials.accessToken,
+        );
+        // Aynı anda iki sekmeden basılırsa ikincisi "zaten var" alır; bu bir
+        // hata değil, istenen sonuç.
+        if (/already exists/i.test(detail)) {
+          results.push({ name: template.name, outcome: 'exists', status: 'pending', error: null });
+          continue;
+        }
+        results.push({ name: template.name, outcome: 'failed', status: null, error: detail });
+      }
+    }
+
+    // Yansıma Meta'dan YENİDEN okunur: az önce oluşturulanlar da listede
+    // görünsün ve durumları Meta'nın söylediği olsun.
+    const refreshed = await this.callMeta(credentials.accessToken, () =>
+      this.client.listTemplates(credentials, account.wabaId),
+    ).catch(() => undefined);
+    if (refreshed !== undefined) {
+      await this.tx.run((tx) => repo.replaceTemplates(tx, this.tx.tenantId, refreshed));
+    }
+
+    return {
+      results,
+      created: results.filter((row) => row.outcome === 'created').length,
+      failed: results.filter((row) => row.outcome === 'failed').length,
+    };
+  }
+
+  /** Meta çağrısının hatasını HTTP hatasına çevirir; token metinden silinir. */
+  private async callMeta<T>(accessToken: string, call: () => Promise<T>): Promise<T> {
+    try {
+      return await call();
+    } catch (error) {
+      const detail = redactToken(error instanceof Error ? error.message : String(error), accessToken);
+      if (error instanceof PermanentSendError) throw new AppError(422, error.code, detail);
+      if (error instanceof TransientSendError) throw new AppError(503, error.code, detail);
+      throw error;
+    }
   }
 
   /** Test gönderimi: onaylı bir template ile gerçek bir mesaj gider. */

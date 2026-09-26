@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
+import { GitMerge, Pencil } from 'lucide-react';
 import { PERMISSIONS, type Customer } from '@klinara/shared';
 import { t } from '@/i18n/tr';
 import { api } from '@/lib/api/client';
@@ -8,10 +9,13 @@ import { useSession } from '@/components/session/session-provider';
 import { toMessage } from '@/lib/reports/errors';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { PageHeader } from '@/components/ui/page-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CustomerFormDialog } from './customer-form';
+import { CustomerProfile } from './customer-profile';
+import { usePageCrumb } from '@/components/shell/page-crumb';
 import { FilesPanel } from './files-panel';
 import { MergeDialog } from './merge-dialog';
 import { NotesPanel } from './notes-panel';
@@ -40,6 +44,8 @@ export function CustomerCard({ customerId }: { customerId: string }): ReactNode 
 
   const canWrite = permissions.includes(PERMISSIONS.CUSTOMER_WRITE);
   const canMerge = permissions.includes(PERMISSIONS.CUSTOMER_MERGE);
+  usePageCrumb(customer?.fullName ?? null);
+
   const canSeeTimeline =
     permissions.includes(PERMISSIONS.APPOINTMENT_READ_ALL) ||
     permissions.includes(PERMISSIONS.APPOINTMENT_READ_OWN);
@@ -72,28 +78,36 @@ export function CustomerCard({ customerId }: { customerId: string }): ReactNode 
 
   if (customer === null) {
     return (
-      <div className="flex flex-col gap-2" aria-busy="true">
-        <Skeleton className="h-10 w-64" />
-        <Skeleton className="h-40 w-full" />
+      <div className="flex flex-col gap-8" aria-busy="true">
+        <div className="flex flex-col gap-2">
+          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-4 w-36" />
+        </div>
+        <div className="grid items-start gap-6 lg:grid-cols-[18rem_minmax(0,1fr)]">
+          <Skeleton className="h-96 w-full rounded-xl" />
+          <Skeleton className="h-72 w-full rounded-xl" />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col">
       <PageHeader
         title={customer.fullName}
         {...(customer.phone === null ? {} : { description: customer.phone })}
         actions={
-          <span className="flex gap-2">
-            {canWrite ? (
-              <Button type="button" variant="secondary" onClick={() => setEditing(true)}>
-                {t('customers.save')}
-              </Button>
-            ) : null}
+          <span className="flex flex-wrap gap-2">
             {canMerge ? (
               <Button type="button" variant="ghost" onClick={() => setMerging(true)}>
+                <GitMerge aria-hidden="true" />
                 {t('customers.merge.title')}
+              </Button>
+            ) : null}
+            {canWrite ? (
+              <Button type="button" variant="secondary" onClick={() => setEditing(true)}>
+                <Pencil aria-hidden="true" />
+                {t('customers.edit')}
               </Button>
             ) : null}
           </span>
@@ -101,33 +115,41 @@ export function CustomerCard({ customerId }: { customerId: string }): ReactNode 
       />
 
       {customer.mergedIntoCustomerId !== null ? (
-        <Alert tone="warn">{t('customers.inactive')}</Alert>
+        <Alert tone="warn" className="mb-6">
+          {t('customers.inactive')}
+        </Alert>
       ) : null}
 
-      <Tabs defaultValue="notes">
-        <TabsList>
-          <TabsTrigger value="notes">{t('customers.tab.notes')}</TabsTrigger>
-          {/* Randevu izni yoksa HİÇ render edilmiyor — bkz. dosya başlığı. */}
-          {canSeeTimeline ? (
-            <TabsTrigger value="timeline">{t('customers.tab.timeline')}</TabsTrigger>
-          ) : null}
-          <TabsTrigger value="files">{t('customers.tab.files')}</TabsTrigger>
-        </TabsList>
+      <div className="grid gap-6 lg:grid-cols-[18rem_minmax(0,1fr)]">
+        <CustomerProfile customer={customer} />
 
-        <TabsContent value="notes">
-          <NotesPanel customerId={customerId} />
-        </TabsContent>
+        <Card className="min-w-0">
+          <Tabs defaultValue="notes" className="gap-5">
+            <TabsList>
+              <TabsTrigger value="notes">{t('customers.tab.notes')}</TabsTrigger>
+              {/* Randevu izni yoksa HİÇ render edilmiyor — bkz. dosya başlığı. */}
+              {canSeeTimeline ? (
+                <TabsTrigger value="timeline">{t('customers.tab.timeline')}</TabsTrigger>
+              ) : null}
+              <TabsTrigger value="files">{t('customers.tab.files')}</TabsTrigger>
+            </TabsList>
 
-        {canSeeTimeline ? (
-          <TabsContent value="timeline">
-            <TimelinePanel customerId={customerId} />
-          </TabsContent>
-        ) : null}
+            <TabsContent value="notes">
+              <NotesPanel customerId={customerId} />
+            </TabsContent>
 
-        <TabsContent value="files">
-          <FilesPanel customerId={customerId} canWrite={canWrite} />
-        </TabsContent>
-      </Tabs>
+            {canSeeTimeline ? (
+              <TabsContent value="timeline">
+                <TimelinePanel customerId={customerId} />
+              </TabsContent>
+            ) : null}
+
+            <TabsContent value="files">
+              <FilesPanel customerId={customerId} canWrite={canWrite} />
+            </TabsContent>
+          </Tabs>
+        </Card>
+      </div>
 
       <CustomerFormDialog
         open={editing}

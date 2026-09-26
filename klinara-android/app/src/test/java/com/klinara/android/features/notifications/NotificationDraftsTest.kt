@@ -25,7 +25,7 @@ class NotificationDraftsTest {
     private fun preference(path: String) =
         KlinaraJson.decodeFromString(NotificationPreference.serializer(), Fixtures.read("notifications/$path"))
 
-    private fun reminderForm(channel: NotificationChannel = NotificationChannel.Sms) =
+    private fun reminderForm(channel: NotificationChannel = NotificationChannel.WhatsApp) =
         NotificationTemplateForm.editing(
             NotificationTemplate(event = NotificationEvent.AppointmentReminder, channel = channel, body = "Merhaba"),
         )
@@ -83,9 +83,9 @@ class NotificationDraftsTest {
     @Test
     @DisplayName("Konu yalnız e-posta kanalında gövdeye konur; Meta alanları yalnız WhatsApp'ta ve ad varsa")
     fun inputShapeByChannel() {
-        val sms = reminderForm().copy(subject = "Hatırlatma").input()
-        assertNull(sms.subject, "Sunucu e-posta dışında `subject` anahtarını 422 ile reddediyor")
-        assertNull(sms.whatsappVariables)
+        val push = reminderForm(NotificationChannel.Push).copy(subject = "Hatırlatma").input()
+        assertNull(push.subject, "Sunucu e-posta dışında `subject` anahtarını 422 ile reddediyor")
+        assertNull(push.whatsappVariables)
 
         val email = reminderForm(NotificationChannel.Email).copy(subject = "Hatırlatma").input()
         assertEquals("Hatırlatma", email.subject)
@@ -118,7 +118,7 @@ class NotificationDraftsTest {
 
         assertNull(decoded.templateId)
         assertTrue(decoded.isDefault)
-        assertEquals("appointment_confirmation|sms|tr", decoded.rowId)
+        assertEquals("appointment_confirmation|whatsapp|tr", decoded.rowId)
     }
 
     @Test
@@ -129,14 +129,13 @@ class NotificationDraftsTest {
                 listOf(template("template-default.json")),
             )
         val confirmation = groups.first { it.event == NotificationEvent.AppointmentConfirmation }
+        val expiring = groups.first { it.event == NotificationEvent.PackageExpiring }
 
-        // E-posta müşteri olaylarından çıktı: katalogda yalnız WhatsApp ve SMS kaldı.
-        assertEquals(
-            listOf(NotificationChannel.WhatsApp, NotificationChannel.Sms),
-            confirmation.rows.map { it.template.channel },
-            "Katalog sırası: WhatsApp önce",
-        )
-        assertEquals(listOf(true, false), confirmation.rows.map { it.isMissing })
+        // Müşteri olaylarında tek kanal WhatsApp: sunucudan gelen satır var, eksik yok.
+        assertEquals(listOf(NotificationChannel.WhatsApp), confirmation.rows.map { it.template.channel })
+        assertEquals(listOf(false), confirmation.rows.map { it.isMissing })
+        // Standart template'i olmayan olayın WhatsApp satırı 'Şablon yok' olarak çıkar.
+        assertEquals(listOf(true), expiring.rows.map { it.isMissing })
     }
 
     // --- Tercih taslağı ---
@@ -170,7 +169,7 @@ class NotificationDraftsTest {
     fun legacyEqualEndsAreDisabled() {
         val legacy =
             NotificationPreference(
-                event = NotificationEvent.Birthday,
+                event = NotificationEvent.PackageExpiring,
                 quietHoursStart = "00:00",
                 quietHoursEnd = "00:00",
             )
@@ -181,17 +180,15 @@ class NotificationDraftsTest {
     }
 
     @Test
-    @DisplayName("Kanal sırası taşınır; ilk kanal yukarı gitmez; şube kapsamı şube kimliğini gönderir")
+    @DisplayName("İlk kanal yukarı gitmez; eklenecek kanal kalmaz; şube kapsamı şube kimliğini gönderir")
     fun channelOrdering() {
         val draft = PreferenceDraft.editing(preference("preference-saved.json"))
 
-        val moved = draft.movingUp(NotificationChannel.Sms)
-        assertEquals(listOf(NotificationChannel.Sms, NotificationChannel.WhatsApp), moved.channels)
-        assertEquals(moved, moved.movingUp(NotificationChannel.Sms))
-        // Eklenebilecek kanal kalmadı: taslak zaten WhatsApp + SMS taşıyor ve müşteriye
-        // gidebilecek küme bu ikisinden ibaret.
+        assertEquals(listOf(NotificationChannel.WhatsApp), draft.channels)
+        assertEquals(draft, draft.movingUp(NotificationChannel.WhatsApp))
+        // Eklenebilecek kanal kalmadı: müşteriye gidebilecek küme yalnız WhatsApp.
         assertEquals(emptyList<NotificationChannel>(), draft.availableChannels)
-        assertEquals("b1", moved.copy(isBranchScope = true).input("b1").branchId)
+        assertEquals("b1", draft.copy(isBranchScope = true).input("b1").branchId)
     }
 
     // --- Hatırlatma taslağı ---

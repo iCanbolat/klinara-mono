@@ -29,6 +29,7 @@ import {
   CreateCustomerDto,
   CustomerMergeResponseDto,
   CustomerPageDto,
+  CustomerSummaryDto,
   CustomerResponseDto,
   CustomerTagInputDto,
   CustomerTagListResponseDto,
@@ -63,6 +64,20 @@ export class CrmController {
   @ApiOkResponse({ type: [CustomerResponseDto] })
   search(@Query() query: SearchCustomersQueryDto): Promise<CustomerResponseDto[]> {
     return this.crm.searchCustomers(query);
+  }
+
+  // NOT: `customers/:id`den ÖNCE tanımlı olmalı (bkz. search).
+  @Get('customers/summary')
+  @RequirePermission(PERMISSIONS.CUSTOMER_READ)
+  @ApiOperation({
+    summary: 'Müşteri tabanı özeti',
+    description:
+      'Kiracı kapsamlı sayılar: toplam, son 30 gün yeni, son 90 gün aktif ve ' +
+      'geri kazanılacak. Yanıt müşteri KİMLİĞİ taşımaz.',
+  })
+  @ApiOkResponse({ type: CustomerSummaryDto })
+  summary(): Promise<CustomerSummaryDto> {
+    return this.crm.customerSummary();
   }
 
   @Post('customers')

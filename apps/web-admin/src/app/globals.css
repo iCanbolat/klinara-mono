@@ -205,6 +205,12 @@
     border-color: var(--border);
   }
 
+  /* Tailwind v4 düğmelerden `cursor: pointer`ı kaldırdı; ham <button>'lar için geri. */
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']) {
+    cursor: pointer;
+  }
+
   body {
     background: var(--background);
     color: var(--foreground);

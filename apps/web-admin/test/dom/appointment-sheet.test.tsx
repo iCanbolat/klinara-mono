@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { PERMISSIONS } from '@klinara/shared';
+import { PERMISSIONS, type Service } from '@klinara/shared';
 
 const get = vi.fn();
 const post = vi.fn();
@@ -64,12 +64,16 @@ const APPOINTMENT = {
 const detailCalls = (): number =>
   get.mock.calls.filter((call) => call[0] === 'appointments/a1').length;
 
-function renderSheet() {
+// Panel yalnız `id` → `name` eşlemesi kullanıyor; gerisi test için gürültü.
+const CATALOG = [{ id: 's1', name: 'Cilt bakımı' }] as Service[];
+
+function renderSheet(services: Service[] = CATALOG) {
   const onChanged = vi.fn();
   render(
     <AppointmentSheet
       appointmentId="a1"
       timezone="Europe/Istanbul"
+      services={services}
       onClose={vi.fn()}
       onChanged={onChanged}
     />,
@@ -90,6 +94,23 @@ describe('randevu ayrıntı paneli', () => {
     });
     post.mockResolvedValue(undefined);
     patch.mockResolvedValue({ ...APPOINTMENT, version: 4, notes: 'yeni' });
+  });
+
+  it('hizmet satırında UUID değil hizmet ADI görünüyor', async () => {
+    renderSheet();
+    expect(await screen.findByText('Cilt bakımı')).toBeInTheDocument();
+    expect(screen.queryByText('s1')).not.toBeInTheDocument();
+  });
+
+  it('katalogda olmayan (silinmiş) hizmet açık etiketle gösteriliyor', async () => {
+    renderSheet([{ id: 'baska', name: 'Başka' }] as Service[]);
+    expect(await screen.findByText('Silinmiş hizmet')).toBeInTheDocument();
+  });
+
+  it('katalog BOŞKEN (yükleniyor/hata) "silinmiş" DENMİYOR', async () => {
+    renderSheet([]);
+    expect(await screen.findByText('—')).toBeInTheDocument();
+    expect(screen.queryByText('Silinmiş hizmet')).not.toBeInTheDocument();
   });
 
   it('DURUM DEĞİŞTİRDİKTEN sonra randevuyu YENİDEN OKUYOR', async () => {
@@ -133,6 +154,53 @@ describe('randevu ayrıntı paneli', () => {
     });
     await waitFor(() => {
       expect(detailCalls()).toBeGreaterThan(before);
+    });
+  });
+
+  describe('iptalde müşteriye bildirim', () => {
+    const FUTURE = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
+
+    const openCancel = async () => {
+      const user = userEvent.setup();
+      renderSheet();
+      await user.click(await screen.findByRole('button', { name: 'İptal et' }));
+      return user;
+    };
+
+    const cancelBody = () =>
+      post.mock.calls.find((call) => call[0] === 'appointments/a1/cancel')?.[1] as
+        | Record<string, unknown>
+        | undefined;
+
+    it('ileri tarihli randevuda kutu varsayılan işaretli; bayrak gövdeye girmiyor', async () => {
+      get.mockImplementation((path: string) =>
+        Promise.resolve(path === 'appointments/a1' ? { ...APPOINTMENT, startsAt: FUTURE } : { data: [] }),
+      );
+      const user = await openCancel();
+
+      const checkbox = await screen.findByRole('checkbox', { name: 'Müşteriye bildir' });
+      expect(checkbox).toBeChecked();
+      await user.click(await screen.findByRole('button', { name: 'İptal et', hidden: false }));
+
+      await waitFor(() => expect(cancelBody()).toEqual({}));
+    });
+
+    it('kutu kaldırılırsa `notifyCustomer: false` gider', async () => {
+      get.mockImplementation((path: string) =>
+        Promise.resolve(path === 'appointments/a1' ? { ...APPOINTMENT, startsAt: FUTURE } : { data: [] }),
+      );
+      const user = await openCancel();
+
+      await user.click(await screen.findByRole('checkbox', { name: 'Müşteriye bildir' }));
+      await user.click(await screen.findByRole('button', { name: 'İptal et', hidden: false }));
+
+      await waitFor(() => expect(cancelBody()).toEqual({ notifyCustomer: false }));
+    });
+
+    it('geçmiş randevuda kutu hiç gösterilmez', async () => {
+      await openCancel();
+      await screen.findByRole('dialog');
+      expect(screen.queryByRole('checkbox', { name: 'Müşteriye bildir' })).not.toBeInTheDocument();
     });
   });
 

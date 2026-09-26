@@ -103,6 +103,32 @@ describe('WhatsApp Cloud API adapter (Batch 8.2)', () => {
     return row;
   };
 
+  /**
+   * Hesabı kaydeder VE doğrular. Dispatcher doğrulanmamış hesapta WhatsApp'ı
+   * atlıyor; gönderim testleri doğrulanmış hesap istiyor.
+   * Doğrulamanın Meta çağrısı sayaçta kalmasın diye mock sıfırlanıyor.
+   */
+  const activate = async () => {
+    await configure().expect(200);
+    const verified = await http(app)
+      .post('/api/v1/integrations/whatsapp/verify')
+      .set(ownerAuth())
+      .expect(200);
+    expect((verified.body as { ok: boolean }).ok).toBe(true);
+    graph.reset();
+  };
+
+  /** Otomatik cevap: standart template'i OLMAYAN, serbest metinli olay. */
+  const enqueueAutoReply = () =>
+    app.get(TenantTxService).runForTenant(clinic.tenant.id, (tx) =>
+      app.get(NotificationDispatcherService).enqueue(tx, clinic.tenant.id, {
+        event: 'auto_reply',
+        customerId: clinic.customer.id,
+        channels: ['whatsapp'],
+        variables: { message: 'Randevunuz onaylandı.' },
+      }),
+    );
+
   /** Kiracıya WhatsApp şablonu tanımlar (template adı + konumsal eşleme). */
   const defineTemplate = () =>
     http(app)
@@ -145,6 +171,12 @@ describe('WhatsApp Cloud API adapter (Batch 8.2)', () => {
         .expect(200);
 
       expect(verified.body).toMatchObject({ ok: true, templateCount: 1 });
+      // Abonelik olmadan Meta bu WABA'nın webhook'larını hiç göndermez.
+      expect(
+        graph.requests.some(
+          (request) => request.method === 'POST' && request.url.endsWith('/subscribed_apps'),
+        ),
+      ).toBe(true);
 
       const account = await http(app)
         .get('/api/v1/integrations/whatsapp')
@@ -159,7 +191,13 @@ describe('WhatsApp Cloud API adapter (Batch 8.2)', () => {
         .expect(200);
       expect(templates.body).toHaveLength(1);
       expect(templates.body).toMatchObject([
-        { name: 'randevu_hatirlatma', status: 'approved', bodyVariableCount: 2 },
+        {
+          name: 'randevu_hatirlatma',
+          status: 'approved',
+          bodyVariableCount: 2,
+          // Gövde de yansımaya yazılır — sohbet ekranı önizlemesi buradan okur.
+          bodyText: 'Sayın {{1}}, {{2}} randevunuzu hatırlatırız.',
+        },
       ]);
     });
 
@@ -308,7 +346,7 @@ describe('WhatsApp Cloud API adapter (Batch 8.2)', () => {
   // -------------------------------------------------------------------------
   describe('bildirim çekirdeğinden gönderim', () => {
     it('template parametrelerini ŞABLONDAKİ SIRAYLA gönderir', async () => {
-      await configure().expect(200);
+      await activate();
       await defineTemplate().expect(200);
 
       const queued = await enqueueWhatsApp();
@@ -332,9 +370,67 @@ describe('WhatsApp Cloud API adapter (Batch 8.2)', () => {
       expect((await lastMessage()).status).toBe('sent');
     });
 
-    it('hesap yapılandırılmamışsa KALICI hata — yeniden denenmez', async () => {
+    it('şablon eşlemesi yoksa Klinara’nın STANDART template’i gider', async () => {
+      await activate();
+
       const queued = await enqueueWhatsApp();
       if (queued.status !== 'queued') throw new Error('kuyruğa yazılmalıydı');
+      await runWorker(queued.messageId);
+
+      const template = (
+        graph.requests.at(-1)?.body as { template: { components: unknown[]; name: string } }
+      ).template;
+      expect(template.name).toBe('klinara_randevu_hatirlatma');
+      // Sıra standart tanımdaki `variables`tan: ad, zaman, hizmet, şube.
+      expect(template.components).toEqual([
+        {
+          type: 'body',
+          parameters: [
+            { type: 'text', text: 'Ayşe Yılmaz' },
+            { type: 'text', text: '7 Eylül 14:00' },
+            { type: 'text', text: 'Lazer' },
+            { type: 'text', text: 'Merkez' },
+          ],
+        },
+      ]);
+      expect((await lastMessage()).status).toBe('sent');
+    });
+
+    it('template ONAY BEKLİYORSA WhatsApp atlanır ve mesaj yazılmaz', async () => {
+      await activate();
+      // Meta onay bekleyen template'le gönderime izin vermiyor (#132001);
+      // denenirse müşteriye hiçbir şey gitmezdi.
+      await database.ownerPool.query(
+        `insert into whatsapp_templates (tenant_id, name, language, status)
+         values ($1, 'klinara_randevu_hatirlatma', 'tr', 'pending')`,
+        [clinic.tenant.id],
+      );
+
+      const queued = await app.get(TenantTxService).runForTenant(clinic.tenant.id, (tx) =>
+        app.get(NotificationDispatcherService).enqueue(tx, clinic.tenant.id, {
+          event: 'appointment_reminder',
+          customerId: clinic.customer.id,
+          branchId: clinic.branch.id,
+          channels: ['whatsapp'],
+          variables: {
+            customerName: 'Ayşe Yılmaz',
+            branchName: 'Merkez',
+            appointmentAt: '7 Eylül 14:00',
+            serviceName: 'Lazer',
+          },
+        }),
+      );
+
+      expect(queued.status).toBe('skipped');
+    });
+
+    it('hesap gönderimden önce kaldırılırsa KALICI hata — yeniden denenmez', async () => {
+      await activate();
+      const queued = await enqueueWhatsApp();
+      if (queued.status !== 'queued') throw new Error('kuyruğa yazılmalıydı');
+      await database.ownerPool.query('delete from whatsapp_accounts where tenant_id = $1', [
+        clinic.tenant.id,
+      ]);
 
       await expect(runWorker(queued.messageId)).resolves.toBeUndefined();
 
@@ -344,10 +440,10 @@ describe('WhatsApp Cloud API adapter (Batch 8.2)', () => {
       expect(graph.requests).toHaveLength(0);
     });
 
-    it('template tanımsızken 24 saat penceresi kapalıysa gönderim REDDEDİLİR', async () => {
-      await configure().expect(200);
-      // Şablon satırı yok → template adı yok → serbest metin denenir.
-      const queued = await enqueueWhatsApp();
+    it('serbest metin 24 saat penceresi kapalıysa REDDEDİLİR', async () => {
+      await activate();
+      // Otomatik cevabın standart template'i yok → serbest metin denenir.
+      const queued = await enqueueAutoReply();
       if (queued.status !== 'queued') throw new Error('kuyruğa yazılmalıydı');
       await runWorker(queued.messageId);
 
@@ -359,14 +455,14 @@ describe('WhatsApp Cloud API adapter (Batch 8.2)', () => {
     });
 
     it('müşteri son 24 saatte yazdıysa serbest metin gider', async () => {
-      await configure().expect(200);
+      await activate();
       await database.ownerPool.query(
         `insert into whatsapp_contact_windows (tenant_id, phone, last_inbound_at)
          values ($1, '+905321234567', now())`,
         [clinic.tenant.id],
       );
 
-      const queued = await enqueueWhatsApp();
+      const queued = await enqueueAutoReply();
       if (queued.status !== 'queued') throw new Error('kuyruğa yazılmalıydı');
       await runWorker(queued.messageId);
 
@@ -375,7 +471,7 @@ describe('WhatsApp Cloud API adapter (Batch 8.2)', () => {
     });
 
     it('GEÇİCİ hatada mesaj `queued`a döner ve iş kuyruğa fırlatılır', async () => {
-      await configure().expect(200);
+      await activate();
       await defineTemplate().expect(200);
       graph.queue(graphError(429, 130429, 'rate limit'));
 
@@ -388,6 +484,128 @@ describe('WhatsApp Cloud API adapter (Batch 8.2)', () => {
       const row = await lastMessage();
       expect(row.status).toBe('queued');
       expect(row.errorCode).toBe('WHATSAPP_RATE_LIMITED');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe('standart template seti (provision)', () => {
+    interface ProvisionBody {
+      results: { name: string; outcome: string; status: string | null; error: string | null }[];
+      created: number;
+      failed: number;
+    }
+
+    const provision = () =>
+      http(app).post('/api/v1/integrations/whatsapp/templates/provision').set(ownerAuth());
+
+    it('eksik template’leri Meta’da oluşturur ve yansımayı tazeler', async () => {
+      await configure().expect(200);
+
+      const result = await provision().expect(200);
+      const body = result.body as ProvisionBody;
+      expect(body.failed).toBe(0);
+      expect(body.created).toBe(body.results.length);
+      expect(body.results.map((row) => row.name)).toContain('klinara_randevu_hatirlatma');
+      // Kaldırılan şablonlar yeniden oluşturulmaz.
+      expect(body.results.map((row) => row.name)).not.toContain('klinara_gorusme_baslat');
+      expect(body.results.map((row) => row.name)).not.toContain('klinara_paket_sure_bilgisi');
+
+      const creates = graph.requests.filter(
+        (request) => request.method === 'POST' && request.url.includes('message_templates'),
+      );
+      expect(creates).toHaveLength(body.created);
+      // Yol: sürüm + WABA — telefon numarası kimliği DEĞİL.
+      expect(creates[0]?.url).toMatch(/^\/v\d+\.\d+\/102290129340398\/message_templates$/);
+
+      // Hatırlatma: konumsal gövde, örnek değerler ve iki hızlı yanıt butonu.
+      const reminder = creates.find(
+        (request) => request.body['name'] === 'klinara_randevu_hatirlatma',
+      )?.body as { category: string; language: string; components: Record<string, unknown>[] };
+      expect(reminder.category).toBe('UTILITY');
+      expect(reminder.language).toBe('tr');
+      const bodyComponent = reminder.components.find((c) => c['type'] === 'BODY') as {
+        text: string;
+        example: { body_text: string[][] };
+      };
+      expect(bodyComponent.text).toContain('{{1}}');
+      expect(bodyComponent.text).toContain('{{4}}');
+      expect(bodyComponent.text).not.toContain('{{customerName}}');
+      expect(bodyComponent.example.body_text[0]).toHaveLength(4);
+      expect(reminder.components.find((c) => c['type'] === 'BUTTONS')).toEqual({
+        type: 'BUTTONS',
+        buttons: [
+          { type: 'QUICK_REPLY', text: 'Onaylıyorum' },
+          { type: 'QUICK_REPLY', text: 'İptal etmek istiyorum' },
+        ],
+      });
+
+      // OTP: AUTHENTICATION biçimi — metni Meta üretir, kopyalama butonu var.
+      const otp = creates.find((request) => request.body['name'] === 'booking_otp')?.body as {
+        category: string;
+        components: Record<string, unknown>[];
+      };
+      expect(otp.category).toBe('AUTHENTICATION');
+      expect(otp.components).toContainEqual({
+        type: 'BUTTONS',
+        buttons: [{ type: 'OTP', otp_type: 'COPY_CODE', text: 'Kodu kopyala' }],
+      });
+
+      // Token HİÇBİR yanıtta yok.
+      expect(JSON.stringify(result.body)).not.toContain(TOKEN);
+    });
+
+    it('Meta’da zaten olan template’e DOKUNMAZ (idempotent)', async () => {
+      await configure().expect(200);
+      graph.queue({
+        status: 200,
+        payload: {
+          data: [
+            {
+              name: 'klinara_randevu_hatirlatma',
+              language: 'tr',
+              category: 'UTILITY',
+              status: 'APPROVED',
+              components: [{ type: 'BODY', text: 'Merhaba {{1}}' }],
+            },
+          ],
+        },
+      });
+
+      const body = (await provision().expect(200)).body as ProvisionBody;
+      const reminder = body.results.find((row) => row.name === 'klinara_randevu_hatirlatma');
+      expect(reminder).toMatchObject({ outcome: 'exists', status: 'approved' });
+
+      const created = graph.requests.filter(
+        (request) =>
+          request.method === 'POST' && request.body['name'] === 'klinara_randevu_hatirlatma',
+      );
+      expect(created).toHaveLength(0);
+    });
+
+    it('tek template’in reddi ötekileri DURDURMAZ ve token hata metninden silinir', async () => {
+      await configure().expect(200);
+      graph.queue({ status: 200, payload: { data: [] } });
+      graph.queue(graphError(400, 100, `Invalid parameter ${TOKEN}`));
+
+      const body = (await provision().expect(200)).body as ProvisionBody;
+      expect(body.failed).toBe(1);
+      expect(body.created).toBe(body.results.length - 1);
+      const failed = body.results.find((row) => row.outcome === 'failed');
+      expect(failed?.error).toContain('Invalid parameter');
+      expect(failed?.error).not.toContain(TOKEN);
+    });
+
+    it('hesap yoksa 422 WHATSAPP_NOT_CONFIGURED', async () => {
+      const rejected = await provision().expect(422);
+      expect((rejected.body as Problem).code).toBe('WHATSAPP_NOT_CONFIGURED');
+    });
+
+    it('`notification:manage` taşımayan rol çağıramaz', async () => {
+      await configure().expect(200);
+      await http(app)
+        .post('/api/v1/integrations/whatsapp/templates/provision')
+        .set(auth(clinic.practitioner.tokens))
+        .expect(403);
     });
   });
 });

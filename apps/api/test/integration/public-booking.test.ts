@@ -578,6 +578,31 @@ describe('public randevu akışı: uygunluk, tutma, OTP, randevu, self-servis (9
       expect((res.body as SelfServiceBody).status).toBe('cancelled');
     });
 
+    it('online randevu onay mesajı, self-servis iptal de iptal mesajı üretir', async () => {
+      // Müşteriye giden tek kanal WhatsApp: hesap doğrulanmış değilse mesaj yazılmaz.
+      await database.ownerPool.query(
+        `insert into whatsapp_accounts (tenant_id, waba_id, phone_number_id, access_token_encrypted, status)
+         values ($1, 'waba-test', 'phone-test', 'sifreli-degil', 'active')`,
+        [clinic.tenant.id],
+      );
+      const { appointmentId, manageToken } = await bookThroughFlow();
+      const events = async (): Promise<string[]> =>
+        (
+          await database.ownerPool.query<{ event: string }>(
+            `select event::text from message_log where appointment_id = $1 order by created_at`,
+            [appointmentId],
+          )
+        ).rows.map((row) => row.event);
+
+      expect(await events()).toEqual(['appointment_confirmation']);
+
+      await http(app)
+        .post(`/api/v1/public/sites/klinik-x/appointments/${manageToken}/cancel`)
+        .send({})
+        .expect(200);
+      expect(await events()).toEqual(['appointment_confirmation', 'appointment_cancelled']);
+    });
+
     it('iptal penceresi kapalıysa reddedilir ve klinik telefonu gösterilir', async () => {
       const { appointmentId, manageToken } = await bookThroughFlow();
       await database.ownerPool.query(

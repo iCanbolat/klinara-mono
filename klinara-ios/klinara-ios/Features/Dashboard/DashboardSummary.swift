@@ -43,11 +43,6 @@ nonisolated struct DaySummary: Sendable, Equatable {
     /// Slot kaplayanlar — iptal ve gelmedi hariç.
     let active: Int
     let completed: Int
-    /// Henüz başlamamış, slot kaplayan randevular; başlangıca göre sıralı,
-    /// önizleme kadar kırpılmış.
-    let upcoming: [CalendarEntry]
-    /// Kırpılmadan önceki bekleyen randevu sayısı — "Tümünü gör" bu sayıdan.
-    let pending: Int
 }
 
 nonisolated struct BranchDashboardSummary: Sendable, Equatable, Identifiable {
@@ -88,7 +83,7 @@ nonisolated enum BranchMetric: String, Sendable, CaseIterable, Identifiable, Has
 }
 
 /// Tüm şubelerin sıradaki randevusu, tek listede.
-nonisolated struct UpcomingItem: Sendable, Identifiable {
+nonisolated struct UpcomingItem: Sendable, Equatable, Identifiable {
     let entry: CalendarEntry
     let branchName: String
     let timezone: String
@@ -113,25 +108,63 @@ nonisolated enum DashboardSummaries {
         branches.filter(\.isActive)
     }
 
-    static func summarizeDay(_ entries: [CalendarEntry], now: Date, upcomingLimit: Int = previewLimit) -> DaySummary {
-        let active = entries.filter { occupiesSlot($0.status) }
-        let pending = active
-            .filter { $0.status != .completed && $0.startsAt >= now }
-            .sorted { $0.startsAt < $1.startsAt }
-        return DaySummary(
+    static func summarizeDay(_ entries: [CalendarEntry]) -> DaySummary {
+        DaySummary(
             total: entries.count,
-            active: active.count,
-            completed: entries.filter { $0.status == .completed }.count,
-            // Şube başına önizleme kadarı yeter: birleşik listenin ilk N'i her
-            // şubenin ilk N'inden gelir.
-            upcoming: Array(pending.prefix(upcomingLimit)),
-            pending: pending.count
+            active: entries.filter { occupiesSlot($0.status) }.count,
+            completed: entries.filter { $0.status == .completed }.count
         )
     }
 
-    /// Tüm şubelerde bugün bekleyen randevu sayısı (önizlemeden bağımsız).
-    static func pendingTotal(_ summaries: [BranchDashboardSummary]) -> Int {
-        summaries.reduce(0) { $0 + ($1.today?.pending ?? 0) }
+    // MARK: Sıradaki randevular
+
+    /// Sıradaki randevular BUGÜNLE SINIRLI DEĞİL: tarihi en yakın N randevu.
+    /// Gün özetinden türetilemiyor — akşam ya da boş bir günde kart "bekleyen
+    /// randevu yok" diyordu, oysa yarın sabah dolu. Şube başına `GET appointments`
+    /// (şimdiden itibaren, bitmemiş durumlar, `limit=N`) atılıyor; sunucu
+    /// başlangıca göre sıralı döndürdüğü için birleşik listenin ilk N'i her
+    /// şubenin ilk N'inden gelir.
+    static let upcomingLimit = 10
+
+    /// Sunucunun liste ucundaki azami aralık (`MAX_RANGE_DAYS`).
+    static let upcomingHorizonDays = 92
+
+    /// Slot kaplayan ve henüz bitmemiş durumlar.
+    static let upcomingStatuses: [AppointmentStatus] = [.scheduled, .confirmed, .arrived, .inProgress]
+
+    /// Şube başına gelen listeleri tek, başlangıca göre sıralı listeye indirir.
+    static func mergeUpcoming(
+        branches: [BranchSummary],
+        lists: [String: [CalendarEntry]],
+        now: Date,
+        limit: Int = upcomingLimit
+    ) -> [UpcomingItem] {
+        Array(
+            branches
+                .flatMap { branch in
+                    (lists[branch.id] ?? []).map {
+                        UpcomingItem(entry: $0, branchName: branch.name, timezone: branch.timezone)
+                    }
+                }
+                .filter {
+                    occupiesSlot($0.entry.status) && $0.entry.status != .completed && $0.entry.startsAt >= now
+                }
+                .sorted { $0.entry.startsAt < $1.entry.startsAt }
+                .prefix(limit)
+        )
+    }
+
+    /// Satırın gün etiketi: "Bugün", "Yarın", yoksa "28 Eyl". Gün ŞUBENİN saat
+    /// diliminde.
+    static func upcomingDayLabel(_ date: Date, timezone: String, now: Date) -> String {
+        let clock = BranchClock(timeZoneIdentifier: timezone)
+        if clock.isSameDay(date, now) { return "Bugün" }
+        if clock.isSameDay(date, clock.adding(days: 1, to: now)) { return "Yarın" }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "tr_TR")
+        formatter.timeZone = TimeZone(identifier: timezone) ?? .current
+        formatter.dateFormat = "d MMM"
+        return formatter.string(from: date)
     }
 
     /// Rapor geldiyse ama şubenin satırı yoksa o dönemde veri YOK demektir —
@@ -141,8 +174,7 @@ nonisolated enum DashboardSummaries {
         days: [String: (entries: [CalendarEntry], timezone: String)],
         occupancy: OccupancyReport?,
         revenue: RevenueReport?,
-        noShow: NoShowReport?,
-        now: Date
+        noShow: NoShowReport?
     ) -> [BranchDashboardSummary] {
         let occupancyRows = rowsById(occupancy?.data ?? [], id: \.groupId)
         let revenueRows = rowsById(revenue?.data ?? [], id: \.groupId)
@@ -152,7 +184,7 @@ nonisolated enum DashboardSummaries {
             let day = days[branch.id]
             return BranchDashboardSummary(
                 branch: branch,
-                today: day.map { summarizeDay($0.entries, now: now) },
+                today: day.map { summarizeDay($0.entries) },
                 timezone: day?.timezone ?? branch.timezone,
                 occupancyRate: occupancy.map { _ in occupancyRows[branch.id]?.occupancyRate ?? 0 },
                 revenueMinor: revenue.map { _ in revenueRows[branch.id]?.accruedMinor ?? 0 },
@@ -182,19 +214,6 @@ nonisolated enum DashboardSummaries {
             revenueMinor: revenue?.totals.accruedMinor,
             currency: revenue?.totals.currency ?? "TRY",
             noShowRate: noShow?.totals.noShowRate
-        )
-    }
-
-    static func upcoming(_ summaries: [BranchDashboardSummary], limit: Int = previewLimit) -> [UpcomingItem] {
-        Array(
-            summaries
-                .flatMap { summary in
-                    (summary.today?.upcoming ?? []).map {
-                        UpcomingItem(entry: $0, branchName: summary.branch.name, timezone: summary.timezone)
-                    }
-                }
-                .sorted { $0.entry.startsAt < $1.entry.startsAt }
-                .prefix(limit)
         )
     }
 

@@ -63,12 +63,22 @@ export class GraphMock {
     });
 
     const queued = this.nextResponses.shift();
-    const response = queued ?? GraphMock.defaultFor(req.url ?? '');
+    const response = queued ?? GraphMock.defaultFor(req.url ?? '', req.method ?? 'GET');
     res.writeHead(response.status, { 'content-type': 'application/json' });
     res.end(JSON.stringify(response.payload));
   }
 
-  private static defaultFor(url: string): GraphMockResponse {
+  private static defaultFor(url: string, method: string): GraphMockResponse {
+    if (url.includes('subscribed_apps')) {
+      return { status: 200, payload: { success: true } };
+    }
+    // Template OLUŞTURMA: Meta yeni template'i onaya düşürür.
+    if (url.includes('message_templates') && method === 'POST') {
+      return {
+        status: 200,
+        payload: { id: `tmpl_${Math.random().toString(36).slice(2)}`, status: 'PENDING', category: 'UTILITY' },
+      };
+    }
     if (url.includes('message_templates')) {
       return {
         status: 200,

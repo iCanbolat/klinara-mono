@@ -90,7 +90,7 @@ final class MockWhatsAppService: WhatsAppService, @unchecked Sendable {
                 wabaId: input.wabaId,
                 phoneNumberId: input.phoneNumberId,
                 businessPhone: input.businessPhone,
-                apiVersion: input.apiVersion ?? "v21.0",
+                apiVersion: input.apiVersion ?? "v26.0",
                 status: .unconfigured,
                 accessTokenMasked: Self.mask(input.accessToken),
                 hasAppSecret: input.appSecret?.isEmpty == false

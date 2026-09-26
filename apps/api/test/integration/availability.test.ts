@@ -20,10 +20,18 @@ interface SlotBody {
   endsAt: string;
   staffProfileIds: string[];
 }
+interface DayBody {
+  date: string;
+  status: string;
+  holidayName: string | null;
+  opensAt: string | null;
+  closesAt: string | null;
+}
 interface AvailabilityBody {
   branchId: string;
   timezone: string;
   slotGranularityMinutes: number;
+  days: DayBody[];
   slots: SlotBody[];
 }
 
@@ -148,6 +156,116 @@ describe('uygunluk motoru (Batch 3.2)', () => {
         to: `${SUNDAY}T23:59:59+03:00`,
       });
       expect(body.slots).toHaveLength(0);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe('gün durumu', () => {
+    it('açık gün saatleriyle döner', async () => {
+      const { body } = await ask();
+      expect(body.days).toEqual([
+        { date: MONDAY, status: 'open', holidayName: null, opensAt: '09:00', closesAt: '18:00' },
+      ]);
+    });
+
+    it('pencerenin dışlayıcı sonu ertesi günü listeye sokmaz', async () => {
+      const { body } = await ask({ to: `${shiftDays(MONDAY, 1)}T00:00:00+03:00` });
+      expect(body.days.map((day) => day.date)).toEqual([MONDAY]);
+    });
+
+    it('haftalık kapalı gün `closed` — boş liste artık NEDENİYLE geliyor', async () => {
+      const { body } = await ask({
+        from: `${SUNDAY}T00:00:00+03:00`,
+        to: `${MONDAY}T00:00:00+03:00`,
+      });
+      expect(body.days).toEqual([
+        { date: SUNDAY, status: 'closed', holidayName: null, opensAt: null, closesAt: null },
+      ]);
+      expect(body.slots).toHaveLength(0);
+    });
+
+    it('tam gün tatil `holiday` ve adıyla döner', async () => {
+      await database.ownerPool.query(
+        `insert into holidays (tenant_id, branch_id, holiday_date, name, is_closed)
+         values ($1, null, $2, 'Test Tatili', true)`,
+        [clinic.tenant.id, MONDAY],
+      );
+      const { body } = await ask();
+      expect(body.days[0]).toMatchObject({ status: 'holiday', holidayName: 'Test Tatili' });
+      expect(body.slots).toHaveLength(0);
+    });
+
+    it('yarım gün tatil `open` kalır, daraltılmış saat ve adla', async () => {
+      await database.ownerPool.query(
+        `insert into holidays (tenant_id, branch_id, holiday_date, name, is_closed, open_time, close_time)
+         values ($1, $2, $3, 'Arife', false, '09:00', '13:00')`,
+        [clinic.tenant.id, clinic.branch.id, MONDAY],
+      );
+      const { body } = await ask();
+      expect(body.days[0]).toEqual({
+        date: MONDAY,
+        status: 'open',
+        holidayName: 'Arife',
+        opensAt: '09:00',
+        closesAt: '13:00',
+      });
+      expect(body.slots.at(-1)?.startsAt).toBe(`${MONDAY}T12:30:00+03:00`);
+    });
+
+    it('geçmiş gün `past`', async () => {
+      const yesterday = shiftDays(upcomingMonday(0), -8);
+      const { body } = await ask({
+        from: `${yesterday}T00:00:00+03:00`,
+        to: `${shiftDays(yesterday, 1)}T00:00:00+03:00`,
+      });
+      expect(body.days[0]?.status).toBe('past');
+    });
+
+    it('ileri rezervasyon sınırı ötesi `beyond_window`', async () => {
+      const daysUntilMonday = Math.ceil(
+        (new Date(`${MONDAY}T00:00:00+03:00`).getTime() - Date.now()) / 86_400_000,
+      );
+      await http(app)
+        .patch('/api/v1/tenant/settings')
+        .set(auth(clinic.owner.tokens))
+        .send({ maxAdvanceDays: Math.max(daysUntilMonday - 1, 0) })
+        .expect(200);
+
+      const { body } = await ask();
+      expect(body.days[0]?.status).toBe('beyond_window');
+    });
+
+    it('`/availability/days` hizmet sormadan bir haftayı işaretler', async () => {
+      const res = await http(app)
+        .get('/api/v1/availability/days')
+        .query({
+          branchId: clinic.branch.id,
+          from: `${MONDAY}T00:00:00+03:00`,
+          to: `${shiftDays(MONDAY, 7)}T00:00:00+03:00`,
+        })
+        .set(auth(clinic.owner.tokens))
+        .set(branchHeader(clinic.branch.id))
+        .expect(200);
+
+      const days = (res.body as { days: DayBody[] }).days;
+      expect(days).toHaveLength(7);
+      // Fixture: pazartesi–cumartesi açık, pazar kapalı.
+      expect(days.map((day) => day.status)).toEqual([
+        'open', 'open', 'open', 'open', 'open', 'open', 'closed',
+      ]);
+    });
+
+    it('`/availability/days` 62 günden uzun pencereyi reddeder', async () => {
+      await http(app)
+        .get('/api/v1/availability/days')
+        .query({
+          branchId: clinic.branch.id,
+          from: `${MONDAY}T00:00:00+03:00`,
+          to: `${shiftDays(MONDAY, 70)}T00:00:00+03:00`,
+        })
+        .set(auth(clinic.owner.tokens))
+        .set(branchHeader(clinic.branch.id))
+        .expect(400);
     });
   });
 

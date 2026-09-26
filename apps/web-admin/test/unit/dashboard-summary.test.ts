@@ -13,8 +13,10 @@ import {
   branchChartRows,
   dashboardTotals,
   mergeBranchSummaries,
+  mergeUpcoming,
   summarizeDay,
   topStaffByRevenue,
+  upcomingDayLabel,
 } from '../../src/lib/dashboard/summary';
 
 const BRANCHES: Branch[] = [
@@ -25,15 +27,15 @@ const BRANCHES: Branch[] = [
 
 const NOW = Date.parse('2026-09-14T12:00:00+03:00');
 
-const entry = (id: string, hour: number, status: string): CalendarEntry => ({
+const entry = (id: string, hour: number, status: string, day = 14): CalendarEntry => ({
   id,
   branchId: 'b1',
   customerId: 'c',
   customerName: id,
   customerPhone: null,
   status,
-  startsAt: `2026-09-14T${String(hour).padStart(2, '0')}:00:00+03:00`,
-  endsAt: `2026-09-14T${String(hour).padStart(2, '0')}:30:00+03:00`,
+  startsAt: `2026-09-${String(day)}T${String(hour).padStart(2, '0')}:00:00+03:00`,
+  endsAt: `2026-09-${String(day)}T${String(hour).padStart(2, '0')}:30:00+03:00`,
   notes: null,
   version: 1,
   totalMinor: 0,
@@ -60,19 +62,51 @@ describe('erişilebilir şubeler', () => {
 });
 
 describe('gün özeti', () => {
-  it('durumları sayıyor; sıradakiler başlamamış ve slot kaplayanlar', () => {
-    const summary = summarizeDay(
-      [
-        entry('done', 9, 'completed'),
-        entry('gone', 10, 'no_show'),
-        entry('later', 16, 'confirmed'),
-        entry('soon', 13, 'scheduled'),
-        entry('void', 14, 'cancelled'),
-      ],
+  it('durumları sayıyor', () => {
+    const summary = summarizeDay([
+      entry('done', 9, 'completed'),
+      entry('gone', 10, 'no_show'),
+      entry('later', 16, 'confirmed'),
+      entry('soon', 13, 'scheduled'),
+      entry('void', 14, 'cancelled'),
+    ]);
+    expect(summary).toEqual({ total: 5, active: 3, completed: 1, noShow: 1, cancelled: 1 });
+  });
+});
+
+describe('sıradaki randevular', () => {
+  it('şubeleri birleştiriyor; başlamamış ve slot kaplayanlar, başlangıca göre, günden bağımsız', () => {
+    const rows = mergeUpcoming(
+      BRANCHES,
+      new Map([
+        ['b1', [entry('past', 9, 'scheduled'), entry('nextWeek', 10, 'confirmed', 21)]],
+        [
+          'b2',
+          [
+            entry('soon', 13, 'scheduled'),
+            entry('void', 14, 'cancelled', 15),
+            entry('tomorrow', 9, 'scheduled', 15),
+          ],
+        ],
+      ]),
       NOW,
     );
-    expect(summary).toMatchObject({ total: 5, active: 3, completed: 1, noShow: 1, cancelled: 1 });
-    expect(summary.upcoming.map((e) => e.id)).toEqual(['soon', 'later']);
+    expect(rows.map((row) => row.entry.id)).toEqual(['soon', 'tomorrow', 'nextWeek']);
+    expect(rows[0]?.branchName).toBe('Nişantaşı');
+  });
+
+  it('en fazla limit kadar', () => {
+    const many = Array.from({ length: 12 }, (_, i) =>
+      entry(`e${String(i)}`, 13, 'scheduled', 15 + i),
+    );
+    expect(mergeUpcoming(BRANCHES, new Map([['b1', many]]), NOW)).toHaveLength(10);
+  });
+
+  it('gün etiketi şubenin saat diliminde: bugün, yarın, sonra tarih', () => {
+    const tz = 'Europe/Istanbul';
+    expect(upcomingDayLabel('2026-09-14T23:30:00+03:00', tz, NOW)).toBe('Bugün');
+    expect(upcomingDayLabel('2026-09-15T00:30:00+03:00', tz, NOW)).toBe('Yarın');
+    expect(upcomingDayLabel('2026-09-28T10:00:00+03:00', tz, NOW)).toBe('28 Eyl');
   });
 });
 
@@ -95,18 +129,14 @@ describe('şube birleştirme', () => {
   } as unknown as RevenueReport;
 
   it('rapor geldiyse satırı olmayan şube SIFIR, rapor hiç yoksa NULL', () => {
-    const summaries = mergeBranchSummaries(
-      BRANCHES.slice(0, 2),
-      {
-        day: new Map([
-          ['b1', { entries: [entry('soon', 13, 'scheduled')], timezone: 'Europe/Istanbul' }],
-        ]),
-        occupancy,
-        revenue,
-        noShow: null,
-      },
-      NOW,
-    );
+    const summaries = mergeBranchSummaries(BRANCHES.slice(0, 2), {
+      day: new Map([
+        ['b1', { entries: [entry('soon', 13, 'scheduled')], timezone: 'Europe/Istanbul' }],
+      ]),
+      occupancy,
+      revenue,
+      noShow: null,
+    });
 
     const [kadikoy, nisantasi] = summaries;
     expect(kadikoy?.occupancyRate).toBe(72);
@@ -129,29 +159,25 @@ describe('şube birleştirme', () => {
   });
 
   it('grafik satırları günü parçalara ayırıyor, göstergeler yalnız bilinenler', () => {
-    const summaries = mergeBranchSummaries(
-      BRANCHES.slice(0, 2),
-      {
-        day: new Map([
-          [
-            'b1',
-            {
-              entries: [
-                entry('done', 9, 'completed'),
-                entry('soon', 13, 'scheduled'),
-                entry('gone', 10, 'cancelled'),
-                entry('late', 11, 'no_show'),
-              ],
-              timezone: 'Europe/Istanbul',
-            },
-          ],
-        ]),
-        occupancy,
-        revenue,
-        noShow: null,
-      },
-      NOW,
-    );
+    const summaries = mergeBranchSummaries(BRANCHES.slice(0, 2), {
+      day: new Map([
+        [
+          'b1',
+          {
+            entries: [
+              entry('done', 9, 'completed'),
+              entry('soon', 13, 'scheduled'),
+              entry('gone', 10, 'cancelled'),
+              entry('late', 11, 'no_show'),
+            ],
+            timezone: 'Europe/Istanbul',
+          },
+        ],
+      ]),
+      occupancy,
+      revenue,
+      noShow: null,
+    });
 
     const [kadikoy, nisantasi] = branchChartRows(summaries);
     expect(kadikoy).toMatchObject({ completed: 1, pending: 1, dropped: 2, occupancy: 72 });
@@ -162,11 +188,12 @@ describe('şube birleştirme', () => {
   });
 
   it('hiçbir şubenin günü yoksa bugünkü toplam NULL', () => {
-    const summaries = mergeBranchSummaries(
-      BRANCHES.slice(0, 1),
-      { day: new Map(), occupancy: null, revenue: null, noShow: null as NoShowReport | null },
-      NOW,
-    );
+    const summaries = mergeBranchSummaries(BRANCHES.slice(0, 1), {
+      day: new Map(),
+      occupancy: null,
+      revenue: null,
+      noShow: null as NoShowReport | null,
+    });
     expect(
       dashboardTotals(summaries, { occupancy: null, revenue: null, noShow: null }).todayTotal,
     ).toBeNull();

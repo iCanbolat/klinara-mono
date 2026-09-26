@@ -12,6 +12,7 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.time.Instant
 
 /**
  * Canlı takvim servisi.
@@ -22,7 +23,11 @@ import kotlinx.serialization.json.put
  * ile doğruluyor; karıştırmak 400 verir.
  */
 @Serializable
-private data class ReasonBody(val reason: String? = null)
+private data class CancelBody(
+    val reason: String? = null,
+    /** Yalnız kapatma açıkça gider; varsayılan (gönder) sunucuda. */
+    val notifyCustomer: Boolean? = null,
+)
 
 @Serializable
 private data class ChangeStatusBody(
@@ -90,11 +95,15 @@ class LiveBookingService internal constructor(
     override suspend fun cancel(
         id: String,
         reason: String?,
+        notifyCustomer: Boolean,
     ): Appointment =
         client.send(
             ApiRequest.post(
                 "appointments/$id/cancel",
-                body = RequestBodyPayload(KlinaraJson.encodeToString(ReasonBody(reason))),
+                body =
+                    RequestBodyPayload(
+                        KlinaraJson.encodeToString(CancelBody(reason, notifyCustomer.takeIf { !it })),
+                    ),
             ),
         )
 
@@ -124,6 +133,23 @@ class LiveBookingService internal constructor(
                         add("to" to clock.wireValue(query.to))
                         query.staffProfileId?.let { add("staffProfileId" to it) }
                     },
+            ),
+        )
+
+    override suspend fun availabilityDays(
+        branchId: String,
+        from: Instant,
+        to: Instant,
+    ): AvailabilityDaysResponse =
+        client.send(
+            ApiRequest.get(
+                "availability/days",
+                query =
+                    listOf(
+                        "branchId" to branchId,
+                        "from" to clock.wireValue(from),
+                        "to" to clock.wireValue(to),
+                    ),
             ),
         )
 

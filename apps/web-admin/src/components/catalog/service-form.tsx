@@ -10,6 +10,7 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -142,150 +143,152 @@ export function ServiceFormDialog({
           <DialogDescription className="sr-only">{t('catalog.title')}</DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field
-            label={t('catalog.name')}
-            value={name}
-            disabled={busy}
-            error={errorFor(errors, 'name')}
-            onChange={(event) => setName(event.target.value)}
-          />
-          <Field
-            label={t('catalog.slug')}
-            value={slug}
-            disabled={busy}
-            error={errorFor(errors, 'slug')}
-            onChange={(event) => setSlug(event.target.value)}
-          />
-          <FieldSelect
-            label={t('catalog.category')}
-            value={categoryId}
-            disabled={busy}
-            error={errorFor(errors, 'categoryId')}
-            onChange={(event) => setCategoryId(event.target.value)}
-          >
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </FieldSelect>
-          <Field
-            label={t('catalog.duration')}
-            type="number"
-            min={1}
-            value={duration}
-            disabled={busy}
-            error={errorFor(errors, 'durationMinutes')}
-            onChange={(event) => setDuration(event.target.value)}
-          />
-          <Field
-            label={t('catalog.bufferBefore')}
-            type="number"
-            min={0}
-            value={bufferBefore}
-            disabled={busy}
-            onChange={(event) => setBufferBefore(event.target.value)}
-          />
-          <Field
-            label={t('catalog.bufferAfter')}
-            type="number"
-            min={0}
-            value={bufferAfter}
-            disabled={busy}
-            onChange={(event) => setBufferAfter(event.target.value)}
-          />
-          <MoneyInput
-            label={t('catalog.price')}
-            valueMinor={priceMinor}
-            disabled={busy}
-            error={errorFor(errors, 'priceMinor')}
-            onChange={setPriceMinor}
-          />
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <FieldCheckbox
-            label={t('catalog.onlineBookable')}
-            checked={onlineBookable}
-            disabled={busy}
-            onCheckedChange={setOnlineBookable}
-          />
-          <FieldCheckbox
-            label={t('catalog.active')}
-            checked={active}
-            disabled={busy}
-            onCheckedChange={setActive}
-          />
-        </div>
-
-        <section className="flex flex-col gap-2">
-          <h3 className="text-label">{t('catalog.overrides')}</h3>
-          {/* Kullanıcı tam değiştirmeyi BİLMELİ — bkz. dosya başlığı. */}
-          <p className="text-xs text-muted-foreground">{t('catalog.overridesHint')}</p>
-
-          {overrides.map((override, index) => (
-            <div key={override.branchId} className="grid items-end gap-2 sm:grid-cols-3">
-              <FieldSelect label={t('staff.branch')} value={override.branchId} disabled>
-                <option value={override.branchId}>
-                  {branches.find((branch: Branch) => branch.id === override.branchId)?.name ??
-                    override.branchId}
-                </option>
-              </FieldSelect>
-              <MoneyInput
-                label={t('catalog.price')}
-                valueMinor={override.priceMinor}
-                disabled={busy}
-                error={errorFor(errors, fieldPath('branchOverrides', index, 'priceMinor'))}
-                onChange={(minor) =>
-                  setOverrides((current) =>
-                    current.map((row, i) => (i === index ? { ...row, priceMinor: minor } : row)),
-                  )
-                }
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                disabled={busy}
-                onClick={() =>
-                  setOverrides((current) => current.filter((_, i) => i !== index))
-                }
-              >
-                {t('catalog.removeOverride')}
-              </Button>
-            </div>
-          ))}
-
-          {unusedBranches.length > 0 ? (
-            <FieldSelect
-              label={t('catalog.addOverride')}
-              value=""
+        <DialogBody className="flex flex-col gap-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field
+              label={t('catalog.name')}
+              value={name}
               disabled={busy}
-              onChange={(event) => {
-                const branchId = event.target.value;
-                if (branchId === '') return;
-                setOverrides((current) => [
-                  ...current,
-                  { branchId, priceMinor: null, durationMinutes: '' },
-                ]);
-              }}
+              error={errorFor(errors, 'name')}
+              onChange={(event) => setName(event.target.value)}
+            />
+            <Field
+              label={t('catalog.slug')}
+              value={slug}
+              disabled={busy}
+              error={errorFor(errors, 'slug')}
+              onChange={(event) => setSlug(event.target.value)}
+            />
+            <FieldSelect
+              label={t('catalog.category')}
+              value={categoryId}
+              disabled={busy}
+              error={errorFor(errors, 'categoryId')}
+              onChange={(event) => setCategoryId(event.target.value)}
             >
-              <option value="">—</option>
-              {unusedBranches.map((branch: Branch) => (
-                <option key={branch.id} value={branch.id}>
-                  {branch.name}
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
                 </option>
               ))}
             </FieldSelect>
-          ) : null}
-        </section>
+            <Field
+              label={t('catalog.duration')}
+              type="number"
+              min={1}
+              value={duration}
+              disabled={busy}
+              error={errorFor(errors, 'durationMinutes')}
+              onChange={(event) => setDuration(event.target.value)}
+            />
+            <Field
+              label={t('catalog.bufferBefore')}
+              type="number"
+              min={0}
+              value={bufferBefore}
+              disabled={busy}
+              onChange={(event) => setBufferBefore(event.target.value)}
+            />
+            <Field
+              label={t('catalog.bufferAfter')}
+              type="number"
+              min={0}
+              value={bufferAfter}
+              disabled={busy}
+              onChange={(event) => setBufferAfter(event.target.value)}
+            />
+            <MoneyInput
+              label={t('catalog.price')}
+              valueMinor={priceMinor}
+              disabled={busy}
+              error={errorFor(errors, 'priceMinor')}
+              onChange={setPriceMinor}
+            />
+          </div>
 
-        {errors.message !== null ? (
-          <Alert tone="danger">
-            <span role="alert">{errors.message}</span>
-          </Alert>
-        ) : null}
+          <div className="flex flex-col gap-2">
+            <FieldCheckbox
+              label={t('catalog.onlineBookable')}
+              checked={onlineBookable}
+              disabled={busy}
+              onCheckedChange={setOnlineBookable}
+            />
+            <FieldCheckbox
+              label={t('catalog.active')}
+              checked={active}
+              disabled={busy}
+              onCheckedChange={setActive}
+            />
+          </div>
+
+          <section className="flex flex-col gap-2">
+            <h3 className="text-label">{t('catalog.overrides')}</h3>
+            {/* Kullanıcı tam değiştirmeyi BİLMELİ — bkz. dosya başlığı. */}
+            <p className="text-xs text-muted-foreground">{t('catalog.overridesHint')}</p>
+
+            {overrides.map((override, index) => (
+              <div key={override.branchId} className="grid items-end gap-2 sm:grid-cols-3">
+                <FieldSelect label={t('staff.branch')} value={override.branchId} disabled>
+                  <option value={override.branchId}>
+                    {branches.find((branch: Branch) => branch.id === override.branchId)?.name ??
+                      override.branchId}
+                  </option>
+                </FieldSelect>
+                <MoneyInput
+                  label={t('catalog.price')}
+                  valueMinor={override.priceMinor}
+                  disabled={busy}
+                  error={errorFor(errors, fieldPath('branchOverrides', index, 'priceMinor'))}
+                  onChange={(minor) =>
+                    setOverrides((current) =>
+                      current.map((row, i) => (i === index ? { ...row, priceMinor: minor } : row)),
+                    )
+                  }
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() =>
+                    setOverrides((current) => current.filter((_, i) => i !== index))
+                  }
+                >
+                  {t('catalog.removeOverride')}
+                </Button>
+              </div>
+            ))}
+
+            {unusedBranches.length > 0 ? (
+              <FieldSelect
+                label={t('catalog.addOverride')}
+                value=""
+                disabled={busy}
+                onChange={(event) => {
+                  const branchId = event.target.value;
+                  if (branchId === '') return;
+                  setOverrides((current) => [
+                    ...current,
+                    { branchId, priceMinor: null, durationMinutes: '' },
+                  ]);
+                }}
+              >
+                <option value="">—</option>
+                {unusedBranches.map((branch: Branch) => (
+                  <option key={branch.id} value={branch.id}>
+                    {branch.name}
+                  </option>
+                ))}
+              </FieldSelect>
+            ) : null}
+          </section>
+
+          {errors.message !== null ? (
+            <Alert tone="danger">
+              <span role="alert">{errors.message}</span>
+            </Alert>
+          ) : null}
+        </DialogBody>
 
         <DialogFooter>
           <Button type="button" variant="ghost" onClick={onClose} disabled={busy}>

@@ -8,7 +8,12 @@ import {
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { Principal } from '../identity/principal';
 import { AvailabilityService } from './availability.service';
-import { AvailabilityQueryDto, AvailabilityResponseDto } from './dto/availability.dto';
+import {
+  AvailabilityDaysQueryDto,
+  AvailabilityDaysResponseDto,
+  AvailabilityQueryDto,
+  AvailabilityResponseDto,
+} from './dto/availability.dto';
 
 @ApiTags('availability')
 @ApiBearerAuth('bearerAuth')
@@ -28,5 +33,20 @@ export class AvailabilityController {
     @Query() query: AvailabilityQueryDto,
   ): Promise<AvailabilityResponseDto> {
     return this.availability.findSlots(principal, query);
+  }
+
+  @Get('availability/days')
+  @RequireAnyPermission(PERMISSIONS.APPOINTMENT_READ_ALL, PERMISSIONS.APPOINTMENT_READ_OWN)
+  @RequireBranchScope()
+  @ApiOperation({
+    summary: 'Gün durumları (açık / kapalı / tatil / geçmiş / pencere dışı)',
+    description: 'Tarih seçicilerin kapalı günleri slot sormadan işaretlemesi için.',
+  })
+  @ApiOkResponse({ type: AvailabilityDaysResponseDto })
+  findDays(
+    @CurrentUser() principal: Principal,
+    @Query() query: AvailabilityDaysQueryDto,
+  ): Promise<AvailabilityDaysResponseDto> {
+    return this.availability.findDays(principal, query);
   }
 }

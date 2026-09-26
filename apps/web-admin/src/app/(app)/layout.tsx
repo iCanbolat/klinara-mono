@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { BranchProvider } from '@/components/session/branch-provider';
 import { SessionProvider } from '@/components/session/session-provider';
+import { PageCrumbProvider } from '@/components/shell/page-crumb';
 import { Sidebar } from '@/components/shell/sidebar';
 import { Topbar } from '@/components/shell/topbar';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
@@ -25,18 +26,20 @@ export default function AppLayout({ children }: { children: ReactNode }): ReactN
           {t('nav.skipToContent')}
         </a>
         <SidebarProvider>
-          <Sidebar />
-          <SidebarInset>
-            <Topbar />
-            {/*
+          <PageCrumbProvider>
+            <Sidebar />
+            <SidebarInset>
+              <Topbar />
+              {/*
               Genişlik sınırı bilinçli: 24"lük bir ekranda tam genişlik bir tablo
               satırının gözle takip edilemeyeceği kadar uzun olur. İçerik dolgusu
               iOS `screenInset` (24) ile aynı.
             */}
-            <main id="main" className="mx-auto w-full max-w-6xl flex-1 p-6 md:p-8">
-              {children}
-            </main>
-          </SidebarInset>
+              <main id="main" className="mx-auto w-full max-w-6xl flex-1 p-6 md:p-8">
+                {children}
+              </main>
+            </SidebarInset>
+          </PageCrumbProvider>
         </SidebarProvider>
       </BranchProvider>
     </SessionProvider>

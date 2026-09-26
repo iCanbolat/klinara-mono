@@ -17,13 +17,14 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldSelect, FieldSwitch } from '@/components/ui/field';
+import { Field, FieldDate, FieldSelect, FieldSwitch } from '@/components/ui/field';
 import { Label } from '@/components/ui/label';
 import { SegmentButton, Segmented } from '@/components/ui/segmented';
 import { WeekdayPicker } from './weekday-picker';
@@ -119,7 +120,7 @@ function ExceptionForm({
   return (
     <form
       noValidate
-      className="flex flex-col gap-5"
+      className="flex min-h-0 flex-1 flex-col"
       onSubmit={(event) => {
         event.preventDefault();
         void submit();
@@ -130,155 +131,154 @@ function ExceptionForm({
         <DialogDescription>{t('schedule.exceptionsEmptyHint')}</DialogDescription>
       </DialogHeader>
 
-      {error !== null ? <Alert tone="danger">{error}</Alert> : null}
+      <DialogBody className="flex flex-col gap-5">
+        {error !== null ? <Alert tone="danger">{error}</Alert> : null}
 
-      <FieldSelect
-        label={t('schedule.pickStaff')}
-        value={draft.staffProfileId}
-        error={shown.staffProfileId}
-        onChange={(event) => patch({ staffProfileId: event.target.value })}
-      >
-        <option value="">—</option>
-        {staff.map((profile) => (
-          <option key={profile.id} value={profile.id}>
-            {profile.userFullName}
-          </option>
-        ))}
-      </FieldSelect>
+        <FieldSelect
+          label={t('schedule.pickStaff')}
+          value={draft.staffProfileId}
+          error={shown.staffProfileId}
+          onChange={(event) => patch({ staffProfileId: event.target.value })}
+        >
+          <option value="">—</option>
+          {staff.map((profile) => (
+            <option key={profile.id} value={profile.id}>
+              {profile.userFullName}
+            </option>
+          ))}
+        </FieldSelect>
 
-      <div className="flex flex-col gap-2">
-        <Label>{t('schedule.exceptionKind')}</Label>
-        <Segmented label={t('schedule.exceptionKind')}>
-          <SegmentButton pressed={draft.kind === 'once'} onClick={() => patch({ kind: 'once' })}>
-            {t('schedule.exceptionOnce')}
-          </SegmentButton>
-          <SegmentButton pressed={draft.kind === 'weekly'} onClick={() => patch({ kind: 'weekly' })}>
-            {t('schedule.exceptionWeekly')}
-          </SegmentButton>
-        </Segmented>
-      </div>
+        <div className="flex flex-col gap-2">
+          <Label>{t('schedule.exceptionKind')}</Label>
+          <Segmented label={t('schedule.exceptionKind')}>
+            <SegmentButton pressed={draft.kind === 'once'} onClick={() => patch({ kind: 'once' })}>
+              {t('schedule.exceptionOnce')}
+            </SegmentButton>
+            <SegmentButton pressed={draft.kind === 'weekly'} onClick={() => patch({ kind: 'weekly' })}>
+              {t('schedule.exceptionWeekly')}
+            </SegmentButton>
+          </Segmented>
+        </div>
 
-      {draft.kind === 'once' ? (
-        <>
-          <FieldSwitch
-            label={t('schedule.exceptionAllDay')}
-            checked={draft.allDay}
-            onCheckedChange={(allDay) => patch({ allDay })}
-          />
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="flex flex-col gap-3">
+        {draft.kind === 'once' ? (
+          <>
+            <FieldSwitch
+              label={t('schedule.exceptionAllDay')}
+              checked={draft.allDay}
+              onCheckedChange={(allDay) => patch({ allDay })}
+            />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="flex flex-col gap-3">
+                <FieldDate
+                  label={t('schedule.exceptionFromDate')}
+                  value={draft.startDate}
+                  error={shown.startDate}
+                  onChange={(value) =>
+                    patch({
+                      startDate: value,
+                      // Bitiş başlangıcın gerisinde kalmasın — en sık hata.
+                      ...(draft.endDate < value ? { endDate: value } : {}),
+                    })
+                  }
+                />
+                {timed ? (
+                  <Field
+                    label={t('schedule.start')}
+                    type="time"
+                    step={300}
+                    value={draft.startTime}
+                    error={shown.startTime}
+                    onChange={(event) => patch({ startTime: event.target.value })}
+                  />
+                ) : null}
+              </div>
+              <div className="flex flex-col gap-3">
+                <FieldDate
+                  label={t('schedule.exceptionToDate')}
+                  min={draft.startDate}
+                  value={draft.endDate}
+                  error={shown.endDate}
+                  onChange={(value) => patch({ endDate: value })}
+                />
+                {timed ? (
+                  <Field
+                    label={t('schedule.end')}
+                    type="time"
+                    step={300}
+                    value={draft.endTime}
+                    error={shown.endTime}
+                    onChange={(event) => patch({ endTime: event.target.value })}
+                  />
+                ) : null}
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex flex-col gap-2">
+              <WeekdayPicker
+                label={t('schedule.exceptionWeekdays')}
+                value={draft.weekdays}
+                onChange={(weekdays) => patch({ weekdays })}
+              />
+              {shown.weekdays === undefined ? null : (
+                <p role="alert" className="text-sm text-destructive">
+                  {shown.weekdays}
+                </p>
+              )}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
               <Field
-                label={t('schedule.exceptionFromDate')}
-                type="date"
+                label={t('schedule.start')}
+                type="time"
+                step={300}
+                value={draft.startTime}
+                error={shown.startTime}
+                onChange={(event) => patch({ startTime: event.target.value })}
+              />
+              <Field
+                label={t('schedule.end')}
+                type="time"
+                step={300}
+                value={draft.endTime}
+                error={shown.endTime}
+                onChange={(event) => patch({ endTime: event.target.value })}
+              />
+              <FieldDate
+                label={t('schedule.exceptionFirstDay')}
                 value={draft.startDate}
                 error={shown.startDate}
-                onChange={(event) =>
-                  patch({
-                    startDate: event.target.value,
-                    // Bitiş başlangıcın gerisinde kalmasın — en sık hata.
-                    ...(draft.endDate < event.target.value ? { endDate: event.target.value } : {}),
-                  })
-                }
+                onChange={(value) => patch({ startDate: value })}
               />
-              {timed ? (
-                <Field
-                  label={t('schedule.start')}
-                  type="time"
-                  step={300}
-                  value={draft.startTime}
-                  error={shown.startTime}
-                  onChange={(event) => patch({ startTime: event.target.value })}
-                />
-              ) : null}
-            </div>
-            <div className="flex flex-col gap-3">
-              <Field
-                label={t('schedule.exceptionToDate')}
-                type="date"
+              <FieldDate
+                label={t('schedule.exceptionUntil')}
                 min={draft.startDate}
-                value={draft.endDate}
-                error={shown.endDate}
-                onChange={(event) => patch({ endDate: event.target.value })}
+                clearable
+                value={draft.untilDate}
+                error={shown.untilDate}
+                onChange={(value) => patch({ untilDate: value })}
               />
-              {timed ? (
-                <Field
-                  label={t('schedule.end')}
-                  type="time"
-                  step={300}
-                  value={draft.endTime}
-                  error={shown.endTime}
-                  onChange={(event) => patch({ endTime: event.target.value })}
-                />
-              ) : null}
+              <Field
+                label={t('schedule.exceptionInterval')}
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={52}
+                value={String(draft.intervalWeeks)}
+                error={shown.intervalWeeks}
+                onChange={(event) => patch({ intervalWeeks: Number.parseInt(event.target.value, 10) })}
+              />
             </div>
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="flex flex-col gap-2">
-            <WeekdayPicker
-              label={t('schedule.exceptionWeekdays')}
-              value={draft.weekdays}
-              onChange={(weekdays) => patch({ weekdays })}
-            />
-            {shown.weekdays === undefined ? null : (
-              <p role="alert" className="text-sm text-destructive">
-                {shown.weekdays}
-              </p>
-            )}
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field
-              label={t('schedule.start')}
-              type="time"
-              step={300}
-              value={draft.startTime}
-              error={shown.startTime}
-              onChange={(event) => patch({ startTime: event.target.value })}
-            />
-            <Field
-              label={t('schedule.end')}
-              type="time"
-              step={300}
-              value={draft.endTime}
-              error={shown.endTime}
-              onChange={(event) => patch({ endTime: event.target.value })}
-            />
-            <Field
-              label={t('schedule.exceptionFirstDay')}
-              type="date"
-              value={draft.startDate}
-              error={shown.startDate}
-              onChange={(event) => patch({ startDate: event.target.value })}
-            />
-            <Field
-              label={t('schedule.exceptionUntil')}
-              type="date"
-              min={draft.startDate}
-              value={draft.untilDate}
-              error={shown.untilDate}
-              onChange={(event) => patch({ untilDate: event.target.value })}
-            />
-            <Field
-              label={t('schedule.exceptionInterval')}
-              type="number"
-              inputMode="numeric"
-              min={1}
-              max={52}
-              value={String(draft.intervalWeeks)}
-              error={shown.intervalWeeks}
-              onChange={(event) => patch({ intervalWeeks: Number.parseInt(event.target.value, 10) })}
-            />
-          </div>
-        </>
-      )}
+          </>
+        )}
 
-      <Field
-        label={t('schedule.exceptionReason')}
-        value={draft.reason}
-        maxLength={200}
-        onChange={(event) => patch({ reason: event.target.value })}
-      />
+        <Field
+          label={t('schedule.exceptionReason')}
+          value={draft.reason}
+          maxLength={200}
+          onChange={(event) => patch({ reason: event.target.value })}
+        />
+      </DialogBody>
 
       <DialogFooter>
         <Button type="button" variant="ghost" disabled={saving} onClick={onClose}>

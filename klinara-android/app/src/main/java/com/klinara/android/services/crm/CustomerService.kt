@@ -25,12 +25,14 @@ interface CustomerService {
     /** `GET customers/:id` */
     suspend fun get(id: String): Customer
 
+    /** `GET customers/summary` — kiracı kapsamlı sayılar, müşteri kimliği taşımaz. */
+    suspend fun summary(): CustomerSummary
+
     /**
      * `GET customers/search?q=`
      *
-     * ⚠️ Bu uç **çıplak dizi** döndürür — `{ data: [...] }` zarfı YOK. Sözleşmede
-     * bunun bir tek eşi var (`GET customers/:id/opt-out`); zarf beklemek HER çağrıda
-     * sessiz bir çözümleme hatası verirdi ve iOS'ta tam olarak bu yaşandı.
+     * ⚠️ Bu uç **çıplak dizi** döndürür — `{ data: [...] }` zarfı YOK. Zarf beklemek
+     * HER çağrıda sessiz bir çözümleme hatası verirdi ve iOS'ta tam olarak bu yaşandı.
      *
      * Sunucu `q ≥ 2` istiyor; daha kısa terimle **hiç çağrılmamalı** (çağıran
      * tarafta eşik var, burada değil — servis sözleşmeyi taşır, kullanıcı arayüzü

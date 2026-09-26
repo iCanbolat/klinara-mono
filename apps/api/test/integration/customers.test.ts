@@ -190,4 +190,27 @@ describe('müşteri çekirdeği (Batch 3.0)', () => {
       .send({ fullName: 'Uygulayıcıdan' });
     expect(write.status).toBe(403);
   });
+
+  it('özet, arşivlenen kaydı saymaz ve okuma izniyle açılır', async () => {
+    const clinic = await setupClinic(app);
+    const ownerAuth = auth(clinic.owner.tokens);
+
+    const extra = await http(app)
+      .post('/api/v1/customers')
+      .set(ownerAuth)
+      .send({ fullName: 'Arşivlenecek' });
+    expect(extra.status).toBe(201);
+    const archived = await http(app)
+      .delete(`/api/v1/customers/${(extra.body as { id: string }).id}`)
+      .set(ownerAuth);
+    expect(archived.status).toBeLessThan(300);
+
+    const res = await http(app)
+      .get('/api/v1/customers/summary')
+      .set(auth(clinic.practitioner.tokens))
+      .set(branchHeader(clinic.branch.id));
+    expect(res.status).toBe(200);
+    // Kurulumdaki tek müşteri: yeni, henüz hiç gelmemiş.
+    expect(res.body).toEqual({ total: 1, newLast30Days: 1, activeLast90Days: 0, lapsed: 0 });
+  });
 });

@@ -31,6 +31,7 @@ struct ProfileView: View {
             .navigationTitle("Profil")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                RootToolbarTitle(title: "Profil")
                 ToolbarItem(placement: .topBarTrailing) {
                     BranchMenu(session: session)
                 }

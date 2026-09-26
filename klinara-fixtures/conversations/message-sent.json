@@ -1,0 +1,12 @@
+{
+  "id": "87de0c9b-af01-491f-836b-325b8ac8870b",
+  "direction": "out",
+  "type": "text",
+  "body": "Tabii, hangi saat uygun?",
+  "createdAt": "2026-09-22T10:31:38.644Z",
+  "status": "sent",
+  "event": "staff_reply",
+  "sentByName": "Klinik Sahibi",
+  "errorDetail": null,
+  "appointmentId": null
+}

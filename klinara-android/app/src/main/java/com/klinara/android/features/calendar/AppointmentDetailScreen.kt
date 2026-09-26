@@ -37,6 +37,7 @@ import com.klinara.android.designsystem.components.KlinaraScreen
 import com.klinara.android.designsystem.components.KlinaraSkeleton
 import com.klinara.android.designsystem.components.KlinaraSkeletonStyle
 import com.klinara.android.designsystem.components.KlinaraTextField
+import com.klinara.android.designsystem.components.KlinaraToggleRow
 import com.klinara.android.features.auth.AppSession
 import com.klinara.android.services.ServiceContainer
 import com.klinara.android.services.booking.Appointment
@@ -47,6 +48,7 @@ import com.klinara.android.services.formatting.BranchClock
 import com.klinara.android.services.formatting.DurationFormat
 import com.klinara.android.services.formatting.Money
 import com.klinara.android.services.networking.Loadable
+import java.time.Instant
 
 /**
  * Randevu detayı.
@@ -365,6 +367,9 @@ private fun ActionsCard(
     val transitions = appointment.status.allowedTransitions(canReopen)
     var isCancelling by rememberSaveable { mutableStateOf(false) }
     var reason by rememberSaveable { mutableStateOf("") }
+    var notifyCustomer by rememberSaveable { mutableStateOf(true) }
+    // Geçmiş randevuya sunucu zaten bildirim göndermiyor; seçenek yanıltmasın.
+    val upcoming = remember(appointment.startsAt) { appointment.startsAt.isAfter(Instant.now()) }
 
     if (transitions.isNotEmpty()) {
         KlinaraCard(title = "Durum") {
@@ -387,10 +392,18 @@ private fun ActionsCard(
                     onValueChange = { reason = it },
                     placeholder = "Müşteri erteleme istedi…",
                 )
+                if (upcoming) {
+                    KlinaraToggleRow(
+                        label = "Müşteriye bildir",
+                        detail = "Müşteriye WhatsApp ile iptal bildirimi gönderilir.",
+                        isOn = notifyCustomer,
+                        onToggle = { notifyCustomer = it },
+                    )
+                }
                 KlinaraButton(
                     title = "İptali onayla",
                     onClick = {
-                        viewModel.cancelAppointment(reason)
+                        viewModel.cancelAppointment(reason, notifyCustomer || !upcoming)
                         isCancelling = false
                         reason = ""
                     },

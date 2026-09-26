@@ -20,6 +20,9 @@ import com.klinara.android.services.catalog.CatalogService
 import com.klinara.android.services.catalog.LiveCatalogService
 import com.klinara.android.services.catalog.MockCatalogService
 import com.klinara.android.services.contracts.Permissions
+import com.klinara.android.services.conversations.ConversationsService
+import com.klinara.android.services.conversations.LiveConversationsService
+import com.klinara.android.services.conversations.MockConversationsService
 import com.klinara.android.services.contracts.RolePermissions
 import com.klinara.android.services.crm.CustomerService
 import com.klinara.android.services.crm.LiveCustomerService
@@ -83,7 +86,7 @@ import kotlinx.coroutines.flow.SharedFlow
  * DEĞİL (boş arayüzler okunmamış uçlar için imza tahmini kodlar ve her batch'te
  * "refactor" edilir; ilerleme gibi görünen çalkantı):
  *
- *     customers A3.4 · notifications(opt-out) A4.2 · notes A4.3 ✓ · files A4.4 ✓ · packages A5.1 ✓
+ *     customers A3.4 · notes A4.3 ✓ · files A4.4 ✓ · packages A5.1 ✓
  *     catalog/staff/users/scheduling A7 ✓ (finans A6 kapsam dışı)
  *     notifications/messages/whatsapp A8 ✓ · reports A9 ✓
  *
@@ -114,6 +117,7 @@ class ServiceContainer private constructor(
     val notifications: NotificationsService,
     val messages: MessagesService,
     val whatsapp: WhatsAppService,
+    val conversations: ConversationsService,
     val notes: NotesService,
     val files: FilesService,
     val thumbnails: ThumbnailCache,
@@ -170,6 +174,7 @@ class ServiceContainer private constructor(
                 notifications = LiveNotificationsService(client),
                 messages = LiveMessagesService(client),
                 whatsapp = LiveWhatsAppService(client),
+                conversations = LiveConversationsService(client),
                 notes = LiveNotesService(client),
                 files = liveFiles,
                 // Küçük görsel indirmesi imzalı URL'ye gidiyor: `bare` istemci, yani
@@ -263,6 +268,7 @@ class ServiceContainer private constructor(
                 notifications = mockNotifications,
                 messages = mockMessages,
                 whatsapp = mockWhatsApp,
+                conversations = MockConversationsService(failing = failing),
                 notes = mockNotes,
                 files = mockFiles,
                 thumbnails = ThumbnailCache(mockFiles, OkHttpClient()),
@@ -297,6 +303,7 @@ class ServiceContainer private constructor(
             notifications: NotificationsService = MockNotificationsService(latencyEnabled = false),
             messages: MessagesService = MockMessagesService(latencyEnabled = false),
             whatsapp: WhatsAppService = MockWhatsAppService(latencyEnabled = false),
+            conversations: ConversationsService = MockConversationsService(latencyEnabled = false),
             notes: NotesService = MockNotesService(latencyEnabled = false),
             files: FilesService = MockFilesService(latencyEnabled = false, thumbnailDelayMillis = 0),
             catalog: CatalogService = MockCatalogService(latencyEnabled = false),
@@ -314,6 +321,7 @@ class ServiceContainer private constructor(
             notifications = notifications,
             messages = messages,
             whatsapp = whatsapp,
+            conversations = conversations,
             notes = notes,
             files = files,
             thumbnails = ThumbnailCache(files, OkHttpClient()),

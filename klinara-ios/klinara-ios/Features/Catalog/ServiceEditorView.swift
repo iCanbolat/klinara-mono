@@ -71,7 +71,8 @@ struct ServiceEditorView: View {
                     text: $form.name,
                     placeholder: "Tüm Vücut Lazer Epilasyon",
                     error: fieldErrors["name"],
-                    autocapitalization: .words
+                    autocapitalization: .words,
+                    reservesErrorSpace: false
                 )
                 .onChange(of: form.name) { _, newValue in form.nameDidChange(newValue) }
 
@@ -79,7 +80,8 @@ struct ServiceEditorView: View {
                     label: "Kod (slug)",
                     text: $form.slug,
                     placeholder: "tum-vucut-lazer",
-                    error: form.slugValidationMessage ?? fieldErrors["slug"]
+                    error: form.slugValidationMessage ?? fieldErrors["slug"],
+                    reservesErrorSpace: false
                 )
                 .onChange(of: form.slug) { _, newValue in form.slugDidChange(newValue) }
 
@@ -96,7 +98,8 @@ struct ServiceEditorView: View {
                     text: $form.description,
                     placeholder: "İsteğe bağlı",
                     error: fieldErrors["description"],
-                    autocapitalization: .sentences
+                    autocapitalization: .sentences,
+                    reservesErrorSpace: false
                 )
             }
             .padding(KlinaraMetrics.md)

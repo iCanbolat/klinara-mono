@@ -1,6 +1,8 @@
 package com.klinara.android.features.shell
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 
@@ -61,10 +63,21 @@ class ManagementSectionsTest {
                     ManagementDestination.NotificationTemplates,
                     ManagementDestination.NotificationPreferences,
                 ),
-                card?.rows?.map { it.destination }?.take(5),
+                card?.rows?.map { it.destination }?.filterNot { it == ManagementDestination.Conversations }?.take(5),
                 role,
             )
         }
+    }
+
+    @Test
+    @DisplayName("Sohbetler `notification:send` ile: resepsiyon görür, uygulayıcı görmez")
+    fun conversationsRow() {
+        fun has(role: String) =
+            managementSections(ShellSessions.forRole(role))
+                .flatMap { it.rows }
+                .any { it.destination == ManagementDestination.Conversations }
+        listOf("owner", "manager", "receptionist").forEach { assertTrue(has(it), it) }
+        assertFalse(has("practitioner"))
     }
 
     @Test

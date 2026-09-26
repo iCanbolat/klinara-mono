@@ -28,6 +28,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -273,61 +274,74 @@ private fun TodayTab(
             }
         }
 
-        composable<ShellRoutes.AppointmentDetail> { entry ->
-            val route = entry.toRoute<ShellRoutes.AppointmentDetail>()
-            AppointmentDetailScreen(
-                appointmentId = route.appointmentId,
-                session = session,
-                container = container,
-                onBack = { navController.popBackStack() },
-                onOpenHistory = { navController.navigate(ShellRoutes.AppointmentHistory(it)) },
-                onReschedule = { navController.navigate(ShellRoutes.BookingFlow(rescheduleId = it)) },
-                onBindPackage =
-                    if (session.can(Permissions.PACKAGE_WRITE)) {
-                        { appointment, line -> navController.navigate(ShellRoutes.BindPackage(appointment, line)) }
-                    } else {
-                        null
-                    },
-            )
-        }
+        appointmentDestinations(navController, session, container)
+    }
+}
 
-        composable<ShellRoutes.BindPackage> { entry ->
-            val route = entry.toRoute<ShellRoutes.BindPackage>()
-            BindPackageHost(
-                session = session,
-                container = container,
-                appointmentId = route.appointmentId,
-                appointmentServiceId = route.appointmentServiceId,
-                serviceName = null,
-                onBack = { navController.popBackStack() },
-            )
-        }
-
-        composable<ShellRoutes.BookingFlow> { entry ->
-            val route = entry.toRoute<ShellRoutes.BookingFlow>()
-            BookingFlowHost(
-                rescheduleId = route.rescheduleId,
-                session = session,
-                container = container,
-                onBack = { navController.popBackStack() },
-                onCreated = {
-                    // Oluşturduktan sonra takvime dönülür ve YENİ randevu orada görünür.
-                    // Detaya atlamak, kullanıcıyı yeni bir ekrana bırakıp "peki günün
-                    // geri kalanı?" sorusunu cevapsız bırakırdı.
-                    navController.popBackStack()
+/**
+ * Randevu detayı ve ondan açılan hedefler — hem Takvim hem Müşteriler sekmesinin
+ * `NavHost`'unda. Müşteri kartının zaman çizelgesinden randevuya gidilebilsin diye
+ * ikinci sekmede de tanımlı; her sekme kendi geri yığınını koruyor.
+ */
+private fun NavGraphBuilder.appointmentDestinations(
+    navController: NavHostController,
+    session: AppSession,
+    container: ServiceContainer,
+) {
+    composable<ShellRoutes.AppointmentDetail> { entry ->
+        val route = entry.toRoute<ShellRoutes.AppointmentDetail>()
+        AppointmentDetailScreen(
+            appointmentId = route.appointmentId,
+            session = session,
+            container = container,
+            onBack = { navController.popBackStack() },
+            onOpenHistory = { navController.navigate(ShellRoutes.AppointmentHistory(it)) },
+            onReschedule = { navController.navigate(ShellRoutes.BookingFlow(rescheduleId = it)) },
+            onBindPackage =
+                if (session.can(Permissions.PACKAGE_WRITE)) {
+                    { appointment, line -> navController.navigate(ShellRoutes.BindPackage(appointment, line)) }
+                } else {
+                    null
                 },
-            )
-        }
+        )
+    }
 
-        composable<ShellRoutes.AppointmentHistory> { entry ->
-            val route = entry.toRoute<ShellRoutes.AppointmentHistory>()
-            AppointmentHistoryScreen(
-                appointmentId = route.appointmentId,
-                session = session,
-                container = container,
-                onBack = { navController.popBackStack() },
-            )
-        }
+    composable<ShellRoutes.BindPackage> { entry ->
+        val route = entry.toRoute<ShellRoutes.BindPackage>()
+        BindPackageHost(
+            session = session,
+            container = container,
+            appointmentId = route.appointmentId,
+            appointmentServiceId = route.appointmentServiceId,
+            serviceName = null,
+            onBack = { navController.popBackStack() },
+        )
+    }
+
+    composable<ShellRoutes.BookingFlow> { entry ->
+        val route = entry.toRoute<ShellRoutes.BookingFlow>()
+        BookingFlowHost(
+            rescheduleId = route.rescheduleId,
+            session = session,
+            container = container,
+            onBack = { navController.popBackStack() },
+            onCreated = {
+                // Oluşturduktan sonra takvime dönülür ve YENİ randevu orada görünür.
+                // Detaya atlamak, kullanıcıyı yeni bir ekrana bırakıp "peki günün
+                // geri kalanı?" sorusunu cevapsız bırakırdı.
+                navController.popBackStack()
+            },
+        )
+    }
+
+    composable<ShellRoutes.AppointmentHistory> { entry ->
+        val route = entry.toRoute<ShellRoutes.AppointmentHistory>()
+        AppointmentHistoryScreen(
+            appointmentId = route.appointmentId,
+            session = session,
+            container = container,
+            onBack = { navController.popBackStack() },
+        )
     }
 }
 
@@ -363,6 +377,8 @@ private fun CustomersTab(
             )
         }
 
+        appointmentDestinations(navController, session, container)
+
         composable<ShellRoutes.CustomerDetail> { entry ->
             val route = entry.toRoute<ShellRoutes.CustomerDetail>()
             CustomerDetailScreen(
@@ -386,6 +402,7 @@ private fun CustomersTab(
                     navController.navigate(ShellRoutes.FileUpload(customer, isPhoto))
                 },
                 onOpenPackage = { navController.navigate(ShellRoutes.CustomerPackageDetail(it)) },
+                onOpenAppointment = { navController.navigate(ShellRoutes.AppointmentDetail(it)) },
                 onSellPackage =
                     if (session.can(Permissions.PACKAGE_WRITE)) {
                         { navController.navigate(ShellRoutes.SellPackage(it)) }
@@ -923,6 +940,7 @@ private fun ManagementDestination.route(): Any =
         ManagementDestination.PackageDefinitions -> ShellRoutes.PackageDefinitionList
         ManagementDestination.PackageReports -> ShellRoutes.PackageReportsHome
         ManagementDestination.Reports -> ShellRoutes.ReportsHome
+        ManagementDestination.Conversations -> ShellRoutes.Conversations
         ManagementDestination.Inbox -> ShellRoutes.Inbox
         ManagementDestination.MessageLog -> ShellRoutes.MessageLog
         ManagementDestination.ReminderSettings -> ShellRoutes.ReminderSettings

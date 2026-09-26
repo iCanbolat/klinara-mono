@@ -1,5 +1,10 @@
 package com.klinara.android.features.customers
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -98,6 +103,7 @@ fun CustomerListScreen(
     LaunchedEffect(Unit) {
         viewModel.load()
         viewModel.loadTags()
+        viewModel.loadSummary()
     }
 
     // Arama alanı yerel metni tutar: ViewModel terimi kırpıyor ve kırpılmış değeri geri
@@ -118,6 +124,19 @@ fun CustomerListScreen(
             // Arama ve etiket filtresi TEK bir başlık bloğu: ikisi de listeyi daraltıyor ve
             // araları açıldığında filtre satırı, listenin ilk satırı gibi okunuyordu.
             Column(verticalArrangement = Arrangement.spacedBy(KlinaraMetrics.sm)) {
+                // Özet tüm tabanı anlatıyor, daraltılmış sonucu değil: arama ya da etiket
+                // filtresi etkinken yanında durması "bu 12 kişiden 37'si" gibi okunurdu.
+                AnimatedVisibility(
+                    visible = !state.isSearching && state.selectedTagId == null && query.isEmpty(),
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically(),
+                ) {
+                    CustomerSummaryStrip(
+                        summary = state.summary,
+                        modifier = Modifier.padding(horizontal = KlinaraMetrics.md),
+                    )
+                }
+
                 KlinaraSearchField(
                     value = query,
                     onValueChange = {

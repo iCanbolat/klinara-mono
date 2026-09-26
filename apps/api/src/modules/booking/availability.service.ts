@@ -8,10 +8,29 @@ import { BranchAccessService } from '../tenancy/branch-access.service';
 import { AvailabilityCacheService } from './availability-cache.service';
 import * as repo from './availability.repository';
 import * as settingsRepo from './booking-settings.repository';
-import type { AvailabilityQueryDto, AvailabilityResponseDto } from './dto/availability.dto';
+import type {
+  AvailabilityDayDto,
+  AvailabilityDaysQueryDto,
+  AvailabilityDaysResponseDto,
+  AvailabilityQueryDto,
+  AvailabilityResponseDto,
+} from './dto/availability.dto';
 
 /** 30 günlük pencere üst sınırı: kabul kriteri p95 < 200 ms bu aralık için. */
 const MAX_WINDOW_DAYS = 31;
+/**
+ * Gün durumu sorgusu slot üretmiyor, gün başına tek satır: bir ay görünümü
+ * (dış günlerle 6 hafta = 42 gün) tek istekte sığsın diye daha geniş.
+ */
+const MAX_DAYS_WINDOW_DAYS = 62;
+
+const toDayDto = (row: repo.DayStatusRow): AvailabilityDayDto => ({
+  date: row.local_date,
+  status: row.status,
+  holidayName: row.holiday_name,
+  opensAt: row.opens_at,
+  closesAt: row.closes_at,
+});
 
 @Injectable()
 export class AvailabilityService {
@@ -31,6 +50,38 @@ export class AvailabilityService {
   }
 
   /**
+   * Yalnız gün durumları — tarih seçicinin kapalı/tatil günleri işaretlemesi
+   * için. Hizmet ve personel gerekmiyor; gün kuralı şubenindir.
+   */
+  async findDays(
+    principal: Principal,
+    query: AvailabilityDaysQueryDto,
+    now: Date = new Date(),
+  ): Promise<AvailabilityDaysResponseDto> {
+    await this.branchAccess.assertInput(principal, query.branchId);
+    const from = new Date(query.from);
+    const to = new Date(query.to);
+    AvailabilityService.assertWindow(from, to, MAX_DAYS_WINDOW_DAYS);
+
+    return this.tx.run(async (tx) => {
+      const branch = await settingsRepo.findBranchForBooking(tx, query.branchId);
+      if (branch === undefined) throw AppError.notFound('Şube bulunamadı');
+      const settings = await settingsRepo.getBookingSettings(tx, this.tx.tenantId);
+      if (settings === undefined) throw AppError.notFound('Kiracı ayarları bulunamadı');
+
+      const rows = await repo.findDayStatuses(tx, {
+        branchId: query.branchId,
+        from,
+        to,
+        minLeadMinutes: settings.minLeadMinutes,
+        maxAdvanceDays: settings.maxAdvanceDays,
+        now,
+      });
+      return { branchId: query.branchId, timezone: branch.timezone, days: rows.map(toDayDto) };
+    });
+  }
+
+  /**
    * Yetki kontrolü OLMADAN hesaplama.
    *
    * Yalnız sunucunun kendi içinden çağrılır (çakışma yanıtındaki alternatif
@@ -44,7 +95,7 @@ export class AvailabilityService {
   ): Promise<AvailabilityResponseDto> {
     const from = new Date(query.from);
     const to = new Date(query.to);
-    AvailabilityService.assertWindow(from, to);
+    AvailabilityService.assertWindow(from, to, MAX_WINDOW_DAYS);
 
     const cacheKey = AvailabilityCacheService.key(this.tx.tenantId, [
       query.branchId,
@@ -63,22 +114,37 @@ export class AvailabilityService {
       const settings = await settingsRepo.getBookingSettings(tx, this.tx.tenantId);
       if (settings === undefined) throw AppError.notFound('Kiracı ayarları bulunamadı');
 
-      const rows = await repo.findAvailableSlots(tx, {
+      // Gün kuralı ÖNCE: penceredeki hiçbir gün açık değilse (tatil, kapalı
+      // gün, geçmiş, rezervasyon sınırı ötesi) pahalı slot sorgusuna hiç
+      // girilmiyor ve istemci boş listenin NEDENİNİ `days`ten okuyor.
+      const days = await repo.findDayStatuses(tx, {
         branchId: query.branchId,
-        serviceIds: query.serviceIds,
         from,
         to,
-        staffProfileId: query.staffProfileId,
-        slotGranularityMinutes: settings.slotGranularityMinutes,
         minLeadMinutes: settings.minLeadMinutes,
         maxAdvanceDays: settings.maxAdvanceDays,
         now,
       });
 
+      const rows = days.some((day) => day.status === 'open')
+        ? await repo.findAvailableSlots(tx, {
+            branchId: query.branchId,
+            serviceIds: query.serviceIds,
+            from,
+            to,
+            staffProfileId: query.staffProfileId,
+            slotGranularityMinutes: settings.slotGranularityMinutes,
+            minLeadMinutes: settings.minLeadMinutes,
+            maxAdvanceDays: settings.maxAdvanceDays,
+            now,
+          })
+        : [];
+
       return {
         branchId: query.branchId,
         timezone: branch.timezone,
         slotGranularityMinutes: settings.slotGranularityMinutes,
+        days: days.map(toDayDto),
         slots: rows.map((row) => ({
           startsAt: toZonedIso(new Date(row.slot_start), branch.timezone),
           endsAt: toZonedIso(new Date(row.visible_end), branch.timezone),
@@ -91,7 +157,7 @@ export class AvailabilityService {
     return response;
   }
 
-  private static assertWindow(from: Date, to: Date): void {
+  private static assertWindow(from: Date, to: Date, maxDays: number): void {
     if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
       throw new AppError(400, ERROR_CODES.VALIDATION_FAILED, 'Tarih aralığı geçersiz');
     }
@@ -99,11 +165,11 @@ export class AvailabilityService {
       throw new AppError(400, ERROR_CODES.VALIDATION_FAILED, '`to`, `from` değerinden sonra olmalı');
     }
     const days = (to.getTime() - from.getTime()) / 86_400_000;
-    if (days > MAX_WINDOW_DAYS) {
+    if (days > maxDays) {
       throw new AppError(
         400,
         ERROR_CODES.VALIDATION_FAILED,
-        `Uygunluk sorgusu en fazla ${MAX_WINDOW_DAYS} gün olabilir`,
+        `Uygunluk sorgusu en fazla ${maxDays} gün olabilir`,
       );
     }
   }

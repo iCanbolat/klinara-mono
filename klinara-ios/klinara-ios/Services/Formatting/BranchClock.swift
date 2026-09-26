@@ -61,7 +61,9 @@ struct ClockTime: Sendable, Equatable, Comparable, Hashable {
 struct BranchClock: Sendable {
 
     let timeZone: TimeZone
-    private let calendar: Calendar
+    /// Şube saat dilimli, tr_TR, pazartesi başlangıçlı takvim — takvim
+    /// bileşenleri (`UICalendarView`) aynı günü görsün diye açık.
+    let calendar: Calendar
 
     init(timeZoneIdentifier: String?) {
         // Bilinmeyen kimlikte UTC'ye düşmek sessiz ama açıklanabilir bir hata
@@ -252,6 +254,16 @@ struct BranchClock: Sendable {
     /// durur; okuyanın aradığı ayrım da çoğunlukla "bugün mü, değil mi".
     /// Yıl **her zaman** yazılır: "11 Eylül" bir yıl sonra okunduğunda hangi
     /// eylül olduğunu söylemez.
+    /// Gün seçici başlığı: "29 Eylül Salı" + (bugün/yarın ise) önek.
+    /// Randevu alırken haftanın günü tarihten daha belirleyici: "salı öğleden
+    /// sonra" diye düşünülüyor.
+    func dayPickerLabel(_ date: Date, now: Date = Date()) -> (title: String, prefix: String?) {
+        let title = pattern("d MMMM EEEE").string(from: date)
+        if isSameDay(date, now) { return (title, "Bugün") }
+        if isSameDay(date, adding(days: 1, to: now)) { return (title, "Yarın") }
+        return (title, nil)
+    }
+
     func relativeDayLabel(_ date: Date, now: Date = Date()) -> String {
         if isSameDay(date, now) { return "Bugün" }
         if isSameDay(date, adding(days: -1, to: now)) { return "Dün" }

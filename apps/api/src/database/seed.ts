@@ -357,7 +357,7 @@ async function seed(): Promise<void> {
       `insert into booking_site_settings
          (tenant_id, booking_site_id, show_staff_selection, show_prices,
           require_otp, otp_channel, locales, contact_email)
-       values ($1, $2, true, true, true, 'sms', '{tr}', 'iletisim@demo-klinik.test')
+       values ($1, $2, true, true, true, 'whatsapp', '{tr}', 'iletisim@demo-klinik.test')
        on conflict (booking_site_id) do update
          set show_staff_selection = excluded.show_staff_selection,
              show_prices = excluded.show_prices`,

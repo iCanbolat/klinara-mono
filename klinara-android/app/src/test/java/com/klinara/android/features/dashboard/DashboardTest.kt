@@ -1,6 +1,7 @@
 package com.klinara.android.features.dashboard
 
 import com.klinara.android.services.auth.BranchSummary
+import com.klinara.android.services.booking.AppointmentListQuery
 import com.klinara.android.services.booking.AppointmentStatus
 import com.klinara.android.services.booking.BookingService
 import com.klinara.android.services.booking.CalendarDayQuery
@@ -10,6 +11,7 @@ import com.klinara.android.services.booking.MockBookingService
 import com.klinara.android.services.contracts.Permissions
 import com.klinara.android.services.contracts.RolePermissions
 import com.klinara.android.services.networking.ApiError
+import com.klinara.android.services.networking.Page
 import com.klinara.android.services.reports.MockReportsService
 import com.klinara.android.services.reports.OccupancyGrouping
 import com.klinara.android.services.reports.OccupancyReport
@@ -90,7 +92,7 @@ class DashboardTest {
     // --- Saf birleştirme ---
 
     @Test
-    @DisplayName("Gün özeti: slot kaplayan, tamamlanan ve sıradakiler (başlamamış, tamamlanmamış)")
+    @DisplayName("Gün özeti: toplam, slot kaplayan ve tamamlanan")
     fun summarizeDay() {
         val day =
             DashboardSummaries.summarizeDay(
@@ -101,26 +103,54 @@ class DashboardTest {
                     entry("gone", "2026-09-14T12:00:00Z", AppointmentStatus.Cancelled),
                     entry("past", "2026-09-14T07:00:00Z", AppointmentStatus.Scheduled),
                 ),
-                now,
             )
-        assertEquals(5, day.total)
-        assertEquals(4, day.active)
-        assertEquals(1, day.completed)
-        assertEquals(listOf("soon", "later"), day.upcoming.map { it.id })
-        assertEquals(2, day.pending)
+        assertEquals(DaySummary(total = 5, active = 4, completed = 1), day)
     }
 
     @Test
-    @DisplayName("Önizleme sınırlı ama toplam korunuyor: 8 bekleyen randevu → 5 satır, 'Tümünü gör' için 8")
-    fun previewIsBoundedButCountIsKept() {
-        val entries = (1..8).map { entry("e$it", "2026-09-14T1$it:00:00Z", AppointmentStatus.Scheduled) }
-        val day = DashboardSummaries.summarizeDay(entries, Instant.parse("2026-09-14T08:00:00Z"))
-        assertEquals(DashboardSummaries.PREVIEW_LIMIT, day.upcoming.size)
-        assertEquals(8, day.pending)
+    @DisplayName("Sıradakiler bugünle sınırlı değil: şubeler birleşiyor, başlangıca göre, bitmemiş olanlar")
+    fun mergesUpcoming() {
+        val items =
+            DashboardSummaries.mergeUpcoming(
+                branches = listOf(kadikoy, nisantasi),
+                lists =
+                    mapOf(
+                        "b1" to
+                            listOf(
+                                entry("past", "2026-09-14T08:30:00Z", AppointmentStatus.Scheduled),
+                                entry("nextWeek", "2026-09-21T09:00:00Z", AppointmentStatus.Confirmed),
+                            ),
+                        "b2" to
+                            listOf(
+                                entry("soon", "2026-09-14T10:00:00Z", AppointmentStatus.Scheduled),
+                                entry("void", "2026-09-14T10:30:00Z", AppointmentStatus.Cancelled),
+                                entry("tomorrow", "2026-09-15T09:00:00Z", AppointmentStatus.Scheduled),
+                            ),
+                    ),
+                now = now,
+            )
+        assertEquals(listOf("soon", "tomorrow", "nextWeek"), items.map { it.entry.id })
+        assertEquals("Nişantaşı", items.first().branchName)
+    }
 
-        val days = mapOf("b1" to (entries to "Europe/Istanbul"))
-        val summaries = DashboardSummaries.merge(listOf(kadikoy), days, null, null, null, now)
-        assertEquals(DashboardSummaries.PREVIEW_LIMIT, DashboardSummaries.upcoming(summaries).size)
+    @Test
+    @DisplayName("Sıradakiler en fazla 10")
+    fun upcomingIsBounded() {
+        val entries =
+            (1..12).map { entry("e$it", now.plusSeconds(it * 86_400L).toString(), AppointmentStatus.Scheduled) }
+        val items = DashboardSummaries.mergeUpcoming(listOf(kadikoy), mapOf("b1" to entries), now)
+        assertEquals(10, DashboardSummaries.UPCOMING_LIMIT)
+        assertEquals(DashboardSummaries.UPCOMING_LIMIT, items.size)
+    }
+
+    @Test
+    @DisplayName("Gün etiketi şubenin saat diliminde: Bugün, Yarın, sonra tarih")
+    fun upcomingDayLabel() {
+        val tz = "Europe/Istanbul"
+        // now = 12:00 İstanbul
+        assertEquals("Bugün", DashboardSummaries.upcomingDayLabel(Instant.parse("2026-09-14T20:00:00Z"), tz, now))
+        assertEquals("Yarın", DashboardSummaries.upcomingDayLabel(Instant.parse("2026-09-14T22:00:00Z"), tz, now))
+        assertEquals("28 Eyl", DashboardSummaries.upcomingDayLabel(Instant.parse("2026-09-28T09:00:00Z"), tz, now))
     }
 
     @Test
@@ -138,7 +168,6 @@ class DashboardTest {
                 occupancy = occupancy,
                 revenue = revenue,
                 noShow = null,
-                now = now,
             )
         val (k, n) = summaries
         assertEquals(72.0, k.occupancyRate)
@@ -216,6 +245,29 @@ class DashboardTest {
         delegate: BookingService,
     ) : BookingService by delegate {
         val days = mutableListOf<CalendarDayQuery>()
+        val lists = mutableListOf<AppointmentListQuery>()
+
+        override suspend fun appointments(query: AppointmentListQuery): Page<CalendarEntry> {
+            lists += query
+            // Nişantaşı'nın bugün randevusu yok ama gelecek hafta var.
+            val data =
+                if (query.branchId == "b2") {
+                    listOf(
+                        CalendarEntry(
+                            id = "nextWeek",
+                            branchId = "b2",
+                            customerId = "c",
+                            customerName = "Deniz Kaya",
+                            status = AppointmentStatus.Scheduled,
+                            startsAt = Instant.parse("2026-09-21T09:00:00Z"),
+                            endsAt = Instant.parse("2026-09-21T09:30:00Z"),
+                        ),
+                    )
+                } else {
+                    emptyList()
+                }
+            return Page(data = data)
+        }
 
         override suspend fun calendarDay(query: CalendarDayQuery): CalendarResponse {
             days += query
@@ -276,6 +328,11 @@ class DashboardTest {
 
             assertEquals(listOf("b1", "b2"), booking.days.map { it.branchId })
             assertEquals("2026-09-14", booking.days.first().date)
+            // Sıradakiler: şube başına, şimdiden itibaren, bitmemiş durumlar, en fazla 10.
+            assertEquals(listOf("b1", "b2"), booking.lists.map { it.branchId })
+            assertTrue(booking.lists.all { it.from == now && it.limit == 10 })
+            assertEquals(DashboardSummaries.UPCOMING_STATUSES, booking.lists.first().statuses)
+            assertEquals(listOf("nextWeek"), model.state.value.data?.upcoming?.map { it.entry.id })
             assertTrue("occupancy:branch:true" in reports.calls)
             assertTrue("revenue:branch" in reports.calls)
             assertEquals(64.0, model.state.value.data?.totals?.occupancyRate)
@@ -293,6 +350,7 @@ class DashboardTest {
             advanceUntilIdle()
 
             assertTrue(booking.days.isEmpty())
+            assertTrue(booking.lists.isEmpty())
             assertFalse(reports.calls.any { it.startsWith("occupancy") })
             assertTrue(reports.calls.any { it.startsWith("revenue") })
         }

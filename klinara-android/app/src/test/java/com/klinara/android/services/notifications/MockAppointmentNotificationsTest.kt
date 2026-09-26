@@ -21,7 +21,7 @@ class MockAppointmentNotificationsTest {
     private val booking = MockBookingService(MockDataScenario.BusyDay, clock, mockClock, latencyEnabled = false)
 
     private fun subject(now: Instant) =
-        MockNotificationsService(latencyEnabled = false, booking = booking, now = { now }, seedOptOuts = false)
+        MockNotificationsService(latencyEnabled = false, booking = booking, now = { now })
 
     private suspend fun firstAppointmentId(): String =
         booking

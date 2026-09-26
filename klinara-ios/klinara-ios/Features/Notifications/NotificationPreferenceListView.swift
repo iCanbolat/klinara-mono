@@ -111,9 +111,6 @@ struct NotificationPreferenceListView: View {
                         .foregroundStyle(KlinaraColor.charcoal)
                         .frame(maxWidth: .infinity, alignment: .leading)
 
-                    if preference.kind == .marketing {
-                        KlinaraBadge(text: "Pazarlama", tone: .warning)
-                    }
                     if preference.isDefault {
                         KlinaraBadge(text: "Varsayılan", tone: .muted)
                     }

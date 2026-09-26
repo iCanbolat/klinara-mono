@@ -14,6 +14,7 @@ import { hasPermission } from '../identity/principal';
 import { BranchAccessService } from '../tenancy/branch-access.service';
 import { AvailabilityCacheService } from './availability-cache.service';
 import { AvailabilityService } from './availability.service';
+import { AppointmentNotifierService } from '../notifications/appointment-notifier.service';
 import { ReminderSchedulerService } from '../notifications/reminder-scheduler.service';
 import * as repo from './appointments.repository';
 import * as settingsRepo from './booking-settings.repository';
@@ -66,6 +67,7 @@ export class AppointmentsService {
     private readonly consumption: PackageConsumptionService,
     private readonly chargeGeneration: ChargeGenerationService,
     private readonly reminders: ReminderSchedulerService,
+    private readonly notifier: AppointmentNotifierService,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -114,6 +116,9 @@ export class AppointmentsService {
           startsAt: appointment.startsAt,
           status: appointment.status,
         });
+        if (input.notifyCustomer !== false) {
+          await this.notifier.notifyCreated(tx, this.tx.tenantId, appointment.id);
+        }
 
         const services = await repo.listAppointmentServices(tx, appointment.id);
         return { appointment, services };
@@ -147,6 +152,7 @@ export class AppointmentsService {
     startsAt: string;
     services: AppointmentServiceInputDto[];
     notes?: string | undefined;
+    notifyCustomer?: boolean;
     prepare?: (tx: Tx) => Promise<void>;
   }): Promise<AppointmentResponseDto> {
     const startsAt = AppointmentsService.parseInstant(input.startsAt);
@@ -190,6 +196,9 @@ export class AppointmentsService {
           startsAt: appointment.startsAt,
           status: appointment.status,
         });
+        if (input.notifyCustomer !== false) {
+          await this.notifier.notifyCreated(tx, this.tx.tenantId, appointment.id);
+        }
 
         const services = await repo.listAppointmentServices(tx, appointment.id);
         return { appointment, services };
@@ -398,7 +407,9 @@ export class AppointmentsService {
     id: string,
     input: CancelAppointmentDto,
   ): Promise<AppointmentResponseDto> {
-    const payload = await this.changeStatus(principal, id, 'cancelled', input.reason);
+    const payload = await this.changeStatus(principal, id, 'cancelled', input.reason, {
+      notifyCustomer: input.notifyCustomer !== false,
+    });
     this.cache.invalidateTenant(this.tx.tenantId);
     return payload;
   }
@@ -411,7 +422,7 @@ export class AppointmentsService {
    * geçişini ve onun yan etkilerini (hatırlatma iptali, cache) yürütür.
    */
   async cancelUnauthorized(id: string, reason: string | undefined): Promise<AppointmentResponseDto> {
-    const payload = await this.changeStatus(null, id, 'cancelled', reason);
+    const payload = await this.changeStatus(null, id, 'cancelled', reason, { notifyCustomer: true });
     this.cache.invalidateTenant(this.tx.tenantId);
     return payload;
   }
@@ -421,7 +432,9 @@ export class AppointmentsService {
     id: string,
     input: ChangeAppointmentStatusDto,
   ): Promise<AppointmentResponseDto> {
-    const payload = await this.changeStatus(principal, id, input.status, input.reason);
+    const payload = await this.changeStatus(principal, id, input.status, input.reason, {
+      notifyCustomer: input.notifyCustomer !== false,
+    });
     this.cache.invalidateTenant(this.tx.tenantId);
     return payload;
   }
@@ -439,6 +452,7 @@ export class AppointmentsService {
     id: string,
     status: AppointmentStatus,
     reason: string | undefined,
+    options: { notifyCustomer: boolean },
   ): Promise<AppointmentResponseDto> {
     const payload = await this.tx
       .run(async (tx) => {
@@ -499,6 +513,9 @@ export class AppointmentsService {
         // bulamaz ve sessizce çıkar (bkz. ReminderWorker).
         if (status !== 'scheduled' && status !== 'confirmed') {
           await this.reminders.cancelForAppointment(tx, id);
+        }
+        if (isCancel && options.notifyCustomer) {
+          await this.notifier.notifyCancelled(tx, this.tx.tenantId, id, updated.version);
         }
         if (status === 'no_show') {
           await this.reminders.scheduleNoShowFollowup(tx, {

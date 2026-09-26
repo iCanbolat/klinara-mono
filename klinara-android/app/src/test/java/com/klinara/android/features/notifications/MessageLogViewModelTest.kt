@@ -76,7 +76,7 @@ class MessageLogViewModelTest {
             val state = viewModel.state.value
             assertNull(state.nextCursor)
             assertEquals(
-                listOf(MockNotificationsSeed.MESSAGE_BIRTHDAY_SKIPPED),
+                listOf(MockNotificationsSeed.MESSAGE_NO_SHOW_SKIPPED),
                 state.messages.valueOrNull?.map { it.id },
             )
             assertTrue(state.filter.isActive)

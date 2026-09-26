@@ -130,6 +130,7 @@ struct StaffDetailView: View {
                 isEnabled: canWrite
             )
         }
+        .environment(\.klinaraReservesFieldErrorSpace, false)
     }
 
     private func linksCard(profile: StaffProfile) -> some View {

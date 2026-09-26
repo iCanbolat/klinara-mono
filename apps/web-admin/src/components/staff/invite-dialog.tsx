@@ -13,6 +13,7 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -107,70 +108,72 @@ export function InviteDialog({
         </DialogHeader>
 
         <form
-          className="flex flex-col gap-4"
+          className="flex min-h-0 flex-1 flex-col"
           onSubmit={(event) => {
             event.preventDefault();
             void submit();
           }}
         >
-          {errors.message !== null ? <Alert tone="danger">{errors.message}</Alert> : null}
-          <Field
-            label={t('invites.email')}
-            type="email"
-            autoComplete="off"
-            required
-            value={email}
-            disabled={busy}
-            error={errorFor(errors, 'email')}
-            onChange={(event) => setEmail(event.target.value)}
-          />
-          <Field
-            label={t('invites.fullName')}
-            value={fullName}
-            maxLength={200}
-            disabled={busy}
-            error={errorFor(errors, 'fullName')}
-            onChange={(event) => setFullName(event.target.value)}
-          />
-          <div className="grid gap-4 sm:grid-cols-2">
-            <FieldSelect
-              label={t('invites.role')}
-              value={roleKey}
+          <DialogBody className="flex flex-col gap-4">
+            {errors.message !== null ? <Alert tone="danger">{errors.message}</Alert> : null}
+            <Field
+              label={t('invites.email')}
+              type="email"
+              autoComplete="off"
+              required
+              value={email}
               disabled={busy}
-              error={errorFor(errors, 'roleKey')}
-              onChange={(event) => setRoleKey(event.target.value)}
-            >
-              {roles.map((role) => (
-                <option key={role} value={role}>
-                  {roleName(role)}
-                </option>
-              ))}
-            </FieldSelect>
-            {tenantScoped ? (
-              <div className="flex flex-col gap-1.5">
-                <span className="text-sm font-medium">{t('invites.branch')}</span>
-                <div className="flex h-11 items-center rounded-lg bg-muted px-3 text-sm text-muted-foreground">
-                  {t('staff.tenantWide')}
-                </div>
-              </div>
-            ) : (
+              error={errorFor(errors, 'email')}
+              onChange={(event) => setEmail(event.target.value)}
+            />
+            <Field
+              label={t('invites.fullName')}
+              value={fullName}
+              maxLength={200}
+              disabled={busy}
+              error={errorFor(errors, 'fullName')}
+              onChange={(event) => setFullName(event.target.value)}
+            />
+            <div className="grid gap-4 sm:grid-cols-2">
               <FieldSelect
-                label={t('invites.branch')}
-                value={branchId}
-                required
+                label={t('invites.role')}
+                value={roleKey}
                 disabled={busy}
-                error={errorFor(errors, 'branchId')}
-                onChange={(event) => setBranchId(event.target.value)}
+                error={errorFor(errors, 'roleKey')}
+                onChange={(event) => setRoleKey(event.target.value)}
               >
-                <option value="">{t('members.pickBranch')}</option>
-                {assignable.map((branch) => (
-                  <option key={branch.id} value={branch.id}>
-                    {branch.name}
+                {roles.map((role) => (
+                  <option key={role} value={role}>
+                    {roleName(role)}
                   </option>
                 ))}
               </FieldSelect>
-            )}
-          </div>
+              {tenantScoped ? (
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-sm font-medium">{t('invites.branch')}</span>
+                  <div className="flex h-11 items-center rounded-lg bg-muted px-3 text-sm text-muted-foreground">
+                    {t('staff.tenantWide')}
+                  </div>
+                </div>
+              ) : (
+                <FieldSelect
+                  label={t('invites.branch')}
+                  value={branchId}
+                  required
+                  disabled={busy}
+                  error={errorFor(errors, 'branchId')}
+                  onChange={(event) => setBranchId(event.target.value)}
+                >
+                  <option value="">{t('members.pickBranch')}</option>
+                  {assignable.map((branch) => (
+                    <option key={branch.id} value={branch.id}>
+                      {branch.name}
+                    </option>
+                  ))}
+                </FieldSelect>
+              )}
+            </div>
+          </DialogBody>
 
           <DialogFooter>
             <Button type="button" variant="secondary" disabled={busy} onClick={onClose}>

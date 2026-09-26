@@ -69,6 +69,14 @@ enum KlinaraFont {
 
     // MARK: Gövde ve arayüz — Manrope
 
+    /// Sekme köklerinin üst çubuk başlığı. Boyut ve kalınlık Android'in
+    /// `KlinaraType.titleM` (22sp, Normal) üst çubuk başlığıyla aynı; aile
+    /// Manrope — üst çubukta şube menüsüyle aynı aileden okunuyor.
+    static var toolbarTitle: Font {
+        font(Face.sansRegular, size: 22, relativeTo: .title2,
+             fallback: .system(.title2))
+    }
+
     static var bodyL: Font {
         font(Face.sansRegular, size: 17, relativeTo: .body,
              fallback: .system(.body))

@@ -1,0 +1,8 @@
+{
+  "type": "https://errors.klinara.app/whatsapp-window-closed",
+  "title": "Müşterinin son mesajının üzerinden 24 saat geçti; WhatsApp yalnız onaylı şablon gönderimine izin veriyor",
+  "status": 422,
+  "code": "WHATSAPP_WINDOW_CLOSED",
+  "instance": "/api/v1/conversations/91088f97-9ffe-417e-ac20-4b05e086485c/messages",
+  "requestId": "46495018-c716-49dc-90bc-e72ada74a7a9"
+}

@@ -284,3 +284,12 @@ extension KeyedEncodingContainer {
         }
     }
 }
+
+/// `GET /customers/summary` — Müşteriler ekranının üstündeki özet şeridi.
+nonisolated struct CustomerSummary: Codable, Sendable, Equatable {
+    let total: Int
+    let newLast30Days: Int
+    let activeLast90Days: Int
+    /// Daha önce gelmiş, 90 gündür gelmeyen ve ileri tarihli randevusu olmayan.
+    let lapsed: Int
+}

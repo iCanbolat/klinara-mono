@@ -77,13 +77,9 @@ struct CalendarHomeView: View {
             .background(KlinaraColor.surface)
             .klinaraFAB(isVisible: canWrite, accessibilityLabel: "Yeni randevu") { isBooking = true }
             .navigationTitle(title)
-            // Tarih BAŞ kenarda, şube menüsü SON kenarda.
-            //
-            // İkisi de solda dururken üst çubuk "hangi şube" ile "hangi gün"ü
-            // yan yana, ayrımsız bir blok hâlinde veriyordu; ortalanmış bir
-            // başlık ise sağdaki menünün genişliği kadar sola kayıyordu.
-            // `.inlineLarge` tarihi baş kenara sabitler: ekranın ne olduğu
-            // solda, kapsamı sağda — diğer sekmelerdeki düzenin aynısı.
+            // Görünür başlık ``RootToolbarTitle`` ("Takvim"); tarih zaten
+            // `header`da yazıyor. `navigationTitle` yalnız geri düğmesi
+            // etiketi ve VoiceOver için duruyor.
             .toolbarTitleDisplayMode(.inline)
             .toolbar { toolbar }
             .task(id: store.loadKey(clock: clock, branchId: session.selectedBranchId)) {
@@ -244,6 +240,7 @@ struct CalendarHomeView: View {
 
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
+        RootToolbarTitle(title: "Takvim")
         ToolbarItem(placement: .topBarTrailing) {
             BranchMenu(session: session)
         }

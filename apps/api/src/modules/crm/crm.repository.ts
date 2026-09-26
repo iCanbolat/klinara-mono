@@ -53,6 +53,49 @@ export async function listCustomers(tx: Tx, filters: ListFilters): Promise<Custo
   return result.rows.map(hydrate);
 }
 
+export interface CustomerSummaryRow {
+  total: number;
+  newLast30Days: number;
+  activeLast90Days: number;
+  lapsed: number;
+}
+
+/**
+ * Müşteri tabanının özeti — tek sorgu, kiracı kapsamlı (şube süzgeci YOK:
+ * müşteri kaydı kiracıya ait, randevular hangi şubede olursa olsun sayılır).
+ *
+ * "Geri kazanılacak": en az bir kez gelmiş, 90 gündür gelmemiş ve ileri
+ * tarihli aktif randevusu olmayan müşteri — aranması gereken liste.
+ */
+export async function customerSummary(tx: Tx): Promise<CustomerSummaryRow> {
+  const result = await tx.execute<Record<string, unknown>>(sql`
+    with visits as (
+      select a.customer_id,
+             max(a.starts_at) filter (where a.status = 'completed') as last_visit,
+             bool_or(a.starts_at > now()
+                     and a.status in ('scheduled', 'confirmed')) as has_upcoming
+        from appointments a
+       where a.deleted_at is null
+       group by a.customer_id
+    )
+    select count(*)::int as total,
+           count(*) filter (where c.created_at >= now() - interval '30 days')::int as new_last_30,
+           count(*) filter (where v.last_visit >= now() - interval '90 days')::int as active_last_90,
+           count(*) filter (where v.last_visit < now() - interval '90 days'
+                              and not coalesce(v.has_upcoming, false))::int as lapsed
+      from customers c
+      left join visits v on v.customer_id = c.id
+     where c.deleted_at is null
+  `);
+  const row = result.rows[0] ?? {};
+  return {
+    total: Number(row.total ?? 0),
+    newLast30Days: Number(row.new_last_30 ?? 0),
+    activeLast90Days: Number(row.active_last_90 ?? 0),
+    lapsed: Number(row.lapsed ?? 0),
+  };
+}
+
 export async function searchCustomers(
   tx: Tx,
   filters: { folded: string; limit: number },

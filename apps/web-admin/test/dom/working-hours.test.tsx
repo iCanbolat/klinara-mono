@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { PERMISSIONS } from '@klinara/shared';
+import { dayFromToday, pickDate } from './date-picker';
 
 const get = vi.fn();
 const put = vi.fn();
@@ -420,10 +421,13 @@ describe('çalışma saatleri — izinler', () => {
     const end = within(dialog).getByLabelText('Bitiş');
     await user.clear(end);
     await user.type(end, '13:00');
-    const first = within(dialog).getByLabelText('İlk gün');
-    await user.clear(first);
-    await user.type(first, '2026-09-14');
-    await user.type(within(dialog).getByLabelText('Son gün'), '2026-11-30');
+    // Sabit tarih yerine bugüne göre: takvim bugünün ayında açılıyor ve
+    // yıllar öteye ok tuşuyla gitmek testi yavaşlatırdı. İlk gün bir PAZARTESİ.
+    const offset = 7 + ((8 - new Date().getDay()) % 7);
+    const firstDay = dayFromToday(offset);
+    const lastDay = dayFromToday(offset + 77);
+    await pickDate(user, within(dialog).getByLabelText('İlk gün'), firstDay);
+    await pickDate(user, within(dialog).getByLabelText('Son gün'), lastDay);
 
     await user.click(within(dialog).getByRole('button', { name: 'İzin ekle' }));
 
@@ -436,10 +440,10 @@ describe('çalışma saatleri — izinler', () => {
       branchId: 'b1',
       recurrenceType: 'weekly',
       // İlk oluşum: şube saat diliminde 12:00–13:00.
-      startsAt: '2026-09-14T12:00:00+03:00',
-      endsAt: '2026-09-14T13:00:00+03:00',
+      startsAt: `${firstDay}T12:00:00+03:00`,
+      endsAt: `${firstDay}T13:00:00+03:00`,
       recurrenceIntervalWeeks: 1,
-      recurrenceUntil: '2026-11-30T23:59:00+03:00',
+      recurrenceUntil: `${lastDay}T23:59:00+03:00`,
       // Arayüz sırasıyla (pazartesi önce).
       recurrenceWeekdays: [1, 3],
     });
@@ -564,7 +568,8 @@ describe('çalışma saatleri — tatiller', () => {
     await user.click(await screen.findByRole('tab', { name: 'Tatiller' }));
     await user.click(await screen.findByRole('button', { name: 'Tatil ekle' }));
     const dialog = await screen.findByRole('dialog');
-    await user.type(within(dialog).getByLabelText('Tarih'), '2099-10-28');
+    const holidayDate = dayFromToday(30);
+    await pickDate(user, within(dialog).getByLabelText('Tarih'), holidayDate);
     await user.type(within(dialog).getByLabelText('Ad'), 'Cumhuriyet Bayramı arifesi');
     await user.click(within(dialog).getByRole('switch', { name: 'Tüm gün kapalı' }));
     await user.click(within(dialog).getByRole('button', { name: 'Kaydet' }));
@@ -574,7 +579,7 @@ describe('çalışma saatleri — tatiller', () => {
       'holidays',
       {
         branchId: 'b1',
-        holidayDate: '2099-10-28',
+        holidayDate,
         name: 'Cumhuriyet Bayramı arifesi',
         isClosed: false,
         openTime: '10:00',

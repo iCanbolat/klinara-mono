@@ -187,8 +187,6 @@ private fun ScopeCard(row: TemplateRow) {
         KlinaraRow(label = "Olay", value = template.event.turkishName)
         KlinaraDivider()
         KlinaraRow(label = "Kanal", value = template.channel.turkishName)
-        KlinaraDivider()
-        KlinaraRow(label = "Tür", value = template.kind.turkishName, detail = template.kind.explanation)
         val note =
             when {
                 row.isMissing ->

@@ -4,6 +4,7 @@ import {
   ArrayMaxSize,
   ArrayNotEmpty,
   IsArray,
+  IsBoolean,
   IsIn,
   IsISO8601,
   IsOptional,
@@ -71,6 +72,13 @@ export class CreateAppointmentDto {
   @IsString()
   @MaxLength(2000)
   notes?: string;
+
+  @ApiPropertyOptional({
+    description: 'false → müşteriye bildirim gönderilmez. Varsayılan: gönderilir.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  notifyCustomer?: boolean;
 }
 
 export class UpdateAppointmentDto {
@@ -111,6 +119,13 @@ export class CancelAppointmentDto {
   @IsString()
   @MaxLength(500)
   reason?: string;
+
+  @ApiPropertyOptional({
+    description: 'false → müşteriye bildirim gönderilmez. Varsayılan: gönderilir.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  notifyCustomer?: boolean;
 }
 
 export class ChangeAppointmentStatusDto {
@@ -123,6 +138,13 @@ export class ChangeAppointmentStatusDto {
   @IsString()
   @MaxLength(500)
   reason?: string;
+
+  @ApiPropertyOptional({
+    description: 'false → müşteriye bildirim gönderilmez. Varsayılan: gönderilir.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  notifyCustomer?: boolean;
 }
 
 export class AppointmentServiceResponseDto {

@@ -113,7 +113,7 @@ class WhatsAppFeatureTest {
         assertNull(withToken.input().appSecret, "Boş secret YAZILMAZ — [S] A8.3 ile kayıtlısı korunur")
         assertFalse(withToken.copy(appSecret = "kisa").isValid)
         assertFalse(withToken.copy(apiVersion = "21").isValid)
-        assertEquals("'v21.0' biçiminde olmalı.", withToken.copy(apiVersion = "21").apiVersionError)
+        assertEquals("'v26.0' biçiminde olmalı.", withToken.copy(apiVersion = "21").apiVersionError)
     }
 
     private fun runTestAccount(): WhatsAppAccount =

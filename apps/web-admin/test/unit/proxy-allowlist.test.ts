@@ -189,6 +189,8 @@ describe('yönetim proxy beyaz listesi', () => {
       expect(isAllowedProxyPath('calendar/week', 'GET')).toBe(true);
       expect(isAllowedProxyPath('calendar/staff', 'GET')).toBe(true);
       expect(isAllowedProxyPath('availability', 'GET')).toBe(true);
+      expect(isAllowedProxyPath('availability/days', 'GET')).toBe(true);
+      expect(isAllowedProxyPath('availability/slots', 'GET')).toBe(false);
 
       expect(isAllowedProxyPath('calendar/day', 'POST')).toBe(false);
       expect(isAllowedProxyPath('availability', 'POST')).toBe(false);
@@ -430,6 +432,73 @@ describe('yönetim proxy beyaz listesi', () => {
       for (const path of ['payments', 'charges', 'packages', 'customer-packages']) {
         expect(isAllowedProxyPath(path, 'GET'), path).toBe(false);
       }
+    });
+  });
+  // -------------------------------------------------------------------------
+  describe('WhatsApp kurulumu ve sohbetler', () => {
+    it('kurulum yüzeyi geçiyor', () => {
+      expect(isAllowedProxyPath('integrations/whatsapp', 'GET')).toBe(true);
+      expect(isAllowedProxyPath('integrations/whatsapp', 'PUT')).toBe(true);
+      expect(isAllowedProxyPath('integrations/whatsapp/templates', 'GET')).toBe(true);
+      expect(isAllowedProxyPath('integrations/whatsapp/verify', 'POST')).toBe(true);
+      expect(isAllowedProxyPath('integrations/whatsapp/test', 'POST')).toBe(true);
+      expect(isAllowedProxyPath('integrations/whatsapp/templates/provision', 'POST')).toBe(true);
+    });
+
+    it('kurulumda izinsiz metot ve kardeş yol geçmiyor', () => {
+      expect(isAllowedProxyPath('integrations/whatsapp', 'DELETE')).toBe(false);
+      expect(isAllowedProxyPath('integrations/whatsapp', 'POST')).toBe(false);
+      expect(isAllowedProxyPath('integrations/whatsapp/templates', 'POST')).toBe(false);
+      expect(isAllowedProxyPath('integrations/whatsapp/verify', 'GET')).toBe(false);
+      expect(isAllowedProxyPath('integrations/whatsapp/templates/provision', 'GET')).toBe(false);
+      expect(isAllowedProxyPath('integrations/whatsapp/token', 'GET')).toBe(false);
+      expect(isAllowedProxyPath('integrations', 'GET')).toBe(false);
+      expect(isAllowedProxyPath('integrations/sms', 'GET')).toBe(false);
+    });
+
+    it('sohbet yüzeyi geçiyor', () => {
+      expect(isAllowedProxyPath('conversations', 'GET')).toBe(true);
+      expect(isAllowedProxyPath('conversations/unread-count', 'GET')).toBe(true);
+      expect(isAllowedProxyPath(`conversations/${UUID}`, 'GET')).toBe(true);
+      expect(isAllowedProxyPath(`conversations/${UUID}/messages`, 'POST')).toBe(true);
+      expect(isAllowedProxyPath(`conversations/${UUID}/read`, 'POST')).toBe(true);
+      expect(isAllowedProxyPath(`conversations/${UUID}/close`, 'POST')).toBe(true);
+      expect(isAllowedProxyPath(`conversations/${UUID}/reopen`, 'POST')).toBe(true);
+      expect(isAllowedProxyPath(`conversations/${UUID}/customer`, 'PUT')).toBe(true);
+      expect(isAllowedProxyPath(`conversations/${UUID}/templates`, 'GET')).toBe(true);
+      expect(isAllowedProxyPath(`conversations/${UUID}/template`, 'POST')).toBe(true);
+    });
+
+    it('personel bildirim uçları geçiyor', () => {
+      expect(isAllowedProxyPath('staff-notifications', 'GET')).toBe(true);
+      expect(isAllowedProxyPath('staff-notifications/read', 'POST')).toBe(true);
+    });
+
+    it('bildirimde izinsiz metot ve kardeş yol geçmiyor', () => {
+      expect(isAllowedProxyPath('staff-notifications', 'POST')).toBe(false);
+      expect(isAllowedProxyPath('staff-notifications', 'DELETE')).toBe(false);
+      expect(isAllowedProxyPath('staff-notifications/read', 'GET')).toBe(false);
+      expect(isAllowedProxyPath('staff-notifications/settings', 'GET')).toBe(false);
+    });
+
+    it('sohbette izinsiz metot ve kardeş yol geçmiyor', () => {
+      expect(isAllowedProxyPath('conversations', 'POST')).toBe(false);
+      expect(isAllowedProxyPath(`conversations/${UUID}`, 'DELETE')).toBe(false);
+      expect(isAllowedProxyPath(`conversations/${UUID}`, 'PATCH')).toBe(false);
+      expect(isAllowedProxyPath(`conversations/${UUID}/messages`, 'GET')).toBe(false);
+      expect(isAllowedProxyPath(`conversations/${UUID}/customer`, 'DELETE')).toBe(false);
+      expect(isAllowedProxyPath(`conversations/${UUID}/export`, 'POST')).toBe(false);
+      expect(isAllowedProxyPath(`conversations/${UUID}/templates`, 'POST')).toBe(false);
+      expect(isAllowedProxyPath(`conversations/${UUID}/template`, 'GET')).toBe(false);
+      expect(isAllowedProxyPath('conversations/not-a-uuid', 'GET')).toBe(false);
+      expect(isAllowedProxyPath(`conversations/${UUID}/../me`, 'GET')).toBe(false);
+    });
+
+    it('eklenmeleri ham mesaj kaydını ve Meta webhook’unu açmadı', () => {
+      expect(isAllowedProxyPath('messages', 'GET')).toBe(false);
+      expect(isAllowedProxyPath('inbox', 'GET')).toBe(false);
+      expect(isAllowedProxyPath('webhooks/whatsapp', 'POST')).toBe(false);
+      expect(isAllowedProxyPath('webhooks/whatsapp', 'GET')).toBe(false);
     });
   });
 });

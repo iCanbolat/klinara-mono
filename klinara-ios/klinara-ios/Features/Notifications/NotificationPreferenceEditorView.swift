@@ -70,12 +70,6 @@ struct NotificationPreferenceEditorView: View {
                 detail: preference.event.explanation
             )
             KlinaraDivider()
-            KlinaraRow(
-                label: "Tür",
-                value: preference.kind.turkishName,
-                detail: preference.kind.explanation
-            )
-            KlinaraDivider()
             if let branchName = session.selectedBranch?.name {
                 KlinaraSegmentedPicker(
                     options: PreferenceScope.allCases,

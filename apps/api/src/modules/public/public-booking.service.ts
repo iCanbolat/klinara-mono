@@ -14,6 +14,7 @@ import { AppointmentsService } from '../booking/appointments.service';
 import * as appointmentRepo from '../booking/appointments.repository';
 import * as pageRepo from '../booking-page/booking-page.repository';
 import { findActiveConsent, type ActiveConsentRow } from './public-consent.repository';
+import { StaffNotificationsService } from '../notifications/staff-notifications.service';
 import { BookingOtpSender } from './booking-otp.sender';
 import * as repo from './holds.repository';
 import { SlotTokenService } from './slot-token.service';
@@ -39,6 +40,7 @@ export class PublicBookingService {
     private readonly appointments: AppointmentsService,
     private readonly cache: AvailabilityCacheService,
     private readonly otpSender: BookingOtpSender,
+    private readonly staffNotifications: StaffNotificationsService,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -362,6 +364,15 @@ export class PublicBookingService {
           ).toISOString()}::timestamptz
         )
       `);
+
+      // Panele "online randevu geldi" bildirimi: resepsiyon takvimi sürekli
+      // açık tutmak zorunda kalmasın.
+      await this.staffNotifications.emitAppointmentEvent(
+        tx,
+        site.tenantId,
+        appointment.id,
+        'appointment_created',
+      );
     });
 
     return { appointmentId: appointment.id, manageToken };

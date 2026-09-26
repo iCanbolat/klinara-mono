@@ -28,7 +28,41 @@ import {
   type CreateInvitationInput,
   type Invitation,
   type UpdateBranchInput,
+  type Conversation,
+  type ConversationDetail,
+  type ConversationMessage,
+  type LinkConversationCustomerInput,
+  type SendConversationMessageInput,
+  type ConversationTemplateOption,
+  type SendConversationTemplateInput,
+  type UpsertWhatsAppAccountInput,
+  type WhatsAppAccount,
+  type WhatsAppProvisionItem,
+  type WhatsAppProvisionResult,
+  type WhatsAppTemplate,
+  type WhatsAppTestResult,
+  type WhatsAppTestSendInput,
+  type WhatsAppVerifyResult,
 } from '@klinara/shared';
+import {
+  UpsertWhatsAppAccountDto,
+  WhatsAppAccountResponseDto,
+  WhatsAppProvisionItemDto,
+  WhatsAppProvisionResultDto,
+  WhatsAppTemplateResponseDto,
+  WhatsAppTestResultDto,
+  WhatsAppTestSendDto,
+  WhatsAppVerifyResultDto,
+} from '../../src/modules/integrations/dto/whatsapp.dto';
+import {
+  ConversationDetailDto,
+  ConversationDto,
+  ConversationMessageDto,
+  LinkConversationCustomerDto,
+  SendConversationMessageDto,
+  ConversationTemplateOptionDto,
+  SendConversationTemplateDto,
+} from '../../src/modules/integrations/dto/conversation.dto';
 import {
   BranchResponseDto,
   CreateBranchDto,
@@ -112,6 +146,28 @@ const _keysCreateBranch: SameKeys<CreateBranchDto, CreateBranchInput> = true;
 const _keysUpdateBranch: SameKeys<UpdateBranchDto, UpdateBranchInput> = true;
 const _keysInvitation: SameKeys<InvitationResponseDto, Invitation> = true;
 const _keysCreateInvitation: SameKeys<CreateInvitationDto, CreateInvitationInput> = true;
+// WhatsApp entegrasyonu ve sohbetler (web-admin'in kurulum ve Mesajlar ekranları).
+const _keysWaAccount: SameKeys<WhatsAppAccountResponseDto, WhatsAppAccount> = true;
+const _keysWaUpsert: SameKeys<UpsertWhatsAppAccountDto, UpsertWhatsAppAccountInput> = true;
+const _keysWaTemplate: SameKeys<WhatsAppTemplateResponseDto, WhatsAppTemplate> = true;
+const _keysWaVerify: SameKeys<WhatsAppVerifyResultDto, WhatsAppVerifyResult> = true;
+const _keysWaProvisionItem: SameKeys<WhatsAppProvisionItemDto, WhatsAppProvisionItem> = true;
+const _keysWaProvision: SameKeys<WhatsAppProvisionResultDto, WhatsAppProvisionResult> = true;
+const _keysWaTestSend: SameKeys<WhatsAppTestSendDto, WhatsAppTestSendInput> = true;
+const _keysWaTestResult: SameKeys<WhatsAppTestResultDto, WhatsAppTestResult> = true;
+const _keysConversation: SameKeys<ConversationDto, Conversation> = true;
+const _keysConversationMessage: SameKeys<ConversationMessageDto, ConversationMessage> = true;
+const _keysConversationDetail: SameKeys<ConversationDetailDto, ConversationDetail> = true;
+const _keysSendConversation: SameKeys<SendConversationMessageDto, SendConversationMessageInput> = true;
+const _keysLinkConversation: SameKeys<LinkConversationCustomerDto, LinkConversationCustomerInput> = true;
+const _keysTemplateOption: SameKeys<ConversationTemplateOptionDto, ConversationTemplateOption> = true;
+const _keysSendTemplate: SameKeys<SendConversationTemplateDto, SendConversationTemplateInput> = true;
+const _templateOptionToShared: ConversationTemplateOption = new ConversationTemplateOptionDto();
+const _conversationToShared: Conversation = new ConversationDto();
+const _conversationMessageToShared: ConversationMessage = new ConversationMessageDto();
+const _waAccountToShared: WhatsAppAccount = new WhatsAppAccountResponseDto();
+const _provisionToShared: WhatsAppProvisionResult = new WhatsAppProvisionResultDto();
+
 const _branchDetailToShared: BranchDetail = new BranchResponseDto();
 const _invitationToShared: Invitation = new InvitationResponseDto();
 
@@ -159,6 +215,26 @@ void [
   _keysUpdateBranch,
   _keysInvitation,
   _keysCreateInvitation,
+  _keysWaAccount,
+  _keysWaUpsert,
+  _keysWaTemplate,
+  _keysWaVerify,
+  _keysWaProvisionItem,
+  _keysWaProvision,
+  _keysWaTestSend,
+  _keysWaTestResult,
+  _keysConversation,
+  _keysConversationMessage,
+  _keysConversationDetail,
+  _keysSendConversation,
+  _keysLinkConversation,
+  _keysTemplateOption,
+  _keysSendTemplate,
+  _templateOptionToShared,
+  _conversationToShared,
+  _conversationMessageToShared,
+  _waAccountToShared,
+  _provisionToShared,
   _branchDetailToShared,
   _invitationToShared,
   _bookingPageToShared,

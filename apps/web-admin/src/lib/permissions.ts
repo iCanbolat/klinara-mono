@@ -85,6 +85,10 @@ export const NAV_ITEMS: readonly NavItem[] = [
     requiresAny: [PERMISSIONS.APPOINTMENT_READ_ALL, PERMISSIONS.APPOINTMENT_READ_OWN],
   },
   { path: '/musteriler', labelKey: 'nav.customers', requires: [PERMISSIONS.CUSTOMER_READ] },
+  // Resepsiyonun WhatsApp sohbetleri. Kapı `notification:send` — sunucudaki
+  // `ConversationsController` ile aynı: okuyup cevaplayamayan rolün (uygulayıcı)
+  // burada işi yok.
+  { path: '/mesajlar', labelKey: 'nav.messages', requires: [PERMISSIONS.NOTIFICATION_SEND] },
   { path: '/katalog', labelKey: 'nav.catalog', requires: [PERMISSIONS.SERVICE_READ] },
   // "Şube ve Personel". Kapı `staff:read`: `branch:read` HER rolde var ve
   // kapı olsaydı personel izni olmayan bir rol yalnız şube listesinden ibaret
@@ -113,6 +117,9 @@ export const NAV_ITEMS: readonly NavItem[] = [
       PERMISSIONS.REPORT_PERFORMANCE_READ_OWN,
     ],
   },
+  // WhatsApp kurulumu: kiracının TÜM müşterilerine giden kanalı değiştiriyor,
+  // bu yüzden `notification:manage` (sahip, şube yöneticisi).
+  { path: '/whatsapp', labelKey: 'nav.whatsapp', requires: [PERMISSIONS.NOTIFICATION_MANAGE] },
   { path: '/hesap', labelKey: 'nav.account', requires: [] },
 ];
 

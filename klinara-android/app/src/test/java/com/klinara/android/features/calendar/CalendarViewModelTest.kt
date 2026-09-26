@@ -77,7 +77,8 @@ class CalendarViewModelTest {
         override suspend fun cancel(
             id: String,
             reason: String?,
-        ) = delegate.cancel(id, reason)
+            notifyCustomer: Boolean,
+        ) = delegate.cancel(id, reason, notifyCustomer)
 
         override suspend fun changeStatus(
             id: String,
@@ -88,6 +89,12 @@ class CalendarViewModelTest {
         override suspend fun availability(
             query: com.klinara.android.services.booking.AvailabilityQuery,
         ) = delegate.availability(query)
+
+        override suspend fun availabilityDays(
+            branchId: String,
+            from: Instant,
+            to: Instant,
+        ) = delegate.availabilityDays(branchId, from, to)
 
         override suspend fun create(
             input: com.klinara.android.services.booking.CreateAppointmentInput,

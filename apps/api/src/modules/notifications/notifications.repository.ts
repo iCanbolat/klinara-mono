@@ -1,7 +1,6 @@
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import {
   branches,
-  contactOptOuts,
   customers,
   messageLog,
   notificationPreferences,
@@ -17,7 +16,6 @@ import type { Tx } from '../../database/tenant-tx';
 export type NotificationTemplateRow = typeof notificationTemplates.$inferSelect;
 export type NotificationPreferenceRow = typeof notificationPreferences.$inferSelect;
 export type MessageLogRow = typeof messageLog.$inferSelect;
-export type ContactOptOutRow = typeof contactOptOuts.$inferSelect;
 
 /** Gönderim için gereken asgari alıcı bilgisi. */
 export interface RecipientContact {
@@ -213,44 +211,6 @@ function hydratePreference(row: Record<string, unknown>): NotificationPreference
 }
 
 // ---------------------------------------------------------------------------
-// Opt-out
-// ---------------------------------------------------------------------------
-
-export async function listActiveOptOuts(
-  tx: Tx,
-  customerId: string,
-): Promise<ContactOptOutRow[]> {
-  return tx
-    .select()
-    .from(contactOptOuts)
-    .where(and(eq(contactOptOuts.customerId, customerId), isNull(contactOptOuts.revokedAt)));
-}
-
-export async function insertOptOut(
-  tx: Tx,
-  values: typeof contactOptOuts.$inferInsert,
-): Promise<ContactOptOutRow> {
-  const [row] = await tx.insert(contactOptOuts).values(values).returning();
-  return row as ContactOptOutRow;
-}
-
-export async function revokeOptOuts(
-  tx: Tx,
-  input: { customerId: string; channel: NotificationChannel | null; actorUserId: string | null },
-): Promise<number> {
-  const result = await tx.execute(sql`
-    update contact_opt_outs
-       set revoked_at = now(),
-           revoked_by = ${input.actorUserId}::uuid
-     where customer_id = ${input.customerId}::uuid
-       and revoked_at is null
-       and (${input.channel}::notification_channel is null
-            or channel is not distinct from ${input.channel}::notification_channel)
-  `);
-  return result.rowCount ?? 0;
-}
-
-// ---------------------------------------------------------------------------
 // Mesaj kaydı
 // ---------------------------------------------------------------------------
 
@@ -338,7 +298,6 @@ function hydrateMessage(row: Record<string, unknown>): MessageLogRow {
     userId: (row['user_id'] as string | null) ?? null,
     channel: row['channel'] as MessageLogRow['channel'],
     event: row['event'] as MessageLogRow['event'],
-    kind: row['kind'] as MessageLogRow['kind'],
     status: row['status'] as MessageStatus,
     toMasked: row['to_masked'] as string,
     templateId: (row['template_id'] as string | null) ?? null,
@@ -356,6 +315,9 @@ function hydrateMessage(row: Record<string, unknown>): MessageLogRow {
     failedAt: date(row['failed_at']),
     dedupeKey: (row['dedupe_key'] as string | null) ?? null,
     templateVariables: (row['template_variables'] as Record<string, string> | null) ?? null,
+    conversationId: (row['conversation_id'] as string | null) ?? null,
+    appointmentId: (row['appointment_id'] as string | null) ?? null,
+    sentByUserId: (row['sent_by_user_id'] as string | null) ?? null,
     createdAt: date(row['created_at']) as Date,
     updatedAt: date(row['updated_at']) as Date,
   };
@@ -414,4 +376,43 @@ export async function resolveTimezone(tx: Tx, branchId: string | null): Promise<
   }
   const [tenant] = await tx.select({ timezone: tenants.timezone }).from(tenants).limit(1);
   return tenant?.timezone ?? 'Europe/Istanbul';
+}
+
+/**
+ * Kiracının WhatsApp hesabı bağlı VE doğrulanmış mı.
+ *
+ * Yalnız `active` sayılır: kaydedilip doğrulanmamış (`unconfigured`) ya da
+ * doğrulaması başarısız (`error`) bir hesaba gönderim, müşteriye hiçbir şey
+ * ulaşmayan bir kayıt üretirdi.
+ */
+/** 24 saatlik müşteri hizmetleri penceresi açık mı — serbest metin yalnız o zaman gider. */
+export async function isWhatsAppWindowOpen(tx: Tx, phone: string): Promise<boolean> {
+  const result = await tx.execute<{ open: boolean }>(sql`
+    select last_inbound_at > now() - interval '24 hours' as open
+    from whatsapp_contact_windows
+    where phone = ${phone}
+    limit 1
+  `);
+  return result.rows[0]?.open === true;
+}
+
+/** Template'in Meta'daki durumu; yansımada satır yoksa `undefined`. */
+export async function whatsAppTemplateStatus(
+  tx: Tx,
+  name: string,
+  language: string,
+): Promise<string | undefined> {
+  const result = await tx.execute<{ status: string }>(sql`
+    select status from whatsapp_templates
+    where name = ${name} and language = ${language}
+    limit 1
+  `);
+  return result.rows[0]?.status;
+}
+
+export async function isWhatsAppReady(tx: Tx): Promise<boolean> {
+  const result = await tx.execute<{ status: string }>(sql`
+    select status from whatsapp_accounts limit 1
+  `);
+  return result.rows[0]?.status === 'active';
 }

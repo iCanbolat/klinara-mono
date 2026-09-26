@@ -56,9 +56,6 @@ nonisolated enum APIErrorCode: String, Decodable, Sendable {
     case packageExpired = "PACKAGE_EXPIRED"
 
     // Bildirim ve WhatsApp (Faz 8)
-    /// Müşteri ticari ileti almayı kapatmış. Yalnız **pazarlama** mesajlarını
-    /// engeller; randevu hatırlatması işlemseldir ve etkilenmez.
-    case optOut = "OPT_OUT"
     /// Şablon metninde o olayda tanımlı olmayan bir `{{değişken}}` var.
     case templateInvalid = "TEMPLATE_INVALID"
     /// Olay için seçilen kanalın sağlayıcısı bu kiracıda kurulu değil.
@@ -252,8 +249,6 @@ extension APIError {
                 return "Paket hakkı yetersiz. İşlem tamamlanmadı; kalan hakkı kontrol edin."
             case .packageExpired:
                 return "Paket kullanılabilir durumda değil. Süresi dolmuş ya da kapatılmış olabilir."
-            case .optOut:
-                return "Müşteri ticari ileti almayı kapatmış. Randevu hatırlatmaları bundan etkilenmez."
             case .templateInvalid:
                 // `detail` izinli değişkenleri sayıyor; genel bir cümle
                 // kullanıcıya hangi adı yazacağını söylemezdi.

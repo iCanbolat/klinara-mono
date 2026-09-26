@@ -38,6 +38,7 @@ struct DashboardView: View {
             .navigationTitle("Dashboard")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                RootToolbarTitle(title: "Dashboard")
                 ToolbarItem(placement: .topBarTrailing) {
                     BranchMenu(session: session)
                 }
@@ -181,29 +182,28 @@ struct DashboardView: View {
 
     // MARK: Sıradaki randevular
 
-    /// Bugün bekleyen randevular — önizleme ``DashboardSummaries/previewLimit``
-    /// kadar.
+    /// Tarihi en yakın randevular — bugünle sınırlı değil, en fazla
+    /// ``DashboardSummaries/upcomingLimit`` kadar.
     ///
     /// Kart SINIRLI: her satır tek yükseklikte (ad ve hizmet tek satıra
-    /// kırpılır) ve en fazla beş satır. Başlık toplamı söyler; fazlası varsa son
-    /// satır takvime götürür. İç kaydırma YOK — sayfa zaten kayıyor ve iç içe
-    /// kaydırma parmağın altında hangi listenin kaydığını belirsiz kılar.
+    /// kırpılır). Fazlası varsa son satır takvime götürür. İç kaydırma YOK —
+    /// sayfa zaten kayıyor ve iç içe kaydırma parmağın altında hangi listenin
+    /// kaydığını belirsiz kılar.
     private func upcomingCard(_ snapshot: DashboardStore.Snapshot) -> some View {
-        let upcoming = DashboardSummaries.upcoming(snapshot.summaries)
-        let total = DashboardSummaries.pendingTotal(snapshot.summaries)
+        let upcoming = snapshot.upcoming
         let multiBranch = snapshot.summaries.count > 1
-        return KlinaraCard(title: Self.listTitle("Sıradaki randevular", count: total)) {
+        return KlinaraCard(title: "Sıradaki randevular") {
             if upcoming.isEmpty {
-                KlinaraRow(label: "Bugün için bekleyen randevu yok.")
+                KlinaraRow(label: "Yaklaşan randevu yok.")
             }
             ForEach(Array(upcoming.enumerated()), id: \.element.id) { index, item in
                 if index > 0 { KlinaraDivider() }
-                UpcomingRow(item: item, showsBranch: multiBranch)
+                UpcomingRow(item: item, showsBranch: multiBranch, now: snapshot.fetchedAt)
             }
-            if total > upcoming.count {
+            if snapshot.upcomingHasMore {
                 KlinaraDivider()
                 Button(action: onOpenCalendar) {
-                    SeeAllRow(label: "Tümünü takvimde gör", count: "+\(total - upcoming.count) randevu")
+                    SeeAllRow(label: "Tümünü takvimde gör", count: nil)
                 }
                 .buttonStyle(.plain)
             }
@@ -374,17 +374,25 @@ private struct UpcomingRow: View {
 
     let item: UpcomingItem
     let showsBranch: Bool
+    let now: Date
 
     var body: some View {
         let detail = [item.entry.serviceSummary, showsBranch ? item.branchName : ""]
             .filter { !$0.isEmpty }
             .joined(separator: " · ")
         HStack(spacing: KlinaraMetrics.sm) {
-            Text(BranchClock(timeZoneIdentifier: item.timezone).formatTime(item.entry.startsAt))
-                .klinaraText(.bodyEmphasis)
-                .monospacedDigit()
-                .foregroundStyle(KlinaraColor.charcoal)
-                .frame(width: 48, alignment: .leading)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(BranchClock(timeZoneIdentifier: item.timezone).formatTime(item.entry.startsAt))
+                    .klinaraText(.bodyEmphasis)
+                    .monospacedDigit()
+                    .foregroundStyle(KlinaraColor.charcoal)
+                Text(DashboardSummaries.upcomingDayLabel(item.entry.startsAt, timezone: item.timezone, now: now))
+                    .klinaraText(.bodyM)
+                    .font(.footnote)
+                    .foregroundStyle(KlinaraColor.charcoalMuted)
+                    .lineLimit(1)
+            }
+            .frame(width: 52, alignment: .leading)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.entry.customerName)
@@ -447,11 +455,11 @@ private struct StaffRevenueRow: View {
     }
 }
 
-/// "Tümünü gör" satırı — kartın son satırı, fazlasının sayısıyla.
+/// "Tümünü gör" satırı — kartın son satırı, biliniyorsa fazlasının sayısıyla.
 private struct SeeAllRow: View {
 
     let label: String
-    let count: String
+    let count: String?
 
     var body: some View {
         HStack(spacing: KlinaraMetrics.sm) {
@@ -459,9 +467,11 @@ private struct SeeAllRow: View {
                 .klinaraText(.bodyEmphasis)
                 .foregroundStyle(KlinaraColor.sageDeep)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            Text(count)
-                .klinaraText(.bodyM)
-                .foregroundStyle(KlinaraColor.charcoalMuted)
+            if let count {
+                Text(count)
+                    .klinaraText(.bodyM)
+                    .foregroundStyle(KlinaraColor.charcoalMuted)
+            }
             Image(systemName: "chevron.right")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(KlinaraColor.charcoalMuted)

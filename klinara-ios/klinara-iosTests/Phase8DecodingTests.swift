@@ -25,7 +25,6 @@ struct Phase8DecodingTests {
         #expect(!template.isDefault)
         #expect(template.event == .appointmentReminder)
         #expect(template.channel == .whatsapp)
-        #expect(template.kind == .transactional)
         // Sıra Meta'nın `{{1}}, {{2}}` konumlarına karşılık geliyor; bir küme
         // olarak çözmek mesajın parametrelerini karıştırırdı.
         #expect(template.whatsappVariables == ["customerName", "appointmentAt"])
@@ -40,7 +39,7 @@ struct Phase8DecodingTests {
         #expect(template.isDefault)
         // `Identifiable` kimliği `id`'den gelseydi listedeki tüm varsayılan
         // satırlar `nil` kimliğini paylaşır ve `ForEach` onları aynı görürdü.
-        #expect(template.id == "appointment_confirmation|sms|tr")
+        #expect(template.id == "appointment_confirmation|whatsapp|tr")
         #expect(template.rowId == template.id)
     }
 
@@ -89,7 +88,7 @@ struct Phase8DecodingTests {
             Fixtures.notificationPreferenceSaved
         )
 
-        #expect(preference.channels == [.whatsapp, .sms])
+        #expect(preference.channels == [.whatsapp])
         #expect(preference.isEnabled)
     }
 
@@ -97,7 +96,7 @@ struct Phase8DecodingTests {
     func emptyChannelsMeansDisabled() throws {
         let json = """
         {
-          "id": null, "branchId": null, "event": "birthday", "kind": "marketing",
+          "id": null, "branchId": null, "event": "package_expiring",
           "channels": [], "quietHoursStart": null, "quietHoursEnd": null, "isDefault": false
         }
         """
@@ -105,7 +104,6 @@ struct Phase8DecodingTests {
 
         #expect(!preference.isEnabled)
         #expect(preference.quietHoursLabel == nil)
-        #expect(preference.kind == .marketing)
     }
 
     // MARK: Hatırlatma ve çizelge
@@ -226,10 +224,11 @@ struct Phase8DecodingTests {
         #expect(message.failureMessage?.contains("WhatsApp'ta geçerli değil") == true)
     }
 
-    @Test("Tanınmayan hata kodu HAM haliyle gösterilir, yutulmaz")
+    @Test("Tanınmayan hata kodu HAM haliyle gösterilir; kaldırılmış kanalın satırı çözülür")
     func keepsUnknownErrorCodeVisible() throws {
         // Kodu saklamak destek kaydını yok ederdi: operasyon "bir sorun oluştu"
-        // ile sunucudaki gerçek sebebi eşleştiremez.
+        // ile sunucudaki gerçek sebebi eşleştiremez. Satır geçmişte SMS'ten
+        // yazılmış: kanal artık yok ama günlük çözülebilmeli.
         let json = """
         {
           "id": "cde431f8-13be-4a88-9303-dd27b369f570", "customerId": null, "userId": null,
@@ -243,20 +242,7 @@ struct Phase8DecodingTests {
         let message = try decode(Message.self, json)
 
         #expect(message.failureMessage == "SMS_PROVIDER_DOWN")
-    }
-
-    // MARK: İletişim izni
-
-    @Test("`channel: null` TÜM kanallar demek")
-    func decodesOptOutAllChannels() throws {
-        let record = try decode(OptOutRecord.self, Fixtures.optOutRecord)
-
-        #expect(record.channel == nil)
-        #expect(record.channelLabel == "Tüm kanallar")
-        // Sunucu `kind`'ı sabit `marketing` yazıyor: işlemsel mesaj zaten
-        // opt-out'tan etkilenmiyor.
-        #expect(record.kind == .marketing)
-        #expect(record.source == .customerRequest)
+        #expect(message.channel == .unknown)
     }
 
     // MARK: WhatsApp
@@ -353,6 +339,5 @@ struct Phase8DecodingTests {
         #expect(!problem(.whatsappTemplateNotApproved, status: 422).isRetryable)
         #expect(!problem(.whatsappInvalidRecipient, status: 422).isRetryable)
         #expect(!problem(.whatsappWindowClosed, status: 422).isRetryable)
-        #expect(!problem(.optOut, status: 422).isRetryable)
     }
 }

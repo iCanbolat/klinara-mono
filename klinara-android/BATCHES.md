@@ -2838,3 +2838,44 @@ Web panelindeki `/personel` → **"Şube ve Personel"** ekranının mobil karş�
 
 - Davet bağlantısını (geliştirme ortamında dönen `link`) mobilde gösterme.
 - Kullanıcı adı/aktiflik düzenleme (`PATCH users/:id`).
+
+---
+
+## A8.4 — Sohbetler (WhatsApp yazışmaları) ✅
+
+iOS `Features/Conversations` ile aynı işte geldi; web'deki Mesajlar ekranının mobil karşılığı.
+
+### Ne geldi
+
+- `services/conversations/`: `ConversationsService` (Live + Mock), modeller. Yollar `GET conversations`,
+  `GET conversations/:id`, `POST :id/messages|template|read|close|reopen`, `GET :id/templates`,
+  `PUT :id/customer`, `GET conversations/unread-count`.
+- `features/conversations/`: liste (Açık / Okunmamış / Kapalı, cursor), akış (balonlar, teslim
+  durumu, başarısız mesajın sebebi), yazma kutusu, şablon sayfası, müşteriye bağlama sayfası.
+- Yönetim → İletişim → **Sohbetler** satırı `notification:send` ile (resepsiyon görür, uygulayıcı
+  görmez). Gelen kutusunun üst çubuğunda Sohbetler'e bağlantı; "uygulamadan yanıt yazılamaz" notu
+  kalktı.
+- Randevu oluşturma formunda ve iptalde **"Müşteriye bildir"** anahtarı (varsayılan açık). İptalde
+  yalnız ileri tarihli randevuda görünür; sunucu geçmiş tarihli randevuya zaten bildirim göndermiyor.
+
+### Davranış
+
+- Pencere kapalıyken serbest metin yok; "Şablon gönder" onaylı, butonsuz UTILITY/MARKETING
+  şablonlarını sunucunun önerdiği değerlerle açar. Boş değişken Gönder'e basınca kendi alanında
+  işaretlenir. Şablon pencereyi açmaz.
+- Yoklama 5 sn, `repeatOnLifecycle(STARTED)`: ekran görünmezken istek atılmaz.
+- Fixture'lar `klinara-fixtures/conversations/` — API entegrasyon testinden birebir yakalandı.
+
+### Testler
+
+- `ConversationsServiceTest` (MockWebServer + fixture'lar), `ConversationViewModelTest` (süzgeç,
+  okundu, gönderim, 422, şablon, kapat/aç, bağlama, yoklamanın durması), `ManagementSectionsTest`
+  (Sohbetler satırının rol görünürlüğü).
+
+### Yeni bağımlılık: YOK
+
+### Kapsam dışı
+
+- Yönetim satırında okunmamış rozeti (iOS'ta var): `managementSections` saf bir fonksiyon ve
+  sayacı taşımak için ayrı bir iş gerekiyor.
+- Push bildirimi — yoklama dışında yeni mesaj haberi yok.

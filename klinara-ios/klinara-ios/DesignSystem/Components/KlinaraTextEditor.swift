@@ -15,6 +15,7 @@ struct KlinaraTextEditor: View {
     var error: String?
     var minHeight: CGFloat = 120
 
+    @Environment(\.klinaraReservesFieldErrorSpace) private var reservesErrorSpace
     @FocusState private var isFocused: Bool
 
     private var hasError: Bool { error?.isEmpty == false }
@@ -54,7 +55,9 @@ struct KlinaraTextEditor: View {
             )
             .clipShape(.rect(cornerRadius: KlinaraMetrics.controlRadius))
 
-            FieldErrorText(message: error)
+            if reservesErrorSpace || hasError {
+                FieldErrorText(message: error)
+            }
         }
         .animation(KlinaraMetrics.feedback, value: hasError)
         .animation(KlinaraMetrics.feedback, value: isFocused)

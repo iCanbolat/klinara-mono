@@ -17,24 +17,40 @@ struct CustomerTimelineView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: KlinaraMetrics.sm) {
+            // Başlık filtreden ÖNCE: çipler başlığın altında, kartın üstünde
+            // duruyor. Başlık kartın içinde kalsaydı çipler onun üstüne binip
+            // hangi bölümün filtresi olduklarını belirsiz bırakırdı.
+            Text("Zaman çizelgesi")
+                .klinaraText(.label)
+                .foregroundStyle(KlinaraColor.charcoalMuted)
+                .padding(.horizontal, KlinaraMetrics.xs)
             filterBar
             content
         }
     }
 
+    /// Filtrede gösterilen türler. Onam kartta çizilmiyor: her randevu öncesi
+    /// yenilenen KVKK onayı akışı kalabalıklaştırıyordu ve personelin bu
+    /// ekranda onamla yapacağı bir iş yok.
+    private static let filterKinds = TimelineKind.allCases.filter { $0 != .consent }
+
     @ViewBuilder
     private var content: some View {
         switch record.timeline {
         case .loading:
-            KlinaraCard(title: "Zaman çizelgesi") {
+            KlinaraCard {
                 KlinaraSkeletonSection()
             }
 
         case .failed(let error):
             ErrorBanner(error: error, onRetry: { Task { await record.loadTimeline() } })
 
-        case .loaded(let entries):
-            KlinaraCard(title: "Zaman çizelgesi", footnote: footnote) {
+        case .loaded(let loaded):
+            let entries = loaded.filter {
+                if case .consent = $0 { return false }
+                return true
+            }
+            KlinaraCard(footnote: footnote) {
                 if entries.isEmpty {
                     // "Kayıt yok" ile "bu filtreyle kayıt yok" farklı şeyler:
                     // ilki kullanıcıyı bir şey eklemeye, ikincisi filtreyi
@@ -69,7 +85,7 @@ struct CustomerTimelineView: View {
             HStack(spacing: KlinaraMetrics.sm) {
                 rangeMenu
 
-                ForEach(TimelineKind.allCases) { kind in
+                ForEach(Self.filterKinds) { kind in
                     chip(title: kind.turkishName, isSelected: query.kinds.contains(kind)) {
                         var updated = query
                         // Çoklu seçim: çipler birbirini dışlamıyor, "randevu

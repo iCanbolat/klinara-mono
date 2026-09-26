@@ -335,3 +335,120 @@ export function buildAvailabilityQuery(query: AvailabilityQuery): SQL {
      order by cd.slot_start
   `;
 }
+
+export interface DayStatusQuery {
+  branchId: string;
+  from: Date;
+  to: Date;
+  minLeadMinutes: number;
+  maxAdvanceDays: number;
+  now: Date;
+}
+
+export interface DayStatusRow extends Record<string, unknown> {
+  local_date: string;
+  status: 'open' | 'closed' | 'holiday' | 'past' | 'beyond_window';
+  holiday_name: string | null;
+  opens_at: string | null;
+  closes_at: string | null;
+}
+
+/**
+ * Penceredeki yerel günlerin DURUMU — slot motorundan ÖNCE ve ondan ayrı.
+ *
+ * Gün kuralı (`branch_hours` + `holidays`) `buildAvailabilityQuery` içindeki
+ * `day_rules` ile BİREBİR aynı çözülüyor; tek fark kapalı günlerin burada
+ * elenmek yerine NEDENİYLE birlikte dönmesi. İki sorgu ayrı çünkü bu taraf
+ * hizmet/personel bilmeden de çalışmalı (tarih seçici kapalı günleri
+ * işaretlemek için yalnız bunu çağırıyor) ve ucuz: gün başına tek satır.
+ *
+ * Pencerenin sonu DIŞLAYICI: istemciler günü `[00:00, ertesi 00:00)` olarak
+ * soruyor; sınırdaki gece yarısı bir sonraki günü listeye sokmamalı.
+ */
+export async function findDayStatuses(tx: Tx, query: DayStatusQuery): Promise<DayStatusRow[]> {
+  const now = query.now.toISOString();
+  const result = await tx.execute<DayStatusRow>(sql`
+    with branch as (
+      select b.id, b.timezone
+        from branches b
+       where b.id = ${query.branchId}
+         and b.is_active
+         and b.deleted_at is null
+    ),
+
+    days as (
+      select d::date as local_date, b.timezone
+        from branch b,
+             generate_series(
+               date_trunc('day', ${query.from.toISOString()}::timestamptz at time zone b.timezone),
+               date_trunc('day', (${query.to.toISOString()}::timestamptz - interval '1 microsecond')
+                                   at time zone b.timezone),
+               interval '1 day'
+             ) d
+    ),
+
+    rules as (
+      select days.local_date,
+             days.timezone,
+             hol.name as holiday_name,
+             coalesce(hol.is_closed, false) as holiday_closed,
+             -- Satır yoksa gün her koşulda kapalı: slot motorundaki
+             -- "join branch_hours" o günü hiç üretmiyor.
+             bh.id is null as no_hours,
+             (bh.is_closed or bh.open_time is null or bh.close_time is null) as weekly_closed,
+             coalesce(hol.open_time,  bh.open_time)  as open_time,
+             coalesce(hol.close_time, bh.close_time) as close_time
+        from days
+        left join branch_hours bh
+          on bh.branch_id = ${query.branchId}
+         and bh.day_of_week = extract(dow from days.local_date)::int
+         and bh.deleted_at is null
+        left join lateral (
+          select h.name, h.is_closed, h.open_time, h.close_time
+            from holidays h
+           where h.holiday_date = days.local_date
+             and h.deleted_at is null
+             and (h.branch_id = ${query.branchId} or h.branch_id is null)
+           order by h.branch_id nulls last
+           limit 1
+        ) hol on true
+    ),
+
+    classified as (
+      select local_date,
+             holiday_name,
+             open_time,
+             close_time,
+             holiday_closed,
+             -- Yarım gün tatil, haftalık kapalı günü AÇAR (tatilin kendi saati var).
+             (no_hours
+              or (weekly_closed and not (holiday_name is not null and not holiday_closed
+                                         and open_time is not null))) as closed,
+             -- Günün son anı: açık günde kapanış, aksi hâlde gece yarısı.
+             ((local_date + coalesce(close_time, time '24:00')) at time zone timezone)
+               as day_end,
+             ((local_date + coalesce(open_time, time '00:00')) at time zone timezone)
+               as day_start
+        from rules
+    )
+
+    select to_char(local_date, 'YYYY-MM-DD') as local_date,
+           case
+             when day_end <= ${now}::timestamptz + make_interval(mins => ${query.minLeadMinutes})
+               then 'past'
+             when day_start > ${now}::timestamptz + make_interval(days => ${query.maxAdvanceDays})
+               then 'beyond_window'
+             when holiday_closed then 'holiday'
+             when closed then 'closed'
+             else 'open'
+           end as status,
+           holiday_name,
+           case when not holiday_closed and not closed then to_char(open_time,  'HH24:MI') end
+             as opens_at,
+           case when not holiday_closed and not closed then to_char(close_time, 'HH24:MI') end
+             as closes_at
+      from classified
+     order by local_date
+  `);
+  return result.rows;
+}

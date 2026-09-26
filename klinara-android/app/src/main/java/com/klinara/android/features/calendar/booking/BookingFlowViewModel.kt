@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.klinara.android.services.ServiceContainer
 import com.klinara.android.services.booking.Appointment
 import com.klinara.android.services.booking.AvailabilityQuery
+import com.klinara.android.services.booking.AvailabilityDay
 import com.klinara.android.services.booking.AvailabilitySlot
 import com.klinara.android.services.booking.BookingService
 import com.klinara.android.services.catalog.CatalogService
@@ -24,6 +25,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.Instant
+import com.klinara.android.services.formatting.ClockTime
+import java.time.YearMonth
+import java.time.LocalDate
 import java.util.UUID
 
 data class BookingUiState(
@@ -34,6 +38,10 @@ data class BookingUiState(
     val customers: List<Customer> = emptyList(),
     val customerQuery: String = "",
     val slots: Loadable<List<AvailabilitySlot>> = Loadable.Loading,
+    /** Seçili günün durumu (açık / kapalı / tatil…) — boş slot listesinin NEDENİ. */
+    val dayInfo: AvailabilityDay? = null,
+    /** Tarih seçicinin gün durumları, `yyyy-MM-dd` → durum. Yüklenen aylar birikir. */
+    val calendarDays: Map<String, AvailabilityDay> = emptyMap(),
     val isSaving: Boolean = false,
     val error: String? = null,
     /** Çakışma bir HATA değil, bir bilgidir: ayrı bir sayfada alternatiflerle gösterilir. */
@@ -117,20 +125,26 @@ class BookingFlowViewModel(
         _state.update { it.copy(slots = Loadable.Loading) }
         viewModelScope.launch {
             val from = current.day
-            val next =
+            val response =
                 Loadable.of {
-                    booking
-                        .availability(
-                            AvailabilityQuery(
-                                branchId = current.draft.branchId,
-                                serviceIds = current.draft.serviceIds,
-                                from = from,
-                                to = clock.adding(1, from),
-                                staffProfileId = current.draft.staffProfileId,
-                            ),
-                        ).slots
+                    booking.availability(
+                        AvailabilityQuery(
+                            branchId = current.draft.branchId,
+                            serviceIds = current.draft.serviceIds,
+                            from = from,
+                            to = clock.adding(1, from),
+                            staffProfileId = current.draft.staffProfileId,
+                        ),
+                    )
                 }
-            _state.update { it.copy(slots = next) }
+            val dayInfo = response.valueOrNull?.day(clock.localDateString(from))
+            val next =
+                when (response) {
+                    is Loadable.Loaded -> Loadable.Loaded(response.value.slots)
+                    is Loadable.Failed -> response
+                    Loadable.Loading -> Loadable.Loading
+                }
+            _state.update { it.copy(slots = next, dayInfo = dayInfo) }
         }
     }
 
@@ -160,7 +174,22 @@ class BookingFlowViewModel(
             )
         }
 
-    fun selectCustomer(id: String) = _state.update { it.copy(draft = it.draft.selectCustomer(id)) }
+    /**
+     * Seçimle arama KAPANIR: sorgu temizlenir ki kart "seçili müşteri" hâline geçtiğinde
+     * yarım kalmış arama metni ve eski sonuç listesi seçimle yarışmasın.
+     */
+    fun selectCustomer(id: String) =
+        _state.update { it.copy(draft = it.draft.selectCustomer(id), customerQuery = "") }
+
+    /** Seçili müşteriyi bırakıp aramaya döner. */
+    fun clearCustomer() =
+        _state.update {
+            it.copy(
+                draft = it.draft.clearCustomer(),
+                customerQuery = "",
+                customers = emptyList(),
+            )
+        }
 
     fun toggleService(id: String) = _state.update { it.copy(draft = it.draft.toggleService(id)) }
 
@@ -170,7 +199,39 @@ class BookingFlowViewModel(
 
     fun setNotes(value: String) = _state.update { it.copy(draft = it.draft.copy(notes = value)) }
 
+    fun setNotifyCustomer(value: Boolean) = _state.update { it.copy(draft = it.draft.copy(notifyCustomer = value)) }
+
     fun setReason(value: String) = _state.update { it.copy(draft = it.draft.copy(reason = value)) }
+
+    /** Takvimden seçilen gün (şube yerel tarihi). Seçili slot düşer: başka günün saati. */
+    fun selectDay(date: LocalDate) =
+        _state.update {
+            it.copy(day = clock.instant(date, ClockTime(0, 0)), draft = it.draft.copy(slot = null))
+        }
+
+    private val loadedMonths = mutableSetOf<YearMonth>()
+
+    /**
+     * Tarih seçicide görünen ayın gün durumları (dış günler için ±1 hafta). Aynı ay ikinci
+     * kez sorulmaz; hata sessiz — işaretleme bir kolaylık, gelmezse seçici yine çalışır.
+     */
+    fun loadCalendarMonth(month: YearMonth) {
+        if (!loadedMonths.add(month)) return
+        val branchId = _state.value.draft.branchId
+        viewModelScope.launch {
+            val first = clock.instant(month.atDay(1), ClockTime(0, 0))
+            val response =
+                Loadable.of {
+                    booking.availabilityDays(branchId, clock.adding(-7L, first), clock.adding(42L, first))
+                }
+            val days = response.valueOrNull?.days
+            if (days == null) {
+                loadedMonths.remove(month)
+                return@launch
+            }
+            _state.update { state -> state.copy(calendarDays = state.calendarDays + days.associateBy { it.date }) }
+        }
+    }
 
     fun stepDay(direction: Long) =
         _state.update { it.copy(day = clock.adding(direction, it.day), draft = it.draft.copy(slot = null)) }

@@ -50,7 +50,7 @@ class MessageModelsTest {
         assertNull(page.pageInfo.nextCursor)
         assertTrue(first.to.startsWith("+90") && "*" in first.to)
         assertEquals(MessageStatus.Queued, first.status)
-        assertEquals(NotificationChannel.Sms, first.channel)
+        assertEquals(NotificationChannel.WhatsApp, first.channel)
         assertFalse(first.wasAttempted)
         assertNull(first.failureMessage)
     }
@@ -80,12 +80,13 @@ class MessageModelsTest {
     }
 
     @Test
-    @DisplayName("OPT_OUT atlanmış mesajda randevu hatırlatmasının etkilenmediğini söyler")
-    fun optOutReason() {
-        val decoded = message(body(event = "birthday", status = "skipped", errorCode = "OPT_OUT", attempt = 0))
+    @DisplayName("Kaldırılmış kanal ve olayın geçmiş satırı `Unknown` olarak çözülür")
+    fun legacySmsAndBirthdayRowsDecode() {
+        val decoded = message(body(event = "birthday", status = "skipped", channel = "sms", attempt = 0))
 
+        assertEquals(NotificationEvent.Unknown, decoded.event)
+        assertEquals(NotificationChannel.Unknown, decoded.channel)
         assertFalse(decoded.wasAttempted)
-        assertTrue(decoded.failureMessage!!.contains("Randevu hatırlatmaları bundan etkilenmez"))
     }
 
     @Test
@@ -162,7 +163,6 @@ class MessageModelsTest {
             ApiErrorCode.WHATSAPP_TEMPLATE_NOT_APPROVED,
             ApiErrorCode.WHATSAPP_INVALID_RECIPIENT,
             ApiErrorCode.WHATSAPP_WINDOW_CLOSED,
-            ApiErrorCode.OPT_OUT,
         ).forEach { assertFalse(problem(it).isRetryable, it.name) }
     }
 }

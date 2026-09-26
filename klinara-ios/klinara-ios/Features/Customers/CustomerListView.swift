@@ -21,6 +21,7 @@ struct CustomerListView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                listHeader
                 tagFilterRow(store.tags)
 
                 KlinaraScreen(
@@ -72,17 +73,25 @@ struct CustomerListView: View {
                 // üstleniyordu ve etiketleri yana kaydırmaya çalışmak listeyi
                 // yeniden çektiriyordu.
                 .refreshable { await store.reload() }
+                // Liste alanı SIKIŞTIRILABİLİR ve taşarsa AŞAĞI taşar.
+                //
+                // İskelet ve boş durum kaydırılmıyor, sabit boyda. Klavye
+                // açılınca (özellikle mini/SE boyunda) kalan alana sığmıyor,
+                // `VStack` taşmayı iki yana bölüyor ve üstteki arama alanı
+                // gezinme çubuğunun altına itiliyordu. `minHeight: 0` yığına
+                // "bu alan küçülebilir" diyor; `.top` hizası fazlalığı
+                // klavyenin altına bırakıyor. `.clipped()` YOK: liste yüzen
+                // sekme çubuğunun arkasına uzanabilmeli.
+                .frame(minHeight: 0, maxHeight: .infinity, alignment: .top)
             }
             .background(KlinaraColor.surface)
             .klinaraFAB(isVisible: canWrite, accessibilityLabel: "Yeni müşteri") { editing = .create }
             .navigationTitle("Müşteriler")
-            // Ortalanmış inline başlık YERİNE sola yaslı: sağdaki şube menüsü
-            // ortadaki başlığı kendi genişliği kadar sola itiyordu ve başlık
-            // ekranın ortasında değil, rastgele bir noktada duruyordu.
-            // `.inlineLarge` başlığı baş kenara sabitler; `navigationTitle`
-            // yerinde kaldığı için geri düğmesinin etiketi de korunur.
-            .toolbarTitleDisplayMode(.inlineLarge)
+            // Görünür başlık ``RootToolbarTitle``; `navigationTitle` geri
+            // düğmesi etiketi ve VoiceOver için kalıyor.
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                RootToolbarTitle(title: "Müşteriler")
                 ToolbarItem(placement: .topBarTrailing) {
                     // Müşteri kaydı kiracı kapsamlı; şube menüsü burada listeyi
                     // FİLTRELEMEZ. Yine de duruyor: paket satışı, randevu ve
@@ -92,12 +101,12 @@ struct CustomerListView: View {
                     BranchMenu(session: session)
                 }
             }
-            .searchable(text: $searchText, prompt: "Ad veya telefon")
             .onChange(of: searchText) { _, term in store.updateSearch(term) }
             .task {
                 async let list: Void = store.load()
                 async let tags: Void = store.loadTags()
-                _ = await (list, tags)
+                async let summary: Void = store.loadSummary()
+                _ = await (list, tags, summary)
             }
             .sheet(item: $editing) { target in
                 CustomerEditorView(session: session, target: target)
@@ -107,6 +116,22 @@ struct CustomerListView: View {
     }
 
     private var isTagFiltered: Bool { store.selectedTagId != nil }
+
+    /// Özet şeridi + arama. Arama ya da etiket filtresi etkinken şerit
+    /// gizlenir: sayılar tüm tabanı anlatıyor, daraltılmış sonucu değil —
+    /// yanında durmaları "bu 12 kişiden 37'si" gibi yanlış okunurdu.
+    private var listHeader: some View {
+        VStack(spacing: KlinaraMetrics.sm) {
+            if !isSearching && !isTagFiltered && searchText.isEmpty {
+                CustomerSummaryStrip(summary: store.summary)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+            CustomerSearchField(text: $searchText)
+        }
+        .padding(.horizontal, KlinaraMetrics.screenInset)
+        .padding(.top, KlinaraMetrics.sm)
+        .animation(KlinaraMetrics.stepTransition, value: isSearching || isTagFiltered || !searchText.isEmpty)
+    }
 
     private var emptyMessage: String {
         if isSearching { return "Ad ya da telefon numarasının bir bölümünü yazmayı deneyin." }
@@ -123,11 +148,6 @@ struct CustomerListView: View {
     /// kimliği her yüklemede değişiyordu. Yükseklik de SABİT verilir — yatay bir
     /// `ScrollView`ün dikey boyu esnektir ve altındaki ``KlinaraScreen`` bütün
     /// yüksekliği istediği için şerit sıfıra eziliyordu.
-    ///
-    /// Şerit bir zaman arama çubuğunun ardında kalıyordu; `.inlineLarge`
-    /// başlıkla birlikte `.searchable` çubuğu gezinme çubuğunun altına kendi
-    /// yerini alıyor ve şerit onun altında doğru konumda çiziliyor
-    /// (iOS 26 simülatöründe doğrulandı).
     private func tagFilterRow(_ tags: [CustomerTag]) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: KlinaraMetrics.sm) {

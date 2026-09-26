@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   PERMISSIONS,
+  type CalendarEntry,
   type CalendarResponse,
   type NoShowReport,
+  type Page,
   type OccupancyReport,
   type RevenueReport,
   type StaffPerformanceReport,
@@ -17,9 +19,14 @@ import {
   accessibleBranches,
   dashboardTotals,
   mergeBranchSummaries,
+  mergeUpcoming,
+  UPCOMING_HORIZON_DAYS,
+  UPCOMING_LIMIT,
+  UPCOMING_STATUSES,
   type BranchSummary,
   type DashboardTotals,
   type SummarySources,
+  type UpcomingRow,
 } from '@/lib/dashboard/summary';
 import { toMessage } from '@/lib/reports/errors';
 import { presetRange, rangeQuery } from '@/lib/reports/period';
@@ -43,6 +50,10 @@ import { presetRange, rangeQuery } from '@/lib/reports/period';
 export interface DashboardState {
   loading: boolean;
   summaries: BranchSummary[];
+  /** Tüm şubelerde tarihi en yakın randevular — bugünle sınırlı değil. */
+  upcoming: UpcomingRow[];
+  /** Verinin çekildiği an; "bugün/yarın" etiketleri buna göre. */
+  fetchedAt: number | null;
   totals: DashboardTotals;
   sources: Omit<SummarySources, 'day'>;
   /** Bu ayın personel performansı; `null` = izin yok ya da alınamadı. */
@@ -61,6 +72,7 @@ export function useDashboard(): DashboardState {
   const [nonce, setNonce] = useState(0);
   const [result, setResult] = useState<{
     day: SummarySources['day'];
+    upcoming: ReadonlyMap<string, readonly CalendarEntry[]>;
     sources: Omit<SummarySources, 'day'>;
     staffPerformance: StaffPerformanceReport | null;
     errors: DashboardState['errors'];
@@ -112,6 +124,27 @@ export function useDashboard(): DashboardState {
           })
         : [];
 
+      // Sıradaki randevular gün isteğinden AYRI: gün yalnız bugünü taşıyor,
+      // kart ise tarihi en yakın N randevuyu istiyor (bkz. `mergeUpcoming`).
+      const nowMs = Date.now();
+      const upcomingQuery = new URLSearchParams({
+        from: new Date(nowMs).toISOString(),
+        to: new Date(nowMs + UPCOMING_HORIZON_DAYS * 86_400_000).toISOString(),
+        status: UPCOMING_STATUSES.join(','),
+        limit: String(UPCOMING_LIMIT),
+      });
+      const upcomingRequests = can.calendar
+        ? branches.map(async (branch) => {
+            const params = new URLSearchParams(upcomingQuery);
+            params.set('branchId', branch.id);
+            const response = await api.get<Page<CalendarEntry>>(
+              `appointments?${params.toString()}`,
+              { signal, branchId: branch.id },
+            );
+            return [branch.id, response.data] as const;
+          })
+        : [];
+
       const range = presetRange('thisMonth');
       // Şube verilmiyor: sunucu "erişebildiğin tüm şubeler" için hesaplayıp
       // `groupBy=branch` ile satırlara bölüyor — kapsamı yine sunucu çözüyor.
@@ -119,8 +152,9 @@ export function useDashboard(): DashboardState {
       const report = <T>(path: string, allowed: boolean): Promise<T | null> =>
         allowed ? api.get<T>(`${path}?${query}`, { signal }) : Promise.resolve(null);
 
-      const [days, reports] = await Promise.all([
+      const [days, upcomingLists, reports] = await Promise.all([
         Promise.allSettled(dayRequests),
+        Promise.allSettled(upcomingRequests),
         Promise.allSettled([
           report<OccupancyReport>('reports/occupancy', can.occupancy),
           report<NoShowReport>('reports/no-show', can.occupancy),
@@ -149,6 +183,16 @@ export function useDashboard(): DashboardState {
         }
       }
 
+      const upcoming = new Map<string, readonly CalendarEntry[]>();
+      for (const settled of upcomingLists) {
+        if (settled.status === 'fulfilled') {
+          const [id, entries] = settled.value;
+          upcoming.set(id, entries);
+        } else {
+          calendarError ??= toMessage(settled.reason);
+        }
+      }
+
       let reportsError: string | null = null;
       const unwrap = <T>(settled: PromiseSettledResult<T | null>): T | null => {
         if (settled.status === 'fulfilled') return settled.value;
@@ -159,6 +203,7 @@ export function useDashboard(): DashboardState {
 
       setResult({
         day,
+        upcoming,
         sources: {
           occupancy: unwrap(occupancy),
           noShow: unwrap(noShow),
@@ -175,9 +220,12 @@ export function useDashboard(): DashboardState {
 
   const summaries = useMemo(
     () =>
-      result === null
-        ? []
-        : mergeBranchSummaries(branches, { day: result.day, ...result.sources }, result.fetchedAt),
+      result === null ? [] : mergeBranchSummaries(branches, { day: result.day, ...result.sources }),
+    [branches, result],
+  );
+
+  const upcoming = useMemo(
+    () => (result === null ? [] : mergeUpcoming(branches, result.upcoming, result.fetchedAt)),
     [branches, result],
   );
 
@@ -186,6 +234,8 @@ export function useDashboard(): DashboardState {
   return {
     loading: result === null,
     summaries,
+    upcoming,
+    fetchedAt: result?.fetchedAt ?? null,
     totals: dashboardTotals(summaries, sources),
     sources,
     staffPerformance: result?.staffPerformance ?? null,

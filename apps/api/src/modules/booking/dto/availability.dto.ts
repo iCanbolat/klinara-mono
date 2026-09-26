@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { AVAILABILITY_DAY_STATUSES, type AvailabilityDayStatus } from '@klinara/shared';
 import { Transform } from 'class-transformer';
 import { ArrayMaxSize, ArrayNotEmpty, IsArray, IsISO8601, IsOptional, IsUUID } from 'class-validator';
 
@@ -40,6 +41,49 @@ export class AvailabilityQueryDto {
   staffProfileId?: string;
 }
 
+/** `GET /availability/days` — hizmet/personel bilmeden yalnız gün durumları. */
+export class AvailabilityDaysQueryDto {
+  @ApiProperty({ format: 'uuid' })
+  @IsUUID()
+  branchId: string;
+
+  @ApiProperty({ example: '2026-09-01T00:00:00+03:00' })
+  @IsISO8601({ strict: true })
+  from: string;
+
+  @ApiProperty({ example: '2026-10-01T00:00:00+03:00', description: 'Dışlayıcı üst sınır' })
+  @IsISO8601({ strict: true })
+  to: string;
+}
+
+export class AvailabilityDayDto {
+  @ApiProperty({ example: '2026-09-07', description: 'Şube saat diliminde yerel gün' })
+  date: string;
+
+  @ApiProperty({ enum: AVAILABILITY_DAY_STATUSES })
+  status: AvailabilityDayStatus;
+
+  @ApiProperty({ type: String, nullable: true, example: 'Cumhuriyet Bayramı' })
+  holidayName: string | null;
+
+  @ApiProperty({ type: String, nullable: true, example: '09:00' })
+  opensAt: string | null;
+
+  @ApiProperty({ type: String, nullable: true, example: '18:00' })
+  closesAt: string | null;
+}
+
+export class AvailabilityDaysResponseDto {
+  @ApiProperty({ format: 'uuid' })
+  branchId: string;
+
+  @ApiProperty({ example: 'Europe/Istanbul' })
+  timezone: string;
+
+  @ApiProperty({ type: [AvailabilityDayDto] })
+  days: AvailabilityDayDto[];
+}
+
 export class AvailabilitySlotDto {
   @ApiProperty({ format: 'date-time', example: '2026-09-07T14:00:00+03:00' })
   startsAt: string;
@@ -60,6 +104,13 @@ export class AvailabilityResponseDto {
 
   @ApiProperty({ example: 15 })
   slotGranularityMinutes: number;
+
+  @ApiProperty({
+    type: [AvailabilityDayDto],
+    description:
+      'Penceredeki her yerel gün. Boş `slots` ile `open` gün = dolu; diğer durumlar gün kuralıdır.',
+  })
+  days: AvailabilityDayDto[];
 
   @ApiProperty({ type: [AvailabilitySlotDto] })
   slots: AvailabilitySlotDto[];

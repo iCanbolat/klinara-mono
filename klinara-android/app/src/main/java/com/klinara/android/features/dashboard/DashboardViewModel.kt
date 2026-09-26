@@ -5,11 +5,13 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.klinara.android.services.ServiceContainer
 import com.klinara.android.services.auth.BranchSummary
+import com.klinara.android.services.booking.AppointmentListQuery
 import com.klinara.android.services.booking.BookingService
 import com.klinara.android.services.booking.CalendarDayQuery
 import com.klinara.android.services.booking.CalendarEntry
 import com.klinara.android.services.formatting.BranchClock
 import com.klinara.android.services.networking.ApiError
+import com.klinara.android.services.networking.Page
 import com.klinara.android.services.reports.NoShowGrouping
 import com.klinara.android.services.reports.OccupancyGrouping
 import com.klinara.android.services.reports.ReportPeriod
@@ -25,11 +27,18 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.time.Duration
 import java.time.Instant
 
 /** Yüklenmiş genel bakış. Bölüm başına hata; `null` = sorun yok ya da istek atılmadı. */
 data class DashboardData(
     val summaries: List<BranchDashboardSummary>,
+    /** Tüm şubelerde tarihi en yakın randevular — bugünle sınırlı değil. */
+    val upcoming: List<UpcomingItem>,
+    /** Listenin ötesinde de bekleyen randevu var; "Tümünü takvimde gör". */
+    val upcomingHasMore: Boolean,
+    /** Verinin çekildiği an; "Bugün/Yarın" etiketleri buna göre. */
+    val fetchedAt: Instant,
     val totals: DashboardTotals,
     val occupancyDelta: Double?,
     val revenueDelta: Double?,
@@ -99,6 +108,11 @@ class DashboardViewModel(
                     emptyList()
                 }
 
+            // Sıradaki randevular gün isteğinden AYRI: gün yalnız bugünü taşıyor, kart ise tarihi en
+            // yakın N randevuyu istiyor (bkz. `mergeUpcoming`).
+            val upcomingPages =
+                if (access.calendar) active.map { async { attempt { upcomingPage(it, at) } } } else emptyList()
+
             // Ay sınırı ilk şubenin saatinde — web de tek bir "bu ay" aralığı gönderiyor.
             val clock = BranchClock(active.firstOrNull()?.timezone)
             val start = clock.startOfMonth(at)
@@ -116,7 +130,10 @@ class DashboardViewModel(
 
             val dayResults = days.map { it.await() }
             val dayMap = dayResults.mapNotNull { it.getOrNull() }.toMap()
-            val calendarError = dayResults.firstNotNullOfOrNull { it.exceptionOrNull() }?.let(::message)
+            val upcomingResults = upcomingPages.map { it.await() }
+            val upcomingMap = upcomingResults.mapNotNull { it.getOrNull() }.toMap()
+            val calendarError =
+                (dayResults + upcomingResults).firstNotNullOfOrNull { it.exceptionOrNull() }?.let(::message)
 
             val reportResults = listOf(occupancy.await(), noShow.await(), revenue.await(), staff.await())
             val reportsError = reportResults.firstNotNullOfOrNull { it.exceptionOrNull() }?.let(::message)
@@ -126,9 +143,15 @@ class DashboardViewModel(
             val revenueReport = revenue.await().getOrNull()
 
             val summaries =
-                DashboardSummaries.merge(active, dayMap, occupancyReport, revenueReport, noShowReport, at)
+                DashboardSummaries.merge(active, dayMap, occupancyReport, revenueReport, noShowReport)
+            val upcoming = DashboardSummaries.mergeUpcoming(active, upcomingMap.mapValues { it.value.data }, at)
             DashboardData(
                 summaries = summaries,
+                upcoming = upcoming,
+                upcomingHasMore =
+                    upcomingMap.values.any { it.pageInfo.hasMore } ||
+                        upcomingMap.values.sumOf { it.data.size } > upcoming.size,
+                fetchedAt = at,
                 totals = DashboardSummaries.totals(summaries, occupancyReport, revenueReport, noShowReport),
                 occupancyDelta = occupancyReport?.delta?.get("occupancyRate"),
                 revenueDelta = revenueReport?.delta?.get("accruedMinor"),
@@ -138,6 +161,22 @@ class DashboardViewModel(
                 reportsError = reportsError,
             )
         }
+
+    /** Şubenin şimdiden itibaren bitmemiş randevuları, başlangıca göre, en fazla N. */
+    private suspend fun upcomingPage(
+        branch: BranchSummary,
+        at: Instant,
+    ): Pair<String, Page<CalendarEntry>> =
+        branch.id to
+            booking.appointments(
+                AppointmentListQuery(
+                    from = at,
+                    to = at.plus(Duration.ofDays(DashboardSummaries.UPCOMING_HORIZON_DAYS)),
+                    branchId = branch.id,
+                    statuses = DashboardSummaries.UPCOMING_STATUSES,
+                    limit = DashboardSummaries.UPCOMING_LIMIT,
+                ),
+            )
 
     /** Yalnız `ApiError` bölüme düşer; programlama hataları yukarı geçer (gizlenmez). */
     private suspend fun <T> attempt(block: suspend () -> T): Result<T> =

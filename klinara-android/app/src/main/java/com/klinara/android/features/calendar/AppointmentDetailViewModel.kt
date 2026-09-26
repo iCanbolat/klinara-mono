@@ -95,8 +95,12 @@ class AppointmentDetailViewModel(
         mutate { current -> booking.changeStatus(current.id, status) }
     }
 
-    fun cancelAppointment(reason: String?) =
-        mutate { current -> booking.cancel(current.id, reason?.trim()?.takeIf { it.isNotEmpty() }) }
+    fun cancelAppointment(
+        reason: String?,
+        notifyCustomer: Boolean = true,
+    ) = mutate { current ->
+        booking.cancel(current.id, reason?.trim()?.takeIf { it.isNotEmpty() }, notifyCustomer)
+    }
 
     /**
      * Notu kaydeder. Boş metin `null` gönderir ve notu **siler** — ekran bunu dipnotla

@@ -10,6 +10,7 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -107,7 +108,7 @@ export function RescheduleDialog({
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>{t('calendar.reschedule.title')}</DialogTitle>
           <DialogDescription>
@@ -116,50 +117,52 @@ export function RescheduleDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <SlotPicker
-          branchId={appointment.branchId}
-          serviceIds={serviceIds}
-          staffProfileId={singleStaff}
-          timezone={timezone}
-          value={startsAt}
-          disabled={busy}
-          onSelect={(target) => {
-            setStartsAt(target);
-            setConflict(null);
-          }}
-        />
+        <DialogBody className="flex flex-col gap-4">
+          <SlotPicker
+            branchId={appointment.branchId}
+            serviceIds={serviceIds}
+            staffProfileId={singleStaff}
+            timezone={timezone}
+            value={startsAt}
+            disabled={busy}
+            onSelect={(target) => {
+              setStartsAt(target);
+              setConflict(null);
+            }}
+          />
 
-        {conflict !== null ? (
-          <Alert tone="warn" title={t('calendar.conflict.title')}>
-            {conflict.suggestions.length > 0 ? (
-              <>
-                <p className="mb-2 text-sm">{t('calendar.conflict.pickSuggestion')}</p>
-                <div className="flex flex-wrap gap-2">
-                  {conflict.suggestions.map((suggestion) => (
-                    <Button
-                      key={suggestion.startsAt}
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      disabled={busy}
-                      onClick={() => void submit(suggestion.startsAt)}
-                    >
-                      {formatTime(suggestion.startsAt, timezone)}
-                    </Button>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <p className="text-sm">{t('calendar.conflict.noSuggestions')}</p>
-            )}
-          </Alert>
-        ) : null}
+          {conflict !== null ? (
+            <Alert tone="warn" title={t('calendar.conflict.title')}>
+              {conflict.suggestions.length > 0 ? (
+                <>
+                  <p className="mb-2 text-sm">{t('calendar.conflict.pickSuggestion')}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {conflict.suggestions.map((suggestion) => (
+                      <Button
+                        key={suggestion.startsAt}
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        disabled={busy}
+                        onClick={() => void submit(suggestion.startsAt)}
+                      >
+                        {formatTime(suggestion.startsAt, timezone)}
+                      </Button>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm">{t('calendar.conflict.noSuggestions')}</p>
+              )}
+            </Alert>
+          ) : null}
 
-        {error !== null ? (
-          <Alert tone="danger">
-            <span role="alert">{error}</span>
-          </Alert>
-        ) : null}
+          {error !== null ? (
+            <Alert tone="danger">
+              <span role="alert">{error}</span>
+            </Alert>
+          ) : null}
+        </DialogBody>
 
         <DialogFooter>
           <Button type="button" variant="ghost" onClick={onClose} disabled={busy}>

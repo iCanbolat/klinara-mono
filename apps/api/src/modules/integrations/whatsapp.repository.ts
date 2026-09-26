@@ -78,6 +78,7 @@ export async function replaceTemplates(
     category: string | null;
     status: WhatsAppTemplateStatus;
     bodyVariableCount: number;
+    bodyText: string | null;
     buttons: { type: string; text: string }[];
   }[],
 ): Promise<void> {
@@ -94,6 +95,7 @@ export async function replaceTemplates(
       category: row.category,
       status: row.status,
       bodyVariableCount: row.bodyVariableCount,
+      bodyText: row.bodyText,
       buttons: row.buttons,
       syncedAt: new Date(),
     })),

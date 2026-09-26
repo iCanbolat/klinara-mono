@@ -11,11 +11,17 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { textArray } from './columns';
+import { appointments } from './appointments';
+import { conversations } from './conversations';
 import { customers } from './crm';
 import { users } from './identity';
 import { branches, tenants } from './tenancy';
 
-export type NotificationChannel = 'whatsapp' | 'sms' | 'email' | 'push';
+/**
+ * Wire düzeyi kanal kümesi. DB enum'u geçmiş satırlar için `sms` değerini
+ * hâlâ taşıyor (Postgres enum değeri düşürülemez); uygulama onu artık üretmez.
+ */
+export type NotificationChannel = 'whatsapp' | 'email' | 'push';
 
 export type NotificationEvent =
   | 'appointment_confirmation'
@@ -24,8 +30,8 @@ export type NotificationEvent =
   | 'no_show_followup'
   | 'package_balance'
   | 'package_expiring'
-  | 'birthday'
   | 'auto_reply'
+  | 'staff_reply'
   | 'staff_internal';
 
 export type MessageStatus =
@@ -36,11 +42,6 @@ export type MessageStatus =
   | 'read'
   | 'failed'
   | 'skipped';
-
-/** İşlemsel ileti opt-out'tan etkilenmez; pazarlama iletisi etkilenir. */
-export type NotificationKind = 'transactional' | 'marketing';
-
-export type OptOutSource = 'customer_request' | 'inbound_stop' | 'staff';
 
 export const notificationTemplates = pgTable(
   'notification_templates',
@@ -106,7 +107,6 @@ export const messageLog = pgTable(
     userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
     channel: text('channel').$type<NotificationChannel>().notNull(),
     event: text('event').$type<NotificationEvent>().notNull(),
-    kind: text('kind').$type<NotificationKind>().notNull().default('transactional'),
     status: text('status').$type<MessageStatus>().notNull().default('queued'),
     /** Ham adres SAKLANMAZ: `+90**********67`. */
     toMasked: text('to_masked').notNull(),
@@ -129,6 +129,16 @@ export const messageLog = pgTable(
     templateVariables: jsonb('template_variables').$type<Record<string, string>>(),
     /** Çift gönderim koruması — kısmi tekil indeks (`failed` hariç). */
     dedupeKey: text('dedupe_key'),
+    /** Sohbet ekranı (0048): resepsiyonun yazdığı cevaplar bu kimliği taşır. */
+    conversationId: uuid('conversation_id').references(() => conversations.id, {
+      onDelete: 'set null',
+    }),
+    /** Mesajın hakkında olduğu randevu — hatırlatma butonları token'ı buradan üretir. */
+    appointmentId: uuid('appointment_id').references(() => appointments.id, {
+      onDelete: 'set null',
+    }),
+    /** Elle yazılmış cevabın yazarı; otomatik bildirimlerde boş. */
+    sentByUserId: uuid('sent_by_user_id').references(() => users.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -137,22 +147,53 @@ export const messageLog = pgTable(
   ],
 );
 
-export const contactOptOuts = pgTable('contact_opt_outs', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  tenantId: uuid('tenant_id')
-    .notNull()
-    .references(() => tenants.id, { onDelete: 'cascade' }),
-  customerId: uuid('customer_id')
-    .notNull()
-    .references(() => customers.id, { onDelete: 'cascade' }),
-  /** `null` = tüm kanallar. */
-  channel: text('channel').$type<NotificationChannel>(),
-  kind: text('kind').$type<NotificationKind>().notNull().default('marketing'),
-  source: text('source').$type<OptOutSource>().notNull().default('customer_request'),
-  note: text('note'),
-  createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  /** Satır silinmez; geri alma bu alanı doldurur. */
-  revokedAt: timestamp('revoked_at', { withTimezone: true }),
-  revokedBy: uuid('revoked_by').references(() => users.id, { onDelete: 'set null' }),
-});
+export type StaffNotificationKind =
+  | 'appointment_created'
+  | 'appointment_cancelled'
+  | 'appointment_rescheduled'
+  | 'inbound_message'
+  | 'delivery_failed';
+
+/** Panelin zil ikonuna düşen bildirimler — kliniğe ait, kişiye değil. */
+export const staffNotifications = pgTable(
+  'staff_notifications',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    branchId: uuid('branch_id').references(() => branches.id, { onDelete: 'cascade' }),
+    kind: text('kind').$type<StaffNotificationKind>().notNull(),
+    title: text('title').notNull(),
+    body: text('body'),
+    /** Tıklayınca gidilecek panel yolu. */
+    link: text('link'),
+    appointmentId: uuid('appointment_id').references(() => appointments.id, {
+      onDelete: 'cascade',
+    }),
+    conversationId: uuid('conversation_id').references(() => conversations.id, {
+      onDelete: 'cascade',
+    }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('staff_notifications_feed_idx').on(table.tenantId, table.createdAt, table.id)],
+);
+
+/** Okundu bilgisi KİŞİSEL: biri okuyunca ötekinin sayacı düşmez. */
+export const staffNotificationReads = pgTable(
+  'staff_notification_reads',
+  {
+    notificationId: uuid('notification_id')
+      .notNull()
+      .references(() => staffNotifications.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    readAt: timestamp('read_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('staff_notification_reads_user_idx').on(table.tenantId, table.userId)],
+);
+

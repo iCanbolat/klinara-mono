@@ -14,6 +14,7 @@ coverage/
 next-env.d.ts
 .turbo/
 
+PayTR Direkt API
 # Android (Faz A0)
 .idea/
 .kotlin/

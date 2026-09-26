@@ -3,13 +3,12 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { TenantTxService } from '../../src/database/tenant-tx.service';
 import { ReminderWorker } from '../../src/modules/notifications/reminder.worker';
 import { ReminderSchedulerService } from '../../src/modules/notifications/reminder-scheduler.service';
-import { SMS_SENDER } from '../../src/lib/sms/sms.types';
-import type { LogSmsSender } from '../../src/lib/sms/log.sender';
 import { NotificationSenderWorker } from '../../src/modules/notifications/notification-sender.worker';
 import { createTestApp } from '../helpers/app';
 import { startTestDatabase, type TestDatabase } from '../helpers/database';
 import { auth, http, PLATFORM_TOKEN } from '../helpers/identity';
 import { branchHeader, setupClinic, type ClinicFixture } from '../helpers/clinic';
+import { GraphMock } from '../helpers/whatsapp';
 
 interface AppointmentBody {
   id: string;
@@ -45,34 +44,56 @@ describe('hatırlatma zamanlaması (Batch 8.4)', () => {
   let database: TestDatabase;
   let app: NestExpressApplication;
   let clinic: ClinicFixture;
+  const graph = new GraphMock();
 
   beforeAll(async () => {
     database = await startTestDatabase();
+    const baseUrl = await graph.start();
     app = await createTestApp({
-      env: { DATABASE_URL: database.appUrl, PLATFORM_ADMIN_TOKEN: PLATFORM_TOKEN },
+      env: {
+        DATABASE_URL: database.appUrl,
+        PLATFORM_ADMIN_TOKEN: PLATFORM_TOKEN,
+        WHATSAPP_API_BASE_URL: baseUrl,
+      },
     });
   });
 
   afterAll(async () => {
     await app.close();
+    await graph.stop();
     await database.stop();
   });
 
   beforeEach(async () => {
     await database.truncateAll();
+    graph.reset();
     clinic = await setupClinic(app);
-    sms().sent.length = 0;
-    // Varsayılan kanal WhatsApp; bu fazda gönderim SMS üzerinden sınanıyor.
-    await http(app)
-      .put('/api/v1/notification-preferences')
-      .set(ownerAuth())
-      .send({ event: 'appointment_reminder', channels: ['sms'] })
-      .expect(200);
+    await activateWhatsApp();
   });
 
   const ownerAuth = () => auth(clinic.owner.tokens);
   const branch = () => branchHeader(clinic.branch.id);
-  const sms = () => app.get<LogSmsSender>(SMS_SENDER);
+  /** WhatsApp hesabını kaydeder ve doğrular: müşteriye giden tek kanal bu. */
+  const activateWhatsApp = async () => {
+    await http(app)
+      .put('/api/v1/integrations/whatsapp')
+      .set(auth(clinic.owner.tokens))
+      .send({
+        wabaId: '102290129340398',
+        phoneNumberId: '106540352242922',
+        businessPhone: '+905321112233',
+        accessToken: 'EAAG-cok-gizli-erisim-tokeni-a91f',
+        appSecret: 'webhook-imza-sirri',
+      })
+      .expect(200);
+    await http(app)
+      .post('/api/v1/integrations/whatsapp/verify')
+      .set(auth(clinic.owner.tokens))
+      .expect(200);
+    graph.reset();
+  };
+  /** Meta'ya giden mesaj gönderimleri. */
+  const sentToMeta = () => graph.requests.filter((request) => request.url.endsWith('/messages'));
 
   const createAppointment = async (startsAt = futureMonday()): Promise<AppointmentBody> => {
     const created = await http(app)
@@ -105,7 +126,11 @@ describe('hatırlatma zamanlaması (Batch 8.4)', () => {
 
   const messages = async (): Promise<MessageBody[]> => {
     const listed = await http(app).get('/api/v1/messages').set(ownerAuth()).expect(200);
-    return (listed.body as { data: MessageBody[] }).data;
+    // Oluşturma/iptal bildirimleri bu dosyanın konusu değil
+    // (bkz. appointment-notifications.test.ts).
+    return (listed.body as { data: MessageBody[] }).data.filter(
+      (row) => row.event !== 'appointment_confirmation' && row.event !== 'appointment_cancelled',
+    );
   };
 
   // -------------------------------------------------------------------------
@@ -253,7 +278,7 @@ describe('hatırlatma zamanlaması (Batch 8.4)', () => {
       // değil, dolayısıyla sessizce çıkar.
       await runReminder(pending?.id ?? '');
       expect(await messages()).toHaveLength(0);
-      expect(sms().sent).toHaveLength(0);
+      expect(sentToMeta()).toHaveLength(0);
     });
   });
 
@@ -287,7 +312,7 @@ describe('hatırlatma zamanlaması (Batch 8.4)', () => {
       expect(await messages()).toHaveLength(1);
     });
 
-    it('gönderim mesajı gerçekten SMS olarak çıkar', async () => {
+    it('gönderim mesajı gerçekten WhatsApp’tan çıkar', async () => {
       const appointment = await createAppointment();
       const pending = (await plan(appointment.id))[0];
       await runReminder(pending?.id ?? '');
@@ -297,8 +322,9 @@ describe('hatırlatma zamanlaması (Batch 8.4)', () => {
         .get(NotificationSenderWorker)
         .handle({ tenantId: clinic.tenant.id, messageId: message?.id ?? '' });
 
-      expect(sms().sent).toHaveLength(1);
-      expect(sms().sent[0]?.body).toContain('hatırlatırız');
+      expect(sentToMeta()).toHaveLength(1);
+      expect(JSON.stringify(sentToMeta()[0]?.body)).toContain('klinara_randevu_hatirlatma');
+      expect(message?.body).toContain('hatırlatırız');
     });
   });
 

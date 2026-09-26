@@ -178,8 +178,6 @@ sealed class ApiError(
                 ApiErrorCode.OUTSIDE_WORKING_HOURS to "Bu saat çalışma saatleri dışında.",
                 // A8 — iOS `APIError.swift` metinleriyle birebir. Mesaj günlüğü `errorCode`'u
                 // da bu tablodan okuyor (`Message.failureMessage`).
-                ApiErrorCode.OPT_OUT to
-                    "Müşteri ticari ileti almayı kapatmış. Randevu hatırlatmaları bundan etkilenmez.",
                 ApiErrorCode.TEMPLATE_INVALID to "Şablonda tanımlı olmayan bir değişken var.",
                 ApiErrorCode.CHANNEL_NOT_CONFIGURED to
                     "Bu kanal henüz kurulmadı. Entegrasyon ayarlarından yapılandırın.",

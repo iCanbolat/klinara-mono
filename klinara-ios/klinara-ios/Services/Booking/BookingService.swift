@@ -11,6 +11,10 @@ protocol BookingService: Sendable {
     /// `GET /availability` — verilen hizmet dizisi için uygun slotlar.
     func availability(_ query: AvailabilityQuery) async throws -> AvailabilityResponse
 
+    /// `GET /availability/days` — gün durumları (açık / kapalı / tatil…),
+    /// `to` dışlayıcı. Tarih seçicinin seçilemez günleri işaretlemesi için.
+    func availabilityDays(branchId: String, from: Date, to: Date) async throws -> AvailabilityDaysResponse
+
     /// `GET /appointments` — filtreli, cursor sayfalamalı liste.
     func appointments(_ query: AppointmentListQuery) async throws -> Page<CalendarEntry>
 
@@ -40,7 +44,8 @@ protocol BookingService: Sendable {
     ) async throws -> Appointment
 
     /// `POST /appointments/:id/cancel` — `If-Match` **almaz**, sürümü sunucu okur.
-    func cancel(id: String, reason: String?) async throws -> Appointment
+    /// `notifyCustomer: false` → müşteriye iptal bildirimi gitmez.
+    func cancel(id: String, reason: String?, notifyCustomer: Bool) async throws -> Appointment
 
     /// `POST /appointments/:id/status`
     func changeStatus(id: String, _ input: ChangeAppointmentStatusInput) async throws -> Appointment
@@ -53,6 +58,13 @@ protocol BookingService: Sendable {
 
     /// `GET /calendar/staff` — `X-Branch-Id` zorunlu.
     func calendarStaff(_ query: CalendarStaffQuery) async throws -> CalendarResponse
+}
+
+extension BookingService {
+    /// Bildirimli iptal — sunucu varsayılanı.
+    func cancel(id: String, reason: String?) async throws -> Appointment {
+        try await cancel(id: id, reason: reason, notifyCustomer: true)
+    }
 }
 
 struct LiveBookingService: BookingService {
@@ -78,6 +90,14 @@ struct LiveBookingService: BookingService {
             items.append(URLQueryItem(name: "staffProfileId", value: staffProfileId))
         }
         return try await client.send(APIRequest.get("availability", query: items))
+    }
+
+    func availabilityDays(branchId: String, from: Date, to: Date) async throws -> AvailabilityDaysResponse {
+        try await client.send(APIRequest.get("availability/days", query: [
+            URLQueryItem(name: "branchId", value: branchId),
+            URLQueryItem(name: "from", value: KlinaraCoding.timestamp(from)),
+            URLQueryItem(name: "to", value: KlinaraCoding.timestamp(to)),
+        ]))
     }
 
     // MARK: Randevu
@@ -153,9 +173,13 @@ struct LiveBookingService: BookingService {
         )
     }
 
-    func cancel(id: String, reason: String?) async throws -> Appointment {
+    func cancel(id: String, reason: String?, notifyCustomer: Bool) async throws -> Appointment {
         try await client.send(
-            APIRequest.post("appointments/\(id)/cancel", body: CancelAppointmentInput(reason: reason))
+            APIRequest.post(
+                "appointments/\(id)/cancel",
+                // Varsayılan (gönder) sunucuda; yalnız kapatma açıkça gider.
+                body: CancelAppointmentInput(reason: reason, notifyCustomer: notifyCustomer ? nil : false)
+            )
         )
     }
 

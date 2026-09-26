@@ -5,13 +5,12 @@ import { NotificationDispatcherService } from '../../src/modules/notifications/n
 import { NotificationSenderWorker } from '../../src/modules/notifications/notification-sender.worker';
 import { MAIL_SENDER } from '../../src/lib/mail/mail.types';
 import type { LogMailSender } from '../../src/lib/mail/mail.module';
-import { SMS_SENDER } from '../../src/lib/sms/sms.types';
-import type { LogSmsSender } from '../../src/lib/sms/log.sender';
 import type { EnqueueInput } from '../../src/modules/notifications/notification-dispatcher.service';
 import { createTestApp } from '../helpers/app';
 import { startTestDatabase, type TestDatabase } from '../helpers/database';
 import { auth, http, PLATFORM_TOKEN, type Tokens } from '../helpers/identity';
 import { setupClinic, type ClinicFixture } from '../helpers/clinic';
+import { GraphMock } from '../helpers/whatsapp';
 
 interface Problem {
   code: string;
@@ -43,30 +42,38 @@ describe('bildirim çekirdeği (Batch 8.1)', () => {
   let app: NestExpressApplication;
   let clinic: ClinicFixture;
   let practitioner: { userId: string; tokens: Tokens };
+  const graph = new GraphMock();
 
   beforeAll(async () => {
     database = await startTestDatabase();
+    const baseUrl = await graph.start();
     app = await createTestApp({
-      env: { DATABASE_URL: database.appUrl, PLATFORM_ADMIN_TOKEN: PLATFORM_TOKEN },
+      env: {
+        DATABASE_URL: database.appUrl,
+        PLATFORM_ADMIN_TOKEN: PLATFORM_TOKEN,
+        WHATSAPP_API_BASE_URL: baseUrl,
+      },
     });
   });
 
   afterAll(async () => {
     await app.close();
+    await graph.stop();
     await database.stop();
   });
 
   beforeEach(async () => {
     await database.truncateAll();
+    graph.reset();
     clinic = await setupClinic(app);
     practitioner = clinic.practitioner;
     mail().sent.length = 0;
-    sms().sent.length = 0;
   });
 
   const ownerAuth = () => auth(clinic.owner.tokens);
   const mail = () => app.get<LogMailSender>(MAIL_SENDER);
-  const sms = () => app.get<LogSmsSender>(SMS_SENDER);
+  /** Meta'ya giden mesaj gönderimleri (template eşitleme ve doğrulama hariç). */
+  const sentToMeta = () => graph.requests.filter((request) => request.url.endsWith('/messages'));
 
   /** Dispatcher'ı istek bağlamı olmadan, kiracı context'i altında çağırır. */
   const enqueue = (input: EnqueueInput) =>
@@ -83,7 +90,7 @@ describe('bildirim çekirdeği (Batch 8.1)', () => {
     event: 'appointment_reminder',
     customerId: clinic.customer.id,
     branchId: clinic.branch.id,
-    channels: ['sms'],
+    channels: ['whatsapp'],
     variables: {
       customerName: 'Ayşe Yılmaz',
       branchName: 'Merkez',
@@ -93,29 +100,61 @@ describe('bildirim çekirdeği (Batch 8.1)', () => {
     ...overrides,
   });
 
+  /**
+   * Kiracıya DOĞRULANMIŞ bir WhatsApp hesabı ekler. Dispatcher doğrulanmamış
+   * hesapta WhatsApp'ı atlıyor; kanal seçimini sınayan testler bunu istiyor.
+   * Token burada şifreli değil — bu yardımcıyla kurulan testler WhatsApp'a
+   * GÖNDERMİYOR, yalnız kanal seçimine bakıyor. Gönderim için `activate`.
+   */
+  const activateWhatsApp = () =>
+    database.ownerPool.query(
+      `insert into whatsapp_accounts (tenant_id, waba_id, phone_number_id, access_token_encrypted, status)
+       values ($1, 'waba-test', 'phone-test', 'sifreli-degil', 'active')`,
+      [clinic.tenant.id],
+    );
+
+  /** Hesabı API üzerinden kaydeder ve doğrular: worker gerçekten gönderebilsin. */
+  const activate = async () => {
+    await http(app)
+      .put('/api/v1/integrations/whatsapp')
+      .set(ownerAuth())
+      .send({
+        wabaId: '102290129340398',
+        phoneNumberId: '106540352242922',
+        businessPhone: '+905321112233',
+        accessToken: 'EAAG-cok-gizli-erisim-tokeni-a91f',
+        appSecret: 'webhook-imza-sirri',
+      })
+      .expect(200);
+    await http(app).post('/api/v1/integrations/whatsapp/verify').set(ownerAuth()).expect(200);
+    graph.reset();
+  };
+
   const setPreference = (body: Record<string, unknown>) =>
     http(app).put('/api/v1/notification-preferences').set(ownerAuth()).send(body);
 
   // -------------------------------------------------------------------------
   describe('gönderim akışı', () => {
     it('mesajı kuyruğa yazar, worker gönderir ve kayıt `sent` olur', async () => {
+      await activate();
       const queued = await enqueue(reminder());
       expect(queued.status).toBe('queued');
       if (queued.status !== 'queued') return;
 
       await runWorker(queued.messageId);
-
-      expect(sms().sent).toHaveLength(1);
-      expect(sms().sent[0]?.body).toContain('Ayşe Yılmaz');
+      expect(sentToMeta()).toHaveLength(1);
 
       const listed = await http(app).get('/api/v1/messages').set(ownerAuth()).expect(200);
       const data = (listed.body as { data: MessageBody[] }).data;
       expect(data).toHaveLength(1);
       expect(data[0]?.status).toBe('sent');
-      expect(data[0]?.channel).toBe('sms');
+      expect(data[0]?.channel).toBe('whatsapp');
+      // Kayda standart template'in metni yazılır: müşterinin gördüğü metin.
+      expect(data[0]?.body).toContain('Ayşe Yılmaz');
     });
 
     it('alıcı adresi yanıtta da veritabanında da MASKELİ durur', async () => {
+      await activateWhatsApp();
       const queued = await enqueue(reminder());
       if (queued.status !== 'queued') throw new Error('kuyruğa yazılmalıydı');
 
@@ -133,30 +172,25 @@ describe('bildirim çekirdeği (Batch 8.1)', () => {
       expect(raw.rows).toHaveLength(0);
     });
 
-    it('yapılandırılmamış kanal KALICI hatadır — yeniden denenmez', async () => {
-      // Varsayılan tercih WhatsApp'ı ilk sıraya koyar; kiracının WhatsApp
-      // hesabı yoksa gönderim KALICI olarak başarısız olur (8.2'den beri kod
-      // `WHATSAPP_NOT_CONFIGURED`; 8.1'de genel `CHANNEL_NOT_CONFIGURED`ti).
-      const queued = await enqueue(reminder({ channels: ['whatsapp'] }));
-      if (queued.status !== 'queued') throw new Error('kuyruğa yazılmalıydı');
-
-      // Fırlatmaz: kalıcı hata kuyruğu meşgul etmemeli.
-      await expect(runWorker(queued.messageId)).resolves.toBeUndefined();
+    it('WhatsApp hesabı doğrulanmamışsa mesaj YAZILMAZ', async () => {
+      // Müşteriye giden tek kanal WhatsApp; hesabı olmayan kiracıda gönderilemeyecek
+      // bir `failed` satırı üretmek yerine hiç yazılmıyor.
+      const result = await enqueue(reminder());
+      expect(result.status).toBe('skipped');
 
       const listed = await http(app).get('/api/v1/messages').set(ownerAuth()).expect(200);
-      const row = (listed.body as { data: MessageBody[] }).data[0];
-      expect(row?.status).toBe('failed');
-      expect(row?.errorCode).toBe('WHATSAPP_NOT_CONFIGURED');
+      expect((listed.body as { data: MessageBody[] }).data).toHaveLength(0);
     });
 
     it('kuyruktan çıkmış bir mesajı worker YENİDEN göndermez', async () => {
+      await activate();
       const queued = await enqueue(reminder());
       if (queued.status !== 'queued') throw new Error('kuyruğa yazılmalıydı');
 
       await runWorker(queued.messageId);
       await runWorker(queued.messageId);
 
-      expect(sms().sent).toHaveLength(1);
+      expect(sentToMeta()).toHaveLength(1);
     });
 
     it('personele giden iç bildirim e-postayla gider', async () => {
@@ -174,27 +208,24 @@ describe('bildirim çekirdeği (Batch 8.1)', () => {
     });
 
     it('müşteri olayında e-posta İSTENSE bile kanal listesinden düşer', async () => {
-      // Klinik müşterisiyle yalnız WhatsApp/SMS üzerinden yazışır; kayıtlı eski
-      // tercihler hâlâ e-posta taşıyabilir ve süzülmezse SMS'in önünü keserdi.
-      const queued = await enqueue(reminder({ channels: ['email', 'sms'] }));
+      // Klinik müşterisiyle yalnız WhatsApp üzerinden yazışır; kayıtlı eski
+      // tercihler hâlâ e-posta taşıyabilir ve süzülmezse WhatsApp'ın önünü keserdi.
+      await activateWhatsApp();
+      const queued = await enqueue(reminder({ channels: ['email', 'whatsapp'] }));
       if (queued.status !== 'queued') throw new Error('kuyruğa yazılmalıydı');
-      expect(queued.channel).toBe('sms');
-
-      await runWorker(queued.messageId);
+      expect(queued.channel).toBe('whatsapp');
       expect(mail().sent).toHaveLength(0);
-      expect(sms().sent).toHaveLength(1);
     });
 
     it('adresi olmayan alıcı için mesaj kaydı HİÇ yazılmaz', async () => {
+      await activateWhatsApp();
       const created = await http(app)
         .post('/api/v1/customers')
         .set(ownerAuth())
         .send({ fullName: 'Telefonsuz Müşteri' })
         .expect(201);
 
-      const result = await enqueue(
-        reminder({ customerId: (created.body as { id: string }).id, channels: ['sms', 'whatsapp'] }),
-      );
+      const result = await enqueue(reminder({ customerId: (created.body as { id: string }).id }));
       expect(result.status).toBe('skipped');
 
       const listed = await http(app).get('/api/v1/messages').set(ownerAuth()).expect(200);
@@ -203,91 +234,9 @@ describe('bildirim çekirdeği (Batch 8.1)', () => {
   });
 
   // -------------------------------------------------------------------------
-  describe('opt-out', () => {
-    const birthday = (): EnqueueInput => ({
-      event: 'birthday',
-      customerId: clinic.customer.id,
-      branchId: clinic.branch.id,
-      channels: ['sms'],
-      variables: { customerName: 'Ayşe Yılmaz', branchName: 'Merkez' },
-    });
-
-    it('PAZARLAMA iletisini engeller ve `skipped` olarak KAYDEDER', async () => {
-      await http(app)
-        .post(`/api/v1/customers/${clinic.customer.id}/opt-out`)
-        .set(ownerAuth())
-        .send({})
-        .expect(201);
-
-      const result = await enqueue(birthday());
-      expect(result.status).toBe('skipped');
-      if (result.status !== 'skipped') return;
-      expect(result.reason).toBe('OPT_OUT');
-
-      // Engellenen mesaj ATILMAZ: "gitmedi mi, hiç denendi mi?" cevaplanabilmeli.
-      const listed = await http(app).get('/api/v1/messages').set(ownerAuth()).expect(200);
-      const row = (listed.body as { data: MessageBody[] }).data[0];
-      expect(row?.status).toBe('skipped');
-      expect(row?.errorCode).toBe('OPT_OUT');
-      expect(sms().sent).toHaveLength(0);
-    });
-
-    it('İŞLEMSEL iletiyi engellemez — randevu hatırlatması ticari ileti değildir', async () => {
-      await http(app)
-        .post(`/api/v1/customers/${clinic.customer.id}/opt-out`)
-        .set(ownerAuth())
-        .send({})
-        .expect(201);
-
-      const result = await enqueue(reminder());
-      expect(result.status).toBe('queued');
-    });
-
-    it('kanal bazlı reddi yalnız O kanalda uygular', async () => {
-      await http(app)
-        .post(`/api/v1/customers/${clinic.customer.id}/opt-out`)
-        .set(ownerAuth())
-        .send({ channel: 'sms' })
-        .expect(201);
-
-      const blocked = await enqueue(birthday());
-      expect(blocked.status).toBe('skipped');
-
-      const allowed = await enqueue({ ...birthday(), channels: ['whatsapp'] });
-      expect(allowed.status).toBe('queued');
-    });
-
-    it('geri alma satırı SİLMEZ, `revoked_at` doldurur', async () => {
-      await http(app)
-        .post(`/api/v1/customers/${clinic.customer.id}/opt-out`)
-        .set(ownerAuth())
-        .send({})
-        .expect(201);
-
-      await http(app)
-        .delete(`/api/v1/customers/${clinic.customer.id}/opt-out`)
-        .set(ownerAuth())
-        .expect(204);
-
-      const active = await http(app)
-        .get(`/api/v1/customers/${clinic.customer.id}/opt-out`)
-        .set(ownerAuth())
-        .expect(200);
-      expect(active.body).toHaveLength(0);
-
-      const rows = await database.ownerPool.query<{ count: string }>(
-        'select count(*)::text as count from contact_opt_outs where revoked_at is not null',
-      );
-      expect(rows.rows[0]?.count).toBe('1');
-
-      // Geri alındıktan sonra pazarlama iletisi yeniden gider.
-      const result = await enqueue(birthday());
-      expect(result.status).toBe('queued');
-    });
-  });
-
-  // -------------------------------------------------------------------------
   describe('çift gönderim ve sessiz saatler', () => {
+    beforeEach(() => activateWhatsApp());
+
     it('aynı `dedupeKey` ile ikinci mesaj YAZILAMAZ', async () => {
       const first = await enqueue(reminder({ dedupeKey: 'reminder:abc:24' }));
       expect(first.status).toBe('queued');
@@ -309,11 +258,23 @@ describe('bildirim çekirdeği (Batch 8.1)', () => {
       expect(queued.scheduledFor.toISOString()).toBe('2026-09-08T06:00:00.000Z');
     });
 
+    it('randevu ONAYI ve İPTALİ sessiz saatte bile ANINDA gider', async () => {
+      // 7 Eylül 23:30 İstanbul — müşteri online randevuyu gece alıyor.
+      const at = new Date('2026-09-07T20:30:00Z');
+      for (const event of ['appointment_confirmation', 'appointment_cancelled'] as const) {
+        const queued = await enqueue(
+          reminder({ event, scheduledFor: at, dedupeKey: `${event}:gece` }),
+        );
+        if (queued.status !== 'queued') throw new Error('kuyruğa yazılmalıydı');
+        expect(queued.scheduledFor.toISOString()).toBe(at.toISOString());
+      }
+    });
+
     it('şube tercihindeki sessiz saat penceresi kiracı varsayılanını EZER', async () => {
       await setPreference({
         branchId: clinic.branch.id,
         event: 'appointment_reminder',
-        channels: ['sms'],
+        channels: ['whatsapp'],
         quietHoursStart: '23:00',
         quietHoursEnd: '07:00',
       }).expect(200);
@@ -329,7 +290,7 @@ describe('bildirim çekirdeği (Batch 8.1)', () => {
       const saved = await setPreference({
         branchId: clinic.branch.id,
         event: 'appointment_reminder',
-        channels: ['sms'],
+        channels: ['whatsapp'],
         quietHoursStart: '00:00',
         quietHoursEnd: '00:00',
       }).expect(200);
@@ -382,21 +343,28 @@ describe('bildirim çekirdeği (Batch 8.1)', () => {
         .expect(200);
 
       const templates = listed.body as TemplateBody[];
-      const smsReminder = templates.find(
-        (row) => row.event === 'appointment_reminder' && row.channel === 'sms',
+      const reminderTemplate = templates.find(
+        (row) => row.event === 'appointment_reminder' && row.channel === 'whatsapp',
       );
-      expect(smsReminder?.isDefault).toBe(true);
-      expect(smsReminder?.variables).toContain('customerName');
+      expect(reminderTemplate?.isDefault).toBe(true);
+      expect(reminderTemplate?.variables).toContain('customerName');
+      // SMS müşteriye kapalı; doğum günü (pazarlama) olayı yok.
+      expect(templates.some((row) => row.channel === 'sms')).toBe(false);
+      expect(templates.some((row) => row.event === 'birthday')).toBe(false);
     });
 
-    it('kiracı şablonu varsayılanın YERİNE geçer', async () => {
+    it('kiracının eşlediği template varsayılanın YERİNE geçer', async () => {
+      await activate();
       await http(app)
         .put('/api/v1/notification-templates')
         .set(ownerAuth())
         .send({
           event: 'appointment_reminder',
-          channel: 'sms',
+          channel: 'whatsapp',
           body: 'Merhaba {{customerName}}, {{appointmentAt}} bekliyoruz.',
+          whatsappTemplateName: 'klinik_hatirlatma',
+          whatsappTemplateLanguage: 'tr',
+          whatsappVariables: ['customerName', 'appointmentAt'],
         })
         .expect(200);
 
@@ -404,7 +372,21 @@ describe('bildirim çekirdeği (Batch 8.1)', () => {
       if (queued.status !== 'queued') throw new Error('kuyruğa yazılmalıydı');
       await runWorker(queued.messageId);
 
-      expect(sms().sent[0]?.body).toBe('Merhaba Ayşe Yılmaz, 7 Eylül 14:00 bekliyoruz.');
+      const listed = await http(app).get('/api/v1/messages').set(ownerAuth()).expect(200);
+      expect((listed.body as { data: MessageBody[] }).data[0]?.body).toBe(
+        'Merhaba Ayşe Yılmaz, 7 Eylül 14:00 bekliyoruz.',
+      );
+      expect(JSON.stringify(sentToMeta()[0]?.body)).toContain('klinik_hatirlatma');
+    });
+
+    it('SMS kanalı artık kabul edilmez', async () => {
+      // Kanal kümesinde yok: istek gövde doğrulamasında düşer.
+      await setPreference({ event: 'appointment_reminder', channels: ['sms'] }).expect(400);
+      await http(app)
+        .put('/api/v1/notification-templates')
+        .set(ownerAuth())
+        .send({ event: 'appointment_reminder', channel: 'sms', body: 'Merhaba {{customerName}}' })
+        .expect(400);
     });
 
     it('olayda TANIMLI OLMAYAN değişken şablona yazılamaz', async () => {
@@ -413,7 +395,7 @@ describe('bildirim çekirdeği (Batch 8.1)', () => {
         .set(ownerAuth())
         .send({
           event: 'appointment_reminder',
-          channel: 'sms',
+          channel: 'whatsapp',
           body: 'Merhaba {{tcKimlikNo}}',
         })
         .expect(422);
@@ -427,7 +409,7 @@ describe('bildirim çekirdeği (Batch 8.1)', () => {
         .set(ownerAuth())
         .send({
           event: 'appointment_reminder',
-          channel: 'sms',
+          channel: 'whatsapp',
           subject: 'Olmaz',
           body: 'Merhaba {{customerName}}',
         })
@@ -435,19 +417,20 @@ describe('bildirim çekirdeği (Batch 8.1)', () => {
     });
 
     it('aynı kiracı tercihi ikinci kez yazıldığında TEK satır kalır', async () => {
-      await setPreference({ event: 'birthday', channels: ['sms'] }).expect(200);
-      await setPreference({ event: 'birthday', channels: ['whatsapp'] }).expect(200);
+      await setPreference({ event: 'no_show_followup', channels: ['whatsapp'] }).expect(200);
+      await setPreference({ event: 'no_show_followup', channels: [] }).expect(200);
 
       const rows = await database.ownerPool.query<{ count: string }>(
-        `select count(*)::text as count from notification_preferences where event = 'birthday'`,
+        `select count(*)::text as count from notification_preferences where event = 'no_show_followup'`,
       );
       expect(rows.rows[0]?.count).toBe('1');
     });
 
     it('tercih kanal sırasını belirler; adresi olmayan kanal atlanır', async () => {
+      await activateWhatsApp();
       await setPreference({
         event: 'appointment_reminder',
-        channels: ['whatsapp', 'sms'],
+        channels: ['whatsapp'],
       }).expect(200);
 
       // Kanal override'ı OLMADAN: seçim tamamen tercihe kalsın.
@@ -496,12 +479,13 @@ describe('bildirim çekirdeği (Batch 8.1)', () => {
       const forbidden = await http(app)
         .put('/api/v1/notification-templates')
         .set(auth(practitioner.tokens))
-        .send({ event: 'birthday', channel: 'sms', body: 'Merhaba {{customerName}}' })
+        .send({ event: 'appointment_reminder', channel: 'whatsapp', body: 'Merhaba {{customerName}}' })
         .expect(403);
       expect((forbidden.body as Problem).code).toBe('FORBIDDEN');
     });
 
     it('bir kiracının mesajları diğerinin listesinde GÖRÜNMEZ', async () => {
+      await activateWhatsApp();
       const queued = await enqueue(reminder());
       expect(queued.status).toBe('queued');
 

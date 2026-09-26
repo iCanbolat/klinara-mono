@@ -17,11 +17,17 @@ struct KlinaraFormScaffold<Content: View>: View {
     var isReadOnly = false
     var isSaving = false
     var error: APIError?
+    /// Kaydet pasifken dokunulursa gösterilecek açıklama ("hizmet ve saat seçin").
+    /// Verilirse düğme **pasifleşmez**, soluk kalır ve dokunuşta ne eksik olduğunu
+    /// söyler: iOS 26'nın cam toolbar düğmesi pasifken de dokunulabilir görünüyor
+    /// ve sessiz bir düğme "bozuk" diye algılanıyor.
+    var invalidSaveMessage: String?
     let onSave: () async -> Void
     @ViewBuilder var content: () -> Content
 
     @Environment(\.dismiss) private var dismiss
     @State private var showsDiscardConfirmation = false
+    @State private var showsInvalidSaveMessage = false
 
     var body: some View {
         NavigationStack {
@@ -39,6 +45,9 @@ struct KlinaraFormScaffold<Content: View>: View {
                     }
                     .padding(.horizontal, KlinaraMetrics.screenInset)
                     .padding(.vertical, KlinaraMetrics.lg)
+                    // Formda alanlar art arda diziliyor: hata satırı yalnız
+                    // hata varken yer kaplasın (aralıklar "Yeni hizmet" ile aynı).
+                    .environment(\.klinaraReservesFieldErrorSpace, false)
                 }
                 .scrollDismissesKeyboard(.interactively)
             }
@@ -61,13 +70,17 @@ struct KlinaraFormScaffold<Content: View>: View {
                 if !isReadOnly {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button(saveTitle) {
-                            Task { await onSave() }
+                            if canSave {
+                                Task { await onSave() }
+                            } else {
+                                showsInvalidSaveMessage = true
+                            }
                         }
                         .klinaraText(.bodyEmphasis)
                         .foregroundStyle(
                             canSave && !isSaving ? KlinaraColor.sageDeep : KlinaraColor.charcoalMuted
                         )
-                        .disabled(!canSave || isSaving)
+                        .disabled(isSaving || (!canSave && invalidSaveMessage == nil))
                     }
                 }
             }
@@ -80,6 +93,12 @@ struct KlinaraFormScaffold<Content: View>: View {
                 Button("Değişiklikleri sil", role: .destructive) { dismiss() }
                 Button("Düzenlemeye dön", role: .cancel) {}
             }
+            .alert(
+                "Eksik bilgi",
+                isPresented: $showsInvalidSaveMessage,
+                actions: { Button("Tamam", role: .cancel) {} },
+                message: { Text(invalidSaveMessage ?? "") }
+            )
             .overlay {
                 if isSaving {
                     AuthLoadingOverlay(message: "Kaydediliyor…")

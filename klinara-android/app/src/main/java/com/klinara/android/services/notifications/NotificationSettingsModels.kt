@@ -8,7 +8,7 @@ import kotlinx.serialization.Serializable
 // `default-templates.ts`; iOS `NotificationModels.swift` / `ReminderModels.swift` paritesi.
 
 /**
- * Olay → tür, varsayılan kanal önceliği ve izinli değişkenler; `default-templates.ts`'in aynası.
+ * Olay → varsayılan kanal önceliği ve izinli değişkenler; `default-templates.ts`'in aynası.
  *
  * İstemcide durmasının tek sebebi bir kullanıcı deneyimi kararı: şablon editörü `{{…}}` yer
  * tutucularını **yazarken** doğrulayabilsin. Sunucu yine son söz sahibi (`TEMPLATE_INVALID`);
@@ -16,57 +16,48 @@ import kotlinx.serialization.Serializable
  */
 object NotificationEventCatalog {
     data class Definition(
-        val kind: NotificationKind,
         val channels: List<NotificationChannel>,
         val variables: List<String>,
     )
 
     // Müşteriye e-posta GİTMEZ: klinik müşterisiyle yalnız WhatsApp üzerinden yazışır.
     // `StaffInternal` bir istisna değil, farklı bir alıcı — personele giden iç bildirim.
-    private val whatsappSms = listOf(NotificationChannel.WhatsApp, NotificationChannel.Sms)
+    private val whatsapp = listOf(NotificationChannel.WhatsApp)
     private val appointmentVariables = listOf("customerName", "branchName", "appointmentAt", "serviceName")
 
     val definitions: Map<NotificationEvent, Definition> =
         mapOf(
             NotificationEvent.AppointmentConfirmation to
-                Definition(NotificationKind.Transactional, whatsappSms, appointmentVariables),
+                Definition(whatsapp, appointmentVariables),
             NotificationEvent.AppointmentReminder to
-                Definition(NotificationKind.Transactional, whatsappSms, appointmentVariables),
+                Definition(whatsapp, appointmentVariables),
             NotificationEvent.AppointmentCancelled to
                 Definition(
-                    NotificationKind.Transactional,
-                    whatsappSms,
+                    whatsapp,
                     listOf("customerName", "branchName", "appointmentAt"),
                 ),
             NotificationEvent.NoShowFollowup to
-                Definition(NotificationKind.Transactional, whatsappSms, listOf("customerName", "branchName")),
+                Definition(whatsapp, listOf("customerName", "branchName")),
             NotificationEvent.PackageBalance to
                 Definition(
-                    NotificationKind.Transactional,
-                    whatsappSms,
+                    whatsapp,
                     listOf("customerName", "packageName", "remainingSessions"),
                 ),
             NotificationEvent.PackageExpiring to
                 Definition(
-                    NotificationKind.Transactional,
-                    whatsappSms,
+                    whatsapp,
                     listOf("customerName", "packageName", "expiresAt", "remainingSessions"),
                 ),
-            NotificationEvent.Birthday to
-                Definition(NotificationKind.Marketing, whatsappSms, listOf("customerName", "branchName")),
             NotificationEvent.AutoReply to
-                Definition(NotificationKind.Transactional, whatsappSms, listOf("message")),
+                Definition(whatsapp, listOf("message")),
             NotificationEvent.StaffInternal to
                 Definition(
-                    NotificationKind.Transactional,
                     listOf(NotificationChannel.Email),
                     listOf("subject", "message"),
                 ),
         )
 
     fun variables(event: NotificationEvent): List<String> = definitions[event]?.variables.orEmpty()
-
-    fun kind(event: NotificationEvent): NotificationKind = definitions[event]?.kind ?: NotificationKind.Transactional
 
     fun channels(event: NotificationEvent): List<NotificationChannel> = definitions[event]?.channels.orEmpty()
 
@@ -102,7 +93,6 @@ data class NotificationTemplate(
     val event: NotificationEvent,
     val channel: NotificationChannel,
     val locale: String = DEFAULT_LOCALE,
-    val kind: NotificationKind = NotificationKind.Transactional,
     /** Yalnız e-posta kanalında anlamlı; sunucu diğerlerinde anahtarı bile 422 ile reddediyor. */
     val subject: String? = null,
     val body: String = "",
@@ -145,7 +135,6 @@ data class NotificationPreference(
     @SerialName("id") val preferenceId: String? = null,
     val branchId: String? = null,
     val event: NotificationEvent,
-    val kind: NotificationKind = NotificationKind.Transactional,
     /** Öncelik sırasında denenecek kanallar. **Boş = olay kapalı.** */
     val channels: List<NotificationChannel> = emptyList(),
     /** `"HH:MM"`, şube saat diliminde yorumlanan duvar saati — zaman damgası değil. */

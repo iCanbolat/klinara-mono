@@ -211,6 +211,7 @@ export function CalendarPage(): ReactNode {
       <AppointmentSheet
         appointmentId={selected}
         timezone={timezone}
+        services={services}
         onClose={() => setSelected(null)}
         onChanged={state.reload}
       />

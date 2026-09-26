@@ -227,6 +227,10 @@ final class CalendarStore {
         try await service.availability(query)
     }
 
+    func availabilityDays(branchId: String, from: Date, to: Date) async throws -> AvailabilityDaysResponse {
+        try await service.availabilityDays(branchId: branchId, from: from, to: to)
+    }
+
     // MARK: Yazma
 
     func create(_ input: CreateAppointmentInput) async throws -> Appointment {
@@ -255,9 +259,17 @@ final class CalendarStore {
         }
     }
 
-    func cancel(_ appointment: Appointment, reason: String?) async throws -> Appointment {
+    func cancel(
+        _ appointment: Appointment,
+        reason: String?,
+        notifyCustomer: Bool = true
+    ) async throws -> Appointment {
         try await mutating {
-            let updated = try await service.cancel(id: appointment.id, reason: reason)
+            let updated = try await service.cancel(
+                id: appointment.id,
+                reason: reason,
+                notifyCustomer: notifyCustomer
+            )
             merge(updated)
             return updated
         }

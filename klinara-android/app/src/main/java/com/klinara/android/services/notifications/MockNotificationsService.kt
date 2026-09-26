@@ -13,9 +13,6 @@ import kotlin.random.Random
 /**
  * Bildirim mock'u — iOS `MockNotificationsService` paritesi.
  *
- * Tohum **bilerek boş değil**: bir müşteride zaten kapalı bir kanal var
- * ([MockNotificationsSeed.optOuts]), yoksa "kapalı" hâlin nasıl göründüğü hiç sürülemez.
- *
  * Randevu bildirim planı ([appointmentNotifications]) randevunun kendi saatinden ve
  * şubenin hatırlatma ayarından **türetilir** — sabit bir tablo, ertelenen bir randevuda
  * planı yalan söyletirdi. [booking] bu yüzden kurucuyla bağlanır (§5.1); verilmezse
@@ -26,13 +23,9 @@ class MockNotificationsService(
     private val random: Random = Random.Default,
     private val booking: BookingService? = null,
     private val now: () -> Instant = Instant::now,
-    seedOptOuts: Boolean = true,
 ) : NotificationsService {
     var failing: Boolean = false
 
-    private val records: MutableList<OptOutRecord> =
-        if (seedOptOuts) MockNotificationsSeed.optOuts(now()).toMutableList() else mutableListOf()
-    private var idCounter: Int = 0
 
     /** Şube override'ları — Nişantaşı kendi saatlerini kullanıyor, Bodrum kiracı varsayılanını. */
     private val branchReminderHours: MutableMap<String, List<Int>> =
@@ -136,7 +129,6 @@ class MockNotificationsService(
                 event = input.event,
                 channel = input.channel,
                 locale = input.locale,
-                kind = NotificationEventCatalog.kind(input.event),
                 subject = input.subject,
                 body = input.body,
                 whatsappTemplateName = input.whatsappTemplateName,
@@ -161,7 +153,6 @@ class MockNotificationsService(
             NotificationEvent.selectable.filterNot { it in covered }.map { event ->
                 NotificationPreference(
                     event = event,
-                    kind = NotificationEventCatalog.kind(event),
                     channels = NotificationEventCatalog.channels(event),
                     quietHoursStart = DEFAULT_QUIET_START,
                     quietHoursEnd = DEFAULT_QUIET_END,
@@ -181,7 +172,6 @@ class MockNotificationsService(
                 preferenceId = existing?.preferenceId ?: nextId(PREFERENCE_ID),
                 branchId = input.branchId,
                 event = input.event,
-                kind = NotificationEventCatalog.kind(input.event),
                 channels = input.channels,
                 quietHoursStart = input.quietHoursStart.wireValue,
                 quietHoursEnd = input.quietHoursEnd.wireValue,
@@ -255,53 +245,6 @@ class MockNotificationsService(
     private fun followupEnabled(branchId: String): Boolean = branchFollowupEnabled[branchId] ?: true
 
     private fun followupDelay(branchId: String): Int = branchFollowupDelay[branchId] ?: DEFAULT_FOLLOWUP_DELAY
-
-    override suspend fun optOuts(customerId: String): List<OptOutRecord> {
-        settle()
-        return records.filter { it.customerId == customerId }
-    }
-
-    override suspend fun createOptOut(
-        customerId: String,
-        channel: NotificationChannel?,
-        source: OptOutSource?,
-        note: String?,
-    ): OptOutRecord {
-        settle()
-
-        // Aynı kapsam iki kez kapatılamaz — sunucuda idempotent; mock'ta da öyle olmalı
-        // ki ekran iki özdeş satır çizmesin.
-        records.firstOrNull { it.customerId == customerId && it.channel == channel }?.let { return it }
-
-        idCounter += 1
-        val record =
-            OptOutRecord(
-                id = "0970000a-0000-4000-8000-%012d".format(idCounter),
-                customerId = customerId,
-                channel = channel,
-                // Reddin kapsamı HER ZAMAN pazarlama: işlemsel ileti kapatılamaz.
-                kind = "marketing",
-                source = source ?: OptOutSource.Staff,
-                createdAt = Instant.parse(SEED_NOW),
-            )
-        records += record
-        return record
-    }
-
-    override suspend fun revokeOptOut(
-        customerId: String,
-        channel: NotificationChannel?,
-    ) {
-        settle()
-
-        val removed =
-            if (channel == null) {
-                records.removeAll { it.customerId == customerId }
-            } else {
-                records.removeAll { it.customerId == customerId && it.channel == channel }
-            }
-        if (!removed) throw MockErrors.notFound("İleti reddi")
-    }
 
     private suspend fun settle() {
         if (latencyEnabled) delay(random.nextLong(MIN_LATENCY_MILLIS, MAX_LATENCY_MILLIS))

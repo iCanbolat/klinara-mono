@@ -44,6 +44,19 @@ struct BookingDraftTests {
         #expect(draft.isDirty)
     }
 
+    @Test("Eksik adımlar form sırasıyla ve Türkçe cümle olarak söylenir")
+    func missingStepsHint() {
+        var draft = BookingDraft(branchId: MockIDs.branchNisantasi)
+        #expect(draft.missingStepsHint == "Devam etmek için müşteri, hizmet ve saat seçin.")
+
+        draft.select(customerId: MockCustomerSeed.ayse)
+        #expect(draft.missingStepsHint == "Devam etmek için hizmet ve saat seçin.")
+
+        draft.toggle(serviceId: MockCatalogSeed.serviceLazerBolgesel)
+        draft.select(slot: slot(at: 11))
+        #expect(draft.missingStepsHint == nil)
+    }
+
     @Test("Hizmet seçim sırası korunur")
     func preservesServiceOrder() {
         var draft = BookingDraft(branchId: MockIDs.branchNisantasi)

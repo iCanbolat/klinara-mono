@@ -4,8 +4,8 @@ import SwiftUI
 ///
 /// Buton yanıtları (Onayla / İptal Et) buraya **düşmez**: sunucu onları
 /// doğrudan randevu durumuna çeviriyor (Ek M). Burada duran, bir insanın
-/// okuyup cevaplaması gereken mesajdır — ve uygulamadan cevap yazılamaz,
-/// çünkü sunucuda giden serbest metin ucu yok. Ekran bunu saklamaz.
+/// okuyup cevaplaması gereken mesajdır. Cevap Sohbetler ekranından yazılır;
+/// araç çubuğundaki bağlantı oraya götürür.
 struct InboxView: View {
 
     let session: AppSession
@@ -34,6 +34,17 @@ struct InboxView: View {
         .background(KlinaraColor.surface)
         .navigationTitle("Gelen kutusu")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if canHandle {
+                ToolbarItem(placement: .topBarTrailing) {
+                    NavigationLink {
+                        ConversationListView(session: session)
+                    } label: {
+                        Label("Sohbetler", systemImage: "bubble.left.and.bubble.right")
+                    }
+                }
+            }
+        }
         .refreshable { await store?.load() }
         .task {
             guard store == nil else { return }
@@ -79,7 +90,9 @@ struct InboxView: View {
                     title: "Mesajlar",
                     // Sunucu bu uçta cursor VERMİYOR (yalnız `limit`); "daha
                     // fazlası var" izlenimi vermemek için sınırı söylüyoruz.
-                    footnote: "En yeni mesajlar gösterilir. Uygulamadan yanıt yazılamaz; müşteriye WhatsApp'tan dönün."
+                    footnote: canHandle
+                        ? "En yeni mesajlar gösterilir. Yanıt yazmak için Sohbetler ekranını kullanın."
+                        : "En yeni mesajlar gösterilir."
                 ) {
                     ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                         if index > 0 { KlinaraDivider() }

@@ -31,6 +31,8 @@ export interface FormState {
   /** Seçilen slotun başlangıcı (offsetli ISO). */
   startsAt: string | null;
   notes: string;
+  /** Müşteriye onay mesajı gitsin mi — varsayılan evet. */
+  notifyCustomer: boolean;
   /**
    * `Idempotency-Key`.
    *
@@ -48,6 +50,7 @@ export function initialState(): FormState {
     rows: [{ serviceId: null, staffProfileId: null }],
     startsAt: null,
     notes: '',
+    notifyCustomer: true,
     idempotencyKey: newIdempotencyKey(),
   };
 }
@@ -60,6 +63,7 @@ export type FormAction =
   | { type: 'removeRow'; index: number }
   | { type: 'slot'; startsAt: string | null }
   | { type: 'notes'; notes: string }
+  | { type: 'notify'; notifyCustomer: boolean }
   | { type: 'reset' };
 
 /**
@@ -123,6 +127,10 @@ export function reduce(state: FormState, action: FormAction): FormState {
       // Not gövdede; anahtar yenilenmeli.
       return { ...state, notes: action.notes, idempotencyKey: newIdempotencyKey() };
 
+    case 'notify':
+      // Bayrak gövdede; anahtar yenilenmeli.
+      return { ...state, notifyCustomer: action.notifyCustomer, idempotencyKey: newIdempotencyKey() };
+
     case 'reset':
       return initialState();
   }
@@ -156,6 +164,7 @@ export function toCreateBody(
   startsAt: string;
   services: AppointmentServiceInput[];
   notes?: string;
+  notifyCustomer?: false;
 } | null {
   if (!canSubmit(state) || state.customerId === null || state.startsAt === null) return null;
 
@@ -174,5 +183,7 @@ export function toCreateBody(
     // Boş not GÖNDERİLMİYOR: `''` ile "not yok" aynı şey değil ve sunucuda
     // boş dize bir not olarak saklanırdı.
     ...(trimmed === '' ? {} : { notes: trimmed }),
+    // Varsayılan (gönder) sunucuda; yalnız kapatma açıkça gider.
+    ...(state.notifyCustomer ? {} : { notifyCustomer: false as const }),
   };
 }

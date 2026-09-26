@@ -62,6 +62,7 @@ fun CustomerDetailScreen(
     onOpenGroups: (String) -> Unit,
     onUploadFile: (customerId: String, isPhoto: Boolean) -> Unit,
     onOpenPackage: (packageId: String) -> Unit,
+    onOpenAppointment: (appointmentId: String) -> Unit,
     /** `null` ise (`package:write` yok) "Paket sat" çizilmez. */
     onSellPackage: ((customerId: String) -> Unit)?,
     modifier: Modifier = Modifier,
@@ -82,7 +83,6 @@ fun CustomerDetailScreen(
     val canWrite = session.can(Permissions.CUSTOMER_WRITE)
     val canReadMedical = session.can(Permissions.CUSTOMER_MEDICAL_READ)
     val canMerge = session.can(Permissions.CUSTOMER_MERGE)
-    val canReadNotifications = session.can(Permissions.NOTIFICATION_READ)
 
     // Kayıt verisi AYRI bir ViewModel'de ve kartla birlikte doğuyor: notu ve çizelgeyi
     // liste ViewModel'ine koymak, açılmış her müşterinin sağlık verisini oturum boyunca
@@ -176,18 +176,9 @@ fun CustomerDetailScreen(
                         onClearFilter = recordViewModel::clearFilter,
                         onLoadMore = recordViewModel::loadMore,
                         onSelectNote = { onOpenNote(customerId, it) },
+                        onSelectAppointment = onOpenAppointment,
+                        onSelectPackage = onOpenPackage,
                     )
-
-                    // İzinsiz kullanıcıda bu bölüm HİÇ kurulmaz — boş bir kart
-                    // "bu müşteriye her şey gönderilebilir" derdi ve bu yanlış bilgi.
-                    if (canReadNotifications) {
-                        CustomerOptOutSection(
-                            session = session,
-                            container = container,
-                            customerId = customerId,
-                            clock = clock,
-                        )
-                    }
 
                     CustomerActions(
                         canWrite = canWrite,

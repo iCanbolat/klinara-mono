@@ -1,0 +1,55 @@
+{
+  "conversation": {
+    "id": "91088f97-9ffe-417e-ac20-4b05e086485c",
+    "phone": "+905321234567",
+    "customer": {
+      "id": "6fb15a2d-d2df-43ca-903f-6e3164bf88c0",
+      "fullName": "Ayşe Yılmaz"
+    },
+    "status": "open",
+    "lastMessageAt": "2026-09-22T10:31:38.780Z",
+    "lastMessagePreview": "Merhaba Ayşe Yılmaz, Nişantaşı olarak size ulaşmak istedik. Uygun olduğunuzda bu mesaja yanıt verebilirsiniz.",
+    "lastMessageDirection": "out",
+    "unread": false,
+    "windowOpen": false,
+    "windowExpiresAt": "2026-09-22T09:31:38.740Z"
+  },
+  "messages": [
+    {
+      "id": "9b0360b5-6598-454d-b40f-e547a27c580a",
+      "direction": "in",
+      "type": "text",
+      "body": "Merhaba, yarınki randevumu değiştirebilir miyim?",
+      "createdAt": "2026-09-22T10:31:38.000Z",
+      "status": null,
+      "event": null,
+      "sentByName": null,
+      "errorDetail": null,
+      "appointmentId": null
+    },
+    {
+      "id": "87de0c9b-af01-491f-836b-325b8ac8870b",
+      "direction": "out",
+      "type": "text",
+      "body": "Tabii, hangi saat uygun?",
+      "createdAt": "2026-09-22T10:31:38.644Z",
+      "status": "sent",
+      "event": "staff_reply",
+      "sentByName": "Klinik Sahibi",
+      "errorDetail": null,
+      "appointmentId": null
+    },
+    {
+      "id": "0e8f4419-7f7e-4fe2-b4b3-2de349f325d3",
+      "direction": "out",
+      "type": "template",
+      "body": "Merhaba Ayşe Yılmaz, Nişantaşı olarak size ulaşmak istedik. Uygun olduğunuzda bu mesaja yanıt verebilirsiniz.",
+      "createdAt": "2026-09-22T10:31:38.780Z",
+      "status": "sent",
+      "event": "staff_reply",
+      "sentByName": "Klinik Sahibi",
+      "errorDetail": null,
+      "appointmentId": null
+    }
+  ]
+}

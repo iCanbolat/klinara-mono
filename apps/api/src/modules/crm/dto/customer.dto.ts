@@ -365,3 +365,19 @@ export class CustomerPageDto {
   @ApiProperty({ type: PageInfoDto })
   pageInfo: PageInfoDto;
 }
+
+export class CustomerSummaryDto {
+  @ApiProperty({ description: 'Kayıtlı (silinmemiş) müşteri sayısı' })
+  total: number;
+
+  @ApiProperty({ description: 'Son 30 günde açılan müşteri kaydı' })
+  newLast30Days: number;
+
+  @ApiProperty({ description: 'Son 90 günde tamamlanmış randevusu olan müşteri' })
+  activeLast90Days: number;
+
+  @ApiProperty({
+    description: 'Daha önce gelmiş, 90 gündür gelmeyen ve ileri tarihli randevusu olmayan müşteri',
+  })
+  lapsed: number;
+}

@@ -20,8 +20,6 @@ import type {
   MessageStatus,
   NotificationChannel,
   NotificationEvent,
-  NotificationKind,
-  OptOutSource,
 } from '../../../database/schema';
 import { ALL_CHANNELS, ALL_EVENTS } from '../default-templates';
 
@@ -44,9 +42,6 @@ export class NotificationTemplateResponseDto {
 
   @ApiProperty({ example: 'tr' })
   locale: string;
-
-  @ApiProperty({ enum: ['transactional', 'marketing'] })
-  kind: NotificationKind;
 
   @ApiPropertyOptional({ nullable: true })
   subject: string | null;
@@ -145,9 +140,6 @@ export class NotificationPreferenceResponseDto {
   @ApiProperty({ enum: ALL_EVENTS })
   event: NotificationEvent;
 
-  @ApiProperty({ enum: ['transactional', 'marketing'] })
-  kind: NotificationKind;
-
   @ApiProperty({ type: [String], description: 'Denenecek kanallar, öncelik sırasında' })
   channels: NotificationChannel[];
 
@@ -192,7 +184,7 @@ export class UpsertNotificationPreferenceDto {
   @ApiProperty({
     type: [String],
     enum: ALL_CHANNELS,
-    description: 'Boş dizi = olay kapalı. Müşteri olaylarında yalnız whatsapp/sms kabul edilir.',
+    description: 'Boş dizi = olay kapalı. Müşteri olaylarında yalnız whatsapp kabul edilir.',
   })
   @IsArray()
   @ArrayMaxSize(4)
@@ -313,46 +305,4 @@ export class MessagePageDto {
 
   @ApiProperty()
   pageInfo: { nextCursor: string | null; hasMore: boolean };
-}
-
-// ---------------------------------------------------------------------------
-// Opt-out
-// ---------------------------------------------------------------------------
-
-export class CreateOptOutDto {
-  @ApiPropertyOptional({ enum: ALL_CHANNELS, description: 'Verilmezse TÜM kanallar' })
-  @IsOptional()
-  @IsIn(ALL_CHANNELS)
-  channel?: NotificationChannel;
-
-  @ApiPropertyOptional({ enum: ['customer_request', 'inbound_stop', 'staff'] })
-  @IsOptional()
-  @IsIn(['customer_request', 'inbound_stop', 'staff'])
-  source?: OptOutSource;
-
-  @ApiPropertyOptional({ maxLength: 500 })
-  @IsOptional()
-  @IsString()
-  @MaxLength(500)
-  note?: string;
-}
-
-export class OptOutResponseDto {
-  @ApiProperty({ format: 'uuid' })
-  id: string;
-
-  @ApiProperty({ format: 'uuid' })
-  customerId: string;
-
-  @ApiPropertyOptional({ nullable: true, enum: ALL_CHANNELS })
-  channel: NotificationChannel | null;
-
-  @ApiProperty({ enum: ['transactional', 'marketing'] })
-  kind: NotificationKind;
-
-  @ApiProperty({ enum: ['customer_request', 'inbound_stop', 'staff'] })
-  source: OptOutSource;
-
-  @ApiProperty({ format: 'date-time' })
-  createdAt: string;
 }

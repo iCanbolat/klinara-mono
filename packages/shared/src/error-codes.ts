@@ -62,7 +62,6 @@ export const ERROR_CODES = {
   VERSION_CONFLICT: 'VERSION_CONFLICT',
 
   // --- İletişim ---
-  OPT_OUT: 'OPT_OUT',
   /** Şablonda tanımsız değişken ya da beyaz listede olmayan yer tutucu. */
   TEMPLATE_INVALID: 'TEMPLATE_INVALID',
   /** Kanal bu kiracı için yapılandırılmamış (WhatsApp hesabı, SMTP vb.). */

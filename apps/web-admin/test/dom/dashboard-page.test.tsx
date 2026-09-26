@@ -68,6 +68,24 @@ vi.mock('@/components/session/session-provider', () => ({
 const { DashboardPage } = await import('../../src/components/dashboard/dashboard-page');
 
 const SOON = new Date(Date.now() + 60 * 60_000).toISOString();
+const NEXT_WEEK = new Date(Date.now() + 5 * 86_400_000).toISOString();
+
+function entries(branchId: string, names: string[], startsAt = SOON): unknown[] {
+  return names.map((name, index) => ({
+    id: `${branchId}-${startsAt}-${String(index)}`,
+    branchId,
+    customerId: 'c',
+    customerName: name,
+    customerPhone: null,
+    status: 'scheduled',
+    startsAt,
+    endsAt: startsAt,
+    notes: null,
+    version: 1,
+    totalMinor: 0,
+    services: [],
+  }));
+}
 
 function calendar(branchId: string, names: string[]): unknown {
   return {
@@ -76,20 +94,7 @@ function calendar(branchId: string, names: string[]): unknown {
     from: '',
     to: '',
     density: [],
-    appointments: names.map((name, index) => ({
-      id: `${branchId}-${String(index)}`,
-      branchId,
-      customerId: 'c',
-      customerName: name,
-      customerPhone: null,
-      status: 'scheduled',
-      startsAt: SOON,
-      endsAt: SOON,
-      notes: null,
-      version: 1,
-      totalMinor: 0,
-      services: [],
-    })),
+    appointments: entries(branchId, names),
   };
 }
 
@@ -103,6 +108,18 @@ function routes(overrides: Record<string, () => Promise<unknown>> = {}): void {
       return Promise.resolve(
         calendar(branchId, branchId === 'b1' ? ['Ayşe Yılmaz', 'Can Er'] : []),
       );
+    }
+    if (path.startsWith('appointments?')) {
+      // Sıradaki randevular bugünle sınırlı değil: Nişantaşı'nın bugün randevusu
+      // yok ama gelecek hafta var.
+      const branchId = new URLSearchParams(path.split('?')[1]).get('branchId') ?? '';
+      const data =
+        branchId === 'b1'
+          ? entries('b1', ['Ayşe Yılmaz', 'Can Er'])
+          : branchId === 'b2'
+            ? entries('b2', ['Deniz Kaya'], NEXT_WEEK)
+            : [];
+      return Promise.resolve({ data, pageInfo: { nextCursor: null, hasMore: false } });
     }
     if (path.startsWith('reports/occupancy')) {
       return Promise.resolve({
@@ -241,6 +258,26 @@ describe('karşılama sayfası', () => {
     expect(
       upcoming.compareDocumentPosition(branches) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+  });
+
+  it('sıradaki randevular bugünle sınırlı değil; en yakın 10 randevu isteniyor', async () => {
+    render(<DashboardPage />);
+
+    const card = (await screen.findByRole('heading', { name: 'Sıradaki randevular' })).closest(
+      '[data-slot=card]',
+    );
+    await waitFor(() => expect(card).toHaveTextContent('Deniz Kaya'));
+    const rows = [...(card?.querySelectorAll('li') ?? [])].map((li) => li.textContent ?? '');
+    // Başlangıca göre sıralı: bugünküler önce, gelecek haftaki sonra.
+    expect(rows).toHaveLength(3);
+    expect(rows[0]).toContain('Bugün');
+    expect(rows[2]).toContain('Deniz Kaya');
+    expect(rows[2]).not.toContain('Bugün');
+
+    const call = get.mock.calls.map((c) => String(c[0])).find((p) => p.startsWith('appointments?'));
+    const params = new URLSearchParams(call?.split('?')[1]);
+    expect(params.get('limit')).toBe('10');
+    expect(params.get('status')).toBe('scheduled,confirmed,arrived,in_progress');
   });
 
   it('sıradaki randevudan takvime giderken şubeyi seçiyor', async () => {

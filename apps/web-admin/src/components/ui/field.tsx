@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
+import { DatePicker, type DatePickerProps } from '@/components/ui/date-picker';
 
 /*
  * Etiket + kontrol + ipucu + hata dörtlüsünün TEK yeri.
@@ -69,6 +70,24 @@ export function Field({ label, hint, error, className, ...props }: FieldProps): 
     <div className="flex flex-col gap-1.5">
       <Label htmlFor={id}>{label}</Label>
       <Input id={id} className={cn('bg-card ',className)} aria-invalid={invalid} {...describedBy} {...props} />
+      {hint !== undefined ? <Hint id={id} hint={hint} /> : null}
+      {error !== undefined ? <ErrorText id={id} error={error} /> : null}
+    </div>
+  );
+}
+
+/**
+ * Tarih alanı — yerel `<input type="date">` yerine shadcn `DatePicker`.
+ * Değer yine `YYYY-MM-DD` dizesi; `onChange` olay değil DEĞER alıyor.
+ */
+export type FieldDateProps = Omit<DatePickerProps, 'id'> & FieldShellProps;
+
+export function FieldDate({ label, hint, error, className, ...props }: FieldDateProps): ReactNode {
+  const { id, describedBy, invalid } = useWiring(hint, error);
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor={id}>{label}</Label>
+      <DatePicker id={id} className={className} aria-invalid={invalid} {...describedBy} {...props} />
       {hint !== undefined ? <Hint id={id} hint={hint} /> : null}
       {error !== undefined ? <ErrorText id={id} error={error} /> : null}
     </div>

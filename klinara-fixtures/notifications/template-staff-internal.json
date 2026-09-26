@@ -3,7 +3,6 @@
   "event": "staff_internal",
   "channel": "email",
   "locale": "tr",
-  "kind": "transactional",
   "subject": "{{subject}}",
   "body": "{{message}}",
   "whatsappTemplateName": null,

@@ -20,7 +20,7 @@ struct WhatsAppSettingsEditorView: View {
     @State private var businessPhone = ""
     @State private var accessToken = ""
     @State private var appSecret = ""
-    @State private var apiVersion = "v21.0"
+    @State private var apiVersion = "v26.0"
     @State private var error: APIError?
     @State private var didLoad = false
     @Environment(\.dismiss) private var dismiss
@@ -95,7 +95,11 @@ struct WhatsAppSettingsEditorView: View {
                     text: $accessToken,
                     placeholder: "EAAG…",
                     error: error?.fieldErrors["accessToken"],
-                    isSecure: true
+                    isSecure: true,
+                    // Tip verilmezse iOS alanı yeni parola sanıyor: "Güçlü
+                    // Parola" önerisi açılıyor ve yapıştırılan token yutuluyor.
+                    // `.oneTimeCode` Parolalar akışını devre dışı bırakır.
+                    textContentType: .oneTimeCode
                 )
                 if let masked = existing?.accessTokenMasked {
                     Text("Kayıtlı token okunamaz (\(masked)). Kaydetmek için token'ı yeniden girmelisiniz.")
@@ -111,7 +115,8 @@ struct WhatsAppSettingsEditorView: View {
                     text: $appSecret,
                     placeholder: existing?.hasAppSecret == true ? "Değiştirmek için doldurun" : "Meta uygulama gizli anahtarı",
                     error: error?.fieldErrors["appSecret"],
-                    isSecure: true
+                    isSecure: true,
+                    textContentType: .oneTimeCode
                 )
                 // App secret webhook imzasını doğrular; olmadan gelen mesajlar
                 // işlenmez ve gelen kutusu boş kalır.
@@ -137,7 +142,7 @@ struct WhatsAppSettingsEditorView: View {
                 KlinaraTextField(
                     label: "Graph API sürümü",
                     text: $apiVersion,
-                    placeholder: "v21.0",
+                    placeholder: "v26.0",
                     error: error?.fieldErrors["apiVersion"]
                 )
             }
@@ -157,28 +162,36 @@ struct WhatsAppSettingsEditorView: View {
             || !appSecret.isEmpty
     }
 
+    /// Meta panelinden kopyalanan değerler çoğu zaman baştaki/sondaki boşluk
+    /// ya da satır sonuyla gelir; token'da tek bir `\n` Graph API'de
+    /// "Malformed access token" demektir.
+    private func trimmed(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private var isValid: Bool {
-        guard wabaId.count >= 3, phoneNumberId.count >= 3 else { return false }
-        guard UpsertWhatsAppAccountInput.accessTokenLength.contains(accessToken.count) else {
+        guard trimmed(wabaId).count >= 3, trimmed(phoneNumberId).count >= 3 else { return false }
+        guard UpsertWhatsAppAccountInput.accessTokenLength.contains(trimmed(accessToken).count) else {
             return false
         }
-        if !appSecret.isEmpty,
-           !UpsertWhatsAppAccountInput.appSecretLength.contains(appSecret.count) {
+        let secret = trimmed(appSecret)
+        if !secret.isEmpty,
+           !UpsertWhatsAppAccountInput.appSecretLength.contains(secret.count) {
             return false
         }
-        return apiVersion.wholeMatch(of: /v\d+\.\d+/) != nil
+        return trimmed(apiVersion).wholeMatch(of: /v\d+\.\d+/) != nil
     }
 
     private func submit() async {
         error = nil
         do {
             _ = try await store.upsertAccount(UpsertWhatsAppAccountInput(
-                wabaId: wabaId,
-                phoneNumberId: phoneNumberId,
-                businessPhone: businessPhone.isEmpty ? nil : businessPhone,
-                accessToken: accessToken,
-                appSecret: appSecret.isEmpty ? nil : appSecret,
-                apiVersion: apiVersion.isEmpty ? nil : apiVersion
+                wabaId: trimmed(wabaId),
+                phoneNumberId: trimmed(phoneNumberId),
+                businessPhone: trimmed(businessPhone).isEmpty ? nil : trimmed(businessPhone),
+                accessToken: trimmed(accessToken),
+                appSecret: trimmed(appSecret).isEmpty ? nil : trimmed(appSecret),
+                apiVersion: trimmed(apiVersion).isEmpty ? nil : trimmed(apiVersion)
             ))
             dismiss()
         } catch {

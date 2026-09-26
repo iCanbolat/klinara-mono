@@ -1,7 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ERROR_CODES } from '@klinara/shared';
 import { MAIL_SENDER, type MailSender } from '../../lib/mail/mail.types';
-import { SMS_SENDER, type SmsSender } from '../../lib/sms/sms.types';
 import type { NotificationChannel } from '../../database/schema';
 import { WhatsAppSenderService } from '../integrations/whatsapp-sender.service';
 import { PermanentSendError, TransientSendError } from './send-errors';
@@ -23,6 +22,8 @@ export interface OutboundMessage {
         templateName?: string | undefined;
         templateLanguage?: string | undefined;
         parameters?: string[] | undefined;
+        /** Hızlı yanıt butonlarının tek kullanımlık token'ları, buton sırasıyla. */
+        buttonPayloads?: string[] | undefined;
       }
     | undefined;
 }
@@ -36,14 +37,12 @@ export interface SendOutcome {
  * Kanal → adapter eşlemesi.
  *
  * Bildirim çekirdeği hangi sağlayıcının koştuğunu bilmez; kanal ekleme ya da
- * sağlayıcı değiştirme tek bir dosyayı etkiler (`lib/sms`, `lib/mail`,
- * `lib/whatsapp`). Bu, SMS adapter'ında Faz 1'de alınan kararın aynısıdır.
+ * sağlayıcı değiştirme tek bir dosyayı etkiler (`lib/mail`, `lib/whatsapp`).
  */
 @Injectable()
 export class ChannelRegistryService {
   constructor(
     @Inject(MAIL_SENDER) private readonly mail: MailSender,
-    @Inject(SMS_SENDER) private readonly sms: SmsSender,
     private readonly whatsapp: WhatsAppSenderService,
   ) {}
 
@@ -57,10 +56,6 @@ export class ChannelRegistryService {
         });
         return { provider: 'smtp', providerMessageId: null };
       }
-      case 'sms': {
-        const result = await this.sms.send({ to: message.to, body: message.body });
-        return { provider: result.provider, providerMessageId: result.providerMessageId };
-      }
       case 'whatsapp': {
         const result = await this.whatsapp.send(message.tenantId, {
           to: message.to,
@@ -68,6 +63,7 @@ export class ChannelRegistryService {
           templateName: message.whatsapp?.templateName,
           templateLanguage: message.whatsapp?.templateLanguage,
           parameters: message.whatsapp?.parameters,
+          buttonPayloads: message.whatsapp?.buttonPayloads,
         });
         return { provider: 'whatsapp', providerMessageId: result.messageId };
       }
@@ -92,7 +88,6 @@ export class ChannelRegistryService {
     switch (channel) {
       case 'email':
         return contact.email ?? undefined;
-      case 'sms':
       case 'whatsapp':
         return contact.phone ?? undefined;
       default:

@@ -52,7 +52,7 @@ nonisolated enum MessageStatus: String, Codable, Sendable, CaseIterable, Identif
         case .delivered: return "Müşterinin cihazına ulaştı."
         case .read: return "Müşteri okudu."
         case .failed: return "Gönderilemedi. Sebebi aşağıda."
-        case .skipped: return "Üretildi ama gönderilmedi — iletişim izni kapalı ya da kanal yapılandırılmamış."
+        case .skipped: return "Üretildi ama gönderilmedi — şablon pasif ya da kanal yapılandırılmamış."
         case .unknown: return "Bu sürümde tanınmayan bir durum. Uygulamayı güncelleyin."
         }
     }

@@ -21,6 +21,7 @@ import {
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -144,85 +145,87 @@ export function BranchFormDialog({
           </DialogHeader>
 
           <form
-            className="flex flex-col gap-4"
+            className="flex min-h-0 flex-1 flex-col"
             onSubmit={(event) => {
               event.preventDefault();
               if (deactivating) setConfirmDeactivate(true);
               else void submit();
             }}
           >
-            {errors.message !== null ? <Alert tone="danger">{errors.message}</Alert> : null}
-            <Field
-              label={t('branches.name')}
-              required
-              maxLength={200}
-              value={name}
-              disabled={busy}
-              error={errorFor(errors, 'name')}
-              onChange={(event) => {
-                setName(event.target.value);
-                if (!slugTouched) setSlug(slugify(event.target.value));
-              }}
-            />
-            <Field
-              label={t('branches.slug')}
-              hint={t('branches.slugHint')}
-              required
-              minLength={3}
-              maxLength={50}
-              pattern="[a-z0-9]+(-[a-z0-9]+)*"
-              value={slug}
-              readOnly={branch !== null}
-              disabled={busy}
-              {...(branch === null ? {} : { className: 'bg-muted text-muted-foreground' })}
-              error={errorFor(errors, 'slug')}
-              onChange={(event) => {
-                setSlugTouched(true);
-                setSlug(event.target.value.toLowerCase());
-              }}
-            />
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FieldSelect
-                label={t('branches.timezone')}
-                value={timezone}
-                disabled={busy}
-                error={errorFor(errors, 'timezone')}
-                onChange={(event) => setTimezone(event.target.value)}
-              >
-                {zones.map((zone) => (
-                  <option key={zone} value={zone}>
-                    {zone}
-                  </option>
-                ))}
-              </FieldSelect>
+            <DialogBody className="flex flex-col gap-4">
+              {errors.message !== null ? <Alert tone="danger">{errors.message}</Alert> : null}
               <Field
-                label={t('branches.phone')}
-                type="tel"
-                autoComplete="tel"
-                value={phone}
+                label={t('branches.name')}
+                required
+                maxLength={200}
+                value={name}
                 disabled={busy}
-                error={errorFor(errors, 'phone')}
-                onChange={(event) => setPhone(event.target.value)}
+                error={errorFor(errors, 'name')}
+                onChange={(event) => {
+                  setName(event.target.value);
+                  if (!slugTouched) setSlug(slugify(event.target.value));
+                }}
               />
-            </div>
-            <FieldTextarea
-              label={t('branches.address')}
-              rows={2}
-              value={address}
-              disabled={busy}
-              error={errorFor(errors, 'address')}
-              onChange={(event) => setAddress(event.target.value)}
-            />
-            {branch === null ? null : (
-              <FieldSwitch
-                label={t('branches.active')}
-                hint={t('branches.activeHint')}
-                checked={active}
+              <Field
+                label={t('branches.slug')}
+                hint={t('branches.slugHint')}
+                required
+                minLength={3}
+                maxLength={50}
+                pattern="[a-z0-9]+(-[a-z0-9]+)*"
+                value={slug}
+                readOnly={branch !== null}
                 disabled={busy}
-                onCheckedChange={setActive}
-                className="rounded-lg border border-border px-3"
+                {...(branch === null ? {} : { className: 'bg-muted text-muted-foreground' })}
+                error={errorFor(errors, 'slug')}
+                onChange={(event) => {
+                  setSlugTouched(true);
+                  setSlug(event.target.value.toLowerCase());
+                }}
               />
-            )}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FieldSelect
+                  label={t('branches.timezone')}
+                  value={timezone}
+                  disabled={busy}
+                  error={errorFor(errors, 'timezone')}
+                  onChange={(event) => setTimezone(event.target.value)}
+                >
+                  {zones.map((zone) => (
+                    <option key={zone} value={zone}>
+                      {zone}
+                    </option>
+                  ))}
+                </FieldSelect>
+                <Field
+                  label={t('branches.phone')}
+                  type="tel"
+                  autoComplete="tel"
+                  value={phone}
+                  disabled={busy}
+                  error={errorFor(errors, 'phone')}
+                  onChange={(event) => setPhone(event.target.value)}
+                />
+              </div>
+              <FieldTextarea
+                label={t('branches.address')}
+                rows={2}
+                value={address}
+                disabled={busy}
+                error={errorFor(errors, 'address')}
+                onChange={(event) => setAddress(event.target.value)}
+              />
+              {branch === null ? null : (
+                <FieldSwitch
+                  label={t('branches.active')}
+                  hint={t('branches.activeHint')}
+                  checked={active}
+                  disabled={busy}
+                  onCheckedChange={setActive}
+                  className="rounded-lg border border-border px-3"
+                />
+              )}
+            </DialogBody>
 
             <DialogFooter>
               <Button type="button" variant="secondary" disabled={busy} onClick={onClose}>

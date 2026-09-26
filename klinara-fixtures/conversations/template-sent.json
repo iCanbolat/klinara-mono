@@ -1,0 +1,12 @@
+{
+  "id": "0e8f4419-7f7e-4fe2-b4b3-2de349f325d3",
+  "direction": "out",
+  "type": "template",
+  "body": "Merhaba Ayşe Yılmaz, Nişantaşı olarak size ulaşmak istedik. Uygun olduğunuzda bu mesaja yanıt verebilirsiniz.",
+  "createdAt": "2026-09-22T10:31:38.780Z",
+  "status": "sent",
+  "event": "staff_reply",
+  "sentByName": "Klinik Sahibi",
+  "errorDetail": null,
+  "appointmentId": null
+}

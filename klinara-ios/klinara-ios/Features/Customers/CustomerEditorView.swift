@@ -118,23 +118,23 @@ struct CustomerEditorView: View {
             footnote: "Telefon numarası klinik içinde tekildir; "
                 + "aynı numarayla ikinci bir kart açılamaz."
         ) {
-            PhoneNumberField(
-                label: "Telefon",
-                e164: $form.phone,
-                error: fieldErrors["phone"]
-            )
-            .padding(KlinaraMetrics.md)
-            .disabled(isReadOnly)
+            // Alanlar tek yığında, araları `md`: form sheet'lerinin ortak
+            // aralığı ("Yeni hizmet" ile aynı).
+            VStack(alignment: .leading, spacing: KlinaraMetrics.md) {
+                PhoneNumberField(
+                    label: "Telefon",
+                    e164: $form.phone,
+                    error: fieldErrors["phone"]
+                )
 
-            KlinaraDivider()
-
-            KlinaraTextField(
-                label: "E-posta",
-                text: $form.email,
-                placeholder: "ayse@ornek.com",
-                error: form.emailValidationMessage ?? fieldErrors["email"],
-                keyboardType: .emailAddress
-            )
+                KlinaraTextField(
+                    label: "E-posta",
+                    text: $form.email,
+                    placeholder: "ayse@ornek.com",
+                    error: form.emailValidationMessage ?? fieldErrors["email"],
+                    keyboardType: .emailAddress
+                )
+            }
             .padding(KlinaraMetrics.md)
             .disabled(isReadOnly)
         }
@@ -145,49 +145,39 @@ struct CustomerEditorView: View {
             title: "Adres ve geliş kaynağı",
             footnote: "Geliş kaynağı hangi kanalın müşteri getirdiğini gösterir."
         ) {
-            KlinaraTextField(
-                label: "Adres",
-                text: $form.addressLine,
-                placeholder: "Bağdat Cad. No: 120 D: 5",
-                error: fieldErrors["addressLine"],
-                autocapitalization: .words
-            )
-            .padding(KlinaraMetrics.md)
-            .disabled(isReadOnly)
+            VStack(alignment: .leading, spacing: KlinaraMetrics.md) {
+                KlinaraTextField(
+                    label: "Adres",
+                    text: $form.addressLine,
+                    placeholder: "Bağdat Cad. No: 120 D: 5",
+                    error: fieldErrors["addressLine"],
+                    autocapitalization: .words
+                )
 
-            KlinaraDivider()
+                KlinaraTextField(
+                    label: "İlçe",
+                    text: $form.district,
+                    placeholder: "Kadıköy",
+                    error: fieldErrors["district"],
+                    autocapitalization: .words
+                )
 
-            KlinaraTextField(
-                label: "İlçe",
-                text: $form.district,
-                placeholder: "Kadıköy",
-                error: fieldErrors["district"],
-                autocapitalization: .words
-            )
-            .padding(KlinaraMetrics.md)
-            .disabled(isReadOnly)
+                KlinaraTextField(
+                    label: "İl",
+                    text: $form.city,
+                    placeholder: "İstanbul",
+                    error: fieldErrors["city"],
+                    autocapitalization: .words
+                )
 
-            KlinaraDivider()
-
-            KlinaraTextField(
-                label: "İl",
-                text: $form.city,
-                placeholder: "İstanbul",
-                error: fieldErrors["city"],
-                autocapitalization: .words
-            )
-            .padding(KlinaraMetrics.md)
-            .disabled(isReadOnly)
-
-            KlinaraDivider()
-
-            KlinaraTextField(
-                label: "Posta kodu",
-                text: $form.postalCode,
-                placeholder: "34710",
-                error: fieldErrors["postalCode"],
-                keyboardType: .numberPad
-            )
+                KlinaraTextField(
+                    label: "Posta kodu",
+                    text: $form.postalCode,
+                    placeholder: "34710",
+                    error: fieldErrors["postalCode"],
+                    keyboardType: .numberPad
+                )
+            }
             .padding(KlinaraMetrics.md)
             .disabled(isReadOnly)
 

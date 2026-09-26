@@ -1,9 +1,9 @@
 import { Injectable, type OnModuleInit } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
-import { toZonedIso } from '../../common/time';
 import { TenantTxService } from '../../database/tenant-tx.service';
 import { QUEUES } from '../../lib/queue/queue.constants';
 import { QueueService } from '../../lib/queue/queue.service';
+import { appointmentVariables } from './appointment-notifier.service';
 import { NotificationDispatcherService } from './notification-dispatcher.service';
 import * as repo from './reminders.repository';
 
@@ -71,12 +71,8 @@ export class ReminderWorker implements OnModuleInit {
         // tekillik anahtarı. İki worker aynı işi alsa bile ikinci mesaj
         // yazılamaz (`message_log` kısmi tekil indeksi).
         dedupeKey: `scheduled:${scheduled.id}`,
-        variables: {
-          customerName: appointment.customerName,
-          branchName: appointment.branchName,
-          appointmentAt: ReminderWorker.formatAppointmentTime(appointment),
-          serviceName: appointment.serviceNames.join(', '),
-        },
+        appointmentId: appointment.id,
+        variables: appointmentVariables(appointment),
       });
 
       await repo.markScheduled(
@@ -86,11 +82,5 @@ export class ReminderWorker implements OnModuleInit {
         result.status === 'queued' ? result.messageId : null,
       );
     });
-  }
-
-  /** Saat ŞUBENİN saat diliminde yazılır — müşteri klinikteki saati okur. */
-  private static formatAppointmentTime(appointment: repo.AppointmentSummary): string {
-    const iso = toZonedIso(appointment.startsAt, appointment.branchTimezone);
-    return `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)} ${iso.slice(11, 16)}`;
   }
 }

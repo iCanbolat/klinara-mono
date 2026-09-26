@@ -179,6 +179,7 @@ export async function listInbox(
     receivedAt: new Date(row['received_at'] as string),
     handledBy: (row['handled_by'] as string | null) ?? null,
     handledAt: row['handled_at'] == null ? null : new Date(row['handled_at'] as string),
+    conversationId: (row['conversation_id'] as string | null) ?? null,
   }));
 }
 
@@ -205,23 +206,6 @@ export async function findCustomerIdByPhone(tx: Tx, phone: string): Promise<stri
   return result.rows[0]?.id ?? null;
 }
 
-/**
- * Gelen "STOP" talebi. Aktif bir kayıt varsa ikinci satır YAZILMAZ — kısmi
- * tekil indeks bunu zaten engelliyor, `do nothing` yalnız hatayı susturuyor.
- */
-export async function insertInboundOptOut(
-  tx: Tx,
-  tenantId: string,
-  customerId: string,
-): Promise<void> {
-  await tx.execute(sql`
-    insert into contact_opt_outs (tenant_id, customer_id, channel, kind, source, note)
-    values (${tenantId}::uuid, ${customerId}::uuid, null, 'marketing', 'inbound_stop',
-            'WhatsApp üzerinden gelen durdurma talebi')
-    on conflict do nothing
-  `);
-}
-
 /** Kiracının iptal penceresi (saat). Ayar satırı yoksa 24. */
 export async function cancelWindowHours(tx: Tx): Promise<number> {
   const result = await tx.execute<{ hours: number }>(sql`
@@ -231,3 +215,17 @@ export async function cancelWindowHours(tx: Tx): Promise<number> {
 }
 
 export type { MessageActionKind };
+
+/** Template onay durumunu yansımaya işler (webhook). */
+export async function applyTemplateStatus(
+  tx: Tx,
+  tenantId: string,
+  input: { name: string; language: string; status: 'pending' | 'approved' | 'rejected' },
+): Promise<void> {
+  await tx.execute(sql`
+    insert into whatsapp_templates (tenant_id, name, language, status, synced_at)
+    values (${tenantId}::uuid, ${input.name}, ${input.language}, ${input.status}, now())
+    on conflict (tenant_id, name, language) do update
+      set status = excluded.status, synced_at = now(), updated_at = now()
+  `);
+}

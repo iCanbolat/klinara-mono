@@ -15,8 +15,8 @@ import java.time.Instant
 /**
  * Mock bildirim verisinin başlangıç durumu — iOS `MockNotificationsSeed` paritesi.
  *
- * Tohum kasıtlı olarak **kurulumu yarım kalmış bir klinik**: bir hatırlatma okunmuş, biri
- * iletişim izni yüzünden `skipped` yazılmış, biri geçersiz numaraya takılmış, gelen kutusunda
+ * Tohum kasıtlı olarak **kurulumu yarım kalmış bir klinik**: bir hatırlatma okunmuş, bir gelmedi
+ * takibi pasif şablon yüzünden `skipped` yazılmış, biri geçersiz numaraya takılmış, gelen kutusunda
  * işlenmemiş iki mesaj var (biri tanınmayan numaradan). Her şeyin yolunda olduğu bir tohum,
  * ekranların asıl zor durumlarını hiç göstermezdi.
  *
@@ -26,7 +26,7 @@ import java.time.Instant
 internal object MockNotificationsSeed {
     const val MESSAGE_REMINDER_READ = "e1000000-0000-4000-8000-000000000001"
     const val MESSAGE_CONFIRMATION_DELIVERED = "e1000000-0000-4000-8000-000000000002"
-    const val MESSAGE_BIRTHDAY_SKIPPED = "e1000000-0000-4000-8000-000000000003"
+    const val MESSAGE_NO_SHOW_SKIPPED = "e1000000-0000-4000-8000-000000000003"
     const val MESSAGE_REMINDER_FAILED = "e1000000-0000-4000-8000-000000000004"
     const val MESSAGE_STAFF_INTERNAL = "e1000000-0000-4000-8000-000000000005"
 
@@ -34,7 +34,6 @@ internal object MockNotificationsSeed {
     const val INBOX_UNKNOWN = "e2000000-0000-4000-8000-000000000002"
     const val INBOX_HANDLED = "e2000000-0000-4000-8000-000000000003"
 
-    const val OPT_OUT_MEHMET = "e3000000-0000-4000-8000-000000000001"
 
     val AYSE: String get() = MockCustomers.at(0).id
     val ZEYNEP: String get() = MockCustomers.at(1).id
@@ -82,17 +81,16 @@ internal object MockNotificationsSeed {
                 deliveredAt = now.ago(hours = 8, seconds = -9),
                 createdAt = now.ago(hours = 8),
             ),
-            // Ek M: engellenen mesaj ATILMIYOR, `skipped` yazılıyor. Sebebi [optOuts]'taki kayıt —
-            // iki tohum birbirini AÇIKLAMALI, yoksa mock gerçekte olamayacak bir durumu gösterir.
+            // Ek M: gönderilmeyen mesaj ATILMIYOR, `skipped` yazılıyor. "Gitmedi mi, hiç denendi
+            // mi?" sorusu cevaplanabilir kalmalı.
             Message(
-                id = MESSAGE_BIRTHDAY_SKIPPED,
+                id = MESSAGE_NO_SHOW_SKIPPED,
                 customerId = MEHMET,
                 channel = NotificationChannel.WhatsApp,
-                event = NotificationEvent.Birthday,
+                event = NotificationEvent.NoShowFollowup,
                 status = MessageStatus.Skipped,
                 to = "+90**********37",
-                body = "Sayın Mehmet Aslan, doğum gününüzü kutlarız.",
-                errorCode = ApiErrorCode.OPT_OUT.wire,
+                body = "Sayın Mehmet Aslan, randevunuza katılamadınız.",
                 attempt = 0,
                 scheduledFor = now.ago(days = 3),
                 createdAt = now.ago(days = 3),
@@ -168,7 +166,6 @@ internal object MockNotificationsSeed {
                 templateId = TEMPLATE_REMINDER_WHATSAPP,
                 event = NotificationEvent.AppointmentReminder,
                 channel = NotificationChannel.WhatsApp,
-                kind = NotificationKind.Transactional,
                 body = "Sayın {{customerName}}, {{appointmentAt}} tarihli {{serviceName}} randevunuzu hatırlatırız.",
                 whatsappTemplateName = "randevu_hatirlatma",
                 whatsappTemplateLanguage = "tr",
@@ -178,73 +175,74 @@ internal object MockNotificationsSeed {
         )
 
     /**
-     * Kod varsayılanları — sunucudaki `default-templates.ts`'in `templates` anahtarlarıyla
-     * **birebir aynı kanallar** (çoğu olayda SMS + e-posta; WhatsApp yalnız otomatik yanıtta).
-     *
-     * iOS mock'u varsayılanı olayın TÜM kanallarından üretiyordu ve canlıda hiç görünmeyen
-     * WhatsApp satırlarını gösteriyordu; sunucunun gerçek davranışı saklanıyordu.
+     * Kod varsayılanları — sunucunun birleştirilmiş görünümüyle **birebir aynı kanallar**: müşteri
+     * olaylarında yalnız WhatsApp satırı (metni standart Meta template'inden), personel iç
+     * bildiriminde e-posta. Standart template'i olmayan paket süre dolumu listede yok.
      */
     fun defaultTemplates(): List<NotificationTemplate> =
-        DEFAULT_BODIES.flatMap { (event, byChannel) ->
-            byChannel.map { (channel, body) ->
-                NotificationTemplate(
-                    event = event,
-                    channel = channel,
-                    kind = NotificationEventCatalog.kind(event),
-                    subject = event.turkishName.takeIf { channel == NotificationChannel.Email },
-                    body = body,
-                    isDefault = true,
-                    variables = NotificationEventCatalog.placeholders(body),
-                )
-            }
+        DEFAULT_BODIES.map { (event, channel, body) ->
+            NotificationTemplate(
+                event = event,
+                channel = channel,
+                subject = event.turkishName.takeIf { channel == NotificationChannel.Email },
+                body = body,
+                isDefault = true,
+                variables = NotificationEventCatalog.placeholders(body),
+            )
         }
 
-    private val DEFAULT_BODIES: List<Pair<NotificationEvent, List<Pair<NotificationChannel, String>>>> =
+    private val DEFAULT_BODIES: List<Triple<NotificationEvent, NotificationChannel, String>> =
         listOf(
-            NotificationEvent.AppointmentConfirmation to
-                smsOnly("Sayın {{customerName}}, {{appointmentAt}} randevunuz oluşturuldu. {{branchName}}"),
-            NotificationEvent.AppointmentReminder to
-                smsOnly("Sayın {{customerName}}, {{appointmentAt}} randevunuzu hatırlatırız. {{branchName}}"),
-            NotificationEvent.AppointmentCancelled to
-                smsOnly("Sayın {{customerName}}, {{appointmentAt}} randevunuz iptal edilmiştir. {{branchName}}"),
-            NotificationEvent.NoShowFollowup to
-                listOf(
-                    NotificationChannel.Sms to
-                        "Sayın {{customerName}}, randevunuza katılamadınız. " +
-                            "{{branchName}} olarak yeni randevu için bekleriz.",
-                ),
-            NotificationEvent.PackageBalance to
-                smsOnly("Sayın {{customerName}}, {{packageName}} paketinizde {{remainingSessions}} seans kaldı."),
-            NotificationEvent.PackageExpiring to
-                smsOnly("Sayın {{customerName}}, {{packageName}} paketiniz {{expiresAt}} tarihinde doluyor."),
-            NotificationEvent.Birthday to
-                listOf(NotificationChannel.Sms to "Sayın {{customerName}}, doğum gününüzü kutlarız! {{branchName}}"),
-            NotificationEvent.AutoReply to
-                listOf(NotificationChannel.WhatsApp to "{{message}}", NotificationChannel.Sms to "{{message}}"),
-            NotificationEvent.StaffInternal to listOf(NotificationChannel.Email to "{{message}}"),
+            whatsapp(
+                NotificationEvent.AppointmentConfirmation,
+                "Merhaba {{customerName}}, {{appointmentAt}} tarihindeki {{serviceName}} randevunuz oluşturuldu. " +
+                    "Sizi {{branchName}} şubemizde bekliyoruz.",
+            ),
+            whatsapp(
+                NotificationEvent.AppointmentReminder,
+                "Merhaba {{customerName}}, {{appointmentAt}} tarihindeki {{serviceName}} randevunuzu hatırlatırız. " +
+                    "Adres: {{branchName}} şubemiz. Katılımınızı aşağıdaki butonlarla bildirebilirsiniz.",
+            ),
+            whatsapp(
+                NotificationEvent.AppointmentCancelled,
+                "Merhaba {{customerName}}, {{appointmentAt}} tarihindeki randevunuz iptal edilmiştir. " +
+                    "Yeni bir randevu için {{branchName}} şubemize bu mesajı yanıtlayarak ulaşabilirsiniz.",
+            ),
+            whatsapp(
+                NotificationEvent.NoShowFollowup,
+                "Merhaba {{customerName}}, bugünkü randevunuza gelemediğinizi gördük. " +
+                    "Yeni bir randevu için {{branchName}} şubemize bu mesajı yanıtlayarak ulaşabilirsiniz.",
+            ),
+            whatsapp(
+                NotificationEvent.PackageBalance,
+                "Merhaba {{customerName}}, {{packageName}} paketinizde {{remainingSessions}} seans hakkınız kaldı. " +
+                    "Randevu için bu mesajı yanıtlayabilirsiniz.",
+            ),
+            whatsapp(NotificationEvent.AutoReply, "{{message}}"),
+            Triple(NotificationEvent.StaffInternal, NotificationChannel.Email, "{{message}}"),
         )
 
-    /** Müşteri olaylarının varsayılan gövdesi yalnız SMS'te durur; WhatsApp metni Meta'dan gelir. */
-    private fun smsOnly(body: String) = listOf(NotificationChannel.Sms to body)
+    private fun whatsapp(
+        event: NotificationEvent,
+        body: String,
+    ) = Triple(event, NotificationChannel.WhatsApp, body)
 
     /**
-     * Kiracı doğum günü mesajını kapatmış (`channels: []`) ve randevu hatırlatmasında sessiz
-     * saati daraltmış. Kalan olaylar sunucunun sentezlediği varsayılanla gelir.
+     * Kiracı paket süre dolumu mesajını kapatmış (`channels: []`) ve randevu hatırlatmasında
+     * sessiz saati daraltmış. Kalan olaylar sunucunun sentezlediği varsayılanla gelir.
      */
     fun tenantPreferences(): List<NotificationPreference> =
         listOf(
             NotificationPreference(
                 preferenceId = "e5000000-0000-4000-8000-000000000001",
                 event = NotificationEvent.AppointmentReminder,
-                kind = NotificationKind.Transactional,
-                channels = listOf(NotificationChannel.WhatsApp, NotificationChannel.Sms),
+                channels = listOf(NotificationChannel.WhatsApp),
                 quietHoursStart = "22:00",
                 quietHoursEnd = "08:00",
             ),
             NotificationPreference(
                 preferenceId = "e5000000-0000-4000-8000-000000000002",
-                event = NotificationEvent.Birthday,
-                kind = NotificationKind.Marketing,
+                event = NotificationEvent.PackageExpiring,
                 channels = emptyList(),
             ),
         )
@@ -254,7 +252,7 @@ internal object MockNotificationsSeed {
             wabaId = "1029384756",
             phoneNumberId = "5647382910",
             businessPhone = "+902121234567",
-            apiVersion = "v21.0",
+            apiVersion = "v26.0",
             status = WhatsAppAccountStatus.Active,
             accessTokenMasked = "••••••••aF3k",
             hasAppSecret = true,
@@ -293,30 +291,12 @@ internal object MockNotificationsSeed {
                 syncedAt = now.ago(hours = 6),
             ),
             WhatsAppTemplate(
-                name = "dogum_gunu",
+                name = "klinara_paket_bakiye",
                 language = "tr",
-                category = "MARKETING",
+                category = "UTILITY",
                 status = WhatsAppTemplateStatus.Pending,
-                bodyVariableCount = 2,
+                bodyVariableCount = 3,
                 syncedAt = now.ago(hours = 6),
-            ),
-        )
-
-    /**
-     * Mehmet tüm kanallarda ticari ileti almıyor — [MESSAGE_BIRTHDAY_SKIPPED] satırının sebebi.
-     *
-     * A4.2'deki mock tohumu "bilerek boş değil" diyordu ama boştu; kapalı hâl ancak burada
-     * sürülebilir hâle geldi.
-     */
-    fun optOuts(now: Instant): List<OptOutRecord> =
-        listOf(
-            OptOutRecord(
-                id = OPT_OUT_MEHMET,
-                customerId = MEHMET,
-                channel = null,
-                kind = "marketing",
-                source = OptOutSource.InboundStop,
-                createdAt = now.ago(days = 10),
             ),
         )
 }

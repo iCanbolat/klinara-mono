@@ -8,8 +8,11 @@ import { normalizePhone } from '../../common/phone';
 import type { EnvironmentVariables } from '../../config/env.validation';
 import { TenantTxService } from '../../database/tenant-tx.service';
 import type { Tx } from '../../database/tenant-tx';
+import { StaffNotificationsService } from '../notifications/staff-notifications.service';
 import { NotificationDispatcherService } from '../notifications/notification-dispatcher.service';
 import * as appointmentsRepo from '../booking/appointments.repository';
+import * as remindersRepo from '../notifications/reminders.repository';
+import * as conversationsRepo from './conversations.repository';
 import * as repo from './webhook.repository';
 import { verifyHubSignature } from './webhook-signature';
 
@@ -31,23 +34,54 @@ interface InboundMessage {
   interactive?: { button_reply?: { id?: string; title?: string } };
 }
 
+/** `message_template_status_update` alanı — template onaylandı/reddedildi. */
+interface TemplateStatusUpdate {
+  event?: string;
+  message_template_name?: string;
+  message_template_language?: string;
+  reason?: string;
+}
+
 /** Meta webhook gövdesinin ilgilendiğimiz parçaları. */
 interface WebhookPayload {
   entry?: {
     id?: string;
     changes?: {
+      field?: string;
       value?: {
         metadata?: { phone_number_id?: string };
         statuses?: StatusUpdate[];
         messages?: InboundMessage[];
-      };
+      } & TemplateStatusUpdate;
     }[];
   }[];
 }
 
+/** Gelen mesajın sohbet listesinde görünen metni. */
+function inboundPreview(message: InboundMessage): string {
+  const text =
+    message.text?.body ??
+    message.button?.text ??
+    message.interactive?.button_reply?.title ??
+    null;
+  if (text !== null) return conversationsRepo.previewOf(text, '');
+  switch (message.type) {
+    case 'image':
+      return '📷 Fotoğraf';
+    case 'audio':
+      return '🎤 Sesli mesaj';
+    case 'video':
+      return '🎬 Video';
+    case 'document':
+      return '📄 Belge';
+    case 'location':
+      return '📍 Konum';
+    default:
+      return 'Mesaj';
+  }
+}
+
 const DELIVERY_STATUSES = new Set(['sent', 'delivered', 'read', 'failed']);
-/** Ticari iletiyi durduran anahtar kelimeler. */
-const STOP_WORDS = new Set(['stop', 'dur', 'iptal', 'çık', 'cik']);
 
 export const sha256 = (value: string | Buffer): string =>
   createHash('sha256').update(value).digest('hex');
@@ -59,6 +93,7 @@ export class WhatsAppWebhookService {
     private readonly encryption: FieldEncryptionService,
     private readonly dispatcher: NotificationDispatcherService,
     private readonly config: ConfigService<EnvironmentVariables, true>,
+    private readonly staffNotifications: StaffNotificationsService,
   ) {}
 
   /** `hub.challenge` akışı — Meta webhook'u kaydederken bir kez çağırır. */
@@ -137,6 +172,10 @@ export class WhatsAppWebhookService {
   private async process(tx: Tx, tenantId: string, payload: WebhookPayload): Promise<void> {
     for (const entry of payload.entry ?? []) {
       for (const change of entry.changes ?? []) {
+        if (change.field === 'message_template_status_update' && change.value !== undefined) {
+          await this.applyTemplateStatus(tx, tenantId, change.value);
+          continue;
+        }
         for (const status of change.value?.statuses ?? []) {
           await this.applyStatus(tx, status);
         }
@@ -173,9 +212,32 @@ export class WhatsAppWebhookService {
     await repo.touchContactWindow(tx, tenantId, from, at);
 
     const customerId = await repo.findCustomerIdByPhone(tx, from);
+    // Her gelen mesaj bir sohbete düşer — buton yanıtları da: resepsiyon
+    // "müşteri İptal'e bastı" bilgisini sohbetin içinde görmeli.
+    const conversationId = await conversationsRepo.upsertOnInbound(tx, {
+      tenantId,
+      phone: from,
+      customerId,
+      at,
+      preview: inboundPreview(message),
+    });
     const token = message.button?.payload ?? message.interactive?.button_reply?.id;
 
     if (token !== undefined && token.length > 0) {
+      // Buton yanıtı OTOMATİK işleniyor; kaydı "işlendi" olarak düşüyor ki
+      // gelen kutusunda bekleyen bir iş gibi görünmesin.
+      await repo.insertInbound(tx, {
+        tenantId,
+        customerId,
+        fromPhone: from,
+        waMessageId: message.id,
+        messageType: 'button',
+        body: message.button?.text ?? message.interactive?.button_reply?.title ?? null,
+        mediaId: null,
+        receivedAt: at,
+        handledAt: new Date(),
+        conversationId,
+      });
       await this.handleAction(tx, tenantId, { token, from, customerId });
       return;
     }
@@ -190,13 +252,19 @@ export class WhatsAppWebhookService {
       body,
       mediaId: message.image?.id ?? null,
       receivedAt: at,
+      conversationId,
     });
 
-    // "STOP" bir gelen kutusu mesajı DEĞİL, bir taleptir: ticari ileti
-    // gönderimini durdurur ve kaydı bırakır.
-    if (customerId !== null && body !== null && STOP_WORDS.has(body.trim().toLowerCase())) {
-      await repo.insertInboundOptOut(tx, tenantId, customerId);
-    }
+    // Gelen kutusunda bekleyen mesaj panele bildirim olarak düşer; buton
+    // yanıtları düşmez (onlar otomatik işleniyor, bekleyen bir iş değil).
+    await this.staffNotifications.emit(tx, {
+      tenantId,
+      kind: 'inbound_message',
+      title: 'Müşteri WhatsApp’tan yazdı',
+      body: inboundPreview(message),
+      link: `/mesajlar?sohbet=${conversationId}`,
+      conversationId,
+    });
   }
 
   /**
@@ -275,6 +343,12 @@ export class WhatsAppWebhookService {
       reason: 'WhatsApp buton yanıtı',
     });
 
+    // İptal edilen randevunun bekleyen hatırlatmaları kapanır — aynı kural
+    // `AppointmentsService.changeStatus` içinde de var.
+    if (target === 'cancelled') {
+      await remindersRepo.closePending(tx, appointment.id, 'cancelled');
+    }
+
     await this.reply(
       tx,
       tenantId,
@@ -283,6 +357,32 @@ export class WhatsAppWebhookService {
         ? 'Randevunuz onaylandı. Görüşmek üzere!'
         : 'Randevunuz iptal edildi. Yeni randevu için bize yazabilirsiniz.',
     );
+  }
+
+  /**
+   * Meta'dan template onay/red bildirimi — yansıma "Doğrula"ya basılmadan
+   * güncel kalsın. Yansımada olmayan template (Meta panelinden elle açılmış)
+   * eklenir; değişken sayısı ve butonlar bir sonraki senkronda dolar.
+   */
+  private async applyTemplateStatus(
+    tx: Tx,
+    tenantId: string,
+    update: TemplateStatusUpdate,
+  ): Promise<void> {
+    const name = update.message_template_name;
+    if (name === undefined || name.length === 0) return;
+    const raw = (update.event ?? '').toUpperCase();
+    const status =
+      raw === 'APPROVED'
+        ? 'approved'
+        : raw === 'REJECTED' || raw === 'DISABLED' || raw === 'PAUSED'
+          ? 'rejected'
+          : 'pending';
+    await repo.applyTemplateStatus(tx, tenantId, {
+      name,
+      language: update.message_template_language ?? 'tr',
+      status,
+    });
   }
 
   /** Otomatik cevap bildirim çekirdeğinden geçer: gönderilen her mesaj kayıtlıdır. */

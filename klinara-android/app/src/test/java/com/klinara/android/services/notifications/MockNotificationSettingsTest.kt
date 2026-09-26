@@ -14,11 +14,11 @@ import org.junit.jupiter.api.Test
 
 /** Mock sunucunun dört davranışını taklit ediyor mu (iOS `MockNotificationsService` notu)? */
 class MockNotificationSettingsTest {
-    private fun subject() = MockNotificationsService(latencyEnabled = false, seedOptOuts = false)
+    private fun subject() = MockNotificationsService(latencyEnabled = false)
 
     private fun upsert(
         body: String,
-        channel: NotificationChannel = NotificationChannel.Sms,
+        channel: NotificationChannel = NotificationChannel.WhatsApp,
         subject: String? = null,
     ) = NotificationTemplateUpsert(
         event = NotificationEvent.AppointmentReminder,
@@ -33,20 +33,17 @@ class MockNotificationSettingsTest {
     )
 
     @Test
-    @DisplayName("Varsayılanlar sunucunun kanallarında; kiracının WhatsApp şablonu listenin SONUNDA")
+    @DisplayName("Müşteri olaylarında tek kanal WhatsApp; kiracının şablonu varsayılanın yerinde")
     fun mergedView() =
         runTest {
             val templates = subject().templates()
             val reminder = templates.filter { it.event == NotificationEvent.AppointmentReminder }
 
-            // E-posta müşteri olaylarından çıktı: varsayılan gövde yalnız SMS'te duruyor,
-            // kiracının yazdığı WhatsApp şablonu yine sonda.
-            assertEquals(
-                listOf(NotificationChannel.Sms, NotificationChannel.WhatsApp),
-                reminder.map { it.channel },
-            )
-            assertTrue(reminder.last().templateId != null && !reminder.last().isDefault)
-            assertTrue(reminder.first().isDefault)
+            // SMS ve e-posta müşteri olaylarından çıktı: tek satır, kiracının WhatsApp şablonu.
+            assertEquals(listOf(NotificationChannel.WhatsApp), reminder.map { it.channel })
+            assertTrue(reminder.single().templateId != null && !reminder.single().isDefault)
+            val confirmation = templates.single { it.event == NotificationEvent.AppointmentConfirmation }
+            assertTrue(confirmation.isDefault)
         }
 
     @Test
@@ -56,12 +53,12 @@ class MockNotificationSettingsTest {
             val service = subject()
             service.upsertTemplate(upsert("Sayın {{customerName}}"))
 
-            val sms =
+            val rows =
                 service.templates().filter {
-                    it.event == NotificationEvent.AppointmentReminder && it.channel == NotificationChannel.Sms
+                    it.event == NotificationEvent.AppointmentReminder && it.channel == NotificationChannel.WhatsApp
                 }
-            assertEquals(1, sms.size)
-            assertFalse(sms.single().isDefault)
+            assertEquals(1, rows.size)
+            assertFalse(rows.single().isDefault)
         }
 
     @Test
@@ -73,8 +70,9 @@ class MockNotificationSettingsTest {
             assertEquals(ApiErrorCode.TEMPLATE_INVALID, (invalid as ApiError).code)
             assertTrue(invalid.displayMessage.contains("customerName"), "detail izinli değişkenleri sayıyor")
 
-            val subjectOnSms = runCatching { service.upsertTemplate(upsert("x", subject = "Konu")) }.exceptionOrNull()
-            assertEquals(ApiErrorCode.VALIDATION_FAILED, (subjectOnSms as ApiError).code)
+            val subjectOnWhatsApp =
+                runCatching { service.upsertTemplate(upsert("x", subject = "Konu")) }.exceptionOrNull()
+            assertEquals(ApiErrorCode.VALIDATION_FAILED, (subjectOnWhatsApp as ApiError).code)
         }
 
     @Test
@@ -87,7 +85,7 @@ class MockNotificationSettingsTest {
                     NotificationPreferenceUpsert(
                         branchId = MockIds.BRANCH_NISANTASI,
                         event = NotificationEvent.AppointmentReminder,
-                        channels = listOf(NotificationChannel.Sms),
+                        channels = listOf(NotificationChannel.WhatsApp),
                         quietHoursStart = ClockTime(0, 0),
                         quietHoursEnd = ClockTime(0, 0),
                     ),
@@ -103,10 +101,10 @@ class MockNotificationSettingsTest {
     @DisplayName("Kayıtlı `null` pencere varsayılana düşer ve AÇIK görünür (sunucunun davranışı)")
     fun nullWindowFallsBackToDefault() =
         runTest {
-            val birthday = subject().preferences().first { it.event == NotificationEvent.Birthday }
+            val expiring = subject().preferences().first { it.event == NotificationEvent.PackageExpiring }
 
-            assertFalse(birthday.isEnabled, "Tohumda doğum günü kapalı")
-            assertEquals("21:00 – 09:00", birthday.quietHoursLabel)
+            assertFalse(expiring.isEnabled, "Tohumda paket süre dolumu kapalı")
+            assertEquals("21:00 – 09:00", expiring.quietHoursLabel)
         }
 
     @Test

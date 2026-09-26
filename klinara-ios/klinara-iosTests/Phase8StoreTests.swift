@@ -77,9 +77,8 @@ struct Phase8StoreTests {
 
         let skipped = try? #require(store.messages.first)
         #expect(skipped?.status == .skipped)
-        // Engel gönderimden ÖNCE oluştu: hiç denenmedi.
+        // Atlama gönderimden ÖNCE oluştu: hiç denenmedi.
         #expect(skipped?.wasAttempted == false)
-        #expect(skipped?.errorCode == APIErrorCode.optOut.rawValue)
     }
 
     // MARK: Gelen kutusu
@@ -144,7 +143,7 @@ struct Phase8StoreTests {
         await #expect(throws: APIError.self) {
             _ = try await store.upsertTemplate(UpsertNotificationTemplateInput(
                 event: .appointmentReminder,
-                channel: .sms,
+                channel: .whatsapp,
                 body: "Sayın {{musteriAdi}}, merhaba."
             ))
         }
@@ -157,8 +156,8 @@ struct Phase8StoreTests {
 
         do {
             _ = try await store.upsertTemplate(UpsertNotificationTemplateInput(
-                event: .birthday,
-                channel: .sms,
+                event: .noShowFollowup,
+                channel: .whatsapp,
                 body: "{{packageName}} paketiniz."
             ))
             Issue.record("reddedilmeliydi")
@@ -176,7 +175,7 @@ struct Phase8StoreTests {
         await #expect(throws: APIError.self) {
             _ = try await store.upsertTemplate(UpsertNotificationTemplateInput(
                 event: .appointmentReminder,
-                channel: .sms,
+                channel: .whatsapp,
                 subject: "Hatırlatma",
                 body: "Sayın {{customerName}}, merhaba."
             ))
@@ -191,7 +190,7 @@ struct Phase8StoreTests {
 
         let saved = try await store.upsertTemplate(UpsertNotificationTemplateInput(
             event: .appointmentCancelled,
-            channel: .sms,
+            channel: .whatsapp,
             body: "Sayın {{customerName}}, randevunuz iptal edildi."
         ))
 
@@ -262,7 +261,7 @@ struct Phase8StoreTests {
         _ = try await store.upsertPreference(UpsertNotificationPreferenceInput(
             branchId: MockGraph.branchId,
             event: .appointmentReminder,
-            channels: [.sms]
+            channels: [.whatsapp]
         ))
 
         #expect(store.tenantPreferences.count == tenantCountBefore)
@@ -375,56 +374,6 @@ struct Phase8StoreTests {
         #expect(rows.allSatisfy { $0.status == .cancelled })
     }
 
-    // MARK: İletişim izni
-
-    @Test("Aynı kapsamda ikinci iptal HATA değil; var olan kayıt döner")
-    func optOutIsIdempotent() async throws {
-        let mock = graph()
-        let store = CustomerOptOutStore(
-            service: mock.notifications,
-            customerId: MockCustomerSeed.zeynep
-        )
-        await store.load()
-
-        try await store.optOut(channel: nil, source: .staff, note: nil)
-        let countAfterFirst = store.records.count
-        try await store.optOut(channel: nil, source: .staff, note: nil)
-
-        #expect(store.records.count == countAfterFirst)
-        #expect(store.blocksAllChannels)
-    }
-
-    @Test("Kanal bazlı iptal tüm kanalları kapatmaz")
-    func channelScopedOptOut() async throws {
-        let mock = graph()
-        let store = CustomerOptOutStore(
-            service: mock.notifications,
-            customerId: MockCustomerSeed.burak
-        )
-        await store.load()
-
-        try await store.optOut(channel: .sms, source: .customerRequest, note: nil)
-
-        #expect(store.isOptedOut)
-        #expect(!store.blocksAllChannels)
-        #expect(store.records.first?.channel == .sms)
-    }
-
-    @Test("Geri alma kaydı listeden düşürür")
-    func revokeRemovesRecord() async throws {
-        let mock = graph()
-        let store = CustomerOptOutStore(
-            service: mock.notifications,
-            customerId: MockCustomerSeed.mehmet
-        )
-        await store.load()
-        #expect(store.isOptedOut)
-
-        try await store.revoke(channel: nil)
-
-        #expect(!store.isOptedOut)
-    }
-
     // MARK: WhatsApp
 
     @Test("Kaydedilen token yanıtta MASKELİ döner, ham hâli hiçbir yerde yok")
@@ -503,7 +452,7 @@ struct Phase8StoreTests {
         do {
             _ = try await store.sendTest(SendTestMessageInput(
                 to: "+905321234567",
-                templateName: "dogum_gunu"
+                templateName: "klinara_paket_bakiye"
             ))
             Issue.record("reddedilmeliydi")
         } catch let error as APIError {
@@ -569,7 +518,7 @@ struct NotificationTemplateFormTests {
 
     private func template(
         event: NotificationEvent = .appointmentReminder,
-        channel: NotificationChannel = .sms,
+        channel: NotificationChannel = .whatsapp,
         body: String = "Sayın {{customerName}}, merhaba.",
         whatsappVariables: [String] = []
     ) -> NotificationTemplate {
@@ -578,7 +527,6 @@ struct NotificationTemplateFormTests {
             event: event,
             channel: channel,
             locale: "tr",
-            kind: .transactional,
             subject: nil,
             body: body,
             whatsappTemplateName: nil,
@@ -651,9 +599,9 @@ struct NotificationTemplateFormTests {
 
     @Test("Konu yalnız e-posta kanalında gövdeye konur")
     func subjectOnlyForEmail() {
-        let sms = NotificationTemplateForm(editing: template(channel: .sms))
-        sms.subject = "Konu"
-        #expect(sms.input().subject == nil)
+        let whatsapp = NotificationTemplateForm(editing: template(channel: .whatsapp))
+        whatsapp.subject = "Konu"
+        #expect(whatsapp.input().subject == nil)
 
         let email = NotificationTemplateForm(editing: template(channel: .email))
         email.subject = "Konu"

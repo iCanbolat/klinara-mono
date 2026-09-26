@@ -88,6 +88,8 @@ export interface CreateAppointmentInput {
   startsAt: string;
   services: AppointmentServiceInput[];
   notes?: string;
+  /** `false` → müşteriye bildirim gitmez. Varsayılan: gider (yalnız ileri tarihli randevular). */
+  notifyCustomer?: boolean;
 }
 
 export interface UpdateAppointmentInput {
@@ -103,11 +105,15 @@ export interface RescheduleAppointmentInput {
 
 export interface CancelAppointmentInput {
   reason?: string;
+  /** `false` → müşteriye bildirim gitmez. Varsayılan: gider (yalnız ileri tarihli randevular). */
+  notifyCustomer?: boolean;
 }
 
 export interface ChangeAppointmentStatusInput {
   status: AppointmentStatus;
   reason?: string;
+  /** `false` → müşteriye bildirim gitmez. Varsayılan: gider (yalnız ileri tarihli randevular). */
+  notifyCustomer?: boolean;
 }
 
 export interface AppointmentServiceLine {
@@ -228,10 +234,56 @@ export interface AvailabilitySlot {
   staffProfileIds: string[];
 }
 
+/**
+ * Penceredeki bir GÜNÜN durumu — slot aranmadan önce çözülür.
+ *
+ * Boş bir `slots` dizisi tek başına belirsizdi: "klinik o gün kapalı" ile
+ * "o gün dolu" aynı görünüyordu ve istemci ikisine de "uygun saat yok"
+ * diyordu. Durum sunucudan geliyor ki istemciler gün kuralını (tatil,
+ * haftalık kapalı gün, rezervasyon penceresi) KENDİ yeniden hesaplamasın.
+ *
+ * Öncelik: `past` → `beyond_window` → `holiday` → `closed` → `open`.
+ */
+export const AVAILABILITY_DAY_STATUSES = [
+  /** Çalışma saatleri var; slot listesi boşsa gün DOLU demektir. */
+  'open',
+  /** Şubenin haftalık kapalı günü (ör. pazar) ya da saat tanımı yok. */
+  'closed',
+  /** Tüm gün kapalı tatil; `holidayName` dolu. */
+  'holiday',
+  /** Günün çalışma saatleri geçti (asgari önden süre dahil). */
+  'past',
+  /** Kiracının ileri rezervasyon sınırının (`maxAdvanceDays`) ötesinde. */
+  'beyond_window',
+] as const;
+export type AvailabilityDayStatus = (typeof AVAILABILITY_DAY_STATUSES)[number];
+
+export interface AvailabilityDay {
+  /** `YYYY-MM-DD`, ŞUBE saat diliminde. */
+  date: string;
+  status: AvailabilityDayStatus;
+  /**
+   * Tatil adı. `holiday`de ve saatleri daraltılmış (yarım gün) tatilde
+   * dolu; ikincisinde durum `open` kalır.
+   */
+  holidayName: string | null;
+  /** `HH:MM`, yalnız `open` günde. */
+  opensAt: string | null;
+  closesAt: string | null;
+}
+
+export interface AvailabilityDaysResponse {
+  branchId: string;
+  timezone: string;
+  days: AvailabilityDay[];
+}
+
 export interface AvailabilityResponse {
   branchId: string;
   timezone: string;
   slotGranularityMinutes: number;
+  /** Penceredeki her yerel gün, sırayla. */
+  days: AvailabilityDay[];
   slots: AvailabilitySlot[];
 }
 
