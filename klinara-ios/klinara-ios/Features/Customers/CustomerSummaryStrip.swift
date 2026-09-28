@@ -70,58 +70,11 @@ struct CustomerSummaryStrip: View {
     }
 }
 
-/// Liste içi arama alanı. `.searchable` gezinme çubuğuna bağlı ve üstüne
-/// içerik (özet şeridi) konamıyordu; bu alan içerikte, şeridin altında durur.
-struct CustomerSearchField: View {
-
-    @Binding var text: String
-    var placeholder = "Ad veya telefon"
-
-    @FocusState private var isFocused: Bool
-
-    var body: some View {
-        HStack(spacing: KlinaraMetrics.sm) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(KlinaraColor.charcoalMuted)
-            TextField(placeholder, text: $text)
-                .klinaraText(.bodyM)
-                .foregroundStyle(KlinaraColor.charcoal)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .submitLabel(.search)
-                .focused($isFocused)
-            if !text.isEmpty {
-                Button {
-                    text = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(KlinaraColor.charcoalMuted)
-                }
-                .accessibilityLabel("Aramayı temizle")
-            }
-        }
-        .padding(.horizontal, KlinaraMetrics.md)
-        .frame(height: 44)
-        .background(KlinaraColor.surfaceRaised)
-        .overlay(
-            RoundedRectangle(cornerRadius: KlinaraMetrics.controlRadius)
-                .stroke(
-                    isFocused ? KlinaraColor.borderFocus : KlinaraColor.border,
-                    lineWidth: isFocused ? KlinaraMetrics.focusBorderWidth : KlinaraMetrics.borderWidth
-                )
-        )
-        .clipShape(.rect(cornerRadius: KlinaraMetrics.controlRadius))
-        .contentShape(.rect)
-        .onTapGesture { isFocused = true }
-    }
-}
-
 #Preview("Müşteri özeti") {
     VStack(spacing: 12) {
         CustomerSummaryStrip(summary: CustomerSummary(total: 248, newLast30Days: 12, activeLast90Days: 131, lapsed: 37))
         CustomerSummaryStrip(summary: nil)
-        CustomerSearchField(text: .constant(""))
+        KlinaraSearchField(text: .constant(""), placeholder: "Ad veya telefon")
     }
     .padding()
     .background(KlinaraColor.surface)

@@ -4,11 +4,12 @@ import SwiftUI
 ///
 /// Sıra hizmet listesindeki grup düzenini belirlediği için sürükle-bırak ile
 /// değiştirilir; ayrı bir "sıra numarası" alanı kullanıcıyı üç kategoride bile
-/// hesap yapmaya zorlardı.
+/// hesap yapmaya zorlardı. Sürükleme ``KlinaraReorderableList``in tutamacından
+/// yapılır.
 ///
-/// **Satırda aksiyon yok.** Daha önce her satırda yukarı/aşağı düğmeleri, chevron
+/// **Satırda aksiyon düğmesi yok.** Daha önce her satırda yukarı/aşağı düğmeleri, chevron
 /// ve `List` dışında hiç çalışmayan bir `swipeActions` vardı; satır bir liste
-/// öğesi değil kontrol paneli gibi okunuyordu. Pasife alma artık kategorinin
+/// öğesi değil kontrol paneli gibi okunuyordu. Şimdi tek ek öğe sıralama tutamacı. Pasife alma artık kategorinin
 /// kendi sayfasında — yıkıcı bir aksiyon listede tek dokunuş uzaklıkta durmamalı
 /// (Android `ServiceCategoryListScreen` ile aynı karar).
 struct ServiceCategoryListView: View {
@@ -17,6 +18,8 @@ struct ServiceCategoryListView: View {
 
     @State private var editing: CategoryEditorSheet.Target?
     @State private var reorderError: APIError?
+    /// Bırakıldıktan sonra sunucu yazmaları bitene dek gösterilen iyimser sıra.
+    @State private var draftOrder: [String]?
 
     private var store: CatalogStore { session.catalogStore }
     private var canWrite: Bool { session.can(Permissions.serviceWrite) }
@@ -37,12 +40,24 @@ struct ServiceCategoryListView: View {
                 ErrorBanner(error: reorderError)
             }
 
-            KlinaraCard(footnote: canWrite ? "Sıralamak için satırı basılı tutup sürükleyin." : nil) {
-                let ordered = catalog.categories.sorted { $0.sortOrder < $1.sortOrder }
-                ForEach(Array(ordered.enumerated()), id: \.element.id) { index, category in
-                    if index > 0 { KlinaraDivider() }
-                    row(for: category, in: ordered)
-                }
+            let ordered = orderedCategories(catalog.categories)
+
+            KlinaraReorderableList(
+                items: ordered,
+                isEnabled: canWrite,
+                // Yazmalar sürerken yeni sürükleme başlamaz: ikinci bir sıra,
+                // birincinin yarım kalmış sunucu durumuna karşı hesaplanırdı.
+                isLocked: isReordering,
+                onMove: { reorder($0) }
+            ) { category in
+                row(for: category, in: ordered)
+            }
+
+            if canWrite {
+                Text("Sıralamak için soldaki tutamacı sürükleyin.")
+                    .klinaraText(.bodyM)
+                    .foregroundStyle(KlinaraColor.charcoalMuted)
+                    .padding(.horizontal, KlinaraMetrics.xs)
             }
         }
         .navigationTitle("Kategoriler")
@@ -61,6 +76,19 @@ struct ServiceCategoryListView: View {
             CategoryEditorSheet(session: session, target: target)
         }
     }
+
+    /// Sunucudaki sıra; iyimser sıra varsa onun üstüne biner.
+    private func orderedCategories(_ categories: [ServiceCategory]) -> [ServiceCategory] {
+        let sorted = categories.sorted { $0.sortOrder < $1.sortOrder }
+        guard let draftOrder else { return sorted }
+        let byId = Dictionary(uniqueKeysWithValues: sorted.map { ($0.id, $0) })
+        let drafted = draftOrder.compactMap { byId[$0] }
+        // Taslakta olmayan (arada eklenen) kayıt kaybolmasın.
+        let missing = sorted.filter { category in !draftOrder.contains(category.id) }
+        return drafted + missing
+    }
+
+    private var isReordering: Bool { draftOrder != nil }
 
     private func row(for category: ServiceCategory, in ordered: [ServiceCategory]) -> some View {
         let serviceCount = store.catalog.services
@@ -86,21 +114,15 @@ struct ServiceCategoryListView: View {
             }
         }
         .buttonStyle(.plain)
-        .draggable(canWrite ? category.id : "")
-        .dropDestination(for: String.self) { items, _ in
-            guard canWrite, let sourceId = items.first, sourceId != category.id else { return false }
-            Task { await move(sourceId: sourceId, onto: category, in: ordered) }
-            return true
-        }
         .accessibilityActions {
-            if canWrite {
+            if canWrite, !isReordering {
                 reorderAccessibilityActions(for: category, in: ordered)
             }
         }
     }
 
-    /// Sürükleme motor beceri ister; sıralamanın tek yolu olamaz. Görsel oklar
-    /// kalktı, VoiceOver yolu kalkmadı.
+    /// Sürükleme motor beceri ister; sıralamanın tek yolu olamaz. Tutamaç
+    /// VoiceOver'a gösterilmez, yolu bu aksiyonlar sağlar.
     @ViewBuilder
     private func reorderAccessibilityActions(
         for category: ServiceCategory,
@@ -108,50 +130,49 @@ struct ServiceCategoryListView: View {
     ) -> some View {
         let index = ordered.firstIndex(of: category) ?? 0
         if index > 0 {
-            Button("Yukarı taşı") {
-                Task { await move(sourceId: category.id, onto: ordered[index - 1], in: ordered) }
-            }
+            Button("Yukarı taşı") { moveBy(-1, category, in: ordered) }
         }
         if index < ordered.count - 1 {
-            Button("Aşağı taşı") {
-                Task { await move(sourceId: category.id, onto: ordered[index + 1], in: ordered) }
-            }
+            Button("Aşağı taşı") { moveBy(1, category, in: ordered) }
         }
     }
 
-    /// [sourceId] kategorisini [target]'ın bulunduğu konuma taşır.
+    private func moveBy(_ step: Int, _ category: ServiceCategory, in ordered: [ServiceCategory]) {
+        guard let from = ordered.firstIndex(of: category) else { return }
+        var ids = ordered.map(\.id)
+        ids.insert(ids.remove(at: from), at: from + step)
+        withAnimation(KlinaraMetrics.stepTransition) { reorder(ids) }
+    }
+
+    /// Yeni sırayı hemen ekrana uygular, sonra sunucuya yazar.
     ///
     /// Komşuyla takas değil **yeniden numaralama**: sürükleme bitişik olmayan bir
     /// hedefe bırakılabiliyor ve art arda takas etmek aradaki her kayda iki yazma
     /// demekti. Yalnız sırası gerçekten değişen kayıtlar yazılır.
-    private func move(
-        sourceId: String,
-        onto target: ServiceCategory,
-        in ordered: [ServiceCategory]
-    ) async {
-        guard
-            let from = ordered.firstIndex(where: { $0.id == sourceId }),
-            let to = ordered.firstIndex(of: target),
-            from != to
-        else { return }
-
-        var reordered = ordered
-        reordered.insert(reordered.remove(at: from), at: to)
-        let previous = Dictionary(uniqueKeysWithValues: ordered.map { ($0.id, $0.sortOrder) })
-
+    private func reorder(_ ids: [String]) {
+        draftOrder = ids
         reorderError = nil
-        do {
-            for (index, category) in reordered.enumerated() where previous[category.id] != index {
-                _ = try await store.updateCategory(
-                    id: category.id,
-                    UpdateServiceCategoryInput(sortOrder: index)
-                )
+        let previous = Dictionary(
+            uniqueKeysWithValues: store.catalog.categories.map { ($0.id, $0.sortOrder) }
+        )
+
+        Task {
+            do {
+                for (index, id) in ids.enumerated() where previous[id] != index {
+                    _ = try await store.updateCategory(
+                        id: id,
+                        UpdateServiceCategoryInput(sortOrder: index)
+                    )
+                }
+            } catch {
+                reorderError = error as? APIError ?? .network
             }
-        } catch {
-            reorderError = error as? APIError ?? .network
+            // Yazmalardan biri düşmüş olabilir; kesin doğru sırayı sunucudan
+            // okuyoruz. Liste yerinde kalır (iskelet yok), taslak ancak bundan
+            // sonra bırakılır — arada eski sıra görünmez.
+            await store.reload()
+            withAnimation(KlinaraMetrics.stepTransition) { draftOrder = nil }
         }
-        // Yazmalardan biri düşmüş olabilir; kesin doğru sırayı sunucudan okuyoruz.
-        await store.reload()
     }
 }
 

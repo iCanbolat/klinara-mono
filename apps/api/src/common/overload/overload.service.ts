@@ -1,4 +1,4 @@
-import { monitorEventLoopDelay, type IntervalHistogram } from 'node:perf_hooks';
+import { monitorEventLoopDelay } from 'node:perf_hooks';
 import { getHeapStatistics } from 'node:v8';
 import { Injectable, type OnApplicationBootstrap, type OnApplicationShutdown } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -37,7 +37,7 @@ export class OverloadService implements OnApplicationBootstrap, OnApplicationShu
   private readonly maxHeapUsedRatio: number;
   private readonly sampleIntervalMs: number;
 
-  private histogram: IntervalHistogram | undefined;
+  private histogram: ReturnType<typeof monitorEventLoopDelay> | undefined;
   private timer: NodeJS.Timeout | undefined;
   private snapshot: OverloadSnapshot = {
     eventLoopDelayMs: 0,

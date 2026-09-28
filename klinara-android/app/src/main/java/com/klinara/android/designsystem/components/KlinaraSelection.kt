@@ -93,6 +93,10 @@ fun KlinaraSelectableRow(
  * sunucu araması gereken listeler (müşteri) bunu kullanmaz, kendi alanını çizer.
  * Seçenek sayısı [searchThreshold]'un altındaysa arama alanı hiç çizilmez — iki
  * seçeneklik bir listede arama kutusu gürültüdür.
+ *
+ * Seçenek sayısı [collapseThreshold]'u AŞARSA boş aramada liste basılmaz: yüzlerce
+ * kaydı olan bir listeyi ekrana dökmek göz atılabilirlik değil, kaydırma yorgunluğu
+ * üretir (iOS tarafı aynı gerekçeyle aynı eşiği kullanıyor).
  */
 @Composable
 fun <T> KlinaraSearchablePicker(
@@ -106,21 +110,29 @@ fun <T> KlinaraSearchablePicker(
     searchLabel: String = "Ara",
     emptyMessage: String = "Aramanızla eşleşen kayıt yok.",
     searchThreshold: Int = SEARCH_THRESHOLD,
+    collapseThreshold: Int = COLLAPSE_THRESHOLD,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     val needle = query.trim().lowercase(TurkishLocale)
+    val isCollapsed = needle.isEmpty() && options.size > collapseThreshold
     val visible =
-        if (needle.isEmpty()) {
-            options
-        } else {
-            options.filter { label(it).lowercase(TurkishLocale).contains(needle) }
+        when {
+            isCollapsed -> emptyList()
+            needle.isEmpty() -> options
+            else -> options.filter { label(it).lowercase(TurkishLocale).contains(needle) }
         }
 
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(KlinaraMetrics.xs)) {
         if (options.size >= searchThreshold) {
             KlinaraTextField(label = searchLabel, value = query, onValueChange = { query = it })
         }
-        if (visible.isEmpty()) {
+        if (isCollapsed) {
+            Text(
+                "${options.size} kayıt var. Bulmak için yazın.",
+                style = KlinaraType.bodyM,
+                color = KlinaraTheme.colors.charcoalMuted,
+            )
+        } else if (visible.isEmpty()) {
             Text(emptyMessage, style = KlinaraType.bodyM, color = KlinaraTheme.colors.charcoalMuted)
         }
         visible.forEachIndexed { index, option ->
@@ -192,3 +204,4 @@ fun KlinaraToggleRow(
 }
 
 private const val SEARCH_THRESHOLD = 6
+private const val COLLAPSE_THRESHOLD = 8

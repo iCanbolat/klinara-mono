@@ -60,7 +60,10 @@ android {
             buildConfigField(
                 "String",
                 "KLINARA_API_BASE_URL",
-                "\"${localProp("klinara.apiBaseUrl", "http://10.0.2.2:3000/api/v1")}\"",
+                // iOS Info.plist'teki KlinaraAPIBaseURL ile aynı ngrok tüneli (A1.5 sonrası
+                // ikisi de aynı geliştirme sunucusunu göstersin diye) — `klinara.apiBaseUrl`
+                // ile local.properties'ten ezilebilir.
+                "\"${localProp("klinara.apiBaseUrl", "https://pleasing-poodle-alive.ngrok-free.app/api/v1")}\"",
             )
             buildConfigField(
                 "String",

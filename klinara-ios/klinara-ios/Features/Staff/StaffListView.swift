@@ -47,6 +47,8 @@ struct StaffListView: View {
                 : (canWrite ? { showsCreate = true } : nil),
             onRetry: { await store.reload() }
         ) { profiles in
+            KlinaraSearchField(text: $searchText, placeholder: "Personel ara")
+
             let visible = filtered(profiles)
 
             if visible.isEmpty {
@@ -66,7 +68,6 @@ struct StaffListView: View {
         }
         .navigationTitle("Personel")
         .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: $searchText, prompt: "Personel ara")
         .klinaraFAB(isVisible: canInvite || canWrite) { addButton }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {

@@ -1,5 +1,14 @@
 import SwiftUI
 
+/// Bu eşiğin altında (ör. hizmet, paket) liste zaten göz atılabilir boyutta —
+/// tamamı doğrudan gösterilir. Üstünde (ör. yüzlerce müşteri) boş aramada tam
+/// listeyi basmak ekranı dolduruyor ve göz atılamaz hâle geliyordu; kullanıcı
+/// yazmaya başlayana kadar liste gizlenir.
+///
+/// Genel (generic) tipte `static let` desteklenmediği için sabit tip dışına
+/// alındı.
+private let searchablePickerCollapseThreshold = 8
+
 /// Aranabilir tek seçim listesi — müşteri, personel, hizmet seçimi.
 ///
 /// `ScheduleExceptionEditorView` bunu elle kuruyordu ve arama alanı yoktu;
@@ -24,8 +33,14 @@ struct KlinaraSearchablePicker<Value: Identifiable>: View {
 
     @State private var term = ""
 
+    private var isCollapsed: Bool {
+        term.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && options.count > searchablePickerCollapseThreshold
+    }
+
     private var visible: [Value] {
-        guard !term.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return options }
+        let trimmed = term.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return isCollapsed ? [] : options }
         return options.filter { option in
             SearchText.matches(label(option), term: term)
                 || detail(option).map { SearchText.matches($0, term: term) } ?? false
@@ -46,7 +61,9 @@ struct KlinaraSearchablePicker<Value: Identifiable>: View {
             .padding(.horizontal, KlinaraMetrics.md)
             .padding(.top, KlinaraMetrics.sm)
 
-            if visible.isEmpty {
+            if isCollapsed {
+                collapsedHint
+            } else if visible.isEmpty {
                 emptyRow
             } else {
                 ForEach(Array(visible.enumerated()), id: \.element.id) { index, option in
@@ -66,6 +83,14 @@ struct KlinaraSearchablePicker<Value: Identifiable>: View {
                 .buttonStyle(.plain)
             }
         }
+    }
+
+    private var collapsedHint: some View {
+        Text("\(options.count) kayıt var. Bulmak için yazın.")
+            .klinaraText(.bodyM)
+            .foregroundStyle(KlinaraColor.charcoalMuted)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(KlinaraMetrics.md)
     }
 
     private var emptyRow: some View {

@@ -51,14 +51,25 @@ final class CatalogStore {
 
     func load(force: Bool = false) async {
         if !force, state.value != nil { return }
-        state = .loading
+        // İlk yüklemede iskelet; yenilemede eldeki liste ekranda kalır.
+        //
+        // Yenilemede `.loading`e dönmek `KlinaraScreen`in ScrollView'unu söküp
+        // iskeleti koyuyordu: aşağı çekerek yenileyen `.refreshable` görevi
+        // bununla birlikte iptal oluyor, iptal edilen istek sessiz hata olarak
+        // `.failed`a düşüyor ve o da iskeleti çizmeye devam ediyordu — yani
+        // ekran yükleme durumunda takılı kalıyordu.
+        if state.value == nil { state = .loading }
         do {
             // İki uç birbirinden bağımsız; sırayla beklemek ekranı iki kat
             // yavaşlatırdı.
             async let categories = service.categories()
             async let services = service.services()
             state = .loaded(Catalog(categories: try await categories, services: try await services))
+        } catch let error as APIError where error.isSilent {
+            // İptal hata DEĞİL; eldeki durum olduğu gibi kalır.
+            return
         } catch {
+            guard !Task.isCancelled else { return }
             state = .failed(error as? APIError ?? .network)
         }
     }

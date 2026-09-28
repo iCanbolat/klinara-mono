@@ -126,7 +126,7 @@ struct CustomerListView: View {
                 CustomerSummaryStrip(summary: store.summary)
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
-            CustomerSearchField(text: $searchText)
+            KlinaraSearchField(text: $searchText, placeholder: "Ad veya telefon")
         }
         .padding(.horizontal, KlinaraMetrics.screenInset)
         .padding(.top, KlinaraMetrics.sm)

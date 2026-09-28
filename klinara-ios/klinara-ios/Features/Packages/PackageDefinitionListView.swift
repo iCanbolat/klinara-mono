@@ -62,6 +62,8 @@ struct PackageDefinitionListView: View {
                 ErrorBanner(error: error)
             }
 
+            KlinaraSearchField(text: $searchText, placeholder: "Paket ara")
+
             let visible = filtered(definitions)
 
             if visible.isEmpty {
@@ -87,7 +89,6 @@ struct PackageDefinitionListView: View {
         }
         .navigationTitle("Paketler")
         .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: $searchText, prompt: "Paket ara")
         // Üst çubukta ŞUBE SEÇİCİ YOK: başlık, arama alanı, şube menüsü ve
         // seçenekler menüsü aynı 44pt'lik şeride sığmıyordu — şube adı uzun
         // olan kiracıda başlık kırpılıyordu. Kapsam zaten "…" menüsünde ve bu

@@ -30,6 +30,8 @@ struct ServiceListView: View {
             emptyAction: canWrite ? { editing = .create } : nil,
             onRetry: { await store.reload() }
         ) { catalog in
+            KlinaraSearchField(text: $searchText, placeholder: "Hizmet ara")
+
             let visible = filtered(catalog.services)
 
             if visible.isEmpty {
@@ -52,7 +54,6 @@ struct ServiceListView: View {
         .klinaraFAB(isVisible: canWrite, accessibilityLabel: "Yeni hizmet") { editing = .create }
         .navigationTitle("Hizmetler")
         .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: $searchText, prompt: "Hizmet ara")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 // Fiyat ve süre seçili şubeye göre değiştiği için hangi şubede
