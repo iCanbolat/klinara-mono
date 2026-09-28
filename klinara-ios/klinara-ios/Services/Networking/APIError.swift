@@ -48,6 +48,11 @@ nonisolated enum APIErrorCode: String, Decodable, Sendable {
     case versionConflict = "VERSION_CONFLICT"
     case idempotencyConflict = "IDEMPOTENCY_CONFLICT"
 
+    // Onam
+    /// İşleme geçerken gerekli işlem onamı imzalanmamış. Hata değil, bir karar
+    /// noktası: personel gerekçe yazıp aynı isteği tekrarlayabilir.
+    case consentMissing = "CONSENT_MISSING"
+
     // Paket (Faz 5)
     /// Kalan hak yetersiz. Randevu tamamlanırken de gelebilir — o zaman
     /// randevu da tamamlanmamıştır, ikisi aynı transaction'da yaşar.
@@ -110,6 +115,8 @@ nonisolated struct ProblemDetails: Decodable, Sendable {
     let conflicts: [SlotConflict]?
     /// Aynı hatada sunulan en fazla üç alternatif slot.
     let suggestions: [SlotSuggestion]?
+    /// `409 CONSENT_MISSING`'te imzası eksik onamlar.
+    let missing: [MissingConsent]?
 
     init(
         code: APIErrorCode,
@@ -119,7 +126,8 @@ nonisolated struct ProblemDetails: Decodable, Sendable {
         requestId: String? = nil,
         errors: [FieldError]? = nil,
         conflicts: [SlotConflict]? = nil,
-        suggestions: [SlotSuggestion]? = nil
+        suggestions: [SlotSuggestion]? = nil,
+        missing: [MissingConsent]? = nil
     ) {
         self.code = code
         self.title = title
@@ -129,7 +137,16 @@ nonisolated struct ProblemDetails: Decodable, Sendable {
         self.errors = errors
         self.conflicts = conflicts
         self.suggestions = suggestions
+        self.missing = missing
     }
+}
+
+/// `CONSENT_MISSING` gövdesindeki eksik onam. Yalnız `title` gösteriliyor;
+/// `kind` ve `templateId` imza akışı geldiğinde kullanılacak.
+nonisolated struct MissingConsent: Decodable, Sendable, Equatable {
+    let kind: String
+    let templateId: String?
+    let title: String
 }
 
 /// Sunucu ve taşıma katmanı hatalarının tek tipi.
@@ -139,7 +156,7 @@ nonisolated struct ProblemDetails: Decodable, Sendable {
 /// mevcut giriş ekranlarını kırmadan yaşatır.
 nonisolated enum APIError: Error, Sendable {
     /// Sunucu RFC 9457 hatası döndürdü.
-    case problem(ProblemDetails)
+    indirect case problem(ProblemDetails)
     /// Bağlantı kurulamadı / zaman aşımı.
     case network
     /// Yanıt beklenen sözleşmeye uymuyor.
@@ -239,6 +256,8 @@ extension APIError {
                 return problem.detail ?? problem.title
             case .invalidStatusTransition:
                 return problem.detail ?? problem.title
+            case .consentMissing:
+                return "Gerekli onam alınmamış. Önce hastaya imzalatmanız önerilir."
             case .idempotencyConflict:
                 return "Aynı istek hâlâ işleniyor. Birkaç saniye sonra tekrar deneyin."
             case .versionConflict:
@@ -330,6 +349,18 @@ extension APIError {
     var slotSuggestions: [SlotSuggestion] {
         guard case .problem(let problem) = self, problem.code == .slotConflict else { return [] }
         return problem.suggestions ?? []
+    }
+
+    /// Eksik onam başlıkları — yalnız `CONSENT_MISSING`'te dolu.
+    var missingConsents: [MissingConsent] {
+        guard case .problem(let problem) = self, problem.code == .consentMissing else { return [] }
+        return problem.missing ?? []
+    }
+
+    /// Personelin gerekçeyle geçebileceği yumuşak onam uyarısı mı.
+    var isConsentMissing: Bool {
+        guard case .problem(let problem) = self else { return false }
+        return problem.code == .consentMissing
     }
 
     /// `PATCH`/`reschedule` başlığı eksik gönderilmiş — istemci hatası.

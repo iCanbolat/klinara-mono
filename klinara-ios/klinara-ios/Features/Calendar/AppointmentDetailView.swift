@@ -16,6 +16,8 @@ struct AppointmentDetailView: View {
     @State private var state: LoadState<Appointment> = .loading
     @State private var error: APIError?
     @State private var pendingStatus: AppointmentStatus?
+    /// `CONSENT_MISSING` sonrası gerekçe isteyen sheet.
+    @State private var consentOverride: ConsentOverrideRequest?
     @State private var isCancelling = false
     @State private var cancelReason = ""
     @State private var notifyOnCancel = true
@@ -98,6 +100,17 @@ struct AppointmentDetailView: View {
                 if let status = pendingStatus {
                     Button(status.turkishName) { Task { await apply(status) } }
                     Button("Vazgeç", role: .cancel) { pendingStatus = nil }
+                }
+            }
+            .sheet(item: $consentOverride) { request in
+                if let appointment = state.value {
+                    ConsentOverrideSheet(
+                        session: session,
+                        appointment: appointment,
+                        request: request
+                    ) { updated in
+                        state = .loaded(updated)
+                    }
                 }
             }
             .sheet(isPresented: $isCancelling) { cancelSheet }
@@ -227,27 +240,14 @@ struct AppointmentDetailView: View {
     }
 
     private func actionsCard(_ appointment: Appointment) -> some View {
-        // Yalnız sunucunun kabul edeceği geçişler çizilir; basınca 409 alacağı
-        // bir düğmeyi göstermek, kullanıcıya yapamayacağı bir şeyi vaat etmek.
-        let transitions = appointment.status
-            .allowedTransitions(canReopen: canReopen)
-            .filter { $0 != .cancelled }
-
-        return VStack(alignment: .leading, spacing: KlinaraMetrics.md) {
-            if !transitions.isEmpty {
-                KlinaraCard(title: "Durum") {
-                    ForEach(Array(transitions.enumerated()), id: \.element) { index, status in
-                        if index > 0 { KlinaraDivider() }
-                        Button { pendingStatus = status } label: {
-                            KlinaraRow(label: status.turkishName) {
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 13, weight: .semibold))
-                                    .foregroundStyle(KlinaraColor.charcoalMuted)
-                            }
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
+        VStack(alignment: .leading, spacing: KlinaraMetrics.md) {
+            // Hangi düğmelerin çizileceğini `allowedTransitions` belirler: basınca
+            // 409 alacağı bir düğmeyi göstermek, yapamayacağı bir şeyi vaat etmek.
+            AppointmentStatusCard(
+                status: appointment.status,
+                canReopen: canReopen
+            ) { target in
+                select(target, from: appointment.status)
             }
 
             if appointment.status.canReschedule {
@@ -317,6 +317,16 @@ struct AppointmentDetailView: View {
         }
     }
 
+    /// Geri alınması pahalı geçişler (tamamla, gelmedi, yeniden aç) önce onay
+    /// ister; gerisi tek dokunuşla uygulanır.
+    private func select(_ status: AppointmentStatus, from source: AppointmentStatus) {
+        if status.needsConfirmation(from: source) {
+            pendingStatus = status
+        } else {
+            Task { await apply(status) }
+        }
+    }
+
     private func apply(_ status: AppointmentStatus) async {
         guard let appointment = state.value else { return }
         pendingStatus = nil
@@ -324,7 +334,17 @@ struct AppointmentDetailView: View {
         do {
             state = .loaded(try await store.changeStatus(appointment, to: status))
         } catch {
-            self.error = error as? APIError ?? .network
+            let apiError = error as? APIError ?? .network
+            // Eksik onam bir hata değil, karar noktası: banner yerine gerekçe
+            // sheet'i açılır ve aynı istek gerekçeyle tekrarlanır.
+            if apiError.isConsentMissing {
+                consentOverride = ConsentOverrideRequest(
+                    status: status,
+                    titles: apiError.missingConsents.map(\.title)
+                )
+            } else {
+                self.error = apiError
+            }
         }
     }
 

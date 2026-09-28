@@ -278,12 +278,17 @@ final class CalendarStore {
     func changeStatus(
         _ appointment: Appointment,
         to status: AppointmentStatus,
-        reason: String? = nil
+        reason: String? = nil,
+        consentOverrideReason: String? = nil
     ) async throws -> Appointment {
         try await mutating {
             let updated = try await service.changeStatus(
                 id: appointment.id,
-                ChangeAppointmentStatusInput(status: status, reason: reason)
+                ChangeAppointmentStatusInput(
+                    status: status,
+                    reason: reason,
+                    consentOverrideReason: consentOverrideReason
+                )
             )
             merge(updated)
             return updated

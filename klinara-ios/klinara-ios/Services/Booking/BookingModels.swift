@@ -398,6 +398,10 @@ nonisolated struct CancelAppointmentInput: Encodable, Sendable, Equatable {
 nonisolated struct ChangeAppointmentStatusInput: Encodable, Sendable, Equatable {
     let status: AppointmentStatus
     var reason: String?
+    /// Gerekli onam imzalanmadan `in_progress`/`completed`a geçmenin gerekçesi.
+    /// Yoksa ve onam eksikse sunucu `409 CONSENT_MISSING` döner; gerekçe randevu
+    /// geçmişine yazılır. `nil` gövdeye yazılmaz.
+    var consentOverrideReason: String?
 }
 
 // MARK: - Sorgular

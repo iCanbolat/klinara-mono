@@ -127,6 +127,42 @@ struct ProblemDetailsTests {
         }
     }
 
+    @Test("CONSENT_MISSING eksik onam başlıklarını taşır ve karar noktası sayılır")
+    func decodesConsentMissing() throws {
+        // Gövde `AppError.conflict(..., { extra: { missing } })`: uzantı alanı
+        // belgenin kökünde, tıpkı `conflicts` gibi.
+        let error = APIError.problem(try problem("""
+        {
+          "type": "https://errors.klinara.app/consent-missing",
+          "title": "Gerekli onam alınmamış",
+          "status": 409,
+          "code": "CONSENT_MISSING",
+          "detail": "Eksik: Botoks uygulama onamı. Devam etmek için gerekçe yazın.",
+          "missing": [
+            { "kind": "treatment", "templateId": "58b7545e-88b8-4235-83f2-2d942a527694", "title": "Botoks uygulama onamı" }
+          ]
+        }
+        """))
+
+        #expect(error.isConsentMissing)
+        #expect(error.missingConsents.map(\.title) == ["Botoks uygulama onamı"])
+        // Bilinmeyen koda düşüp "Bir sorun oluştu" + referans göstermemeli.
+        #expect(error.supportReference == nil)
+        #expect(error.displayMessage != "Bir sorun oluştu. Lütfen tekrar deneyin.")
+    }
+
+    @Test("Eksik onam listesi yalnız CONSENT_MISSING'te okunur")
+    func missingConsentsAreScoped() {
+        let unrelated = APIError.problem(ProblemDetails(
+            code: .conflict,
+            title: "x",
+            status: 409,
+            missing: [MissingConsent(kind: "treatment", templateId: nil, title: "y")]
+        ))
+        #expect(!unrelated.isConsentMissing)
+        #expect(unrelated.missingConsents.isEmpty)
+    }
+
     @Test("Oturum yalnız token hatalarında düşürülür")
     func invalidatesSessionOnlyForTokens() {
         func error(_ code: APIErrorCode) -> APIError {
