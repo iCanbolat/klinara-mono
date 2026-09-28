@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CustomerFormDialog } from './customer-form';
 import { CustomerProfile } from './customer-profile';
 import { usePageCrumb } from '@/components/shell/page-crumb';
+import { CustomerConsentsPanel } from '@/components/consent/customer-consents-panel';
 import { FilesPanel } from './files-panel';
 import { MergeDialog } from './merge-dialog';
 import { NotesPanel } from './notes-panel';
@@ -45,6 +46,8 @@ export function CustomerCard({ customerId }: { customerId: string }): ReactNode 
   const canWrite = permissions.includes(PERMISSIONS.CUSTOMER_WRITE);
   const canMerge = permissions.includes(PERMISSIONS.CUSTOMER_MERGE);
   usePageCrumb(customer?.fullName ?? null);
+
+  const canSeeConsents = permissions.includes(PERMISSIONS.CONSENT_READ);
 
   const canSeeTimeline =
     permissions.includes(PERMISSIONS.APPOINTMENT_READ_ALL) ||
@@ -132,6 +135,9 @@ export function CustomerCard({ customerId }: { customerId: string }): ReactNode 
                 <TabsTrigger value="timeline">{t('customers.tab.timeline')}</TabsTrigger>
               ) : null}
               <TabsTrigger value="files">{t('customers.tab.files')}</TabsTrigger>
+              {canSeeConsents ? (
+                <TabsTrigger value="consents">{t('consent.required.title')}</TabsTrigger>
+              ) : null}
             </TabsList>
 
             <TabsContent value="notes">
@@ -147,6 +153,12 @@ export function CustomerCard({ customerId }: { customerId: string }): ReactNode 
             <TabsContent value="files">
               <FilesPanel customerId={customerId} canWrite={canWrite} />
             </TabsContent>
+
+            {canSeeConsents ? (
+              <TabsContent value="consents">
+                <CustomerConsentsPanel customerId={customerId} />
+              </TabsContent>
+            ) : null}
           </Tabs>
         </Card>
       </div>

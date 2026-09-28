@@ -22,7 +22,9 @@ import { ConfirmButton } from '@/components/ui/confirm-button';
 import { PageHeader } from '@/components/ui/page-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import { TreatmentTemplates } from '@/components/consent/treatment-templates';
 
 /**
  * Faz 7 — tek zorunlu KVKK/aydınlatma onam metni.
@@ -175,7 +177,10 @@ function ConsentEditor(): ReactNode {
         ) : (
           <ul className="flex flex-col gap-2 text-sm">
             {versions.map((version) => (
-              <li key={version.id} className="flex flex-wrap items-center gap-2 border-b pb-2 last:border-0">
+              <li
+                key={version.id}
+                className="flex flex-wrap items-center gap-2 border-b pb-2 last:border-0"
+              >
                 <span className="font-medium">
                   {t('consent.version')} {version.version}
                 </span>
@@ -227,7 +232,22 @@ function toMessage(caught: unknown): string {
 export default function Page(): ReactNode {
   return (
     <PermissionGate required={[PERMISSIONS.CONSENT_READ]}>
-      <ConsentEditor />
+      <Tabs defaultValue="kvkk" className="gap-5">
+        <TabsList>
+          <TabsTrigger value="kvkk">{t('consent.tab.kvkk')}</TabsTrigger>
+          <TabsTrigger value="treatments">{t('consent.tab.treatments')}</TabsTrigger>
+        </TabsList>
+        <TabsContent value="kvkk">
+          <ConsentEditor />
+        </TabsContent>
+        <TabsContent value="treatments" className="max-w-3xl">
+          <PageHeader
+            title={t('consent.templates.title')}
+            description={t('consent.templates.subtitle')}
+          />
+          <TreatmentTemplates />
+        </TabsContent>
+      </Tabs>
     </PermissionGate>
   );
 }

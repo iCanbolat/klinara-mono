@@ -27,6 +27,13 @@ export const FORWARD_REQUEST_HEADERS = [
   // `If-Match` alacağı gün proxy'nin değişmesi gerekmesin.
   'if-match',
   'if-none-match',
+  // İsteğin izi. Proxy sunucu tarafında koştuğu için bunlar olmadan API her
+  // isteği proxy'nin kendisinden (`127.0.0.1`, `node`) gelmiş görürdü:
+  // klinikte alınan imzalı onamın kanıtına hastanın tableti değil proxy
+  // yazılırdı. API `trust proxy` açık — `x-forwarded-for`u doğrudan
+  // erişimdeki gibi okuyor, yani burada yeni bir güven sınırı açılmıyor.
+  'user-agent',
+  'x-forwarded-for',
 ] as const;
 
 /** İstemciye geri verilen yanıt başlıkları — beyaz liste. */

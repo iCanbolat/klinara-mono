@@ -168,10 +168,7 @@ export class ConsentService {
     });
   }
 
-  private async loadActive(
-    tx: Tx,
-    siteId: string,
-  ): Promise<repo.ConsentDocumentRow | undefined> {
+  private async loadActive(tx: Tx, siteId: string): Promise<repo.ConsentDocumentRow | undefined> {
     const settings = await pageRepo.findSettings(tx, siteId);
     if (settings?.activeConsentDocumentId == null) return undefined;
     return repo.findById(tx, settings.activeConsentDocumentId);

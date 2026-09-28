@@ -23,6 +23,7 @@ import {
 } from '@/lib/calendar/date';
 import { CreateAppointmentDialog } from './appointment-form/create-dialog';
 import { AgendaList } from './agenda-list';
+import { ConsentStatusProvider } from '@/components/consent/consent-status-context';
 import { AppointmentSheet } from './appointment-sheet';
 import { CalendarToolbar } from './calendar-toolbar';
 import { DayGrid } from './day-grid';
@@ -100,6 +101,11 @@ export function CalendarPage(): ReactNode {
     [staff],
   );
 
+  const appointmentIds = useMemo(
+    () => (state.data?.appointments ?? []).map((entry) => entry.id),
+    [state.data],
+  );
+
   const anchor = view === 'week' ? weekStart(day) : day;
   const days = useMemo(() => (view === 'week' ? daysFrom(anchor, 7) : [anchor]), [view, anchor]);
 
@@ -175,37 +181,39 @@ export function CalendarPage(): ReactNode {
           arka planı aynı renkteyken ızgaranın nerede bitip sayfanın nerede
           başladığı okunmuyordu. */}
       {state.data !== null ? (
-        <Card className={mode === 'agenda' ? 'p-3 sm:p-5' : 'p-2 sm:p-4'}>
-          {mode === 'agenda' ? (
-            <AgendaList
-              days={days}
-              entries={state.data.appointments}
-              timezone={state.data.timezone}
-              staffNames={staffNames}
-              onSelect={(entry) => setSelected(entry.id)}
-            />
-          ) : view === 'day' ? (
-            <DayGrid
-              day={anchor}
-              entries={state.data.appointments}
-              timezone={state.data.timezone}
-              onSelect={(entry) => setSelected(entry.id)}
-            />
-          ) : (
-            <WeekGrid
-              weekStart={anchor}
-              entries={state.data.appointments}
-              density={state.data.density}
-              timezone={state.data.timezone}
-              staffFiltered={staffProfileId !== null}
-              onSelect={(entry) => setSelected(entry.id)}
-              onPickDay={(picked) => {
-                setDay(picked);
-                setView('day');
-              }}
-            />
-          )}
-        </Card>
+        <ConsentStatusProvider appointmentIds={appointmentIds}>
+          <Card className={mode === 'agenda' ? 'p-3 sm:p-5' : 'p-2 sm:p-4'}>
+            {mode === 'agenda' ? (
+              <AgendaList
+                days={days}
+                entries={state.data.appointments}
+                timezone={state.data.timezone}
+                staffNames={staffNames}
+                onSelect={(entry) => setSelected(entry.id)}
+              />
+            ) : view === 'day' ? (
+              <DayGrid
+                day={anchor}
+                entries={state.data.appointments}
+                timezone={state.data.timezone}
+                onSelect={(entry) => setSelected(entry.id)}
+              />
+            ) : (
+              <WeekGrid
+                weekStart={anchor}
+                entries={state.data.appointments}
+                density={state.data.density}
+                timezone={state.data.timezone}
+                staffFiltered={staffProfileId !== null}
+                onSelect={(entry) => setSelected(entry.id)}
+                onPickDay={(picked) => {
+                  setDay(picked);
+                  setView('day');
+                }}
+              />
+            )}
+          </Card>
+        </ConsentStatusProvider>
       ) : null}
 
       <AppointmentSheet

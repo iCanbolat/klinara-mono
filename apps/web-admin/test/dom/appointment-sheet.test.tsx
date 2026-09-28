@@ -22,6 +22,12 @@ class ApiProblemError extends Error {
 
 vi.mock('@/lib/api/client', () => ({ api: { get, post, patch }, ApiProblemError, SessionExpiredError }));
 
+const push = vi.fn();
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push }),
+  usePathname: () => '/takvim',
+}));
+
 let permissions: string[] = [PERMISSIONS.APPOINTMENT_WRITE];
 vi.mock('@/components/session/session-provider', () => ({
   useSession: () => ({ permissions, me: null, loading: false }),
@@ -86,6 +92,7 @@ describe('randevu ayrıntı paneli', () => {
     get.mockReset();
     post.mockReset();
     patch.mockReset();
+    push.mockReset();
     permissions = [PERMISSIONS.APPOINTMENT_WRITE];
     get.mockImplementation((path: string) => {
       if (path === 'appointments/a1') return Promise.resolve(APPOINTMENT);
@@ -262,5 +269,78 @@ describe('randevu ayrıntı paneli', () => {
     renderSheet();
 
     expect(await screen.findByRole('button', { name: 'İşlemde' })).toBeEnabled();
+  });
+  describe('onam (0053)', () => {
+    const REQUIREMENTS = {
+      appointmentId: 'a1',
+      customerId: 'c1',
+      customerName: 'Ayşe Yılmaz',
+      items: [
+        {
+          kind: 'treatment',
+          templateId: 'tpl1',
+          title: 'Botoks onamı',
+          satisfied: false,
+          signatureId: null,
+          document: null,
+        },
+      ],
+      missingCount: 1,
+    };
+
+    beforeEach(() => {
+      permissions = [
+        PERMISSIONS.APPOINTMENT_WRITE,
+        PERMISSIONS.CONSENT_READ,
+        PERMISSIONS.CONSENT_COLLECT,
+      ];
+      get.mockImplementation((path: string) => {
+        if (path === 'appointments/a1') return Promise.resolve({ ...APPOINTMENT, status: 'arrived' });
+        if (path === 'appointments/a1/consent-requirements') return Promise.resolve(REQUIREMENTS);
+        return Promise.resolve({ data: [] });
+      });
+    });
+
+    it('eksik onam rozeti ve "Onam al" imza moduna götürüyor', async () => {
+      const user = userEvent.setup();
+      renderSheet();
+
+      expect(await screen.findByText('1 onam eksik')).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Onam al' }));
+      expect(push).toHaveBeenCalledWith('/imza/randevu/a1?donus=%2Ftakvim');
+    });
+
+    // Sunucu eksik onamları gövdenin `missing` alanında döndürüyor.
+    const CONSENT_MISSING = {
+      code: 'CONSENT_MISSING',
+      status: 409,
+      missing: [{ kind: 'treatment', templateId: 'tpl1', title: 'Botoks onamı' }],
+    };
+
+    it('CONSENT_MISSING gerekçe diyaloğunu açıyor; gerekçe AYNI geçişle gidiyor', async () => {
+      const user = userEvent.setup();
+      post.mockImplementation((_path: string, body: Record<string, unknown>) =>
+        body['consentOverrideReason'] === undefined
+          ? Promise.reject(new ApiProblemError(CONSENT_MISSING, null))
+          : Promise.resolve(undefined),
+      );
+      renderSheet();
+
+      await user.click(await screen.findByRole('button', { name: 'İşlemde' }));
+      const dialog = await screen.findByRole('dialog');
+      expect(dialog).toHaveTextContent('Botoks onamı');
+
+      const confirm = screen.getByRole('button', { name: 'Gerekçeyle devam et' });
+      expect(confirm).toBeDisabled();
+      await user.type(screen.getByLabelText('Gerekçe'), 'Kağıt form imzalandı');
+      await user.click(confirm);
+
+      await waitFor(() => {
+        expect(post).toHaveBeenLastCalledWith('appointments/a1/status', {
+          status: 'in_progress',
+          consentOverrideReason: 'Kağıt form imzalandı',
+        });
+      });
+    });
   });
 });

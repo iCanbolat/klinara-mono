@@ -5,7 +5,7 @@
   "compilerOptions": {
     "deleteOutDir": true,
     "tsConfigPath": "tsconfig.build.json",
-    "assets": ["**/*.sql", "**/*.webp"],
+    "assets": ["**/*.sql", "**/*.webp", "**/*.ttf"],
     "watchAssets": true
   }
 }

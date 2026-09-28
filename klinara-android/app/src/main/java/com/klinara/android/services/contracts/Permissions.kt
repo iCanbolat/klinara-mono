@@ -50,6 +50,7 @@ object Permissions {
     const val REPORT_PERFORMANCE_READ_OWN = "report.performance:read.own"
     const val CONSENT_READ = "consent:read"
     const val CONSENT_MANAGE = "consent:manage"
+    const val CONSENT_COLLECT = "consent:collect"
     const val NOTIFICATION_SEND = "notification:send"
     const val NOTIFICATION_READ = "notification:read"
     const val NOTIFICATION_MANAGE = "notification:manage"
@@ -154,6 +155,7 @@ object RolePermissions {
                     "report.performance:read.own",
                     "consent:read",
                     "consent:manage",
+                    "consent:collect",
                     "notification:send",
                     "notification:read",
                     "notification:manage",
@@ -188,6 +190,7 @@ object RolePermissions {
                     "package:transfer",
                     "report.revenue:read",
                     "consent:manage",
+                    "consent:collect",
                     "notification:send",
                     "notification:manage",
                     "booking_page:read",
@@ -209,6 +212,7 @@ object RolePermissions {
                     "notification:read",
                     "package:write",
                     "consent:manage",
+                    "consent:collect",
                     "notification:send",
                     "booking_page:read",
                 ),
@@ -225,6 +229,7 @@ object RolePermissions {
                     "schedule:read",
                     "package:read",
                     "consent:read",
+                    "consent:collect",
                     "notification:read",
                     "report.performance:read.own",
                 ),

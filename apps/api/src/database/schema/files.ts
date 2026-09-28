@@ -8,7 +8,7 @@ import { tenants } from './tenancy';
 export type CustomerFileKind = 'photo' | 'document';
 export type CustomerFilePosition = 'before' | 'after' | 'other';
 export type CustomerFileStatus = 'pending' | 'ready';
-export type RecordAccessResource = 'file' | 'note';
+export type RecordAccessResource = 'file' | 'note' | 'consent';
 export type RecordAccessAction = 'view' | 'download';
 
 export const customerFileGroups = pgTable(

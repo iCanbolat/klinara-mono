@@ -73,6 +73,13 @@ export const PERMISSIONS = {
   // --- Onam / KVKK ---
   CONSENT_READ: 'consent:read',
   CONSENT_MANAGE: 'consent:manage',
+  /**
+   * Klinikte hastaya imzalı onam attırma (KVKK + işlem onamı).
+   *
+   * `consent:manage` üzerine BİNMEZ: uygulayıcı imza alabilir ama kiracının
+   * onam METİNLERİNİ değiştiremez.
+   */
+  CONSENT_COLLECT: 'consent:collect',
 
   // --- İletişim ve denetim ---
   NOTIFICATION_SEND: 'notification:send',
@@ -186,6 +193,7 @@ export const ROLE_DEFINITIONS: RoleDefinition[] = [
       P.PACKAGE_TRANSFER,
       P.REPORT_REVENUE_READ,
       P.CONSENT_MANAGE,
+      P.CONSENT_COLLECT,
       P.NOTIFICATION_SEND,
       P.NOTIFICATION_MANAGE,
       P.BOOKING_PAGE_READ,
@@ -204,6 +212,7 @@ export const ROLE_DEFINITIONS: RoleDefinition[] = [
       ...OPERATIONS,
       P.PACKAGE_WRITE,
       P.CONSENT_MANAGE,
+      P.CONSENT_COLLECT,
       P.NOTIFICATION_SEND,
       P.BOOKING_PAGE_READ,
     ],
@@ -227,6 +236,7 @@ export const ROLE_DEFINITIONS: RoleDefinition[] = [
       P.SCHEDULE_READ,
       P.PACKAGE_READ,
       P.CONSENT_READ,
+      P.CONSENT_COLLECT,
       P.NOTIFICATION_READ,
       // Kendi işlem sayısı, cirosu, primi ve doluluğu. Ciro raporunun tamamı
       // DEĞİL — `report.revenue:read` bu rolde bilerek yok.

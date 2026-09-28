@@ -2,10 +2,17 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
-import type { Branch, Service, ServiceCategorySummary } from '@klinara/shared';
+import {
+  PERMISSIONS,
+  type Branch,
+  type ConsentTemplate,
+  type Service,
+  type ServiceCategorySummary,
+} from '@klinara/shared';
 import { t } from '@/i18n/tr';
 import { api } from '@/lib/api/client';
 import { useBranch } from '@/components/session/branch-provider';
+import { useSession } from '@/components/session/session-provider';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
@@ -56,6 +63,12 @@ export function ServiceFormDialog({
   onSaved: () => void;
 }): ReactNode {
   const { branches } = useBranch();
+  const { permissions } = useSession();
+  const canReadConsent = permissions.includes(PERMISSIONS.CONSENT_READ);
+  /** `null` = liste okunamadı ya da izin yok; bölüm hiç çizilmiyor. */
+  const [templates, setTemplates] = useState<ConsentTemplate[] | null>(null);
+  const [consentIds, setConsentIds] = useState<string[]>([]);
+  const [initialConsentIds, setInitialConsentIds] = useState<string[]>([]);
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [categoryId, setCategoryId] = useState('');
@@ -87,13 +100,41 @@ export function ServiceFormDialog({
         (service?.branchOverrides ?? []).map((override) => ({
           branchId: override.branchId,
           priceMinor: override.priceMinor,
-          durationMinutes: override.durationMinutes === null ? '' : String(override.durationMinutes),
+          durationMinutes:
+            override.durationMinutes === null ? '' : String(override.durationMinutes),
         })),
       );
       setErrors(NO_ERRORS);
       setBusy(false);
     })();
   }, [open, service, categories]);
+
+  // Gerekli onamlar ayrı bir uçta (`PUT services/:id/consent-templates`);
+  // şablon listesi bağlantıları zaten taşıyor.
+  useEffect(() => {
+    if (!open || !canReadConsent) return;
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        const list = await api.get<ConsentTemplate[]>('consent-templates', {
+          signal: controller.signal,
+        });
+        if (controller.signal.aborted) return;
+        const linked =
+          service === null
+            ? []
+            : list
+                .filter((template) => template.serviceIds.includes(service.id))
+                .map((row) => row.id);
+        setTemplates(list);
+        setConsentIds(linked);
+        setInitialConsentIds(linked);
+      } catch {
+        if (!controller.signal.aborted) setTemplates(null);
+      }
+    })();
+    return () => controller.abort();
+  }, [open, service, canReadConsent]);
 
   async function submit(): Promise<void> {
     setBusy(true);
@@ -119,8 +160,17 @@ export function ServiceFormDialog({
         })),
       };
 
-      if (service === null) await api.post('services', body);
-      else await api.patch(`services/${service.id}`, body);
+      const saved =
+        service === null
+          ? await api.post<Service>('services', body)
+          : await api.patch<Service>(`services/${service.id}`, body);
+
+      const consentChanged =
+        consentIds.length !== initialConsentIds.length ||
+        consentIds.some((id) => !initialConsentIds.includes(id));
+      if (templates !== null && consentChanged) {
+        await api.put(`services/${saved.id}/consent-templates`, { templateIds: consentIds });
+      }
 
       toast.success(t('catalog.saved'));
       onSaved();
@@ -250,9 +300,7 @@ export function ServiceFormDialog({
                   variant="ghost"
                   size="sm"
                   disabled={busy}
-                  onClick={() =>
-                    setOverrides((current) => current.filter((_, i) => i !== index))
-                  }
+                  onClick={() => setOverrides((current) => current.filter((_, i) => i !== index))}
                 >
                   {t('catalog.removeOverride')}
                 </Button>
@@ -282,6 +330,37 @@ export function ServiceFormDialog({
               </FieldSelect>
             ) : null}
           </section>
+
+          {templates !== null ? (
+            <section className="flex flex-col gap-2">
+              <h3 className="text-label">{t('consent.catalog.label')}</h3>
+              <p className="text-xs text-muted-foreground">{t('consent.catalog.hint')}</p>
+              {templates.filter((template) => !template.archived).length === 0 ? (
+                <p className="text-sm text-muted-foreground">{t('consent.catalog.none')}</p>
+              ) : (
+                templates
+                  .filter((template) => !template.archived)
+                  .map((template) => (
+                    <FieldCheckbox
+                      key={template.id}
+                      label={template.name}
+                      {...(template.active === null
+                        ? { hint: t('consent.templates.unpublished') }
+                        : {})}
+                      checked={consentIds.includes(template.id)}
+                      disabled={busy}
+                      onCheckedChange={(checked) =>
+                        setConsentIds((current) =>
+                          checked
+                            ? [...current, template.id]
+                            : current.filter((id) => id !== template.id),
+                        )
+                      }
+                    />
+                  ))
+              )}
+            </section>
+          ) : null}
 
           {errors.message !== null ? (
             <Alert tone="danger">

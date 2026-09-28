@@ -6,6 +6,7 @@ import { toZonedIso } from '../../common/time';
 import { TenantTxService } from '../../database/tenant-tx.service';
 import type { Tx } from '../../database/tenant-tx';
 import type { AppointmentStatus } from '../../database/schema/appointments';
+import { missingConsents } from '../consent/consent-requirements';
 import { ChargeGenerationService } from '../finance/charge-generation.service';
 import { CustomerPackagesService } from '../packages/customer-packages.service';
 import { PackageConsumptionService } from '../packages/package-consumption.service';
@@ -17,6 +18,7 @@ import { AvailabilityService } from './availability.service';
 import { AppointmentNotifierService } from '../notifications/appointment-notifier.service';
 import { ReminderSchedulerService } from '../notifications/reminder-scheduler.service';
 import * as repo from './appointments.repository';
+import type { AppointmentRow } from './appointments.repository';
 import * as settingsRepo from './booking-settings.repository';
 import type {
   AppointmentHistoryEntryDto,
@@ -434,6 +436,7 @@ export class AppointmentsService {
   ): Promise<AppointmentResponseDto> {
     const payload = await this.changeStatus(principal, id, input.status, input.reason, {
       notifyCustomer: input.notifyCustomer !== false,
+      consentOverrideReason: input.consentOverrideReason,
     });
     this.cache.invalidateTenant(this.tx.tenantId);
     return payload;
@@ -452,7 +455,7 @@ export class AppointmentsService {
     id: string,
     status: AppointmentStatus,
     reason: string | undefined,
-    options: { notifyCustomer: boolean },
+    options: { notifyCustomer: boolean; consentOverrideReason?: string | undefined },
   ): Promise<AppointmentResponseDto> {
     const payload = await this.tx
       .run(async (tx) => {
@@ -483,6 +486,13 @@ export class AppointmentsService {
           throw AppError.forbidden('Bu durum değişikliği için yetkiniz yok', {
             detail: `Gereken izin: ${transition.requiredPermission}`,
           });
+        }
+
+        // Onam kontrolü YUMUŞAK: eksikse personel gerekçe yazıp geçebilir,
+        // gerekçe geçmişe düşer. Self-servis yolu (`principal === null`)
+        // işleme geçiremez zaten; kontrol yalnız personel içindir.
+        if (principal !== null && (status === 'in_progress' || status === 'completed')) {
+          await this.assertConsentOrOverride(tx, current, principal, options.consentOverrideReason);
         }
 
         const isCancel = status === 'cancelled';
@@ -888,6 +898,62 @@ export class AppointmentsService {
    * Başkasının randevusu 403 değil 404 döner: 403, "bu kayıt var ama sana
    * kapalı" bilgisini sızdırırdı.
    */
+  /**
+   * İşleme geçerken gerekli İŞLEM onamları imzalanmış mı.
+   *
+   * Eksikse ve gerekçe yoksa `CONSENT_MISSING` (409) — gövdede eksik onam
+   * başlıkları var, istemci gerekçe diyaloğunu açıp aynı isteği gerekçeyle
+   * tekrarlar. Gerekçe bir kez yazıldıysa (`in_progress`e geçerken) aynı
+   * randevunun `completed`a geçişinde yeniden sorulmaz.
+   *
+   * KVKK eksikliği geçişi DURDURMAZ, yalnız rozet ve imza modunda görünür:
+   * randevu sayfası olan her kiracıda KVKK metni zaten yayında ve kontrol
+   * ona da bağlansaydı, bu özellik açılır açılmaz tüm mevcut randevular
+   * gerekçe sormaya başlardı. İşlem onamı ise klinik şablon tanımlayıp
+   * hizmete bağlayınca devreye girer.
+   */
+  private async assertConsentOrOverride(
+    tx: Tx,
+    appointment: AppointmentRow,
+    principal: Principal,
+    overrideReason: string | undefined,
+  ): Promise<void> {
+    const services = await repo.listAppointmentServices(tx, appointment.id);
+    const missing = await missingConsents(
+      tx,
+      {
+        appointmentId: appointment.id,
+        customerId: appointment.customerId,
+        serviceIds: services.map((line) => line.serviceId),
+      },
+      new Date(),
+    ).then((items) => items.filter((item) => item.kind === 'treatment'));
+    if (missing.length === 0) return;
+    if (await repo.hasHistoryAction(tx, appointment.id, 'consent_override')) return;
+
+    const reason = overrideReason?.trim();
+    if (reason === undefined || reason.length === 0) {
+      throw AppError.conflict(ERROR_CODES.CONSENT_MISSING, 'Gerekli onam alınmamış', {
+        detail: `Eksik: ${missing.map((item) => item.title).join(', ')}. Devam etmek için gerekçe yazın.`,
+        extra: {
+          missing: missing.map((item) => ({
+            kind: item.kind,
+            templateId: item.templateId,
+            title: item.title,
+          })),
+        },
+      });
+    }
+
+    await repo.insertHistory(tx, {
+      tenantId: this.tx.tenantId,
+      appointmentId: appointment.id,
+      actorUserId: principal.userId,
+      action: 'consent_override',
+      reason,
+    });
+  }
+
   private async assertVisible(
     principal: Principal,
     services: repo.AppointmentServiceRow[],

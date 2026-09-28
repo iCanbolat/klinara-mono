@@ -443,6 +443,20 @@ export async function insertHistory(
   await tx.insert(appointmentHistory).values(values);
 }
 
+/** Randevuda bu türden bir geçmiş kaydı var mı (ör. `consent_override`). */
+export async function hasHistoryAction(
+  tx: Tx,
+  appointmentId: string,
+  action: AppointmentHistoryRow['action'],
+): Promise<boolean> {
+  const [row] = await tx
+    .select({ id: appointmentHistory.id })
+    .from(appointmentHistory)
+    .where(and(eq(appointmentHistory.appointmentId, appointmentId), eq(appointmentHistory.action, action)))
+    .limit(1);
+  return row !== undefined;
+}
+
 export async function listHistory(
   tx: Tx,
   appointmentId: string,

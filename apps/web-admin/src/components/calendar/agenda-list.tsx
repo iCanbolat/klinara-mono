@@ -7,6 +7,7 @@ import { t } from '@/i18n/tr';
 import { formatDayLabel, formatTime, todayKey, type DayKey } from '@/lib/calendar/date';
 import { groupByDay } from '@/lib/calendar/grid';
 import { STATUS_LABEL, occupiesSlot } from '@/lib/calendar/status';
+import { ConsentMissingMark } from '@/components/consent/consent-status-context';
 import { toneClassOf } from './appointment-block';
 
 /**
@@ -139,8 +140,11 @@ function AgendaRow({
       </span>
 
       <span className={cn('flex min-w-0 flex-col', dimmed && 'opacity-60')}>
-        <span className={cn('truncate font-medium', dimmed && 'line-through')}>
-          {entry.customerName}
+        <span
+          className={cn('flex items-center gap-1.5 truncate font-medium', dimmed && 'line-through')}
+        >
+          <span className="truncate">{entry.customerName}</span>
+          <ConsentMissingMark appointmentId={entry.id} appointmentStatus={status} />
         </span>
         {services === '' ? null : (
           <span className="truncate text-sm text-muted-foreground">{services}</span>

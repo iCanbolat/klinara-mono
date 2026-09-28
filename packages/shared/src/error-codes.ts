@@ -56,6 +56,10 @@ export const ERROR_CODES = {
   // --- Tıbbi & onam ---
   CONTRAINDICATION_BLOCK: 'CONTRAINDICATION_BLOCK',
   CONSENT_REQUIRED: 'CONSENT_REQUIRED',
+  /** Randevu işleme geçerken gerekli onam imzalanmamış; gerekçeyle geçilebilir. */
+  CONSENT_MISSING: 'CONSENT_MISSING',
+  /** Hastaya gösterilen metin, imza anında yayındaki sürümle eşleşmiyor. */
+  CONSENT_TEXT_CHANGED: 'CONSENT_TEXT_CHANGED',
 
   // --- Eş zamanlılık ---
   IDEMPOTENCY_CONFLICT: 'IDEMPOTENCY_CONFLICT',

@@ -112,6 +112,11 @@ export interface CancelAppointmentInput {
 export interface ChangeAppointmentStatusInput {
   status: AppointmentStatus;
   reason?: string;
+  /**
+   * Gerekli onam imzalanmadan `in_progress`/`completed`a geçmenin gerekçesi.
+   * Yoksa ve onam eksikse sunucu `CONSENT_MISSING` döner.
+   */
+  consentOverrideReason?: string;
   /** `false` → müşteriye bildirim gitmez. Varsayılan: gider (yalnız ileri tarihli randevular). */
   notifyCustomer?: boolean;
 }
@@ -390,8 +395,10 @@ export type TimelineKind = (typeof TIMELINE_KINDS)[number];
  * madde). Ekran bu boşluğu dipnotla belirtmeli, sessizce gizlememeli.
  *
  * `consent` kolunun payload'ında metnin GÖVDESİ yoktur (`consentKind`,
- * `version`, `locale`, `textSha256`): 20k'lık bir aydınlatma metni her zaman
- * çizelgesi sayfasına binerdi. Tam kanıt `GET /consent-acceptances`ten gelir.
+ * `version`, `locale`, `textSha256`, `source`): 20k'lık bir aydınlatma metni
+ * her zaman çizelgesi sayfasına binerdi. `source: 'online'` kabulün tam
+ * kanıtı `GET /consent-acceptances`ten, `source: 'in_clinic'` imzanınki
+ * (`title`, `signerName`, `appointmentId` de taşır) `GET /consent-signatures/:id`den gelir.
  *
  * Paket İKİ kola bölünür ve bu bir tercih değil, zorunluluk:
  *

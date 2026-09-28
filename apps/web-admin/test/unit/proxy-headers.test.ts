@@ -22,6 +22,11 @@ describe('proxy başlık politikası', () => {
     expect(FORWARD_REQUEST_HEADERS).toContain('if-none-match');
   });
 
+  it('istemcinin izi (IP, tarayıcı) geçiyor — onam kanıtı proxy’yi değil tableti yazmalı', () => {
+    expect(FORWARD_REQUEST_HEADERS).toContain('user-agent');
+    expect(FORWARD_REQUEST_HEADERS).toContain('x-forwarded-for');
+  });
+
   it('yanıtta x-request-id geri veriliyor — hata paneli onu gösteriyor', () => {
     expect(FORWARD_RESPONSE_HEADERS).toContain('x-request-id');
     expect(FORWARD_RESPONSE_HEADERS).toContain('retry-after');

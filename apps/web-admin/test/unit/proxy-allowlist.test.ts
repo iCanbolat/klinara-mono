@@ -131,9 +131,7 @@ describe('yönetim proxy beyaz listesi', () => {
       'package-definitions',
       'customer-packages',
       `customer-packages/${UUID}/refund`,
-      // Faz 7 daraltılınca bu iki tablo HİÇ yazılmadı; uçları yok, kapıları
-      // da kapalı kalıyor.
-      'consent-templates',
+      // Faz 7 daraltılınca bu tablo HİÇ yazılmadı; ucu yok, kapısı da kapalı.
       'consent-records',
       'messages',
       'audit-log',
@@ -162,6 +160,32 @@ describe('yönetim proxy beyaz listesi', () => {
       expect(isAllowedProxyPath('consent-document/versions', 'POST')).toBe(false);
       // Kabul kanıtı yalnız OKUNUR — panelden yazılamaz.
       expect(isAllowedProxyPath('consent-acceptances', 'POST')).toBe(false);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe('klinikte imzalı onam (0053)', () => {
+    it('şablon, gereksinim ve imza yüzeyi geçiyor', () => {
+      expect(isAllowedProxyPath('consent-templates', 'GET')).toBe(true);
+      expect(isAllowedProxyPath('consent-templates', 'POST')).toBe(true);
+      expect(isAllowedProxyPath(`consent-templates/${UUID}`, 'PATCH')).toBe(true);
+      expect(isAllowedProxyPath(`consent-templates/${UUID}/draft`, 'PUT')).toBe(true);
+      expect(isAllowedProxyPath(`consent-templates/${UUID}/publish`, 'POST')).toBe(true);
+      expect(isAllowedProxyPath(`consent-templates/${UUID}/archive`, 'POST')).toBe(true);
+      expect(isAllowedProxyPath(`services/${UUID}/consent-templates`, 'PUT')).toBe(true);
+      expect(isAllowedProxyPath(`appointments/${UUID}/consent-requirements`, 'GET')).toBe(true);
+      expect(isAllowedProxyPath(`appointments/${UUID}/consent-signatures`, 'POST')).toBe(true);
+      expect(isAllowedProxyPath('consent-statuses', 'GET')).toBe(true);
+      expect(isAllowedProxyPath(`customers/${UUID}/consent-signatures`, 'GET')).toBe(true);
+      expect(isAllowedProxyPath(`consent-signatures/${UUID}/pdf-url`, 'GET')).toBe(true);
+    });
+
+    it('şablon silinemez, imza kaydı değiştirilemez', () => {
+      expect(isAllowedProxyPath(`consent-templates/${UUID}`, 'DELETE')).toBe(false);
+      expect(isAllowedProxyPath(`consent-signatures/${UUID}`, 'PATCH')).toBe(false);
+      expect(isAllowedProxyPath(`consent-signatures/${UUID}`, 'DELETE')).toBe(false);
+      expect(isAllowedProxyPath(`appointments/${UUID}/consent-signatures`, 'GET')).toBe(false);
+      expect(isAllowedProxyPath('consent-statuses', 'POST')).toBe(false);
     });
   });
 

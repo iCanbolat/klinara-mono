@@ -158,6 +158,8 @@ export const appointmentHistoryAction = pgEnum('appointment_history_action', [
   'status_changed',
   'cancelled',
   'updated',
+  /** Onam eksikken işleme geçildi; gerekçe `reason`da (0053). */
+  'consent_override',
 ]);
 
 /**

@@ -13,6 +13,7 @@ import {
   MaxLength,
   ValidateNested,
 } from 'class-validator';
+import { CONSENT_LIMITS } from '@klinara/shared';
 
 export const APPOINTMENT_STATUSES = [
   'scheduled',
@@ -145,6 +146,16 @@ export class ChangeAppointmentStatusDto {
   @IsOptional()
   @IsBoolean()
   notifyCustomer?: boolean;
+
+  @ApiPropertyOptional({
+    maxLength: CONSENT_LIMITS.overrideReason,
+    description:
+      'Gerekli onam imzalanmadan `in_progress`/`completed`a geçmenin gerekçesi. Onam eksikse ve bu alan yoksa `CONSENT_MISSING` (409) döner.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(CONSENT_LIMITS.overrideReason)
+  consentOverrideReason?: string;
 }
 
 export class AppointmentServiceResponseDto {

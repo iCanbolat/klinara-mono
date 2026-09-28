@@ -1,15 +1,18 @@
 'use client';
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
+  ERROR_CODES,
+  PERMISSIONS,
   isAppointmentStatus,
   type Appointment,
   type AppointmentHistoryEntry,
   type Service,
 } from '@klinara/shared';
 import { t } from '@/i18n/tr';
-import { api } from '@/lib/api/client';
+import { ApiProblemError, api } from '@/lib/api/client';
 import { useSession } from '@/components/session/session-provider';
 import { toMessage } from '@/lib/reports/errors';
 import { Alert } from '@/components/ui/alert';
@@ -25,8 +28,21 @@ import {
 import { FieldTextarea } from '@/components/ui/field';
 import { formatTime } from '@/lib/calendar/date';
 import { STATUS_LABEL, statusActions } from '@/lib/calendar/status';
+import { AppointmentConsentSection } from '@/components/consent/appointment-consent-section';
+import { ConsentOverrideDialog } from '@/components/consent/consent-override-dialog';
 import { CancelDialog } from './cancel-dialog';
 import { RescheduleDialog } from './reschedule-dialog';
+
+/** `CONSENT_MISSING` gövdesindeki eksik onam başlıkları. */
+function missingConsentTitles(error: ApiProblemError): string[] {
+  const missing = error.problem['missing'];
+  if (!Array.isArray(missing)) return [];
+  return missing
+    .map((item: unknown) =>
+      typeof item === 'object' && item !== null && 'title' in item ? String(item.title) : '',
+    )
+    .filter((title) => title !== '');
+}
 
 /**
  * Randevu ayrıntısı — durum zinciri, not, geçmiş.
@@ -79,6 +95,11 @@ export function AppointmentSheet({
   const [nonce, setNonce] = useState(0);
   const [rescheduling, setRescheduling] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  /** Onam eksik diye durdurulan geçiş; gerekçe diyaloğu açıkken dolu. */
+  const [override, setOverride] = useState<{ to: string; titles: string[] } | null>(null);
+  const [overrideError, setOverrideError] = useState<string | null>(null);
+  const router = useRouter();
+  const pathname = usePathname();
 
   const serviceNames = useMemo(
     () => new Map(services.map((service) => [service.id, service.name])),
@@ -127,17 +148,30 @@ export function AppointmentSheet({
     onChanged();
   }
 
-  async function changeStatus(to: string): Promise<void> {
+  async function changeStatus(to: string, consentOverrideReason?: string): Promise<void> {
     if (appointment === null) return;
     setBusy(to);
     setError(null);
+    setOverrideError(null);
     try {
-      await api.post(`appointments/${appointment.id}/status`, { status: to });
+      await api.post(`appointments/${appointment.id}/status`, {
+        status: to,
+        ...(consentOverrideReason === undefined ? {} : { consentOverrideReason }),
+      });
+      setOverride(null);
       toast.success(t('calendar.updated'));
       // ⚠️ ETag DÖNMÜYOR — yeniden okumak ZORUNLU.
       refetch();
     } catch (caught) {
-      setError(toMessage(caught));
+      // İşlem onamı eksik: yumuşak uyarı. Hata değil, bir karar noktası —
+      // personel ya imza alır ya da gerekçe yazıp devam eder.
+      if (caught instanceof ApiProblemError && caught.code === ERROR_CODES.CONSENT_MISSING) {
+        setOverride({ to, titles: missingConsentTitles(caught) });
+      } else if (consentOverrideReason !== undefined) {
+        setOverrideError(toMessage(caught));
+      } else {
+        setError(toMessage(caught));
+      }
     } finally {
       setBusy(null);
     }
@@ -214,6 +248,11 @@ export function AppointmentSheet({
                 </ul>
               </section>
 
+              <AppointmentConsentSection
+                appointmentId={appointment.id}
+                refreshKey={appointment.version}
+              />
+
               {actions.length > 0 ? (
                 <section>
                   <h3 className="text-label mb-2">{t('calendar.detail.title')}</h3>
@@ -284,7 +323,10 @@ export function AppointmentSheet({
                 <ul className="flex flex-col gap-1 text-xs text-muted-foreground">
                   {(history ?? []).map((entry) => (
                     <li key={entry.id}>
-                      {formatTime(entry.createdAt, timezone)} · {entry.action}
+                      {formatTime(entry.createdAt, timezone)} ·{' '}
+                      {entry.action === 'consent_override'
+                        ? `${t('consent.history.override')}: ${entry.reason ?? ''}`
+                        : entry.action}
                       {entry.toStatus === null ? '' : ` → ${entry.toStatus}`}
                     </li>
                   ))}
@@ -305,6 +347,25 @@ export function AppointmentSheet({
             onDone={() => {
               setRescheduling(false);
               refetch();
+            }}
+          />
+          <ConsentOverrideDialog
+            open={override !== null}
+            missingTitles={override?.titles ?? []}
+            busy={busy !== null}
+            error={overrideError}
+            canCollect={permissions.includes(PERMISSIONS.CONSENT_COLLECT)}
+            onCollect={() =>
+              router.push(
+                `/imza/randevu/${appointment.id}?donus=${encodeURIComponent(pathname)}`,
+              )
+            }
+            onConfirm={(reason) => {
+              if (override !== null) void changeStatus(override.to, reason);
+            }}
+            onClose={() => {
+              setOverride(null);
+              setOverrideError(null);
             }}
           />
           <CancelDialog

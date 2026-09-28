@@ -25,6 +25,11 @@ vi.mock('@/lib/api/client', () => ({
   SessionExpiredError,
 }));
 
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+  usePathname: () => '/takvim',
+}));
+
 const setBranchId = vi.fn();
 let branchState: {
   branchId: string | null;

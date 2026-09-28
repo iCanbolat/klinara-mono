@@ -6,6 +6,7 @@ import { cn } from '@/lib/cn';
 import { formatTime } from '@/lib/calendar/date';
 import type { PositionedEntry } from '@/lib/calendar/grid';
 import { STATUS_TONE, occupiesSlot } from '@/lib/calendar/status';
+import { ConsentMissingMark } from '@/components/consent/consent-status-context';
 
 /**
  * Izgaradaki tek randevu bloğu — gün ızgarası ve hafta ızgarasının her sütunu
@@ -79,14 +80,24 @@ export function AppointmentBlock({
     >
       {compact ? (
         <>
-          <span className="block truncate tabular-nums opacity-80">{time}</span>
+          <span className="flex items-center gap-0.5 truncate tabular-nums opacity-80">
+            <ConsentMissingMark
+              appointmentId={row.entry.id}
+              appointmentStatus={status}
+              className="size-2.5"
+            />
+            {time}
+          </span>
           {height >= 36 ? (
             <span className="block truncate font-medium">{row.entry.customerName}</span>
           ) : null}
         </>
       ) : (
         <>
-          <span className="block truncate font-medium">{row.entry.customerName}</span>
+          <span className="flex items-center gap-1 truncate font-medium">
+            <ConsentMissingMark appointmentId={row.entry.id} appointmentStatus={status} />
+            <span className="truncate">{row.entry.customerName}</span>
+          </span>
           <span className="block truncate text-[11px] opacity-80">
             {time}
             {service === undefined ? '' : ` · ${service}`}

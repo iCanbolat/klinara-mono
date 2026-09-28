@@ -1,22 +1,40 @@
 import { Module } from '@nestjs/common';
+import { BookingModule } from '../booking/booking.module';
 import { BookingPageModule } from '../booking-page/booking-page.module';
+import {
+  ConsentSignaturesController,
+  ConsentTemplatesController,
+  ServiceConsentTemplatesController,
+} from './consent-clinic.controller';
+import { ConsentSignaturesService } from './consent-signatures.service';
+import { ConsentTemplatesService } from './consent-templates.service';
 import { ConsentAcceptancesController, ConsentController } from './consent.controller';
 import { ConsentService } from './consent.service';
 
 /**
- * KVKK/aydınlatma onam metni ve kabul kanıtı.
+ * Onam: KVKK/aydınlatma metni, işlem onamı şablonları ve kanıt.
  *
- * Faz 7 tek zorunlu onaya daraltıldığı için `consent_templates` /
- * `consent_records` hiç yazılmadı: site başına tek sürümlü belge ve 9.4'ten
- * devralınan (artık kalıcı) `booking_consent_acceptances` kanıt tablosu.
+ *   * Online randevu: site başına tek sürümlü KVKK belgesi, kanıtı
+ *     `booking_consent_acceptances`.
+ *   * Klinik (0053): hasta tablete imza atar — eksikse KVKK ve hizmete bağlı
+ *     işlem onamları. Kanıtı `consent_signatures` + PDF.
+ *
+ * Gereksinim hesabı (`consent-requirements.ts`) DI'sız: randevu durum geçişi
+ * de aynı hesabı kullanıyor ve `BookingModule` bu modülü import etmiyor.
  */
 @Module({
-  // Yalnız `BookingSiteProvisioner` için: onam metni siteye bağlı ve site
-  // kaydı ilk çağrıda açılıyor — ikinci bir provizyon yolu açmak, iki farklı
-  // "site var mı" gerçeği demekti.
-  imports: [BookingPageModule],
-  controllers: [ConsentController, ConsentAcceptancesController],
-  providers: [ConsentService],
+  // `BookingSiteProvisioner` için: onam metni siteye bağlı ve site kaydı ilk
+  // çağrıda açılıyor. `AppointmentsService` için: imza alınan randevunun
+  // erişim kontrolü (şube, uygulayıcının kendi randevusu) tek yerde.
+  imports: [BookingPageModule, BookingModule],
+  controllers: [
+    ConsentController,
+    ConsentAcceptancesController,
+    ConsentTemplatesController,
+    ServiceConsentTemplatesController,
+    ConsentSignaturesController,
+  ],
+  providers: [ConsentService, ConsentTemplatesService, ConsentSignaturesService],
   exports: [ConsentService],
 })
 export class ConsentModule {}

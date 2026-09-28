@@ -9,7 +9,11 @@ export class ConsentDocumentDto {
   @ApiProperty({ example: 'kvkk_explicit' })
   kind: string;
 
-  @ApiProperty({ example: 3, nullable: true, description: 'Taslakta null — sürüm yayın anında verilir.' })
+  @ApiProperty({
+    example: 3,
+    nullable: true,
+    description: 'Taslakta null — sürüm yayın anında verilir.',
+  })
   version: number | null;
 
   @ApiProperty({ example: 'tr' })

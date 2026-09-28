@@ -27,8 +27,8 @@
  * - **Paket, bildirim, denetim** (`packages`, `customer-packages`, `messages`,
  *   `audit*`) ve API'den kaldırılmış finans uçları (`payments`, `charges`,
  *   `cash`, `commission*`): Faz 12 bunların HİÇBİRİNİ istemiyor. Kural aynı: uç buraya yazılmadıkça
- *   geçmez. `consent-templates` / `consent-records` de burada: Faz 7
- *   daraltılınca o tablolar HİÇ yazılmadı, dolayısıyla o uçlar YOK.
+ *   geçmez. `consent-records` de burada: Faz 7 daraltılınca o tablo HİÇ
+ *   yazılmadı. (`consent-templates` 0053'te işlem onamıyla geldi — aşağıda.)
  *
  * KLİNİK OPERASYONU — Faz 12'de AÇILDI, gerekçesi değişti
  *
@@ -161,13 +161,33 @@ const RULES: readonly Rule[] = [
   { methods: ['DELETE'], pattern: new RegExp(`^booking-page/assets/${UUID}$`) },
 
   // --- Onam metni (Faz 7) ---
-  // Yalnız `consent-document*` ve `consent-acceptances`. `consent-templates` /
-  // `consent-records` KAPALI kalıyor: Faz 7 daraltılınca hiç yazılmadılar.
   { methods: ['GET'], pattern: /^consent-document$/ },
   { methods: ['PUT'], pattern: /^consent-document\/draft$/ },
   { methods: ['POST'], pattern: /^consent-document\/publish$/ },
   { methods: ['GET'], pattern: /^consent-document\/versions$/ },
   { methods: ['GET'], pattern: /^consent-acceptances$/ },
+
+  // --- Klinikte imzalı onam (0053) ---
+  // İşlem onamı şablonları: `DELETE` YOK — şablon silinmez, arşivlenir
+  // (eski imzalar ona bağlı).
+  { methods: ['GET', 'POST'], pattern: /^consent-templates$/ },
+  { methods: ['GET', 'PATCH'], pattern: new RegExp(`^consent-templates/${UUID}$`) },
+  { methods: ['PUT'], pattern: new RegExp(`^consent-templates/${UUID}/draft$`) },
+  {
+    methods: ['POST'],
+    pattern: new RegExp(`^consent-templates/${UUID}/(publish|archive|restore)$`),
+  },
+  { methods: ['GET'], pattern: new RegExp(`^consent-templates/${UUID}/versions$`) },
+  { methods: ['GET', 'PUT'], pattern: new RegExp(`^services/${UUID}/consent-templates$`) },
+  // Gereksinim ve imza. İmza kaydı DEĞİŞMEZ: `PATCH`/`DELETE` yolu yok.
+  { methods: ['GET'], pattern: new RegExp(`^appointments/${UUID}/consent-requirements$`) },
+  { methods: ['POST'], pattern: new RegExp(`^appointments/${UUID}/consent-signatures$`) },
+  { methods: ['GET'], pattern: /^consent-statuses$/ },
+  { methods: ['GET'], pattern: new RegExp(`^customers/${UUID}/consent-requirements$`) },
+  { methods: ['GET', 'POST'], pattern: new RegExp(`^customers/${UUID}/consent-signatures$`) },
+  { methods: ['GET'], pattern: new RegExp(`^consent-signatures/${UUID}$`) },
+  // ⚠️ `pdf-url` HER ÇAĞRIDA KVKK erişim kaydı yazıyor (dosyalardaki kural).
+  { methods: ['GET'], pattern: new RegExp(`^consent-signatures/${UUID}/pdf-url$`) },
 
   { methods: ['GET', 'POST'], pattern: /^booking-page\/domains$/ },
   { methods: ['DELETE'], pattern: new RegExp(`^booking-page/domains/${UUID}$`) },

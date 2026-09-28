@@ -238,11 +238,33 @@ export async function listTimeline(tx: Tx, filters: TimelineFilters): Promise<Ti
                'consentKind', c.kind,
                'version',     c.consent_version,
                'locale',      c.locale,
-               'textSha256',  c.text_sha256
+               'textSha256',  c.text_sha256,
+               'source',      'online'
              ) as payload
         from booking_consent_acceptances c
        where c.customer_id = ${filters.customerId}::uuid
          ${window(sql`c.accepted_at`)}`);
+
+    // Klinikte tablete atılan imza (0053). Aynı `consent` türü: zaman
+    // çizelgesi için ikisi de "hasta şu metni onayladı" olayı; ayrım
+    // `source`ta. Eski istemciler yeni alanları yok sayar.
+    branches.push(sql`
+      select 'consent'::text as kind,
+             s.id,
+             s.signed_at as occurred_at,
+             jsonb_build_object(
+               'consentKind',   s.kind,
+               'version',       s.document_version,
+               'locale',        'tr',
+               'textSha256',    s.text_sha256,
+               'source',        'in_clinic',
+               'title',         s.document_title,
+               'signerName',    s.signer_name,
+               'appointmentId', s.appointment_id
+             ) as payload
+        from consent_signatures s
+       where s.customer_id = ${filters.customerId}::uuid
+         ${window(sql`s.signed_at`)}`);
   }
 
   if (wants('package_sale')) {

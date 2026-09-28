@@ -1,9 +1,5 @@
 import { and, desc, eq, sql } from 'drizzle-orm';
-import {
-  bookingConsentAcceptances,
-  consentDocuments,
-  CONSENT_KIND,
-} from '../../database/schema';
+import { bookingConsentAcceptances, consentDocuments, CONSENT_KIND } from '../../database/schema';
 import type { Tx } from '../../database/tenant-tx';
 
 export type ConsentDocumentRow = typeof consentDocuments.$inferSelect;
@@ -19,7 +15,11 @@ export async function findDraft(tx: Tx, siteId: string): Promise<ConsentDocument
 }
 
 export async function findById(tx: Tx, id: string): Promise<ConsentDocumentRow | undefined> {
-  const [row] = await tx.select().from(consentDocuments).where(eq(consentDocuments.id, id)).limit(1);
+  const [row] = await tx
+    .select()
+    .from(consentDocuments)
+    .where(eq(consentDocuments.id, id))
+    .limit(1);
   return row;
 }
 
