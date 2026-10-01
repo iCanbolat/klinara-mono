@@ -360,10 +360,6 @@ object ShellRoutes {
         val conversationId: String,
     )
 
-    /** Gelen kutusu (A8.1). */
-    @Serializable
-    data object Inbox
-
     /** Mesaj günlüğü (A8.1) — detayla PAYLAŞILAN ViewModel'in sahibi. */
     @Serializable
     data object MessageLog
@@ -385,16 +381,6 @@ object ShellRoutes {
     /** [rowId] `event|channel|locale` — sunucunun upsert anahtarı. */
     @Serializable
     data class NotificationTemplateEditor(
-        val rowId: String,
-    )
-
-    /** Bildirim tercihleri (A8.2). */
-    @Serializable
-    data object NotificationPreferences
-
-    /** [rowId] `event|branchId` (kiracı satırında `tenant`). */
-    @Serializable
-    data class NotificationPreferenceEditor(
         val rowId: String,
     )
 

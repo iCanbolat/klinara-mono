@@ -27,7 +27,7 @@ struct OutstandingReportView: View {
         .navigationTitle("Taşınan yükümlülük")
         .navigationBarTitleDisplayMode(.inline)
         .task { await store.loadOutstanding() }
-        .refreshable { await store.loadOutstanding() }
+        .refreshable { await store.loadOutstanding(refreshing: true) }
     }
 
     private func totalsCard(_ totals: OutstandingTotals) -> some View {

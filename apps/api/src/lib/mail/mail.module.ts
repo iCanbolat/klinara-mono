@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { PinoLogger } from 'nestjs-pino';
 import type { EnvironmentVariables } from '../../config/env.validation';
 import { MAIL_SENDER, type MailMessage, type MailSender } from './mail.types';
+import { ResendMailSender } from './resend.sender';
 import { SmtpMailSender } from './smtp.sender';
 
 /**
@@ -26,13 +27,22 @@ export class LogMailSender implements MailSender {
 /**
  * Gönderici seçimi tek yerde — `SmsModule` fabrikasının aynısı.
  *
- * `SMTP_HOST` boşsa gerçek gönderici HİÇ KURULMAZ: yanlış yapılandırılmış bir
+ * Öncelik: Resend (üretim), SMTP (yerelde Mailpit/MailHog), log. İkisi de
+ * yapılandırılmamışsa gerçek gönderici HİÇ KURULMAZ: yanlış yapılandırılmış bir
  * ortamda sessizce gönderim denemek yerine loga yazmak güvenli varsayılandır.
  */
 function createMailSender(
   config: ConfigService<EnvironmentVariables, true>,
   logger: PinoLogger,
 ): MailSender {
+  const resendKey = config.get('RESEND_API_KEY', { infer: true });
+  if (resendKey !== undefined && resendKey !== '') {
+    return new ResendMailSender(
+      { apiKey: resendKey, from: config.get('MAIL_FROM', { infer: true }) },
+      logger,
+    );
+  }
+
   const host = config.get('SMTP_HOST', { infer: true });
   if (host === undefined || host === '') return new LogMailSender(logger);
 

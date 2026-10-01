@@ -8,3 +8,4 @@ export * from './clinic-api.js';
 export * from './asset-resolution.js';
 export * from './reports-api.js';
 export * from './messaging-api.js';
+export * from './notification-templates.js';

@@ -6,24 +6,24 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import com.klinara.android.designsystem.KlinaraMetrics
 import com.klinara.android.designsystem.KlinaraTheme
+import com.klinara.android.services.notifications.TemplateSegment
 import com.klinara.android.designsystem.KlinaraType
 import com.klinara.android.designsystem.components.AuthLoadingOverlay
 import com.klinara.android.designsystem.components.EmptyStateView
@@ -37,12 +37,11 @@ import com.klinara.android.designsystem.components.KlinaraRow
 import com.klinara.android.designsystem.components.KlinaraScreen
 import com.klinara.android.designsystem.components.KlinaraSkeleton
 import com.klinara.android.designsystem.components.KlinaraSkeletonStyle
-import com.klinara.android.designsystem.components.KlinaraTextEditor
 import com.klinara.android.designsystem.components.KlinaraTextField
 import com.klinara.android.designsystem.components.KlinaraToggleRow
 import com.klinara.android.designsystem.components.klinaraClickable
-import com.klinara.android.features.customers.SelectableChip
 import com.klinara.android.services.networking.Loadable
+import com.klinara.android.services.notifications.NotificationEventCatalog
 
 /**
  * Bildirim şablonları (A8.2) — iOS `NotificationTemplateListView` paritesi.
@@ -63,7 +62,7 @@ fun NotificationTemplateListScreen(
     KlinaraScreen(title = "Bildirim şablonları", modifier = modifier, onBack = onBack) {
         if (!canWrite) {
             Text(
-                "Şablonları görüntüleyebilirsiniz; değiştirmek için bildirim yönetimi izni gerekir.",
+                "Mesajları görüntüleyebilirsiniz; açıp kapatmak için bildirim yönetimi izni gerekir.",
                 style = KlinaraType.bodyM,
                 color = KlinaraTheme.colors.charcoalMuted,
             )
@@ -112,32 +111,27 @@ private fun TemplateListRow(
             verticalArrangement = Arrangement.spacedBy(KlinaraMetrics.xs),
         ) {
             Text(template.channel.turkishName, style = KlinaraType.bodyEmphasis, color = colors.charcoal)
-            when {
-                row.isMissing -> KlinaraBadge("Şablon yok", tone = KlinaraBadgeTone.Warning)
-                template.isDefault -> KlinaraBadge("Varsayılan", tone = KlinaraBadgeTone.Muted)
+            if (row.isMissing) {
+                KlinaraBadge("Hazır metin yok", tone = KlinaraBadgeTone.Warning)
+            } else if (!template.isActive) {
+                KlinaraBadge("Kapalı", tone = KlinaraBadgeTone.Warning)
             }
-            if (!template.isActive) KlinaraBadge("Pasif", tone = KlinaraBadgeTone.Warning)
-            // Sağlayıcısı olmayan kanal kaydedilir ama gönderim yapmaz; bunu aramak kullanıcının işi değil.
-            if (!template.channel.isDeliverable) KlinaraBadge("Kanal kurulu değil", tone = KlinaraBadgeTone.Muted)
         }
         Text(
-            template.body.ifEmpty { "(metin yok)" },
+            templateText(template.displaySegments, emptyLabel = "(metin yok)"),
             style = KlinaraType.bodyM,
             color = colors.charcoalMuted,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
-        template.whatsappTemplateName?.let {
-            Text("Meta şablonu: $it", style = KlinaraType.bodyM, color = colors.charcoalMuted)
-        }
     }
 }
 
 /**
- * Şablon editörü (A8.2) — iOS `NotificationTemplateEditorView` paritesi; sheet değil route.
+ * Şablon detayı (A8.2) — iOS `NotificationTemplateEditorView` paritesi; sheet değil route.
  *
- * Olay ve kanal değiştirilemez (upsert anahtarı); yer tutucu metnin sonuna eklenir; WhatsApp'ta
- * gövde gönderimin metni gibi sunulmaz — Meta'ya giden onaylı template'tir (Ek M).
+ * Sade: müşterinin göreceği mesaj salt okunur, tek düzenlenebilir şey "gönderilsin" anahtarı.
+ * Meta şablon adı, dil ve değişken eşlemesi teknik ayrıntıdır; ekranda yer almaz ve değiştirilemez.
  */
 @Composable
 fun NotificationTemplateEditorScreen(
@@ -151,26 +145,53 @@ fun NotificationTemplateEditorScreen(
     modifier: Modifier = Modifier,
 ) {
     val form = state.form
+    val colors = KlinaraTheme.colors
     Box {
         KlinaraScreen(title = form.event.turkishName, modifier = modifier, onBack = onBack) {
             state.error?.let { ErrorBanner(message = it, retryLabel = "Kapat", onRetry = onDismissError) }
-            ScopeCard(row)
-            BodyCard(form, state.fieldErrors, canWrite, onUpdate)
-            if (form.usesWhatsAppTemplate) WhatsAppCard(form, state.fieldErrors, canWrite, onUpdate)
-            KlinaraCard(title = "Durum") {
-                KlinaraToggleRow(
-                    label = "Aktif",
-                    detail = "Pasif şablonla bu olay için mesaj üretilmez.",
-                    isOn = form.isActive,
-                    onToggle = { on -> onUpdate { it.copy(isActive = on) } },
-                    enabled = canWrite,
+            Text(form.event.explanation, style = KlinaraType.bodyM, color = colors.charcoalMuted)
+            KlinaraCard(
+                title = "Müşteriye giden mesaj",
+                footnote = "Mavi @ ile başlayan bilgiler gönderim anında müşteriye özel doldurulur.",
+            ) {
+                val text =
+                    if (row.isMissing) {
+                        AnnotatedString("Bu mesaj için henüz hazır bir metin yok.")
+                    } else {
+                        templateText(form.segments, emptyLabel = "(metin yok)")
+                    }
+                Text(
+                    text,
+                    style = KlinaraType.bodyM,
+                    color = if (row.isMissing) colors.charcoalMuted else colors.charcoal,
                 )
             }
-            if (canWrite) {
+            state.branch?.let { branch ->
+                KlinaraCard(
+                    title = "Klinik konumu",
+                    footnote =
+                        "Adres, randevu mesajlarında müşteriye gösterilir; mesajdaki \"Haritada aç\" butonu bu " +
+                            "adresten oluşturulur. Adresi şube ayarlarından değiştirebilirsiniz. Şube: ${branch.name}.",
+                ) {
+                    KlinaraRow(label = "Adres", value = branch.address?.takeIf { it.isNotBlank() } ?: "Girilmemiş")
+                }
+            }
+            if (!row.isMissing) {
+                KlinaraCard(title = "Gönderim") {
+                    KlinaraToggleRow(
+                        label = "Bu mesaj gönderilsin",
+                        detail = "Kapalıyken müşteriye bu mesaj gitmez.",
+                        isOn = form.isActive,
+                        onToggle = { on -> onUpdate { it.copy(isActive = on) } },
+                        enabled = canWrite,
+                    )
+                }
+            }
+            if (canWrite && (!row.isMissing || state.branch != null)) {
                 KlinaraButton(
                     title = "Kaydet",
                     onClick = onSave,
-                    enabled = form.isValid && (form.isDirty || row.isMissing || form.wasDefault),
+                    enabled = state.canSave,
                     isLoading = state.isSaving,
                 )
             }
@@ -179,165 +200,29 @@ fun NotificationTemplateEditorScreen(
     }
 }
 
+/**
+ * Şablon gövdesi: düz metin olduğu gibi, değişkenler `@Etiket` olarak mavi bağlantı renginde.
+ * iOS `[TemplateSegment].attributed()` paritesi.
+ */
 @Composable
-private fun ScopeCard(row: TemplateRow) {
-    val template = row.template
-    val colors = KlinaraTheme.colors
-    KlinaraCard(title = "Kapsam") {
-        KlinaraRow(label = "Olay", value = template.event.turkishName)
-        KlinaraDivider()
-        KlinaraRow(label = "Kanal", value = template.channel.turkishName)
-        val note =
-            when {
-                row.isMissing ->
-                    "Bu kanal için henüz şablon yok. Kaydettiğinizde bu kiracıya özel bir şablon oluşur."
-                template.isDefault ->
-                    "Şu anda kod içindeki varsayılan metin geçerli. Kaydettiğinizde bu kiracıya özel bir şablon oluşur."
-                else -> null
-            }
-        note?.let {
-            KlinaraDivider()
-            Text(it, style = KlinaraType.bodyM, color = colors.charcoalMuted)
-        }
-        if (!template.channel.isDeliverable) {
-            KlinaraDivider()
-            Text(
-                "Bu kanalın sağlayıcısı henüz kurulmadı; şablon kaydedilir ama mesaj gönderilmez.",
-                style = KlinaraType.bodyM,
-                color = colors.charcoalMuted,
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun BodyCard(
-    form: NotificationTemplateForm,
-    fieldErrors: Map<String, String>,
-    canWrite: Boolean,
-    onUpdate: ((NotificationTemplateForm) -> NotificationTemplateForm) -> Unit,
-) {
-    val colors = KlinaraTheme.colors
-    KlinaraCard(title = "Metin", footnote = "Değişkenler gönderim anında müşteri ve randevu bilgisiyle doldurulur.") {
-        if (form.usesSubject) {
-            KlinaraTextField(
-                label = "Konu",
-                value = form.subject,
-                onValueChange = { text -> onUpdate { it.copy(subject = text) } },
-                placeholder = "E-posta konusu",
-                error = fieldErrors["subject"],
-                enabled = canWrite,
-            )
-        }
-        KlinaraTextEditor(
-            label = "Gövde",
-            value = form.body,
-            onValueChange = { text -> onUpdate { it.copy(body = text) } },
-            placeholder = "Sayın {{customerName}}, …",
-            error = fieldErrors["body"],
-            enabled = canWrite,
-            minHeight = EDITOR_MIN_HEIGHT,
-        )
-        Text(
-            KlinaraType.labelText("Kullanılabilecek değişkenler"),
-            style = KlinaraType.label,
-            color = colors.charcoalMuted,
-        )
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(KlinaraMetrics.sm),
-            verticalArrangement = Arrangement.spacedBy(KlinaraMetrics.sm),
-        ) {
-            form.allowedVariables.forEach { name ->
-                SelectableChip(
-                    label = "{{$name}}",
-                    isSelected = "{{$name}}" in form.body,
-                    onClick = { if (canWrite) onUpdate { it.appendingVariable(name) } },
-                )
-            }
-        }
-        // Sunucunun 422'sini beklemeden: kullanıcı hatayı yazarken görmeli.
-        if (form.unknownPlaceholders.isNotEmpty()) {
-            Text(
-                "Tanımsız değişken: ${form.unknownPlaceholders.joinToString(", ")}",
-                style = KlinaraType.bodyM,
-                color = colors.danger,
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun WhatsAppCard(
-    form: NotificationTemplateForm,
-    fieldErrors: Map<String, String>,
-    canWrite: Boolean,
-    onUpdate: ((NotificationTemplateForm) -> NotificationTemplateForm) -> Unit,
-) {
-    val colors = KlinaraTheme.colors
-    KlinaraCard(
-        title = "WhatsApp şablonu",
-        footnote =
-            "WhatsApp'a giden metin Meta'da onaylı template'tir. Buradaki eşleme, template'in " +
-                "{{1}}, {{2}}… sırasına hangi değişkenin gideceğini söyler.",
-    ) {
-        KlinaraTextField(
-            label = "Meta şablon adı",
-            value = form.whatsappTemplateName,
-            onValueChange = { text -> onUpdate { it.copy(whatsappTemplateName = text) } },
-            placeholder = "randevu_hatirlatma",
-            error = fieldErrors["whatsappTemplateName"],
-            enabled = canWrite,
-        )
-        KlinaraTextField(
-            label = "Şablon dili",
-            value = form.whatsappTemplateLanguage,
-            onValueChange = { text -> onUpdate { it.copy(whatsappTemplateLanguage = text) } },
-            placeholder = "tr",
-            error =
-                fieldErrors["whatsappTemplateLanguage"]
-                    ?: "Şablon adı verildiyse dil zorunlu.".takeIf {
-                        form.whatsappTemplateName.isNotBlank() && form.whatsappTemplateLanguage.isBlank()
-                    },
-            enabled = canWrite,
-        )
-        Text(KlinaraType.labelText("Konumsal değişkenler"), style = KlinaraType.label, color = colors.charcoalMuted)
-        if (form.whatsappVariables.isEmpty()) {
-            Text("Henüz eşleme yok. Aşağıdan sırayla ekleyin.", style = KlinaraType.bodyM, color = colors.charcoalMuted)
+internal fun templateText(
+    segments: List<TemplateSegment>,
+    emptyLabel: String,
+): AnnotatedString {
+    val link = KlinaraTheme.colors.link
+    return remember(segments, link, emptyLabel) {
+        if (segments.isEmpty()) {
+            AnnotatedString(emptyLabel)
         } else {
-            form.whatsappVariables.forEachIndexed { index, name ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("{{${index + 1}}}", style = KlinaraType.bodyM, color = colors.charcoalMuted)
-                    Text(
-                        name,
-                        style = KlinaraType.bodyM,
-                        color = colors.charcoal,
-                        modifier = Modifier.weight(1f).padding(start = KlinaraMetrics.sm),
-                    )
-                    if (canWrite) {
-                        IconButton(onClick = { onUpdate { it.removingWhatsAppVariable(index) } }) {
-                            Icon(Icons.Filled.Close, contentDescription = "${index + 1}. değişkeni kaldır")
-                        }
+            buildAnnotatedString {
+                segments.forEach { segment ->
+                    if (segment.isVariable) {
+                        withStyle(SpanStyle(color = link, fontWeight = FontWeight.SemiBold)) { append(segment.display) }
+                    } else {
+                        append(segment.text)
                     }
                 }
             }
         }
-        if (canWrite) {
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(KlinaraMetrics.sm),
-                verticalArrangement = Arrangement.spacedBy(KlinaraMetrics.sm),
-            ) {
-                form.allowedVariables.filterNot { it in form.whatsappVariables }.forEach { name ->
-                    SelectableChip(
-                        label = name,
-                        isSelected = false,
-                        onClick = { onUpdate { it.addingWhatsAppVariable(name) } },
-                    )
-                }
-            }
-        }
     }
 }
-
-private val EDITOR_MIN_HEIGHT = 140.dp

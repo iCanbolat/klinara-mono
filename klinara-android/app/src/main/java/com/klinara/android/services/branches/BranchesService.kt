@@ -86,6 +86,7 @@ class MockBranchesService(
                 timezone = input.timezone ?: "Europe/Istanbul",
                 phone = input.phone,
                 address = input.address,
+                mapsUrl = input.mapsUrl,
                 createdAt = Instant.now(),
             )
         records += created
@@ -106,6 +107,7 @@ class MockBranchesService(
                 timezone = input.timezone ?: old.timezone,
                 phone = input.phone.resolve(old.phone),
                 address = input.address.resolve(old.address),
+                mapsUrl = input.mapsUrl.resolve(old.mapsUrl),
                 isActive = input.isActive ?: old.isActive,
             )
         records[index] = updated

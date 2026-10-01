@@ -17,19 +17,9 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
-import type { CustomerGender, CustomerSource } from '../../../database/schema/crm';
+import type { CustomerGender } from '../../../database/schema/crm';
 
 export const CUSTOMER_GENDERS = ['female', 'male', 'other', 'undisclosed'] as const;
-
-export const CUSTOMER_SOURCES = [
-  'walk_in',
-  'referral',
-  'instagram',
-  'google',
-  'website',
-  'whatsapp',
-  'other',
-] as const;
 
 export class CustomerTagResponseDto {
   @ApiProperty({ format: 'uuid' })
@@ -78,9 +68,6 @@ export class CustomerResponseDto {
 
   @ApiProperty({ nullable: true, type: String })
   postalCode: string | null;
-
-  @ApiProperty({ nullable: true, type: String, enum: CUSTOMER_SOURCES })
-  source: CustomerSource | null;
 
   @ApiProperty({
     nullable: true,
@@ -163,11 +150,6 @@ export class CreateCustomerDto {
   @IsString()
   @MaxLength(20)
   postalCode?: string;
-
-  @ApiPropertyOptional({ enum: CUSTOMER_SOURCES })
-  @IsOptional()
-  @IsIn(CUSTOMER_SOURCES)
-  source?: CustomerSource;
 }
 
 export class UpdateCustomerDto {
@@ -229,11 +211,6 @@ export class UpdateCustomerDto {
   @IsString()
   @MaxLength(20)
   postalCode?: string | null;
-
-  @ApiPropertyOptional({ nullable: true, type: String, enum: CUSTOMER_SOURCES })
-  @IsOptional()
-  @IsIn(CUSTOMER_SOURCES)
-  source?: CustomerSource | null;
 }
 
 export class CustomerTagListResponseDto {
@@ -296,11 +273,6 @@ export class ListCustomersQueryDto {
   @IsOptional()
   @IsUUID()
   tagId?: string;
-
-  @ApiPropertyOptional({ enum: CUSTOMER_SOURCES })
-  @IsOptional()
-  @IsIn(CUSTOMER_SOURCES)
-  source?: CustomerSource;
 }
 
 export class SearchCustomersQueryDto {

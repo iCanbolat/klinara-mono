@@ -34,7 +34,6 @@ class MockWhatsAppService(
 ) : WhatsAppService {
     var failing: Boolean = false
 
-    private val inboxRecords: MutableList<InboxItem> = MockNotificationsSeed.inbox(now()).toMutableList()
     private var accountRecord: WhatsAppAccount? = if (configured) MockNotificationsSeed.account(now()) else null
     private var templateRecords: List<WhatsAppTemplate> = MockNotificationsSeed.whatsAppTemplates(now())
     private val testSendCount: MutableMap<String, Int> = mutableMapOf()
@@ -132,25 +131,6 @@ class MockWhatsAppService(
         code: ApiErrorCode,
         detail: String,
     ) = MockErrors.problem(code, "Gönderilemedi", MockErrors.HTTP_UNPROCESSABLE, detail)
-
-    override suspend fun inbox(
-        onlyUnhandled: Boolean,
-        limit: Int?,
-    ): List<InboxItem> {
-        settle()
-        val filtered =
-            inboxRecords
-                .filter { !onlyUnhandled || !it.isHandled }
-                .sortedByDescending { it.receivedAt }
-        return if (limit == null) filtered else filtered.take(limit)
-    }
-
-    override suspend fun markInboxHandled(id: String) {
-        settle()
-        val index = inboxRecords.indexOfFirst { it.id == id }
-        if (index < 0) throw MockErrors.notFound("Mesaj")
-        inboxRecords[index] = inboxRecords[index].copy(handledAt = now())
-    }
 
     private suspend fun settle() {
         if (latencyEnabled) delay(random.nextLong(MIN_LATENCY_MILLIS, MAX_LATENCY_MILLIS))

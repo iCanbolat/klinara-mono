@@ -84,13 +84,13 @@ enum MockReportsSeed {
         default:
             return [
                 RevenueRow(
-                    groupId: MockCatalogSeed.serviceLazerTumVucut,
-                    groupLabel: "Tüm Vücut Lazer",
+                    groupId: MockCatalogSeed.serviceKanalTedavisi,
+                    groupLabel: "Kanal Tedavisi",
                     accruedMinor: 900_000
                 ),
                 RevenueRow(
-                    groupId: MockCatalogSeed.serviceLazerBolgesel,
-                    groupLabel: "Bölgesel Lazer",
+                    groupId: MockCatalogSeed.serviceOrtodontiKontrol,
+                    groupLabel: "Ortodonti Kontrolü",
                     accruedMinor: 350_000
                 ),
             ]
@@ -206,14 +206,6 @@ enum MockReportsSeed {
         activeCustomers: 55,
         returningRate: 74.55
     )
-
-    static let acquisition = [
-        AcquisitionRow(source: "instagram", customers: 24),
-        AcquisitionRow(source: "referral", customers: 19),
-        // Kaynağı girilmemiş müşteri her klinikte var; ekranın onu
-        // "Belirtilmemiş" diye göstermesi burada sınanıyor.
-        AcquisitionRow(source: nil, customers: 22),
-    ]
 
     static let cohorts = [
         CohortReturn(withinDays: 30, returned: 7, rate: 38.89),

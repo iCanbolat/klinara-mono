@@ -98,6 +98,14 @@ export class GraphWhatsAppClient implements WhatsAppClient {
         parameters: [{ type: 'payload', payload }],
       });
     });
+    if (message.urlButton !== undefined) {
+      components.push({
+        type: 'button',
+        sub_type: 'url',
+        index: String(message.urlButton.index),
+        parameters: [{ type: 'text', text: message.urlButton.suffix }],
+      });
+    }
     if (message.copyCode !== undefined) {
       // Kimlik doğrulama template'inin kopyalama butonu Meta'da bir URL
       // butonu olarak modellenmiş; parametresi kodun kendisi.
@@ -216,12 +224,20 @@ export class GraphWhatsAppClient implements WhatsAppClient {
           : {}),
       },
     ];
-    if (draft.quickReplies !== undefined && draft.quickReplies.length > 0) {
-      components.push({
-        type: 'BUTTONS',
-        buttons: draft.quickReplies.map((text) => ({ type: 'QUICK_REPLY', text })),
-      });
-    }
+    const buttons: unknown[] = [
+      ...(draft.quickReplies ?? []).map((text) => ({ type: 'QUICK_REPLY', text })),
+      ...(draft.urlButton === undefined
+        ? []
+        : [
+            {
+              type: 'URL',
+              text: draft.urlButton.text,
+              url: draft.urlButton.url,
+              example: [draft.urlButton.example],
+            },
+          ]),
+    ];
+    if (buttons.length > 0) components.push({ type: 'BUTTONS', buttons });
     return components;
   }
 

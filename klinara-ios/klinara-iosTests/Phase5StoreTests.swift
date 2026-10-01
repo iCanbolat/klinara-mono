@@ -29,7 +29,7 @@ struct Phase5StoreTests {
                 totalPriceMinor: 500_000,
                 items: [
                     PackageDefinitionItemInput(
-                        serviceId: MockCatalogSeed.serviceHydrafacial,
+                        serviceId: MockCatalogSeed.serviceDisTasiTemizligi,
                         quantity: 3
                     )
                 ]
@@ -51,12 +51,12 @@ struct Phase5StoreTests {
         do {
             _ = try await store.create(
                 CreatePackageDefinitionInput(
-                    slug: "lazer-10-seans",
+                    slug: "ortodonti-10-kontrol",
                     name: "Kopya",
                     totalPriceMinor: 100_000,
                     items: [
                         PackageDefinitionItemInput(
-                            serviceId: MockCatalogSeed.serviceHydrafacial,
+                            serviceId: MockCatalogSeed.serviceDisTasiTemizligi,
                             quantity: 1
                         )
                     ]
@@ -158,14 +158,14 @@ struct Phase5StoreTests {
         let key = UUID().uuidString
 
         let first = try await store.sell(
-            definitionId: MockPackagesSeed.definitionCilt5,
+            definitionId: MockPackagesSeed.definitionDolgu5,
             note: nil,
             idempotencyKey: key
         )
         #expect(store.packages.count == before + 1)
 
         let second = try await store.sell(
-            definitionId: MockPackagesSeed.definitionCilt5,
+            definitionId: MockPackagesSeed.definitionDolgu5,
             note: nil,
             idempotencyKey: key
         )
@@ -310,7 +310,7 @@ struct Phase5StoreTests {
 
         // Cilt bakımı paketi devredilemez satılıyor.
         let sold = try await store.sell(
-            definitionId: MockPackagesSeed.definitionCilt5,
+            definitionId: MockPackagesSeed.definitionDolgu5,
             note: nil,
             idempotencyKey: UUID().uuidString
         )
@@ -339,7 +339,7 @@ struct Phase5StoreTests {
             branchId: nil
         )
         #expect(entitlements.allSatisfy { $0.remainingSessions > 0 })
-        #expect(entitlements.contains { $0.serviceId == MockCatalogSeed.serviceLazerBolgesel })
+        #expect(entitlements.contains { $0.serviceId == MockCatalogSeed.serviceOrtodontiKontrol })
     }
 
     // MARK: Gövde doğrulaması

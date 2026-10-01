@@ -52,6 +52,7 @@ function toBranchResponse(row: repo.BranchRow): BranchResponseDto {
     timezone: row.timezone,
     phone: row.phone,
     address: row.address,
+    mapsUrl: row.mapsUrl,
     isActive: row.isActive,
     createdAt: row.createdAt.toISOString(),
   };
@@ -173,6 +174,7 @@ export class TenancyService {
           timezone: input.timezone ?? tenant.timezone,
           phone: input.phone,
           address: input.address,
+          mapsUrl: input.mapsUrl,
         });
       })
       .catch((error: unknown) => {

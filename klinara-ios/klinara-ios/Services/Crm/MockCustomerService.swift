@@ -55,8 +55,7 @@ final class MockCustomerService: CustomerService, @unchecked Sendable {
     func customers(
         cursor: String?,
         limit: Int?,
-        tagId: String?,
-        source: CustomerSource?
+        tagId: String?
     ) async throws -> Page<Customer> {
         await latency(0.3)
         let size = min(limit ?? 50, 200)
@@ -66,7 +65,6 @@ final class MockCustomerService: CustomerService, @unchecked Sendable {
                 ($0.createdAt, $0.id) > ($1.createdAt, $1.id)
             }
             if let tagId { visible = visible.filter { $0.tags.contains { $0.id == tagId } } }
-            if let source { visible = visible.filter { $0.source == source } }
 
             if let cursor {
                 guard let key = MockCursor.decodeKey(cursor) else {
@@ -143,7 +141,6 @@ final class MockCustomerService: CustomerService, @unchecked Sendable {
                 district: input.district,
                 city: input.city,
                 postalCode: input.postalCode,
-                source: input.source,
                 mergedIntoCustomerId: nil,
                 tags: [],
                 createdAt: MockNow.next()
@@ -183,7 +180,6 @@ final class MockCustomerService: CustomerService, @unchecked Sendable {
                 district: resolve(input.district, current: old.district),
                 city: resolve(input.city, current: old.city),
                 postalCode: resolve(input.postalCode, current: old.postalCode),
-                source: resolve(input.source, current: old.source),
                 mergedIntoCustomerId: old.mergedIntoCustomerId,
                 tags: old.tags,
                 createdAt: old.createdAt
@@ -251,7 +247,6 @@ final class MockCustomerService: CustomerService, @unchecked Sendable {
                 district: target.district ?? source.district,
                 city: target.city ?? source.city,
                 postalCode: target.postalCode ?? source.postalCode,
-                source: target.source ?? source.source,
                 mergedIntoCustomerId: nil,
                 tags: target.tags,
                 createdAt: target.createdAt
@@ -386,7 +381,6 @@ final class MockCustomerService: CustomerService, @unchecked Sendable {
                 district: record.district,
                 city: record.city,
                 postalCode: record.postalCode,
-                source: record.source,
                 mergedIntoCustomerId: record.mergedIntoCustomerId,
                 tags: assigned,
                 createdAt: record.createdAt
@@ -557,8 +551,8 @@ enum MockCustomerSeed {
 
     static let tags = [
         CustomerTag(id: tagVip, name: "VIP", color: "#c0392b"),
-        CustomerTag(id: tagSensitive, name: "Hassas cilt", color: "#8e7cc3"),
-        CustomerTag(id: tagCampaign, name: "Kampanya", color: "#2e8b57"),
+        CustomerTag(id: tagSensitive, name: "Diş hassasiyeti", color: "#8e7cc3"),
+        CustomerTag(id: tagCampaign, name: "Ortodonti hastası", color: "#2e8b57"),
     ]
 
     static func assignments(scenario: MockDataScenario) -> [String: Set<String>] {
@@ -573,24 +567,22 @@ enum MockCustomerSeed {
         var records = [
             customer(
                 id: ayse,
-                name: "Ayşe Yılmaz",
+                name: "Şule Aydın",
                 phone: "+905321112233",
-                email: "ayse@ornek.test",
+                email: "sule@ornek.test",
                 birthDate: "1990-05-12",
                 gender: .female,
                 addressLine: "Bağdat Cad. No: 120 D: 5",
                 district: "Kadıköy",
                 city: "İstanbul",
                 postalCode: "34710",
-                source: .instagram,
                 createdAt: now.addingTimeInterval(-86_400 * 40)
             ),
             customer(
                 id: mehmet,
-                name: "Mehmet Demir",
+                name: "Can Öztürk",
                 phone: "+905324445566",
                 email: nil,
-                source: .walkIn,
                 createdAt: now.addingTimeInterval(-86_400 * 25)
             ),
         ]
@@ -605,10 +597,9 @@ enum MockCustomerSeed {
                 email: "zeynep@ornek.test",
                 birthDate: "1985-11-03",
                 gender: .female,
-                notes: "Cilt hassasiyeti var, düşük enerji tercih ediyor.",
+                notes: "Soğuğa hassasiyeti var, işlem öncesi anestezi soruluyor.",
                 district: "Beşiktaş",
                 city: "İstanbul",
-                source: .referral,
                 createdAt: now.addingTimeInterval(-86_400 * 10)
             ),
             customer(
@@ -617,7 +608,6 @@ enum MockCustomerSeed {
                 phone: nil,
                 email: "burak@ornek.test",
                 gender: .male,
-                source: .google,
                 createdAt: now.addingTimeInterval(-86_400 * 2)
             ),
         ])
@@ -636,7 +626,6 @@ enum MockCustomerSeed {
         district: String? = nil,
         city: String? = nil,
         postalCode: String? = nil,
-        source: CustomerSource? = nil,
         createdAt: Date
     ) -> Customer {
         Customer(
@@ -652,7 +641,6 @@ enum MockCustomerSeed {
             district: district,
             city: city,
             postalCode: postalCode,
-            source: source,
             mergedIntoCustomerId: nil,
             tags: [],
             createdAt: createdAt

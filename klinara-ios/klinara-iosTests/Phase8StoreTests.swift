@@ -81,45 +81,6 @@ struct Phase8StoreTests {
         #expect(skipped?.wasAttempted == false)
     }
 
-    // MARK: Gelen kutusu
-
-    @Test("İşlendi işaretlenen satır, \"yalnız işlenmemişler\" süzgecinde listeden düşer")
-    func markHandledRemovesRow() async throws {
-        let store = InboxStore(service: graph().whatsapp)
-        await store.load()
-
-        let target = try #require(store.items.first { !$0.isHandled })
-        let countBefore = store.items.count
-
-        try await store.markHandled(id: target.id)
-
-        #expect(store.items.count == countBefore - 1)
-        #expect(!store.items.contains { $0.id == target.id })
-    }
-
-    @Test("\"Tümü\" süzgecinde işlendi işaretlenen satır kalır, damgalanır")
-    func markHandledStampsRowWhenShowingAll() async throws {
-        let store = InboxStore(service: graph().whatsapp)
-        await store.setOnlyUnhandled(false)
-
-        let target = try #require(store.items.first { !$0.isHandled })
-        try await store.markHandled(id: target.id)
-
-        let updated = try #require(store.items.first { $0.id == target.id })
-        #expect(updated.isHandled)
-    }
-
-    @Test("Süzgeç işlenmişleri de gösterince liste büyür")
-    func showingAllIncludesHandled() async {
-        let store = InboxStore(service: graph().whatsapp)
-        await store.load()
-        let unhandledCount = store.items.count
-
-        await store.setOnlyUnhandled(false)
-
-        #expect(store.items.count > unhandledCount)
-    }
-
     // MARK: Şablonlar
 
     @Test("Liste kod varsayılanlarıyla kiracı satırlarını BİRLEŞTİRİR")
@@ -215,57 +176,6 @@ struct Phase8StoreTests {
                 whatsappVariables: ["musteriAdi"]
             ))
         }
-    }
-
-    // MARK: Tercihler
-
-    @Test("Sessiz saatin yalnız bir ucu VALIDATION_FAILED verir")
-    func quietHoursMustComeInPairs() async throws {
-        let store = settingsStore(graph())
-        await store.loadPreferences()
-
-        do {
-            _ = try await store.upsertPreference(UpsertNotificationPreferenceInput(
-                event: .appointmentReminder,
-                channels: [.whatsapp],
-                quietHoursStart: "22:00"
-            ))
-            Issue.record("reddedilmeliydi")
-        } catch let error as APIError {
-            #expect(error.code == .validationFailed)
-        }
-    }
-
-    @Test("İki uç birlikte gönderilince kabul edilir ve sıra korunur")
-    func acceptsQuietHoursPair() async throws {
-        let store = settingsStore(graph())
-        await store.loadPreferences()
-
-        let saved = try await store.upsertPreference(UpsertNotificationPreferenceInput(
-            event: .appointmentConfirmation,
-            channels: [.email, .whatsapp],
-            quietHoursStart: "23:00",
-            quietHoursEnd: "07:30"
-        ))
-
-        #expect(saved.channels == [.email, .whatsapp])
-        #expect(saved.quietHoursLabel == "23:00 – 07:30")
-    }
-
-    @Test("Şube satırı kiracı satırının YANINDA durur, yerine geçmez")
-    func branchPreferenceCoexistsWithTenantDefault() async throws {
-        let store = settingsStore(graph())
-        await store.loadPreferences()
-        let tenantCountBefore = store.tenantPreferences.count
-
-        _ = try await store.upsertPreference(UpsertNotificationPreferenceInput(
-            branchId: MockGraph.branchId,
-            event: .appointmentReminder,
-            channels: [.whatsapp]
-        ))
-
-        #expect(store.tenantPreferences.count == tenantCountBefore)
-        #expect(store.branchPreferences(branchId: MockGraph.branchId).count == 1)
     }
 
     // MARK: Hatırlatma ayarları
@@ -507,11 +417,7 @@ struct Phase8StoreTests {
     }
 }
 
-/// ``NotificationTemplateForm``un yer tutucu doğrulaması — saf, sunucusuz.
-///
-/// Bu kontrol istemcide DURUYOR ki kullanıcı hatayı kaydete basınca değil
-/// yazarken görsün; sunucu yine son söz sahibi. İki tarafın aynı beyaz listeyi
-/// kullandığı buradan sınanıyor.
+/// ``NotificationTemplateForm`` — sade şablon detayı: yalnız Aktif düzenlenir.
 @MainActor
 @Suite("Faz 8 şablon formu")
 struct NotificationTemplateFormTests {
@@ -520,6 +426,7 @@ struct NotificationTemplateFormTests {
         event: NotificationEvent = .appointmentReminder,
         channel: NotificationChannel = .whatsapp,
         body: String = "Sayın {{customerName}}, merhaba.",
+        subject: String? = nil,
         whatsappVariables: [String] = []
     ) -> NotificationTemplate {
         NotificationTemplate(
@@ -527,7 +434,7 @@ struct NotificationTemplateFormTests {
             event: event,
             channel: channel,
             locale: "tr",
-            subject: nil,
+            subject: subject,
             body: body,
             whatsappTemplateName: nil,
             whatsappTemplateLanguage: nil,
@@ -551,74 +458,69 @@ struct NotificationTemplateFormTests {
         #expect(NotificationEventCatalog.placeholders(in: "{{ customerName }}") == ["customerName"])
     }
 
-    @Test("Olayda tanımlı olmayan ad hatalı sayılır")
-    func flagsUnknownPlaceholder() {
-        let form = NotificationTemplateForm(editing: template(body: "{{musteriAdi}}"))
-
-        #expect(form.unknownPlaceholders == ["musteriAdi"])
-        #expect(!form.isValid)
+    @Test("Gövde düz metin ve @Etiket parçalarına ayrılır; tanımsız ad ham @ad olarak kalır")
+    func segmentsCarryHandles() {
+        let segments = TemplateSegment.parse("Sayın {{customerName}}, {{ serviceName }} {{bilinmeyen}}")
+        #expect(segments == [
+            .text("Sayın "),
+            .variable(name: "customerName", handle: "@MüşteriAdı"),
+            .text(", "),
+            .variable(name: "serviceName", handle: "@HizmetAdı"),
+            .text(" "),
+            .variable(name: "bilinmeyen", handle: "@bilinmeyen"),
+        ])
+        #expect(segments.plainText == "Sayın @MüşteriAdı, @HizmetAdı @bilinmeyen")
     }
 
-    @Test("Başka bir olayın değişkeni bu olayda geçersiz")
-    func variablesAreScopedToEvent() {
-        // `packageName` gerçek bir değişken ama yalnız paket olaylarında.
-        let form = NotificationTemplateForm(
-            editing: template(event: .appointmentReminder, body: "{{packageName}}")
-        )
-
-        #expect(form.unknownPlaceholders == ["packageName"])
+    @Test("Sunucunun gönderdiği parçalar gövdeden ayrıştırmaya tercih edilir")
+    func serverSegmentsWin() throws {
+        let json = """
+        {"id":null,"event":"appointment_reminder","channel":"whatsapp","locale":"tr","subject":null,
+         "body":"{{customerName}}","whatsappTemplateName":null,"whatsappTemplateLanguage":null,
+         "whatsappVariables":[],"isActive":true,"isDefault":true,"variables":["customerName"],
+         "segments":[{"kind":"text","text":"Merhaba "},{"kind":"variable","name":"customerName","handle":"@MüşteriAdı"}]}
+        """
+        let decoded = try JSONDecoder().decode(NotificationTemplate.self, from: Data(json.utf8))
+        #expect(decoded.segments == [.text("Merhaba "), .variable(name: "customerName", handle: "@MüşteriAdı")])
     }
 
-    @Test("WhatsApp konumsal değişkenleri de aynı beyaz listeye tabi")
-    func validatesWhatsAppVariables() {
+    @Test("segments göndermeyen eski sunucuda gövde yerelde parçalanır")
+    func missingSegmentsFallBackToBody() throws {
+        let json = """
+        {"id":null,"event":"appointment_reminder","channel":"whatsapp","locale":"tr","subject":null,
+         "body":"Selam {{customerName}}","whatsappTemplateName":null,"whatsappTemplateLanguage":null,
+         "whatsappVariables":[],"isActive":true,"isDefault":true,"variables":["customerName"]}
+        """
+        let decoded = try JSONDecoder().decode(NotificationTemplate.self, from: Data(json.utf8))
+        #expect(decoded.segments == [.text("Selam "), .variable(name: "customerName", handle: "@MüşteriAdı")])
+    }
+
+    @Test("Yalnız Aktif anahtarı formu kirletir; metin ve Meta alanları olduğu gibi geri gider")
+    func onlyActiveIsEditable() {
         let form = NotificationTemplateForm(editing: template(
             channel: .whatsapp,
-            body: "Meta şablonu kullanılıyor.",
-            whatsappVariables: ["customerName", "musteriAdi"]
+            whatsappVariables: ["customerName", "appointmentAt"]
         ))
+        #expect(!form.isDirty)
 
-        #expect(form.unknownPlaceholders == ["musteriAdi"])
-    }
+        form.isActive = false
+        #expect(form.isDirty)
+        form.isActive = true
+        #expect(!form.isDirty)
 
-    @Test("Boş gövde kaydedilemez")
-    func rejectsEmptyBody() {
-        let form = NotificationTemplateForm(editing: template(body: "geçerli"))
-        form.body = "   \n  "
-
-        #expect(!form.isValid)
-    }
-
-    @Test("Meta şablon adı verildiyse dil de zorunlu")
-    func templateNameRequiresLanguage() {
-        let form = NotificationTemplateForm(editing: template(channel: .whatsapp))
-        form.whatsappTemplateName = "randevu_hatirlatma"
-        form.whatsappTemplateLanguage = ""
-
-        #expect(!form.isValid)
+        form.isActive = false
+        let input = form.input()
+        #expect(input.isActive == false)
+        #expect(input.body == form.body)
+        #expect(input.whatsappVariables == ["customerName", "appointmentAt"])
     }
 
     @Test("Konu yalnız e-posta kanalında gövdeye konur")
     func subjectOnlyForEmail() {
-        let whatsapp = NotificationTemplateForm(editing: template(channel: .whatsapp))
-        whatsapp.subject = "Konu"
+        let whatsapp = NotificationTemplateForm(editing: template(channel: .whatsapp, subject: "Konu"))
         #expect(whatsapp.input().subject == nil)
 
-        let email = NotificationTemplateForm(editing: template(channel: .email))
-        email.subject = "Konu"
+        let email = NotificationTemplateForm(editing: template(channel: .email, subject: "Konu"))
         #expect(email.input().subject == "Konu")
-    }
-
-    @Test("Değişken eklemek formu kirletir ve sıra korunur")
-    func appendingVariablesTracksOrder() {
-        let form = NotificationTemplateForm(editing: template(channel: .whatsapp))
-        #expect(!form.isDirty)
-
-        form.addWhatsAppVariable("appointmentAt")
-        form.addWhatsAppVariable("customerName")
-        form.addWhatsAppVariable("appointmentAt")
-
-        #expect(form.isDirty)
-        // Aynı ad iki kez eklenmez; sıra Meta'nın `{{1}}, {{2}}`'si.
-        #expect(form.whatsappVariables == ["appointmentAt", "customerName"])
     }
 }

@@ -1,12 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { ERROR_CODES } from '@klinara/shared';
+import { ERROR_CODES, templateSegments } from '@klinara/shared';
 import { AppError } from '../../common/errors/app-error';
-import type { EnvironmentVariables } from '../../config/env.validation';
 import { TenantTxService } from '../../database/tenant-tx.service';
 import type { NotificationChannel } from '../../database/schema';
-import { BranchAccessService } from '../tenancy/branch-access.service';
-import type { Principal } from '../identity/principal';
 import {
   CONFIGURABLE_EVENTS,
   CUSTOMER_CHANNELS,
@@ -17,14 +13,12 @@ import * as repo from './notifications.repository';
 import { STANDARD_TEMPLATE_BY_EVENT } from '../integrations/whatsapp-standard-templates';
 import { templateVariables } from './template-renderer';
 import type {
-  NotificationPreferenceResponseDto,
   NotificationTemplateResponseDto,
-  UpsertNotificationPreferenceDto,
   UpsertNotificationTemplateDto,
 } from './dto/notification.dto';
 
 /**
- * Şablon ve tercih yönetimi.
+ * Şablon yönetimi.
  *
  * Liste uçları KİRACI SATIRLARIYLA VARSAYILANLARI BİRLİKTE döndürür
  * (`isDefault` bayrağıyla). Yalnız kiracı satırlarını döndürmek, arayüzde
@@ -35,8 +29,6 @@ import type {
 export class NotificationSettingsService {
   constructor(
     private readonly tx: TenantTxService,
-    private readonly branchAccess: BranchAccessService,
-    private readonly config: ConfigService<EnvironmentVariables, true>,
   ) {}
 
   async listTemplates(): Promise<NotificationTemplateResponseDto[]> {
@@ -78,6 +70,7 @@ export class NotificationSettingsService {
           isActive: override?.isActive ?? true,
           isDefault: override === undefined,
           variables: templateVariables(override?.body ?? fallback?.body ?? ''),
+          segments: templateSegments(override?.body ?? fallback?.body ?? ''),
         });
       }
     }
@@ -90,6 +83,8 @@ export class NotificationSettingsService {
       // kullanıcıya yürürlükte olmayan bir metni yürürlükteymiş gibi okutmak
       // olurdu. (DB enum'u `sms`'i geçmiş için taşıyor, tip taşımıyor.)
       if (isCustomerEvent(row.event) && !CUSTOMER_CHANNELS.includes(row.channel)) continue;
+      // Personel olayı şablon ekranında yok; eski bir kiracı satırı da geri gelmesin.
+      if (!CONFIGURABLE_EVENTS.includes(row.event)) continue;
       const known = result.some(
         (item) => item.event === row.event && item.channel === row.channel && item.id !== null,
       );
@@ -107,6 +102,7 @@ export class NotificationSettingsService {
         isActive: row.isActive,
         isDefault: false,
         variables: templateVariables(row.body),
+        segments: templateSegments(row.body),
       });
     }
 
@@ -116,8 +112,16 @@ export class NotificationSettingsService {
   async upsertTemplate(
     input: UpsertNotificationTemplateDto,
   ): Promise<NotificationTemplateResponseDto> {
-    // Müşteriye e-posta gitmiyor: kanal yalnız personele giden iç bildirimde
-    // (`staff_internal`) geçerli. Kapıyı burada tutmak, DTO'daki `ALL_CHANNELS`
+    // Personel iç bildirimi ve elle yazılan cevaplar şablon değildir.
+    if (!CONFIGURABLE_EVENTS.includes(input.event)) {
+      throw new AppError(
+        422,
+        ERROR_CODES.VALIDATION_FAILED,
+        'Bu olayın şablonu kiracı tarafından düzenlenemez',
+      );
+    }
+
+    // Müşteriye e-posta gitmiyor: kanal hiçbir müşteri olayında geçerli değil. Kapıyı burada tutmak, DTO'daki `ALL_CHANNELS`
     // kümesini wire düzeyinde bırakıp kuralı olayla birlikte ifade ediyor.
     if (input.channel === 'email' && isCustomerEvent(input.event)) {
       throw new AppError(
@@ -184,90 +188,7 @@ export class NotificationSettingsService {
       isActive: row.isActive,
       isDefault: false,
       variables: templateVariables(row.body),
-    };
-  }
-
-  async listPreferences(): Promise<NotificationPreferenceResponseDto[]> {
-    const rows = await this.tx.run((tx) => repo.listPreferences(tx));
-    const stored = rows.map((row) => this.toPreferenceResponse(row));
-
-    const covered = new Set(rows.filter((row) => row.branchId === null).map((row) => row.event));
-    const defaults = CONFIGURABLE_EVENTS.filter((event) => !covered.has(event)).map((event) => ({
-      id: null,
-      branchId: null,
-      event,
-      channels: EVENT_DEFINITIONS[event].channels,
-      quietHoursStart: this.defaultQuietHours().start,
-      quietHoursEnd: this.defaultQuietHours().end,
-      quietHoursEnabled: this.defaultQuietHours().start !== this.defaultQuietHours().end,
-      isDefault: true,
-    }));
-
-    return [...defaults, ...stored].sort((a, b) => a.event.localeCompare(b.event));
-  }
-
-  async upsertPreference(
-    principal: Principal,
-    input: UpsertNotificationPreferenceDto,
-  ): Promise<NotificationPreferenceResponseDto> {
-    if (input.branchId !== undefined) {
-      await this.branchAccess.assertInput(principal, input.branchId);
-    }
-    // DTO da aynı kümeyi doğruluyor; buradaki ikinci kapı, servisi doğrudan
-    // çağıran iç yolların (seed, worker) kuralı atlamasını engelliyor.
-    const rejected = isCustomerEvent(input.event)
-      ? input.channels.filter((channel) => !CUSTOMER_CHANNELS.includes(channel))
-      : [];
-    if (rejected.length > 0) {
-      throw new AppError(
-        422,
-        ERROR_CODES.VALIDATION_FAILED,
-        `Müşteri bildirimlerinde kullanılamayan kanal: ${rejected.join(', ')}`,
-      );
-    }
-    if ((input.quietHoursStart === undefined) !== (input.quietHoursEnd === undefined)) {
-      throw new AppError(
-        422,
-        ERROR_CODES.VALIDATION_FAILED,
-        'Sessiz saat başlangıcı ve bitişi birlikte verilmeli',
-      );
-    }
-
-    const row = await this.tx.run((tx) =>
-      repo.upsertPreference(tx, this.tx.tenantId, {
-        branchId: input.branchId ?? null,
-        event: input.event,
-        channels: input.channels,
-        quietHoursStart: input.quietHoursStart ?? null,
-        quietHoursEnd: input.quietHoursEnd ?? null,
-      }),
-    );
-    return this.toPreferenceResponse(row);
-  }
-
-  private toPreferenceResponse(
-    row: repo.NotificationPreferenceRow,
-  ): NotificationPreferenceResponseDto {
-    const start = row.quietHoursStart?.slice(0, 5) ?? this.defaultQuietHours().start;
-    const end = row.quietHoursEnd?.slice(0, 5) ?? this.defaultQuietHours().end;
-    return {
-      id: row.id,
-      branchId: row.branchId,
-      event: row.event,
-      channels: row.channels,
-      quietHoursStart: start,
-      quietHoursEnd: end,
-      // Kayıtlı `null` pencere varsayılana düşer (dispatcher de öyle uygular);
-      // "kapalı" ancak eşit uçlarla ifade edilir. Bkz. DTO notu.
-      quietHoursEnabled: start !== end,
-      isDefault: false,
-    };
-  }
-
-  private defaultQuietHours(): { start: string; end: string } {
-    return {
-      start: this.config.get('NOTIFICATION_QUIET_HOURS_START', { infer: true }),
-      end: this.config.get('NOTIFICATION_QUIET_HOURS_END', { infer: true }),
+      segments: templateSegments(row.body),
     };
   }
 }

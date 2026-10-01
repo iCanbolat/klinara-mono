@@ -403,6 +403,8 @@ export interface BranchDetail {
   timezone: string;
   phone: string | null;
   address: string | null;
+  /** Google Maps bağlantısı (https); şube bilgisi; mesajlarda kullanılmaz (harita butonu adresten üretilir). */
+  mapsUrl: string | null;
   isActive: boolean;
   createdAt: string;
 }
@@ -416,6 +418,7 @@ export interface CreateBranchInput {
   timezone?: string;
   phone?: string;
   address?: string;
+  mapsUrl?: string;
 }
 
 /** `PATCH branches/:id` — `null` alanı TEMİZLER, eksik alan dokunulmaz. */
@@ -424,6 +427,7 @@ export interface UpdateBranchInput {
   timezone?: string;
   phone?: string | null;
   address?: string | null;
+  mapsUrl?: string | null;
   isActive?: boolean;
 }
 

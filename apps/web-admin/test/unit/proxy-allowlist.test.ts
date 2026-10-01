@@ -459,6 +459,21 @@ describe('yönetim proxy beyaz listesi', () => {
     });
   });
   // -------------------------------------------------------------------------
+  describe('mesaj şablonları', () => {
+    it('listeleme ve yazma geçiyor', () => {
+      expect(isAllowedProxyPath('notification-templates', 'GET')).toBe(true);
+      expect(isAllowedProxyPath('notification-templates', 'PUT')).toBe(true);
+    });
+
+    it('izinsiz metot ve kardeş yol geçmiyor', () => {
+      expect(isAllowedProxyPath('notification-templates', 'POST')).toBe(false);
+      expect(isAllowedProxyPath('notification-templates', 'DELETE')).toBe(false);
+      expect(isAllowedProxyPath('notification-templates/x', 'GET')).toBe(false);
+      expect(isAllowedProxyPath('messages', 'GET')).toBe(false);
+    });
+  });
+
+  // -------------------------------------------------------------------------
   describe('WhatsApp kurulumu ve sohbetler', () => {
     it('kurulum yüzeyi geçiyor', () => {
       expect(isAllowedProxyPath('integrations/whatsapp', 'GET')).toBe(true);
@@ -503,6 +518,13 @@ describe('yönetim proxy beyaz listesi', () => {
       expect(isAllowedProxyPath('staff-notifications', 'DELETE')).toBe(false);
       expect(isAllowedProxyPath('staff-notifications/read', 'GET')).toBe(false);
       expect(isAllowedProxyPath('staff-notifications/settings', 'GET')).toBe(false);
+    });
+
+    it('anlık olay bileti yalnız POST ile geçiyor', () => {
+      expect(isAllowedProxyPath('realtime/ticket', 'POST')).toBe(true);
+      expect(isAllowedProxyPath('realtime/ticket', 'GET')).toBe(false);
+      expect(isAllowedProxyPath('realtime', 'GET')).toBe(false);
+      expect(isAllowedProxyPath('realtime/ticket/extra', 'POST')).toBe(false);
     });
 
     it('sohbette izinsiz metot ve kardeş yol geçmiyor', () => {

@@ -443,21 +443,14 @@ private val STAT_LABEL_WIDTHS = listOf(96.dp, 76.dp, 108.dp, 88.dp)
 private val STAT_VALUE_WIDTHS = listOf(72.dp, 96.dp, 60.dp, 84.dp)
 private val STAT_HINT_WIDTHS = listOf(120.dp, 88.dp, 104.dp, 132.dp)
 
-/** [KlinaraStatStrip] ile aynı ızgara: iki sütun, eşit boy. */
+/** [KlinaraStatStrip] ile aynı düzen: tek satır, sabit genişlikli kartlar. */
 @Composable
 private fun StatGrid(count: Int) {
-    val total = count.coerceAtLeast(2)
-    Column(verticalArrangement = Arrangement.spacedBy(KlinaraMetrics.sm)) {
-        for (start in 0 until total step 2) {
-            Row(horizontalArrangement = Arrangement.spacedBy(KlinaraMetrics.sm)) {
-                StatCard(start, Modifier.weight(1f))
-                if (start + 1 < total) {
-                    StatCard(start + 1, Modifier.weight(1f))
-                } else {
-                    Box(Modifier.weight(1f))
-                }
-            }
-        }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(KlinaraMetrics.sm),
+    ) {
+        repeat(count.coerceAtLeast(2)) { index -> StatCard(index, Modifier.width(CARD_WIDTH)) }
     }
 }
 

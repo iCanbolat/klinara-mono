@@ -247,12 +247,6 @@ enum ReportFixtures {
         "activeCustomers": 1,
         "returningRate": 0
       },
-      "acquisition": [
-        {
-          "source": null,
-          "customers": 1
-        }
-      ],
       "cohorts": [
         {
           "withinDays": 30,

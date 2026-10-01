@@ -23,7 +23,8 @@ object NotificationEventCatalog {
     // Müşteriye e-posta GİTMEZ: klinik müşterisiyle yalnız WhatsApp üzerinden yazışır.
     // `StaffInternal` bir istisna değil, farklı bir alıcı — personele giden iç bildirim.
     private val whatsapp = listOf(NotificationChannel.WhatsApp)
-    private val appointmentVariables = listOf("customerName", "branchName", "appointmentAt", "serviceName")
+    private val appointmentVariables =
+        listOf("customerName", "branchName", "branchAddress", "appointmentAt", "serviceName")
 
     val definitions: Map<NotificationEvent, Definition> =
         mapOf(
@@ -61,6 +62,42 @@ object NotificationEventCatalog {
 
     fun channels(event: NotificationEvent): List<NotificationChannel> = definitions[event]?.channels.orEmpty()
 
+    /**
+     * Ekranda görünen `@Etiket`ler; teknik `{{customerName}}` biçimi arayüzde geçmez.
+     * Sunucudaki `packages/shared/src/notification-templates.ts` ile aynı tablo: canlıda parçalar
+     * sunucudan gelir, bu tablo yalnız mock'un ve `segments` göndermeyen eski bir sunucunun yedeğidir.
+     */
+    private val variableHandles =
+        mapOf(
+            "customerName" to "@MüşteriAdı",
+            "branchName" to "@KlinikAdı",
+            "branchAddress" to "@KlinikAdresi",
+            "appointmentAt" to "@RandevuZamanı",
+            "serviceName" to "@HizmetAdı",
+            "packageName" to "@PaketAdı",
+            "remainingSessions" to "@KalanSeans",
+            "expiresAt" to "@SonKullanımTarihi",
+            "message" to "@Mesaj",
+            "subject" to "@Konu",
+        )
+
+    /** Tanımsız ad ham haliyle (`@ad`) görünür — sessizce yutulmaz. */
+    fun handle(variable: String): String = variableHandles[variable] ?: "@$variable"
+
+    /** `Sayın {{customerName}}` → `[metin "Sayın ", değişken @MüşteriAdı]`. */
+    fun segments(text: String): List<TemplateSegment> {
+        val result = mutableListOf<TemplateSegment>()
+        var cursor = 0
+        for (match in PLACEHOLDER.findAll(text)) {
+            if (match.range.first > cursor) result += TemplateSegment.text(text.substring(cursor, match.range.first))
+            val name = match.groupValues[1]
+            result += TemplateSegment.variable(name, handle(name))
+            cursor = match.range.last + 1
+        }
+        if (cursor < text.length) result += TemplateSegment.text(text.substring(cursor))
+        return result
+    }
+
     private val PLACEHOLDER = Regex("""\{\{\s*([A-Za-z0-9_]+)\s*\}\}""")
 
     /** Metindeki `{{ad}}` yer tutucuları — göründükleri sırada, tekrarsız. */
@@ -78,6 +115,38 @@ object NotificationEventCatalog {
     ): List<String> {
         val allowed = variables(event).toSet()
         return placeholders(text).filterNot { it in allowed }
+    }
+}
+
+/**
+ * Şablon gövdesinin bir parçası: düz metin ya da `@HizmetAdı` gibi bir değişken.
+ *
+ * Ekranlar `{{…}}` ayrıştırmaz; sunucunun verdiği parçaları sırayla çizer. Değişken mavi bağlantı
+ * renginde görünür — yazılabilir bir metin değil, gönderim anında doldurulan tipli bir alandır.
+ * Düz veri sınıfı: bilinmeyen bir `kind` çökmez, düz metin sayılır.
+ */
+@Serializable
+data class TemplateSegment(
+    val kind: String = KIND_TEXT,
+    val text: String = "",
+    val name: String = "",
+    val handle: String = "",
+) {
+    val isVariable: Boolean get() = kind == KIND_VARIABLE
+
+    /** Ekranda görünen yazı: değişkenlerde `@Etiket`, metinde kendisi. */
+    val display: String get() = if (isVariable) handle.ifEmpty { "@$name" } else text
+
+    companion object {
+        const val KIND_TEXT = "text"
+        const val KIND_VARIABLE = "variable"
+
+        fun text(value: String) = TemplateSegment(kind = KIND_TEXT, text = value)
+
+        fun variable(
+            name: String,
+            handle: String,
+        ) = TemplateSegment(kind = KIND_VARIABLE, name = name, handle = handle)
     }
 }
 
@@ -104,7 +173,12 @@ data class NotificationTemplate(
     val isActive: Boolean = true,
     val isDefault: Boolean = false,
     val variables: List<String> = emptyList(),
+    /** Sunucunun parçaladığı gövde; eski bir sunucu göndermezse `null`. Ekranlar [displaySegments]i okur. */
+    val segments: List<TemplateSegment>? = null,
 ) {
+    /** Ekranın çizdiği gövde: `@Etiket`li parçalar. */
+    val displaySegments: List<TemplateSegment> get() = segments ?: NotificationEventCatalog.segments(body)
+
     /** `(event, channel, locale)` — sunucunun upsert anahtarı. */
     val rowId: String get() = "${event.wire}|${channel.wire}|$locale"
 
@@ -124,57 +198,6 @@ data class NotificationTemplateUpsert(
     val whatsappTemplateLanguage: String?,
     val whatsappVariables: List<String>?,
     val isActive: Boolean,
-)
-
-/**
- * `NotificationPreferenceResponseDto`. `branchId == null` kiracı varsayılanıdır; şube satırı onu
- * ezer. Varsayılan satırların `id`'si boş, liste `(event, branchId)` ile anahtarlanır.
- */
-@Serializable
-data class NotificationPreference(
-    @SerialName("id") val preferenceId: String? = null,
-    val branchId: String? = null,
-    val event: NotificationEvent,
-    /** Öncelik sırasında denenecek kanallar. **Boş = olay kapalı.** */
-    val channels: List<NotificationChannel> = emptyList(),
-    /** `"HH:MM"`, şube saat diliminde yorumlanan duvar saati — zaman damgası değil. */
-    val quietHoursStart: String? = null,
-    val quietHoursEnd: String? = null,
-    /**
-     * [S] A8.2: sunucu artık türetiyor (`start !== end`). Eski sunucuda alan yok; o zaman
-     * aynı kural istemcide uygulanır ([isQuietHoursEnabled]).
-     */
-    val quietHoursEnabled: Boolean? = null,
-    val isDefault: Boolean = false,
-) {
-    val rowId: String get() = "${event.wire}|${branchId ?: "tenant"}"
-
-    val isEnabled: Boolean get() = channels.isNotEmpty()
-
-    val isQuietHoursEnabled: Boolean
-        get() =
-            quietHoursEnabled
-                ?: (quietHoursStart != null && quietHoursEnd != null && quietHoursStart != quietHoursEnd)
-
-    /** "21:00 – 09:00"; kapalıysa `null`. */
-    val quietHoursLabel: String?
-        get() {
-            val start = ClockTime.parse(quietHoursStart) ?: return null
-            val end = ClockTime.parse(quietHoursEnd) ?: return null
-            return if (isQuietHoursEnabled) "${start.displayValue} – ${end.displayValue}" else null
-        }
-}
-
-/**
- * `PUT notification-preferences` gövdesi. Sessiz saatin iki ucu **birlikte** gider (sunucu
- * yalnız birini alınca `VALIDATION_FAILED`); "kapalı" eşit uçlarla (`00:00`–`00:00`) ifade edilir.
- */
-data class NotificationPreferenceUpsert(
-    val branchId: String?,
-    val event: NotificationEvent,
-    val channels: List<NotificationChannel>,
-    val quietHoursStart: ClockTime,
-    val quietHoursEnd: ClockTime,
 )
 
 /**

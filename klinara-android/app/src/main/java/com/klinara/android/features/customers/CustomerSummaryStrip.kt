@@ -34,7 +34,7 @@ import com.klinara.android.services.crm.CustomerSummary
 /**
  * Müşteriler listesinin üstündeki kompakt özet: tek kart, dört sütun.
  *
- * Dashboard'daki 2×2 `KlinaraStatStrip` burada BİLEREK kullanılmıyor — listenin asıl içerik
+ * Dashboard'daki büyük `KlinaraStatStrip` burada BİLEREK kullanılmıyor — listenin asıl içerik
  * olduğu bir ekranda dört büyük kart ilk ekranı yutardı. `summary == null` iken sayılar yer
  * tutucuyla çizilir; kart boyu yükleme bitince değişmez. iOS `CustomerSummaryStrip` ile aynı.
  */

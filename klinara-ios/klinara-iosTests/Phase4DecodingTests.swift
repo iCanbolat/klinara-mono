@@ -31,7 +31,6 @@ struct Phase4DecodingTests {
         ).data
         let ayse = try #require(list.first)
 
-        #expect(ayse.source == .instagram)
         #expect(ayse.city == "İstanbul")
         #expect(ayse.district == "Kadıköy")
         #expect(ayse.postalCode == "34710")

@@ -299,17 +299,6 @@ export interface AvailabilityResponse {
 export const CUSTOMER_GENDERS = ['female', 'male', 'other', 'undisclosed'] as const;
 export type CustomerGender = (typeof CUSTOMER_GENDERS)[number];
 
-export const CUSTOMER_SOURCES = [
-  'walk_in',
-  'referral',
-  'instagram',
-  'google',
-  'website',
-  'whatsapp',
-  'other',
-] as const;
-export type CustomerSource = (typeof CUSTOMER_SOURCES)[number];
-
 export interface CustomerTag {
   id: string;
   name: string;
@@ -329,7 +318,6 @@ export interface Customer {
   district: string | null;
   city: string | null;
   postalCode: string | null;
-  source: CustomerSource | null;
   mergedIntoCustomerId: string | null;
   tags: CustomerTag[];
   createdAt: string;

@@ -7,12 +7,11 @@ import Foundation
 protocol CustomerService: Sendable {
 
     /// `GET /customers` — **cursor sayfalamalı**, en yeniden eskiye.
-    /// `tagId` ve `source` sunucuda filtreliyor; arama için ``search(_:limit:)``.
+    /// `tagId` sunucuda filtreliyor; arama için ``search(_:limit:)``.
     func customers(
         cursor: String?,
         limit: Int?,
-        tagId: String?,
-        source: CustomerSource?
+        tagId: String?
     ) async throws -> Page<Customer>
 
     /// `GET /customers/search?q=` — ad **ve** telefon üzerinde, Türkçe duyarlı
@@ -76,14 +75,12 @@ struct LiveCustomerService: CustomerService {
     func customers(
         cursor: String?,
         limit: Int?,
-        tagId: String?,
-        source: CustomerSource?
+        tagId: String?
     ) async throws -> Page<Customer> {
         var query: [URLQueryItem] = []
         if let cursor { query.append(URLQueryItem(name: "cursor", value: cursor)) }
         if let limit { query.append(URLQueryItem(name: "limit", value: String(limit))) }
         if let tagId { query.append(URLQueryItem(name: "tagId", value: tagId)) }
-        if let source { query.append(URLQueryItem(name: "source", value: source.rawValue)) }
         return try await client.send(APIRequest.get("customers", query: query))
     }
 

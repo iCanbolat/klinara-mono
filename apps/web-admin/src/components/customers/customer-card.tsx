@@ -22,6 +22,9 @@ import { MergeDialog } from './merge-dialog';
 import { NotesPanel } from './notes-panel';
 import { TimelinePanel } from './timeline-panel';
 
+/** Sekme içeriği: kart sabit yükseklikteyken yalnız bu alan kayar. */
+const PANEL = 'min-h-0 lg:-mr-2 lg:overflow-y-auto lg:pr-2';
+
 /**
  * Müşteri kartı.
  *
@@ -123,12 +126,16 @@ export function CustomerCard({ customerId }: { customerId: string }): ReactNode 
         </Alert>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[18rem_minmax(0,1fr)]">
-        <CustomerProfile customer={customer} />
+      {/* Geniş ekranda iki kart SABİT yükseklikte yan yana; uzun içerik
+          sayfayı değil kartın içini kaydırıyor. Sekme şeridi yerinde kalıyor,
+          yalnız sekme içeriği kayıyor. Dar ekranda kartlar alt alta ve doğal
+          yükseklikte — orada sabit yükseklik iç içe iki kaydırma yaratırdı. */}
+      <div className="grid gap-6 lg:h-[calc(100dvh-15rem)] lg:min-h-[520px] lg:grid-cols-[18rem_minmax(0,1fr)]">
+        <CustomerProfile customer={customer} className="lg:min-h-0 lg:overflow-y-auto" />
 
-        <Card className="min-w-0">
-          <Tabs defaultValue="notes" className="gap-5">
-            <TabsList>
+        <Card className="flex min-w-0 flex-col lg:min-h-0 lg:overflow-hidden">
+          <Tabs defaultValue="notes" className="min-h-0 flex-1 gap-5">
+            <TabsList className="shrink-0">
               <TabsTrigger value="notes">{t('customers.tab.notes')}</TabsTrigger>
               {/* Randevu izni yoksa HİÇ render edilmiyor — bkz. dosya başlığı. */}
               {canSeeTimeline ? (
@@ -140,22 +147,22 @@ export function CustomerCard({ customerId }: { customerId: string }): ReactNode 
               ) : null}
             </TabsList>
 
-            <TabsContent value="notes">
+            <TabsContent value="notes" className={PANEL}>
               <NotesPanel customerId={customerId} />
             </TabsContent>
 
             {canSeeTimeline ? (
-              <TabsContent value="timeline">
+              <TabsContent value="timeline" className={PANEL}>
                 <TimelinePanel customerId={customerId} />
               </TabsContent>
             ) : null}
 
-            <TabsContent value="files">
+            <TabsContent value="files" className={PANEL}>
               <FilesPanel customerId={customerId} canWrite={canWrite} />
             </TabsContent>
 
             {canSeeConsents ? (
-              <TabsContent value="consents">
+              <TabsContent value="consents" className={PANEL}>
                 <CustomerConsentsPanel customerId={customerId} />
               </TabsContent>
             ) : null}

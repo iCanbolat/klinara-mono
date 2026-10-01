@@ -55,8 +55,11 @@ final class PackageReportsStore {
 
     // MARK: Yükleme
 
-    func loadOutstanding() async {
-        outstanding = .loading
+    /// `refreshing`: aşağı çekerek yenileme. Eldeki rapor ekranda KALIR —
+    /// iskelete dönmek `.refreshable` görevini iptal ettirip ekranı yükleme
+    /// durumunda takılı bırakır. Dönem/gruplama değişince `false` (iskelet).
+    func loadOutstanding(refreshing: Bool = false) async {
+        if !refreshing || outstanding.value == nil { outstanding = .loading }
         do {
             outstanding = .loaded(
                 try await service.outstandingReport(
@@ -65,8 +68,11 @@ final class PackageReportsStore {
                     groupBy: outstandingGrouping
                 )
             )
+        } catch let error as APIError where error.isSilent {
+            return
         } catch {
-            outstanding = .failed(error as? APIError ?? .network)
+            guard !Task.isCancelled else { return }
+            if !refreshing || outstanding.value == nil { outstanding = .failed(error as? APIError ?? .network) }
         }
     }
 
@@ -75,8 +81,11 @@ final class PackageReportsStore {
     /// güncelleyip diğerini unutmaya açık kapı bırakırdı.
     var canLoadMoreExpiring: Bool { expiring.value?.pageInfo.nextCursor != nil }
 
-    func loadExpiring() async {
-        expiring = .loading
+    /// `refreshing`: aşağı çekerek yenileme. Eldeki rapor ekranda KALIR —
+    /// iskelete dönmek `.refreshable` görevini iptal ettirip ekranı yükleme
+    /// durumunda takılı bırakır. Dönem/gruplama değişince `false` (iskelet).
+    func loadExpiring(refreshing: Bool = false) async {
+        if !refreshing || expiring.value == nil { expiring = .loading }
         do {
             expiring = .loaded(
                 try await service.expiringReport(
@@ -87,8 +96,11 @@ final class PackageReportsStore {
                     limit: nil
                 )
             )
+        } catch let error as APIError where error.isSilent {
+            return
         } catch {
-            expiring = .failed(error as? APIError ?? .network)
+            guard !Task.isCancelled else { return }
+            if !refreshing || expiring.value == nil { expiring = .failed(error as? APIError ?? .network) }
         }
     }
 
@@ -122,8 +134,11 @@ final class PackageReportsStore {
         }
     }
 
-    func loadUsage() async {
-        usage = .loading
+    /// `refreshing`: aşağı çekerek yenileme. Eldeki rapor ekranda KALIR —
+    /// iskelete dönmek `.refreshable` görevini iptal ettirip ekranı yükleme
+    /// durumunda takılı bırakır. Dönem/gruplama değişince `false` (iskelet).
+    func loadUsage(refreshing: Bool = false) async {
+        if !refreshing || usage.value == nil { usage = .loading }
         do {
             usage = .loaded(
                 try await service.usageReport(
@@ -133,8 +148,11 @@ final class PackageReportsStore {
                     groupBy: usageGrouping
                 )
             )
+        } catch let error as APIError where error.isSilent {
+            return
         } catch {
-            usage = .failed(error as? APIError ?? .network)
+            guard !Task.isCancelled else { return }
+            if !refreshing || usage.value == nil { usage = .failed(error as? APIError ?? .network) }
         }
     }
 }

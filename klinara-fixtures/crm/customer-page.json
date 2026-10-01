@@ -13,7 +13,6 @@
       "district": null,
       "city": null,
       "postalCode": null,
-      "source": "instagram",
       "mergedIntoCustomerId": null,
       "tags": [],
       "createdAt": "2026-08-14T11:23:45.000Z"
@@ -31,7 +30,6 @@
       "district": null,
       "city": "Muğla",
       "postalCode": null,
-      "source": null,
       "mergedIntoCustomerId": null,
       "tags": [],
       "createdAt": "2026-08-13T08:00:00.000Z"

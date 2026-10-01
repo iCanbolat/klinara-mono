@@ -1,6 +1,5 @@
 package com.klinara.android.services.reports
 
-import com.klinara.android.services.crm.CustomerSource
 import com.klinara.android.services.networking.PageInfo
 import com.klinara.android.services.networking.WireEnumSerializer
 import kotlinx.serialization.Serializable
@@ -244,30 +243,6 @@ data class RetentionTotals(
 )
 
 @Serializable
-data class AcquisitionRow(
-    /** Müşteri kaynağı (`customers.source`); girilmemişse `null`. */
-    val source: String? = null,
-    val customers: Int = 0,
-) {
-    val id: String get() = source ?: UNKNOWN_ID
-
-    /**
-     * iOS ham değeri gösteriyordu (`instagram`); kaynak müşteri kartındaki enum'un aynısı, bu
-     * yüzden kartla aynı Türkçe ad kullanılıyor. Tanınmayan değer ham kalır.
-     */
-    val turkishName: String
-        get() {
-            val raw = source ?: return "Belirtilmemiş"
-            val known = CustomerSource.from(raw)
-            return if (known == CustomerSource.Unknown) raw else known.turkishName
-        }
-
-    companion object {
-        const val UNKNOWN_ID = "__unknown__"
-    }
-}
-
-@Serializable
 data class CohortReturn(
     val withinDays: Int,
     val returned: Int = 0,
@@ -279,7 +254,6 @@ data class CohortReturn(
 data class RetentionReport(
     val period: ReportPeriodEcho,
     val totals: RetentionTotals,
-    val acquisition: List<AcquisitionRow> = emptyList(),
     val cohorts: List<CohortReturn> = emptyList(),
     val previous: RetentionTotals? = null,
     val delta: ReportDelta? = null,

@@ -23,7 +23,6 @@ final class MockWhatsAppService: WhatsAppService, @unchecked Sendable {
 
     private var accountRecord: WhatsAppAccount?
     private var templateRecords: [WhatsAppTemplate] = []
-    private var inboxRecords: [InboxItem] = []
     /// Kota simülasyonu: aynı numaraya arka arkaya üçüncü test gönderimi
     /// geçici hataya düşer.
     private var testSendCount: [String: Int] = [:]
@@ -41,7 +40,6 @@ final class MockWhatsAppService: WhatsAppService, @unchecked Sendable {
         let now = Date()
         accountRecord = MockNotificationsSeed.account(at: now)
         templateRecords = MockNotificationsSeed.whatsAppTemplates(at: now)
-        inboxRecords = MockNotificationsSeed.inbox(at: now)
         testSendCount = [:]
     }
 
@@ -200,37 +198,5 @@ final class MockWhatsAppService: WhatsAppService, @unchecked Sendable {
         let digits = raw.filter(\.isNumber)
         guard digits.count > 4 else { return raw }
         return "+\(digits.prefix(2))\(String(repeating: "*", count: digits.count - 4))\(digits.suffix(2))"
-    }
-
-    // MARK: Gelen kutusu
-
-    func inbox(onlyUnhandled: Bool, limit: Int?) async throws -> [InboxItem] {
-        await latency(0.3)
-        return withLock {
-            let filtered = inboxRecords
-                .filter { !onlyUnhandled || !$0.isHandled }
-                .sorted { $0.receivedAt > $1.receivedAt }
-            guard let limit else { return filtered }
-            return Array(filtered.prefix(limit))
-        }
-    }
-
-    func markInboxHandled(id: String) async throws {
-        await latency()
-        try withLock {
-            guard let index = inboxRecords.firstIndex(where: { $0.id == id }) else {
-                throw notFound()
-            }
-            let existing = inboxRecords[index]
-            inboxRecords[index] = InboxItem(
-                id: existing.id,
-                customerId: existing.customerId,
-                from: existing.from,
-                messageType: existing.messageType,
-                body: existing.body,
-                receivedAt: existing.receivedAt,
-                handledAt: Date()
-            )
-        }
     }
 }

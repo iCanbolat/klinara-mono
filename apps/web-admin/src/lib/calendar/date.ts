@@ -244,6 +244,20 @@ export function formatTime(iso: string, timeZone: string): string {
   }).format(date);
 }
 
+/** `'7 Eyl 10:30'` — tarih ve saat, ŞUBE saat diliminde. */
+export function formatDateTime(iso: string, timeZone: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat('tr-TR', {
+    timeZone,
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(date);
+}
+
 /** `'7 Eylül Pazartesi'` — gün anahtarı zaten yerelleştirilmiş bir tarih. */
 export function formatDayLabel(key: DayKey): string {
   const base = parseKey(key);

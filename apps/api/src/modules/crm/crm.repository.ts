@@ -29,18 +29,29 @@ interface ListFilters {
   cursorCreatedAt?: string | undefined;
   cursorId?: string | undefined;
   tagId?: string | undefined;
-  source?: string | undefined;
 }
 
-export async function listCustomers(tx: Tx, filters: ListFilters): Promise<CustomerRow[]> {
+/**
+ * Liste satırı + keyset anahtarı.
+ *
+ * ⚠️ Cursor'daki zaman MİKROSANİYE hassasiyetinde ve metin olarak DB'den
+ * geliyor. `createdAt.toISOString()` milisaniyeye kırpar; aynı istekte
+ * (tek INSERT, içe aktarma) açılan kayıtlar aynı `now()`u paylaştığından
+ * kırpılmış cursor onları "sonraki sayfadan büyük" gösterir ve sayfa
+ * sınırındaki kayıtlar SESSİZCE kaybolur.
+ */
+export type CustomerListRow = CustomerRow & { cursorCreatedAt: string };
+
+export async function listCustomers(tx: Tx, filters: ListFilters): Promise<CustomerListRow[]> {
   const result = await tx.execute<Record<string, unknown>>(sql`
-    select c.*
+    select c.*,
+           to_char(c.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+             as cursor_created_at
       from customers c
      where c.deleted_at is null
        and (${filters.tagId ?? null}::uuid is null or exists (
              select 1 from customer_tag_assignments a
               where a.customer_id = c.id and a.tag_id = ${filters.tagId ?? null}::uuid))
-       and (${filters.source ?? null}::text is null or c.source = ${filters.source ?? null}::text)
        -- Keyset: sıralama anahtarı (created_at) TEKİL DEĞİL; aynı saniyede
        -- açılan iki kayıt yalnız zamanla ilerleyen bir cursor'da birbirini
        -- gizlerdi.
@@ -50,7 +61,10 @@ export async function listCustomers(tx: Tx, filters: ListFilters): Promise<Custo
      order by c.created_at desc, c.id desc
      limit ${filters.limit}
   `);
-  return result.rows.map(hydrate);
+  return result.rows.map((row) => ({
+    ...hydrate(row),
+    cursorCreatedAt: row.cursor_created_at as string,
+  }));
 }
 
 export interface CustomerSummaryRow {
@@ -131,7 +145,6 @@ function hydrate(row: Record<string, unknown>): CustomerRow {
     district: (row.district ?? null) as string | null,
     city: (row.city ?? null) as string | null,
     postalCode: (row.postal_code ?? null) as string | null,
-    source: (row.source ?? null) as CustomerRow['source'],
     mergedIntoCustomerId: (row.merged_into_customer_id ?? null) as string | null,
     searchText: (row.search_text ?? null) as string | null,
     createdAt: new Date(row.created_at as string),
@@ -167,7 +180,6 @@ type CustomerWritableFields = Pick<
   | 'district'
   | 'city'
   | 'postalCode'
-  | 'source'
 >;
 
 export async function insertCustomer(
@@ -359,6 +371,6 @@ export async function archiveMergedCustomer(
     .where(eq(customers.id, sourceId));
 }
 
-export function listCustomersOrderKey(row: CustomerRow): { sortKey: string; id: string } {
-  return { sortKey: row.createdAt.toISOString(), id: row.id };
+export function listCustomersOrderKey(row: CustomerListRow): { sortKey: string; id: string } {
+  return { sortKey: row.cursorCreatedAt, id: row.id };
 }

@@ -83,7 +83,7 @@ final class MockBranchesService: BranchesService, @unchecked Sendable {
             let branch = BranchDetail(
                 id: MockIDs.uuid(), tenantId: MockIDs.tenant, slug: input.slug, name: input.name,
                 timezone: input.timezone ?? "Europe/Istanbul", phone: input.phone,
-                address: input.address, isActive: true, createdAt: Date()
+                address: input.address, mapsUrl: input.mapsUrl, isActive: true, createdAt: Date()
             )
             _branches.append(branch)
             return branch
@@ -103,6 +103,7 @@ final class MockBranchesService: BranchesService, @unchecked Sendable {
                 timezone: input.timezone ?? old.timezone,
                 phone: input.phone.applied(to: old.phone),
                 address: input.address.applied(to: old.address),
+                mapsUrl: input.mapsUrl.applied(to: old.mapsUrl),
                 isActive: input.isActive ?? old.isActive,
                 createdAt: old.createdAt
             )

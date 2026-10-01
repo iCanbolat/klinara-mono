@@ -364,20 +364,16 @@ struct KlinaraSkeletonBody: View {
         .clipped()
     }
 
-    /// ``KlinaraStatStrip`` ile aynı ızgara: iki sütun, eşit boy.
+    /// ``KlinaraStatStrip`` ile aynı düzen: tek satır, sabit genişlikli kartlar.
     private func statGrid(count: Int) -> some View {
-        Grid(alignment: .topLeading, horizontalSpacing: KlinaraMetrics.sm, verticalSpacing: KlinaraMetrics.sm) {
-            ForEach(Array(stride(from: 0, to: max(2, count), by: 2)), id: \.self) { start in
-                GridRow {
-                    statCard(seed: start)
-                    if start + 1 < max(2, count) {
-                        statCard(seed: start + 1)
-                    } else {
-                        Color.clear
-                    }
-                }
+        HStack(alignment: .top, spacing: KlinaraMetrics.sm) {
+            ForEach(0..<max(2, count), id: \.self) { index in
+                statCard(seed: index)
+                    .frame(width: KlinaraStatCard.width)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .clipped()
     }
 
     private func statCard(seed: Int) -> some View {

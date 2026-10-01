@@ -87,15 +87,11 @@ class ReportModelsTest {
     }
 
     @Test
-    @DisplayName("Kazanım: kaynağı girilmemiş müşteri 'Belirtilmemiş'; bilinen kaynak kartın Türkçe adı")
+    @DisplayName("Kazanım: kohortlar çözülüyor")
     fun retentionDecodes() {
         val report = decode("retention", RetentionReport.serializer())
 
-        assertEquals("Belirtilmemiş", report.acquisition.single().turkishName)
-        assertEquals(AcquisitionRow.UNKNOWN_ID, report.acquisition.single().id)
         assertEquals(listOf(30, 60, 90), report.cohorts.map { it.withinDays })
-        assertEquals("Instagram", AcquisitionRow("instagram", 1).turkishName)
-        assertEquals("tiktok", AcquisitionRow("tiktok", 1).turkishName)
     }
 
     @Test

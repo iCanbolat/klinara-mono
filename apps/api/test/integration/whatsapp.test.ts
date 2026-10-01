@@ -86,6 +86,8 @@ describe('WhatsApp Cloud API adapter (Batch 8.2)', () => {
         variables: {
           customerName: 'Ayşe Yılmaz',
           branchName: 'Merkez',
+          branchAddress: 'Bağdat Cad. No:1, Kadıköy',
+          branchMapsQuery: 'Merkez%20Ba%C4%9Fdat',
           appointmentAt: '7 Eylül 14:00',
           serviceName: 'Lazer',
         },
@@ -380,8 +382,8 @@ describe('WhatsApp Cloud API adapter (Batch 8.2)', () => {
       const template = (
         graph.requests.at(-1)?.body as { template: { components: unknown[]; name: string } }
       ).template;
-      expect(template.name).toBe('klinara_randevu_hatirlatma');
-      // Sıra standart tanımdaki `variables`tan: ad, zaman, hizmet, şube.
+      expect(template.name).toBe('klinara_randevu_hatirlatma_v3');
+      // Sıra standart tanımdaki `variables`tan: ad, zaman, hizmet, şube, adres.
       expect(template.components).toEqual([
         {
           type: 'body',
@@ -390,7 +392,15 @@ describe('WhatsApp Cloud API adapter (Batch 8.2)', () => {
             { type: 'text', text: '7 Eylül 14:00' },
             { type: 'text', text: 'Lazer' },
             { type: 'text', text: 'Merkez' },
+            { type: 'text', text: 'Bağdat Cad. No:1, Kadıköy' },
           ],
+        },
+        // Haritada aç: quick-reply'lardan (2) sonra gelen URL butonu, adresten üretilen ek.
+        {
+          type: 'button',
+          sub_type: 'url',
+          index: '2',
+          parameters: [{ type: 'text', text: 'Merkez%20Ba%C4%9Fdat' }],
         },
       ]);
       expect((await lastMessage()).status).toBe('sent');
@@ -402,7 +412,7 @@ describe('WhatsApp Cloud API adapter (Batch 8.2)', () => {
       // denenirse müşteriye hiçbir şey gitmezdi.
       await database.ownerPool.query(
         `insert into whatsapp_templates (tenant_id, name, language, status)
-         values ($1, 'klinara_randevu_hatirlatma', 'tr', 'pending')`,
+         values ($1, 'klinara_randevu_hatirlatma_v3', 'tr', 'pending')`,
         [clinic.tenant.id],
       );
 
@@ -415,6 +425,8 @@ describe('WhatsApp Cloud API adapter (Batch 8.2)', () => {
           variables: {
             customerName: 'Ayşe Yılmaz',
             branchName: 'Merkez',
+            branchAddress: 'Bağdat Cad. No:1, Kadıköy',
+          branchMapsQuery: 'Merkez%20Ba%C4%9Fdat',
             appointmentAt: '7 Eylül 14:00',
             serviceName: 'Lazer',
           },
@@ -505,7 +517,7 @@ describe('WhatsApp Cloud API adapter (Batch 8.2)', () => {
       const body = result.body as ProvisionBody;
       expect(body.failed).toBe(0);
       expect(body.created).toBe(body.results.length);
-      expect(body.results.map((row) => row.name)).toContain('klinara_randevu_hatirlatma');
+      expect(body.results.map((row) => row.name)).toContain('klinara_randevu_hatirlatma_v3');
       // Kaldırılan şablonlar yeniden oluşturulmaz.
       expect(body.results.map((row) => row.name)).not.toContain('klinara_gorusme_baslat');
       expect(body.results.map((row) => row.name)).not.toContain('klinara_paket_sure_bilgisi');
@@ -519,7 +531,7 @@ describe('WhatsApp Cloud API adapter (Batch 8.2)', () => {
 
       // Hatırlatma: konumsal gövde, örnek değerler ve iki hızlı yanıt butonu.
       const reminder = creates.find(
-        (request) => request.body['name'] === 'klinara_randevu_hatirlatma',
+        (request) => request.body['name'] === 'klinara_randevu_hatirlatma_v3',
       )?.body as { category: string; language: string; components: Record<string, unknown>[] };
       expect(reminder.category).toBe('UTILITY');
       expect(reminder.language).toBe('tr');
@@ -528,14 +540,20 @@ describe('WhatsApp Cloud API adapter (Batch 8.2)', () => {
         example: { body_text: string[][] };
       };
       expect(bodyComponent.text).toContain('{{1}}');
-      expect(bodyComponent.text).toContain('{{4}}');
+      expect(bodyComponent.text).toContain('{{5}}');
       expect(bodyComponent.text).not.toContain('{{customerName}}');
-      expect(bodyComponent.example.body_text[0]).toHaveLength(4);
+      expect(bodyComponent.example.body_text[0]).toHaveLength(5);
       expect(reminder.components.find((c) => c['type'] === 'BUTTONS')).toEqual({
         type: 'BUTTONS',
         buttons: [
           { type: 'QUICK_REPLY', text: 'Onaylıyorum' },
           { type: 'QUICK_REPLY', text: 'İptal etmek istiyorum' },
+          {
+            type: 'URL',
+            text: 'Haritada aç',
+            url: 'https://www.google.com/maps/search/?api=1&query={{1}}',
+            example: ['https://www.google.com/maps/search/?api=1&query=Kadikoy'],
+          },
         ],
       });
 
@@ -561,7 +579,7 @@ describe('WhatsApp Cloud API adapter (Batch 8.2)', () => {
         payload: {
           data: [
             {
-              name: 'klinara_randevu_hatirlatma',
+              name: 'klinara_randevu_hatirlatma_v3',
               language: 'tr',
               category: 'UTILITY',
               status: 'APPROVED',
@@ -572,12 +590,12 @@ describe('WhatsApp Cloud API adapter (Batch 8.2)', () => {
       });
 
       const body = (await provision().expect(200)).body as ProvisionBody;
-      const reminder = body.results.find((row) => row.name === 'klinara_randevu_hatirlatma');
+      const reminder = body.results.find((row) => row.name === 'klinara_randevu_hatirlatma_v3');
       expect(reminder).toMatchObject({ outcome: 'exists', status: 'approved' });
 
       const created = graph.requests.filter(
         (request) =>
-          request.method === 'POST' && request.body['name'] === 'klinara_randevu_hatirlatma',
+          request.method === 'POST' && request.body['name'] === 'klinara_randevu_hatirlatma_v3',
       );
       expect(created).toHaveLength(0);
     });

@@ -4,6 +4,7 @@ import pg from 'pg';
 import { loadEnvOrExit } from '../config/load-env';
 import { buildDefaultTemplate } from '../modules/booking-page/template/default-template';
 import { seedBookingImages } from './seed-booking-images';
+import { seedDemoActivity } from './seed-demo-activity';
 
 /** `Algorithm.Argon2id`. Ambient const enum olduğu için değeri doğrudan yazıyoruz. */
 const ARGON2_ID = 2;
@@ -246,12 +247,12 @@ async function seed(): Promise<void> {
     // ama listeyi gerçekten daralttığı görülmezdi; boş etiket de boş durum
     // metnini kimse görmeden geçerdi.
     await client.query(
-      `insert into customers (tenant_id, full_name, phone, email, source)
-       values ($1, 'Elif Şahin', '+905331112200', 'elif@ornek.test', 'instagram'),
-              ($1, 'Burak Aydın', '+905331112201', null, 'referral'),
-              ($1, 'Selin Koç', '+905331112202', 'selin@ornek.test', 'google'),
-              ($1, 'Deniz Arslan', '+905331112203', null, 'walk_in'),
-              ($1, 'Merve Çelik', '+905331112204', 'merve@ornek.test', 'website')
+      `insert into customers (tenant_id, full_name, phone, email)
+       values ($1, 'Elif Şahin', '+905331112200', 'elif@ornek.test'),
+              ($1, 'Burak Aydın', '+905331112201', null),
+              ($1, 'Selin Koç', '+905331112202', 'selin@ornek.test'),
+              ($1, 'Deniz Arslan', '+905331112203', null),
+              ($1, 'Merve Çelik', '+905331112204', 'merve@ornek.test')
        on conflict do nothing`,
       [tenantId],
     );
@@ -322,13 +323,15 @@ async function seed(): Promise<void> {
 
     await client.query(
       `update branches set phone = '+902121234567',
-                           address = 'Bağdat Cad. No:1, Kadıköy, İstanbul'
+                           address = 'Bağdat Cad. No:1, Kadıköy, İstanbul',
+                           maps_url = 'https://www.google.com/maps/search/?api=1&query=Ba%C4%9Fdat+Cad.+No+1+Kad%C4%B1k%C3%B6y+%C4%B0stanbul'
         where tenant_id = $1 and slug = 'kadikoy'`,
       [tenantId],
     );
     await client.query(
       `update branches set phone = '+902129876543',
-                           address = 'Nispetiye Cad. No:10, Beşiktaş, İstanbul'
+                           address = 'Nispetiye Cad. No:10, Beşiktaş, İstanbul',
+                           maps_url = 'https://www.google.com/maps/search/?api=1&query=Nispetiye+Cad.+No+10+Be%C5%9Fikta%C5%9F+%C4%B0stanbul'
         where tenant_id = $1 and slug = 'merkez'`,
       [tenantId],
     );
@@ -521,6 +524,17 @@ async function seed(): Promise<void> {
           );
         }
       }
+    }
+
+    if (kadikoyId !== undefined && staffId !== undefined && hiddenStaffId !== undefined) {
+      await seedDemoActivity(client, {
+        tenantId,
+        ownerId,
+        merkezId,
+        kadikoyId,
+        staffId,
+        hiddenStaffId,
+      });
     }
 
     process.stdout.write(

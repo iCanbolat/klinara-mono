@@ -156,11 +156,16 @@ describe('randevu oluşturma / iptal bildirimleri', () => {
       expect(await messages('appointment_confirmation')).toHaveLength(1);
     });
 
-    it('olay tercihlerden kapatılmışsa mesaj yazılmaz', async () => {
+    it('şablon kapatılmışsa (Aktif değil) mesaj yazılmaz', async () => {
       await http(app)
-        .put('/api/v1/notification-preferences')
+        .put('/api/v1/notification-templates')
         .set(ownerAuth())
-        .send({ event: 'appointment_confirmation', channels: [] })
+        .send({
+          event: 'appointment_confirmation',
+          channel: 'whatsapp',
+          body: 'Sayın {{customerName}}, randevunuz onaylandı.',
+          isActive: false,
+        })
         .expect(200);
       await createAppointment();
       expect(await messages('appointment_confirmation')).toHaveLength(0);

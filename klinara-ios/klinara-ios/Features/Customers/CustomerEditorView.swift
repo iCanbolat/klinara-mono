@@ -180,20 +180,6 @@ struct CustomerEditorView: View {
             }
             .padding(KlinaraMetrics.md)
             .disabled(isReadOnly)
-
-            KlinaraDivider()
-
-            Picker("Geliş kaynağı", selection: $form.source) {
-                Text("Belirtilmedi").tag(CustomerSource?.none)
-                ForEach(CustomerSource.allCases) { value in
-                    Text(value.turkishName).tag(CustomerSource?.some(value))
-                }
-            }
-            .pickerStyle(.menu)
-            .tint(KlinaraColor.sageDeep)
-            .klinaraText(.bodyM)
-            .padding(KlinaraMetrics.md)
-            .disabled(isReadOnly)
         }
     }
 

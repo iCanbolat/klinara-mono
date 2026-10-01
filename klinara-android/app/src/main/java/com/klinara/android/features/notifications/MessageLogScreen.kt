@@ -75,7 +75,6 @@ import com.klinara.android.services.notifications.NotificationEvent
 fun MessageLogScreen(
     state: MessageLogUiState,
     clock: BranchClock,
-    onStatus: (MessageStatusFilter) -> Unit,
     /** Özet şeridi: seçili sayaca tekrar dokunmak süzgeci kaldırır. */
     onToggleStatus: (MessageStatusFilter) -> Unit,
     onEvent: (NotificationEvent) -> Unit,
@@ -88,7 +87,7 @@ fun MessageLogScreen(
     modifier: Modifier = Modifier,
 ) {
     KlinaraScreen(title = "Mesaj günlüğü", modifier = modifier, onBack = onBack, scrollable = false) {
-        Filters(state, onStatus, onEvent, onClearFilters)
+        Filters(state, onEvent, onClearFilters)
 
         when (val messages = state.messages) {
             Loadable.Loading ->
@@ -310,30 +309,14 @@ private fun RowScope.SummaryTile(
     }
 }
 
-/**
- * İki segment seçici üst üste yığılınca listeyi ekranın dışına itiyordu; durum da olay da artık
- * aynı dili konuşan yatay çip satırları.
- */
+/** Durum süzgeci özet kartlarında (Toplam / Başarısız / Atlandı); burada yalnız olay çipleri kalır. */
 @Composable
 private fun Filters(
     state: MessageLogUiState,
-    onStatus: (MessageStatusFilter) -> Unit,
     onEvent: (NotificationEvent) -> Unit,
     onClearFilters: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(KlinaraMetrics.sm)) {
-        Row(
-            modifier = Modifier.horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(KlinaraMetrics.sm),
-        ) {
-            MessageStatusFilter.entries.forEach { option ->
-                KlinaraFilterPill(
-                    label = option.title,
-                    isSelected = option == state.status,
-                    onClick = { onStatus(option) },
-                )
-            }
-        }
         Row(
             modifier = Modifier.horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(KlinaraMetrics.sm),

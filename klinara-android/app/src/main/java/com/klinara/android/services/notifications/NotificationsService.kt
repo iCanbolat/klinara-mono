@@ -3,8 +3,8 @@ package com.klinara.android.services.notifications
 /**
  * Bildirim uçları — iOS `NotificationsService` paritesi.
  *
- * Randevu bildirim planı A8.1'de, şablon/tercih/hatırlatma ayarı A8.2'de geldi.
- * Gelen kutusu `WhatsAppService`'te, mesaj günlüğü `MessagesService`'te — sunucudaki
+ * Randevu bildirim planı A8.1'de, şablon/hatırlatma ayarı A8.2'de geldi.
+ * Mesaj günlüğü `MessagesService`'te — sunucudaki
  * modül sınırlarının aynası.
  *
  * **İzin `customer:*` DEĞİL:** okuma `notification:read`, yazma `notification:manage`.
@@ -26,12 +26,6 @@ interface NotificationsService {
      * Bilinmeyen yer tutucu `422 TEMPLATE_INVALID`.
      */
     suspend fun upsertTemplate(input: NotificationTemplateUpsert): NotificationTemplate
-
-    /** `GET notification-preferences` — kiracı + şube satırları, çıplak dizi. */
-    suspend fun preferences(): List<NotificationPreference>
-
-    /** `PUT notification-preferences` — `(event, branchId)` üzerinde upsert. `notification:manage`. */
-    suspend fun upsertPreference(input: NotificationPreferenceUpsert): NotificationPreference
 
     /** `GET branches/:id/reminder-settings` — çözülmüş ayar. */
     suspend fun reminderSettings(branchId: String): BranchReminderSettings

@@ -2,7 +2,6 @@ package com.klinara.android.services.mock
 
 import com.klinara.android.services.crm.Customer
 import com.klinara.android.services.crm.CustomerGender
-import com.klinara.android.services.crm.CustomerSource
 import com.klinara.android.services.crm.CustomerTag
 import java.time.Instant
 
@@ -48,7 +47,6 @@ object MockCustomers {
         val addressLine: String? = null,
         val district: String? = null,
         val city: String? = null,
-        val source: CustomerSource? = null,
         val tags: List<CustomerTag> = emptyList(),
         /** Sıralama ve cursor için — sunucu `createdAt` azalan döndürüyor. */
         val createdAt: Instant = Instant.EPOCH,
@@ -66,7 +64,6 @@ object MockCustomers {
                 addressLine = addressLine,
                 district = district,
                 city = city,
-                source = source,
                 tags = tags,
                 createdAt = createdAt,
             )
@@ -84,28 +81,28 @@ object MockCustomers {
     val ALL: List<Row> =
         listOf(
             Seed("Ayşe Yılmaz", "+905321112233", "ayse.yilmaz@ornek.com", "1990-05-12", CustomerGender.Female,
-                "Alerjisi yok.", "Bağdat Cad. 12", "Kadıköy", "İstanbul", CustomerSource.Instagram,
+                "Alerjisi yok.", "Bağdat Cad. 12", "Kadıköy", "İstanbul",
                 listOf(Tags.VIP)),
             Seed("Zeynep Kaya", "+905321112234", "zeynep@ornek.com", "1985-11-03", CustomerGender.Female,
-                null, "Teşvikiye Mah. 4", "Şişli", "İstanbul", CustomerSource.Referral,
+                null, "Teşvikiye Mah. 4", "Şişli", "İstanbul",
                 listOf(Tags.VIP, Tags.HASSAS_CILT)),
             Seed("Elif Demir", null, null, null, CustomerGender.Female,
-                "Telefon vermek istemedi.", null, null, null, CustomerSource.WalkIn, emptyList()),
+                "Telefon vermek istemedi.", null, null, null, emptyList()),
             Seed("Fatma Şahin", "+905321112236", "fatma.sahin@ornek.com", "1978-02-27", CustomerGender.Female,
-                null, "Cumhuriyet Cad. 88", "Beşiktaş", "İstanbul", CustomerSource.Google,
+                null, "Cumhuriyet Cad. 88", "Beşiktaş", "İstanbul",
                 listOf(Tags.TAKIPTE)),
             Seed("Mehmet Aslan", "+905321112237", null, "1992-08-19", CustomerGender.Male,
-                null, null, "Bodrum", "Muğla", CustomerSource.Website, emptyList()),
+                null, null, "Bodrum", "Muğla", emptyList()),
             Seed("Selin Arslan", "+905321112238", "selin@ornek.com", "1996-01-30", CustomerGender.Female,
-                null, "Yalıkavak Mah. 7", "Bodrum", "Muğla", CustomerSource.WhatsApp, listOf(Tags.HASSAS_CILT)),
+                null, "Yalıkavak Mah. 7", "Bodrum", "Muğla", listOf(Tags.HASSAS_CILT)),
             Seed("Can Öztürk", null, "can.ozturk@ornek.com", null, CustomerGender.Male,
-                null, null, null, null, CustomerSource.Other, emptyList()),
+                null, null, null, null, emptyList()),
             Seed("Deniz Yıldız", "+905321112240", null, "2000-06-06", CustomerGender.Other,
-                null, "Moda Cad. 21", "Kadıköy", "İstanbul", CustomerSource.Instagram, listOf(Tags.TAKIPTE)),
+                null, "Moda Cad. 21", "Kadıköy", "İstanbul", listOf(Tags.TAKIPTE)),
             Seed("Burcu Çelik", "+905321112241", "burcu.celik@ornek.com", "1988-09-14", CustomerGender.Female,
-                null, "Nispetiye Cad. 3", "Beşiktaş", "İstanbul", CustomerSource.Referral, emptyList()),
+                null, "Nispetiye Cad. 3", "Beşiktaş", "İstanbul", emptyList()),
             Seed("Kerem Doğan", "+905321112242", null, null, CustomerGender.Undisclosed,
-                null, null, "Şişli", "İstanbul", CustomerSource.WalkIn, emptyList()),
+                null, null, "Şişli", "İstanbul", emptyList()),
         ).mapIndexed { index, seed ->
             Row(
                 id = "c0570000-0000-4000-8000-%012d".format(index + 1),
@@ -118,7 +115,6 @@ object MockCustomers {
                 addressLine = seed.addressLine,
                 district = seed.district,
                 city = seed.city,
-                source = seed.source,
                 tags = seed.tags,
                 createdAt = BASE_CREATED_AT.minusSeconds(index.toLong() * CREATED_AT_STEP_SECONDS),
             )
@@ -139,7 +135,6 @@ object MockCustomers {
         val addressLine: String?,
         val district: String?,
         val city: String?,
-        val source: CustomerSource?,
         val tags: List<CustomerTag>,
     )
 }

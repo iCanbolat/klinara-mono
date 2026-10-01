@@ -286,6 +286,11 @@ describe('karşılama sayfası', () => {
 
     await user.click(await screen.findByRole('button', { name: /Ayşe Yılmaz/ }));
     expect(setBranchId).toHaveBeenCalledWith('b1');
-    expect(push).toHaveBeenCalledWith('/takvim');
+    // Randevunun kendi günü (şube saat diliminde) ve kimliği derin bağlantıda.
+    const href = String(push.mock.calls[0]?.[0]);
+    const url = new URL(href, 'http://localhost');
+    expect(url.pathname).toBe('/takvim');
+    expect(url.searchParams.get('gun')).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(url.searchParams.get('randevu')).toMatch(/^b1-/);
   });
 });

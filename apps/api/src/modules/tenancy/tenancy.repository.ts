@@ -113,6 +113,7 @@ export async function insertBranch(
     timezone: string;
     phone?: string | undefined;
     address?: string | undefined;
+    mapsUrl?: string | undefined;
   },
 ): Promise<BranchRow> {
   const [row] = await tx.insert(branches).values(values).returning();
@@ -138,7 +139,7 @@ export async function findBranchById(tx: Tx, id: string): Promise<BranchRow | un
 export async function updateBranch(
   tx: Tx,
   id: string,
-  values: Updatable<Pick<BranchRow, 'name' | 'timezone' | 'phone' | 'address' | 'isActive'>>,
+  values: Updatable<Pick<BranchRow, 'name' | 'timezone' | 'phone' | 'address' | 'mapsUrl' | 'isActive'>>,
 ): Promise<BranchRow | undefined> {
   const patch = definedValues(values);
   if (!hasUpdates(patch)) return findBranchById(tx, id);

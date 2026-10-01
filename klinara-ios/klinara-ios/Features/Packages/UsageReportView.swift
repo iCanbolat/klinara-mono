@@ -59,6 +59,6 @@ struct UsageReportView: View {
         .navigationTitle("Dönem kullanımı")
         .navigationBarTitleDisplayMode(.inline)
         .task { await store.loadUsage() }
-        .refreshable { await store.loadUsage() }
+        .refreshable { await store.loadUsage(refreshing: true) }
     }
 }

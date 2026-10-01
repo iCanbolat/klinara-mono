@@ -244,7 +244,6 @@ struct Phase10StoreTests {
             compareToPrevious: false
         )
         #expect(!report.cohorts.isEmpty)
-        #expect(!report.acquisition.isEmpty)
     }
 }
 

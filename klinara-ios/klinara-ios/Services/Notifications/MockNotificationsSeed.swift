@@ -16,9 +16,6 @@ enum MockNotificationsSeed {
     static let messageReminderFailed = "e1000000-0000-4000-8000-000000000004"
     static let messageStaffInternal = "e1000000-0000-4000-8000-000000000005"
 
-    static let inboxAyse = "e2000000-0000-4000-8000-000000000001"
-    static let inboxUnknown = "e2000000-0000-4000-8000-000000000002"
-    static let inboxHandled = "e2000000-0000-4000-8000-000000000003"
 
     /// Kiracının kendi metnini yazdığı **tek** şablon. Kalanlar kod
     /// varsayılanıyla (`isDefault: true`, `id: nil`) döner — sunucunun
@@ -50,7 +47,7 @@ enum MockNotificationsSeed {
     /// Kod varsayılanları — sunucudaki `default-templates.ts`in istemci aynası.
     /// Yalnız mock için: canlıda bu satırlar sunucudan gelir.
     static func defaultTemplates() -> [NotificationTemplate] {
-        NotificationEvent.selectable.flatMap { event -> [NotificationTemplate] in
+        NotificationEvent.templateEvents.flatMap { event -> [NotificationTemplate] in
             guard let definition = NotificationEventCatalog.definitions[event] else { return [] }
             return definition.channels.map { channel in
                 NotificationTemplate(
@@ -76,9 +73,9 @@ enum MockNotificationsSeed {
     private static func defaultBody(for event: NotificationEvent) -> String {
         switch event {
         case .appointmentConfirmation:
-            return "Sayın {{customerName}}, {{branchName}} şubemizdeki {{appointmentAt}} tarihli {{serviceName}} randevunuz oluşturuldu."
+            return "Merhaba {{customerName}}, {{appointmentAt}} tarihindeki {{serviceName}} randevunuz başarıyla oluşturuldu. Sizi {{branchName}} şubemizde bekliyoruz.\n\nŞubemize kolayca ulaşabilmeniz için adres bilgimizi paylaşıyor, konumu aşağıdaki butonla açabilmenizi sağlıyoruz.\n\nAdres: {{branchAddress}}\n\nRandevunuzla ilgili bir değişiklik olursa bu mesajı yanıtlayarak bize ulaşabilirsiniz. Görüşmek üzere!"
         case .appointmentReminder:
-            return "Sayın {{customerName}}, {{appointmentAt}} tarihli {{serviceName}} randevunuzu hatırlatırız."
+            return "Merhaba {{customerName}}, {{appointmentAt}} tarihindeki {{serviceName}} randevunuzu hatırlatırız. Sizi {{branchName}} şubemizde bekliyoruz.\n\nŞubemize kolayca ulaşabilmeniz için adres bilgimizi paylaşıyor, konumu aşağıdaki butonla açabilmenizi sağlıyoruz.\n\nAdres: {{branchAddress}}\n\nKatılımınızı aşağıdaki butonlarla bildirebilirsiniz."
         case .appointmentCancelled:
             return "Sayın {{customerName}}, {{appointmentAt}} tarihli randevunuz iptal edilmiştir."
         case .noShowFollowup:
@@ -94,47 +91,6 @@ enum MockNotificationsSeed {
         case .unknown:
             return ""
         }
-    }
-
-    // MARK: Tercihler
-
-    /// Kiracı, paket süre dolumu mesajını kapatmış (`channels: []`) ve randevu
-    /// hatırlatmasında sessiz saati daraltmış. Kalan olaylar varsayılanda.
-    static func tenantPreferences() -> [NotificationPreference] {
-        [
-            NotificationPreference(
-                preferenceId: MockIDs.uuid(),
-                branchId: nil,
-                event: .appointmentReminder,
-                channels: [.whatsapp],
-                quietHoursStart: "22:00",
-                quietHoursEnd: "08:00",
-                isDefault: false
-            ),
-            NotificationPreference(
-                preferenceId: MockIDs.uuid(),
-                branchId: nil,
-                event: .packageExpiring,
-                channels: [],
-                quietHoursStart: nil,
-                quietHoursEnd: nil,
-                isDefault: false
-            ),
-        ]
-    }
-
-    /// Kiracı satırı olmayan her olay için sentezlenen varsayılan.
-    static func defaultPreference(for event: NotificationEvent) -> NotificationPreference {
-        let definition = NotificationEventCatalog.definitions[event]
-        return NotificationPreference(
-            preferenceId: nil,
-            branchId: nil,
-            event: event,
-            channels: definition?.channels ?? [],
-            quietHoursStart: "21:00",
-            quietHoursEnd: "09:00",
-            isDefault: true
-        )
     }
 
     // MARK: Hatırlatma ayarları
@@ -159,7 +115,7 @@ enum MockNotificationsSeed {
                 event: .appointmentReminder,
                 status: .read,
                 to: "+90**********01",
-                body: "Sayın Ayşe Yılmaz, yarın 10:00 randevunuzu hatırlatırız.",
+                body: "Sayın Şule Aydın, yarın 10:00 randevunuzu hatırlatırız.",
                 attempt: 1,
                 scheduledFor: now.addingTimeInterval(-20 * 3_600),
                 sentAt: now.addingTimeInterval(-20 * 3_600),
@@ -189,7 +145,7 @@ enum MockNotificationsSeed {
                 event: .noShowFollowup,
                 status: .skipped,
                 to: "+90**********02",
-                body: "Sayın Mehmet Demir, randevunuza katılamadınız.",
+                body: "Sayın Can Öztürk, randevunuza katılamadınız.",
                 attempt: 0,
                 scheduledFor: now.addingTimeInterval(-3 * 86_400),
                 createdAt: now.addingTimeInterval(-3 * 86_400)
@@ -260,42 +216,6 @@ enum MockNotificationsSeed {
             deliveredAt: deliveredAt,
             createdAt: createdAt
         )
-    }
-
-    // MARK: Gelen kutusu
-
-    static func inbox(at now: Date) -> [InboxItem] {
-        [
-            InboxItem(
-                id: inboxAyse,
-                customerId: MockCustomerSeed.ayse,
-                from: "+90**********01",
-                messageType: "text",
-                body: "Merhaba, yarınki randevumu bir saat öne alabilir miyiz?",
-                receivedAt: now.addingTimeInterval(-45 * 60),
-                handledAt: nil
-            ),
-            // Tanınmayan numara: `customerId` yok. Sunucu bunu bilerek
-            // eşleştirmiyor — yanlış müşteriye bağlamak yanlış kartı açardı.
-            InboxItem(
-                id: inboxUnknown,
-                customerId: nil,
-                from: "+90**********88",
-                messageType: "text",
-                body: "Fiyat listeniz var mı?",
-                receivedAt: now.addingTimeInterval(-3 * 3_600),
-                handledAt: nil
-            ),
-            InboxItem(
-                id: inboxHandled,
-                customerId: MockCustomerSeed.zeynep,
-                from: "+90**********03",
-                messageType: "image",
-                body: nil,
-                receivedAt: now.addingTimeInterval(-2 * 86_400),
-                handledAt: now.addingTimeInterval(-2 * 86_400 + 1_800)
-            ),
-        ]
     }
 
     // MARK: WhatsApp hesabı

@@ -4,12 +4,16 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.klinara.android.services.ServiceContainer
+import com.klinara.android.services.branches.BranchDetail
+import com.klinara.android.services.branches.BranchMapsLink
+import com.klinara.android.services.branches.BranchesService
+import com.klinara.android.services.branches.UpdateBranchInput
+import com.klinara.android.services.crm.Patch
 import com.klinara.android.services.networking.ApiError
 import com.klinara.android.services.networking.Loadable
 import com.klinara.android.services.notifications.BranchReminderSettings
 import com.klinara.android.services.notifications.NotificationEvent
 import com.klinara.android.services.notifications.NotificationEventCatalog
-import com.klinara.android.services.notifications.NotificationPreference
 import com.klinara.android.services.notifications.NotificationTemplate
 import com.klinara.android.services.notifications.NotificationsService
 import com.klinara.android.services.notifications.ReminderSettingsUpdate
@@ -59,7 +63,7 @@ class NotificationTemplatesViewModel(
          * sorusunu üç satıra bölerdi); grup içinde kanal sırası kataloğunki, eksikler dahil.
          */
         fun groups(templates: List<NotificationTemplate>): List<TemplateGroup> =
-            NotificationEvent.selectable.mapNotNull { event ->
+            NotificationEvent.templateEvents.mapNotNull { event ->
                 val present = templates.filter { it.event == event }
                 val missing =
                     NotificationEventCatalog
@@ -93,18 +97,37 @@ class NotificationTemplatesViewModel(
 
 data class TemplateEditorUiState(
     val form: NotificationTemplateForm,
+    /** Klinik konumu: seçili şubenin adresi (salt okunur; "Haritada aç" butonu adresten üretilir). */
+    val branch: BranchDetail? = null,
     val isSaving: Boolean = false,
     val error: String? = null,
     val fieldErrors: Map<String, String> = emptyMap(),
     val saved: Boolean = false,
-)
+) {
+    val canSave: Boolean get() = form.isDirty
+}
 
 class NotificationTemplateEditorViewModel(
     private val service: NotificationsService,
+    private val branches: BranchesService,
+    private val branchId: String?,
     template: NotificationTemplate,
 ) : ViewModel() {
     private val _state = MutableStateFlow(TemplateEditorUiState(NotificationTemplateForm.editing(template)))
     val state: StateFlow<TemplateEditorUiState> = _state.asStateFlow()
+
+    init {
+        loadBranch()
+    }
+
+    private fun loadBranch() {
+        val id = branchId ?: return
+        viewModelScope.launch {
+            // Konum kartı süs değil ama zorunlu da değil: okunamazsa kart hiç çizilmez.
+            val detail = runCatching { branches.list().firstOrNull { it.id == id } }.getOrNull() ?: return@launch
+            _state.update { it.copy(branch = detail) }
+        }
+    }
 
     fun update(transform: (NotificationTemplateForm) -> NotificationTemplateForm) =
         _state.update { it.copy(form = transform(it.form), error = null, fieldErrors = emptyMap()) }
@@ -113,11 +136,11 @@ class NotificationTemplateEditorViewModel(
 
     fun save() {
         val current = _state.value
-        if (current.isSaving || !current.form.isValid) return
+        if (current.isSaving || !current.canSave) return
         _state.update { it.copy(isSaving = true, error = null, fieldErrors = emptyMap()) }
         viewModelScope.launch {
             try {
-                service.upsertTemplate(current.form.input())
+                if (current.form.isDirty) service.upsertTemplate(current.form.input())
                 _state.update { it.copy(isSaving = false, saved = true) }
             } catch (error: ApiError) {
                 _state.update { it.failed(error) }
@@ -136,83 +159,17 @@ class NotificationTemplateEditorViewModel(
         fun factory(
             container: ServiceContainer,
             template: NotificationTemplate,
+            branchId: String?,
         ): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                    NotificationTemplateEditorViewModel(container.notifications, template) as T
-            }
-    }
-}
-
-/** Tercih listesi — editörle PAYLAŞILIR. */
-class NotificationPreferencesViewModel(
-    private val service: NotificationsService,
-) : ViewModel() {
-    private val _preferences = MutableStateFlow<Loadable<List<NotificationPreference>>>(Loadable.Loading)
-    val preferences: StateFlow<Loadable<List<NotificationPreference>>> = _preferences.asStateFlow()
-
-    fun load() {
-        viewModelScope.launch { _preferences.value = Loadable.of { service.preferences() } }
-    }
-
-    fun preference(rowId: String): NotificationPreference? =
-        _preferences.value.valueOrNull?.firstOrNull { it.rowId == rowId }
-
-    companion object {
-        fun factory(container: ServiceContainer): ViewModelProvider.Factory =
-            object : ViewModelProvider.Factory {
-                @Suppress("UNCHECKED_CAST")
-                override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                    NotificationPreferencesViewModel(container.notifications) as T
-            }
-    }
-}
-
-data class PreferenceEditorUiState(
-    val draft: PreferenceDraft,
-    val isSaving: Boolean = false,
-    val error: String? = null,
-    val saved: Boolean = false,
-)
-
-class NotificationPreferenceEditorViewModel(
-    private val service: NotificationsService,
-    preference: NotificationPreference,
-    private val activeBranchId: String?,
-) : ViewModel() {
-    private val _state = MutableStateFlow(PreferenceEditorUiState(PreferenceDraft.editing(preference)))
-    val state: StateFlow<PreferenceEditorUiState> = _state.asStateFlow()
-
-    fun update(transform: (PreferenceDraft) -> PreferenceDraft) =
-        _state.update { it.copy(draft = transform(it.draft), error = null) }
-
-    fun dismissError() = _state.update { it.copy(error = null) }
-
-    fun save() {
-        val current = _state.value
-        if (current.isSaving || !current.draft.isValid) return
-        _state.update { it.copy(isSaving = true, error = null) }
-        viewModelScope.launch {
-            try {
-                service.upsertPreference(current.draft.input(activeBranchId))
-                _state.update { it.copy(isSaving = false, saved = true) }
-            } catch (error: ApiError) {
-                _state.update { it.copy(isSaving = false, error = error.displayMessage) }
-            }
-        }
-    }
-
-    companion object {
-        fun factory(
-            container: ServiceContainer,
-            preference: NotificationPreference,
-            activeBranchId: String?,
-        ): ViewModelProvider.Factory =
-            object : ViewModelProvider.Factory {
-                @Suppress("UNCHECKED_CAST")
-                override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                    NotificationPreferenceEditorViewModel(container.notifications, preference, activeBranchId) as T
+                    NotificationTemplateEditorViewModel(
+                        container.notifications,
+                        container.branches,
+                        branchId,
+                        template,
+                    ) as T
             }
     }
 }

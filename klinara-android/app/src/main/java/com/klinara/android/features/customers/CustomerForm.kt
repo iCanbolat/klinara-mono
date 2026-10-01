@@ -3,7 +3,6 @@ package com.klinara.android.features.customers
 import com.klinara.android.services.crm.CreateCustomerInput
 import com.klinara.android.services.crm.Customer
 import com.klinara.android.services.crm.CustomerGender
-import com.klinara.android.services.crm.CustomerSource
 import com.klinara.android.services.crm.Patch
 import com.klinara.android.services.crm.UpdateCustomerInput
 
@@ -25,7 +24,6 @@ data class CustomerForm(
     val district: String = "",
     val city: String = "",
     val postalCode: String = "",
-    val source: CustomerSource? = null,
     val tagIds: Set<String> = emptySet(),
     private val original: Snapshot = Snapshot(),
 ) {
@@ -41,7 +39,6 @@ data class CustomerForm(
         val district: String = "",
         val city: String = "",
         val postalCode: String = "",
-        val source: CustomerSource? = null,
         val tagIds: Set<String> = emptySet(),
     )
 
@@ -95,7 +92,6 @@ data class CustomerForm(
             district = district.trimOrNull(),
             city = city.trimOrNull(),
             postalCode = postalCode.trimOrNull(),
-            source = source,
         )
 
     /**
@@ -117,7 +113,6 @@ data class CustomerForm(
             district = patchOf(district, original.district),
             city = patchOf(city, original.city),
             postalCode = patchOf(postalCode, original.postalCode),
-            source = if (source == original.source) Patch.Unchanged else Patch.orClear(source),
         )
 
     private fun patchOf(
@@ -129,7 +124,7 @@ data class CustomerForm(
         Snapshot(
             fullName.trim(), phoneE164.trim(), email.trim(), birthDate.trim(), gender,
             notes.trim(), addressLine.trim(), district.trim(), city.trim(), postalCode.trim(),
-            source, tagIds,
+            tagIds,
         )
 
     private fun String.trimOrNull(): String? = trim().takeIf { it.isNotEmpty() }
@@ -154,7 +149,6 @@ data class CustomerForm(
                     district = customer.district.orEmpty(),
                     city = customer.city.orEmpty(),
                     postalCode = customer.postalCode.orEmpty(),
-                    source = customer.source,
                     tagIds = customer.tags.map { it.id }.toSet(),
                 )
             return CustomerForm(
@@ -168,7 +162,6 @@ data class CustomerForm(
                 district = snapshot.district,
                 city = snapshot.city,
                 postalCode = snapshot.postalCode,
-                source = snapshot.source,
                 tagIds = snapshot.tagIds,
                 original = snapshot,
             )

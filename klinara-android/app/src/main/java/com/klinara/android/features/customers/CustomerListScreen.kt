@@ -17,10 +17,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -154,15 +156,21 @@ fun CustomerListScreen(
                 HorizontalDivider(color = KlinaraTheme.colors.border, thickness = KlinaraMetrics.borderWidth)
             }
 
-            CustomerListBody(
-                state = state,
-                onSelectCustomer = onSelectCustomer,
-                onRetry = if (state.isSearching) viewModel::retrySearch else viewModel::reload,
-                onLoadMore = viewModel::loadMore,
-                onRetryLoadMore = viewModel::retryLoadMore,
-                bottomClearance = if (onCreateCustomer != null) FabContentClearance else 0.dp,
-                onCreateCustomer = onCreateCustomer,
-            )
+            PullToRefreshBox(
+                isRefreshing = state.isRefreshing,
+                onRefresh = viewModel::refresh,
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+            ) {
+                CustomerListBody(
+                    state = state,
+                    onSelectCustomer = onSelectCustomer,
+                    onRetry = if (state.isSearching) viewModel::retrySearch else viewModel::reload,
+                    onLoadMore = viewModel::loadMore,
+                    onRetryLoadMore = viewModel::retryLoadMore,
+                    bottomClearance = if (onCreateCustomer != null) FabContentClearance else 0.dp,
+                    onCreateCustomer = onCreateCustomer,
+                )
+            }
         }
     }
 }
@@ -268,6 +276,7 @@ private fun CustomerListBody(
                     canLoadMore = state.canLoadMore,
                     hasMore = state.hasMore,
                     isLoadingMore = state.isLoadingMore,
+                    isRefreshing = state.isRefreshing,
                     loadMoreError = state.loadMoreError,
                     onSelectCustomer = onSelectCustomer,
                     onLoadMore = onLoadMore,
@@ -311,13 +320,23 @@ private fun CustomerList(
     canLoadMore: Boolean,
     hasMore: Boolean,
     isLoadingMore: Boolean,
+    isRefreshing: Boolean,
     loadMoreError: String?,
     onSelectCustomer: (String) -> Unit,
     onLoadMore: () -> Unit,
     onRetryLoadMore: () -> Unit,
     bottomClearance: Dp,
 ) {
+    val listState = rememberLazyListState()
+    // Anahtarlı liste ilk görünen satırı yerinde tutar: yenilemede başa eklenen yeni kayıt
+    // görünümün ÜSTÜNDE kalıyordu. Yenileme bitince başa dönülür.
+    var wasRefreshing by remember { mutableStateOf(false) }
+    LaunchedEffect(isRefreshing) {
+        if (wasRefreshing && !isRefreshing) listState.scrollToItem(0)
+        wasRefreshing = isRefreshing
+    }
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize().testTag("customer-list"),
         contentPadding =
             PaddingValues(

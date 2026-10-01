@@ -88,15 +88,22 @@ final class MessageLogStore {
     }
 
     func load() async {
-        state = .loading
-        cursor = nil
-        loadMoreError = nil
+        // İlk yüklemede iskelet; yenilemede eldeki liste ekranda kalır.
+        // Yenilemede `.loading`e dönmek `KlinaraScreen`in ScrollView'unu söküp
+        // iskeleti koyar: aşağı çekerek yenileyen `.refreshable` görevi iptal
+        // olur, iptal sessiz hata olarak `.failed`a düşer ve ekran yükleme
+        // durumunda takılı kalır.
+        if state.value == nil { state = .loading }
         do {
             let page = try await service.messages(cursor: nil, limit: nil, filter: filter)
             state = .loaded(page.data)
             cursor = page.pageInfo.nextCursor
+            loadMoreError = nil
+        } catch let error as APIError where error.isSilent {
+            return
         } catch {
-            state = .failed(error as? APIError ?? .network)
+            guard !Task.isCancelled else { return }
+            if state.value == nil { state = .failed(error as? APIError ?? .network) }
         }
     }
 
@@ -124,6 +131,8 @@ final class MessageLogStore {
     func applyFilter(_ filter: MessageFilter) async {
         guard filter != self.filter else { return }
         self.filter = filter
+        // Başka süzgecin satırları yeni süzgeç başlığının altında kalmasın.
+        state = .loading
         await load()
     }
 

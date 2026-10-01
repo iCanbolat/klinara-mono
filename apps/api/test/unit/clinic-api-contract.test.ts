@@ -6,7 +6,6 @@ import {
   APPOINTMENT_STATUSES,
   CUSTOMER_GENDERS,
   CUSTOMER_NOTE_KINDS,
-  CUSTOMER_SOURCES,
   MEDICAL_NOTE_KINDS,
   RECURRENCE_TYPES,
   TIMELINE_KINDS,
@@ -73,7 +72,6 @@ import {
 } from '../../src/modules/booking/dto/availability.dto';
 import {
   CUSTOMER_GENDERS as DTO_CUSTOMER_GENDERS,
-  CUSTOMER_SOURCES as DTO_CUSTOMER_SOURCES,
   CustomerResponseDto,
   CustomerTagResponseDto,
 } from '../../src/modules/crm/dto/customer.dto';
@@ -314,7 +312,6 @@ describe('klinik API sözleşmesi — shared ile DTO arasında sapma yok', () =>
   it('numaralandırmalar iki tarafta AYNI', () => {
     expect([...APPOINTMENT_STATUSES]).toEqual([...DTO_APPOINTMENT_STATUSES]);
     expect([...CUSTOMER_GENDERS]).toEqual([...DTO_CUSTOMER_GENDERS]);
-    expect([...CUSTOMER_SOURCES]).toEqual([...DTO_CUSTOMER_SOURCES]);
     expect([...CUSTOMER_NOTE_KINDS]).toEqual([...DTO_NOTE_KINDS]);
     expect([...TIMELINE_KINDS]).toEqual([...DTO_TIMELINE_KINDS]);
     // Yinelenme tipi DTO'da `@ApiProperty({enum})` içinde satır içi yazılı.

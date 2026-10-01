@@ -73,13 +73,17 @@ const detailCalls = (): number =>
 // Panel yalnız `id` → `name` eşlemesi kullanıyor; gerisi test için gürültü.
 const CATALOG = [{ id: 's1', name: 'Cilt bakımı' }] as Service[];
 
-function renderSheet(services: Service[] = CATALOG) {
+function renderSheet(
+  services: Service[] = CATALOG,
+  extra: Partial<React.ComponentProps<typeof AppointmentSheet>> = {},
+) {
   const onChanged = vi.fn();
   render(
     <AppointmentSheet
       appointmentId="a1"
       timezone="Europe/Istanbul"
       services={services}
+      {...extra}
       onClose={vi.fn()}
       onChanged={onChanged}
     />,
@@ -270,6 +274,98 @@ describe('randevu ayrıntı paneli', () => {
 
     expect(await screen.findByRole('button', { name: 'İşlemde' })).toBeEnabled();
   });
+  describe('durum şeridi ve başlık', () => {
+    const withStatus = (status: string, extra: Record<string, unknown> = {}): void => {
+      get.mockImplementation((path: string) => {
+        if (path === 'appointments/a1')
+          return Promise.resolve({ ...APPOINTMENT, status, ...extra });
+        return Promise.resolve({ data: [] });
+      });
+    };
+
+    it('başlıkta müşteri adı, telefon ve gün var', async () => {
+      renderSheet(CATALOG, { customer: { id: 'c1', name: 'Ayşe Yılmaz', phone: '+905551112233' } });
+      expect(await screen.findByRole('heading', { name: 'Ayşe Yılmaz' })).toBeInTheDocument();
+      expect(screen.getByText('+905551112233')).toBeInTheDocument();
+      expect(screen.getByText('10:00 – 10:30')).toBeInTheDocument();
+    });
+
+    it('BAŞKA müşterinin ipucu başlığa BASILMIYOR', async () => {
+      renderSheet(CATALOG, { customer: { id: 'baska', name: 'Yanlış Kişi', phone: null } });
+      await screen.findByText('Cilt bakımı');
+      expect(screen.queryByText('Yanlış Kişi')).not.toBeInTheDocument();
+    });
+
+    it('şeritte GEÇİLEN adım düğme değil, GİDİLEBİLİR adım düğme; şimdiki adım işaretli', async () => {
+      withStatus('confirmed');
+      renderSheet();
+      await screen.findByRole('button', { name: 'Geldi' });
+      // Şimdiki adım tıklanamaz, `aria-current` taşır.
+      expect(screen.queryByRole('button', { name: 'Onaylandı' })).not.toBeInTheDocument();
+      expect(document.querySelector('[aria-current="step"]')).toHaveTextContent('Onaylandı');
+      // Geri dönüş tablosunda yok: geçilen adım tıklanamaz.
+      expect(screen.queryByRole('button', { name: 'Planlandı' })).not.toBeInTheDocument();
+      // Kilitli ileri adım (işlemde `confirmed`dan doğrudan gidilemez).
+      expect(screen.queryByRole('button', { name: 'İşlemde' })).not.toBeInTheDocument();
+    });
+
+    it('"Gelmedi" onay İSTİYOR; onaylanınca gidiyor', async () => {
+      const user = userEvent.setup();
+      withStatus('confirmed');
+      renderSheet();
+
+      await user.click(await screen.findByRole('button', { name: 'Gelmedi olarak işaretle' }));
+      expect(post).not.toHaveBeenCalled();
+      await user.click(await screen.findByRole('button', { name: 'Gelmedi' }));
+
+      await waitFor(() => {
+        expect(post).toHaveBeenCalledWith('appointments/a1/status', { status: 'no_show' });
+      });
+    });
+
+    it('iptal edilmiş randevuda şerit YOK; sebep gösteriliyor, işlem düğmesi yok', async () => {
+      withStatus('cancelled', { cancellationReason: 'Müşteri vazgeçti' });
+      renderSheet();
+
+      expect(await screen.findByText(/Müşteri vazgeçti/)).toBeInTheDocument();
+      expect(screen.queryByRole('list', { name: 'Randevu ilerlemesi' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'İptal et' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Ertele' })).not.toBeInTheDocument();
+    });
+
+    it('geçmiş satırları okunur: eylem adı ve durum geçişi', async () => {
+      get.mockImplementation((path: string) => {
+        if (path === 'appointments/a1') return Promise.resolve(APPOINTMENT);
+        if (path === 'appointments/a1/history')
+          return Promise.resolve({
+            data: [
+              {
+                id: 'h1',
+                action: 'status_changed',
+                actorUserId: null,
+                fromStatus: 'scheduled',
+                toStatus: 'confirmed',
+                oldStartsAt: null,
+                newStartsAt: null,
+                reason: null,
+                createdAt: '2026-09-07T09:00:00+03:00',
+              },
+            ],
+          });
+        return Promise.resolve({ data: [] });
+      });
+      renderSheet();
+
+      expect(await screen.findByText('Durum değişti')).toBeInTheDocument();
+      expect(screen.getByText('Planlandı → Onaylandı')).toBeInTheDocument();
+    });
+
+    it('personel adı verilince hizmet satırında görünüyor', async () => {
+      renderSheet(CATALOG, { staffNames: new Map([['p1', 'Dr. Deniz']]) });
+      expect(await screen.findByText(/Dr\. Deniz/)).toBeInTheDocument();
+    });
+  });
+
   describe('onam (0053)', () => {
     const REQUIREMENTS = {
       appointmentId: 'a1',

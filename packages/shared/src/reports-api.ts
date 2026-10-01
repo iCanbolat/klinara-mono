@@ -201,12 +201,6 @@ export interface NoShowReport {
 // Kazanım ve retention
 // ---------------------------------------------------------------------------
 
-export interface AcquisitionRow {
-  /** `customers.source`; girilmemişse `null`. */
-  source: string | null;
-  customers: number;
-}
-
 export interface RetentionTotals {
   /** Penceredeki İLK tamamlanmış randevusu olan müşteriler. */
   newCustomers: number;
@@ -231,7 +225,6 @@ export interface CohortReturn {
 export interface RetentionReport {
   period: ReportPeriod;
   totals: RetentionTotals;
-  acquisition: AcquisitionRow[];
   cohorts: CohortReturn[];
   previous?: RetentionTotals;
   delta?: ReportDelta;

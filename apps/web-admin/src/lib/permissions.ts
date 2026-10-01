@@ -117,6 +117,9 @@ export const NAV_ITEMS: readonly NavItem[] = [
       PERMISSIONS.REPORT_PERFORMANCE_READ_OWN,
     ],
   },
+  // Müşteriye giden mesajların metni ve gönderim anahtarı. Okumak `notification:read`;
+  // sayfa içindeki anahtar ve konum alanı kendi izinlerine ayrıca bakıyor.
+  { path: '/sablonlar', labelKey: 'nav.templates', requires: [PERMISSIONS.NOTIFICATION_READ] },
   // WhatsApp kurulumu: kiracının TÜM müşterilerine giden kanalı değiştiriyor,
   // bu yüzden `notification:manage` (sahip, şube yöneticisi).
   { path: '/whatsapp', labelKey: 'nav.whatsapp', requires: [PERMISSIONS.NOTIFICATION_MANAGE] },

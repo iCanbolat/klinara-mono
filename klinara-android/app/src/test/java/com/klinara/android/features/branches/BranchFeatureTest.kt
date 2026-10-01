@@ -1,6 +1,7 @@
 package com.klinara.android.features.branches
 
 import com.klinara.android.services.branches.BranchDetail
+import com.klinara.android.services.branches.BranchMapsLink
 import com.klinara.android.services.branches.BranchSlug
 import com.klinara.android.services.branches.MockBranchesService
 import com.klinara.android.services.crm.Patch
@@ -106,5 +107,33 @@ class BranchFeatureTest {
                 ),
             )
         assertEquals(listOf("b2", "k", "z"), sorted.map { it.id })
+    }
+
+    @Test
+    @DisplayName("Google Maps bağlantısı yalnız https kabul eder; boşluklu ya da http bağlantı reddedilir")
+    fun mapsLinkMustBeHttps() {
+        assertTrue(BranchMapsLink.isValid("https://maps.app.goo.gl/abc123"))
+        assertFalse(BranchMapsLink.isValid("http://maps.app.goo.gl/abc123"))
+        assertFalse(BranchMapsLink.isValid("https://maps.app.goo.gl/a b"))
+        assertFalse(BranchMapsLink.isValid("maps.app.goo.gl/abc"))
+    }
+
+    @Test
+    @DisplayName("Bağlantı taslağı: geçersizse kaydedilemez, değişince yalnız o alan yamalanır, boşaltınca temizlenir")
+    fun mapsLinkDraft() {
+        val original = bodrum.copy(mapsUrl = "https://maps.app.goo.gl/eski")
+        val draft = BranchDraft(original)
+        assertFalse(draft.isDirty)
+
+        val edited = draft.copy(mapsUrl = "http://guvensiz")
+        assertNotNull(edited.mapsUrlError)
+        assertFalse(edited.isValid)
+
+        val changed = draft.copy(mapsUrl = "https://maps.app.goo.gl/yeni")
+        assertTrue(changed.isValid)
+        assertEquals(Patch.text("https://maps.app.goo.gl/yeni"), changed.updateInput(original).mapsUrl)
+        assertEquals(Patch.Unchanged, changed.updateInput(original).phone)
+
+        assertEquals(Patch.text(""), draft.copy(mapsUrl = "").updateInput(original).mapsUrl)
     }
 }

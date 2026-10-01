@@ -64,11 +64,11 @@ internal object MockReportCsv {
             },
         )
 
-    /** Kazanımın CSV'si yalnız kaynak kırılımı — kohortlar ekranda kalır (sunucu kararı). */
+    /** Kazanımın CSV'si kohort geri dönüş tablosu — toplamlar ekranda kalır (sunucu kararı). */
     fun retention(report: RetentionReport): String =
         csv(
-            listOf("Geliş kaynağı", "Müşteri"),
-            report.acquisition.map { listOf(it.source ?: "Belirtilmemiş", "${it.customers}") },
+            listOf("Süre (gün)", "Geri dönen", "Oran (%)"),
+            report.cohorts.map { listOf("${it.withinDays}", "${it.returned}", decimal(it.rate)) },
         )
 
     private fun csv(

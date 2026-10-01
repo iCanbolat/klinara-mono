@@ -17,6 +17,12 @@ export interface WhatsAppTemplateMessage {
    */
   buttonPayloads?: string[];
   /**
+   * Dinamik URL butonu: Meta'da alan adı sabit, yalnız SONUNA eklenen kısım
+   * (`{{1}}`) gönderimde verilir. `index` butonun template'teki sırasıdır
+   * (önce quick-reply'lar gelir).
+   */
+  urlButton?: { index: number; suffix: string };
+  /**
    * Kimlik doğrulama (AUTHENTICATION) template'inin "Kodu kopyala" butonu.
    * Meta kodu HEM gövdede HEM bu butonda ister; biri eksikse gönderim
    * parametre uyuşmazlığıyla reddedilir.
@@ -35,6 +41,8 @@ export interface WhatsAppTemplateDraft {
   /** Her değişken için örnek değer — Meta değişkenli gövdeyi örneksiz reddeder. */
   bodyExamples?: string[];
   quickReplies?: string[];
+  /** Sabit alan adlı, sonu değişkenli URL butonu (quick-reply'lardan sonra gelir). */
+  urlButton?: { text: string; url: string; example: string };
   /** Yalnız AUTHENTICATION: kodun geçerlilik süresi (dakika). */
   codeExpirationMinutes?: number;
 }

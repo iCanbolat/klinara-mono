@@ -2,6 +2,7 @@ package com.klinara.android.designsystem.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
@@ -122,9 +124,12 @@ fun KlinaraStatCard(
 }
 
 /**
- * Özet kartı şeridi — iki sütunlu ızgara. Telefon genişliğinde dört kart yan yana sığmaz; web de
- * dar ekranda iki sütuna iner. Tek kalan kart satırın yarısında durur, genişlemez: kart boyları
- * birbirinden zıplamasın.
+ * Özet kartı şeridi — yatay kaydırılan tek satır. İki sütunlu ızgara dört kartı ekranın üçte biri
+ * kadar dikey alana yayıyordu; tek satır alanı yarıya indirir. Kartlar sabit genişlikte
+ * ([CARD_WIDTH]) ve bir sonraki kartın kenarı görünür kalır — kaydırılabildiğini söyleyen ipucu bu.
+ *
+ * Kartlar aynı yükseklikte: satır bütçesi zaten eşit boy veriyor; `IntrinsicSize` yalnız bir
+ * etiketin cihaz fontunda beklenmedik şekilde yükseldiği durumda komşuyu da hizalı tutar.
  */
 @Composable
 fun KlinaraStatStrip(
@@ -132,28 +137,26 @@ fun KlinaraStatStrip(
     modifier: Modifier = Modifier,
     isLoading: Boolean = false,
 ) {
-    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(KlinaraMetrics.sm)) {
-        stats.chunked(COLUMNS).forEach { row ->
-            Row(
-                // Satır bütçesi zaten eşit boy veriyor; IntrinsicSize yalnız bir etiketin cihaz
-                // fontunda beklenmedik şekilde yükseldiği durumda komşuyu da hizalı tutar.
-                modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
-                horizontalArrangement = Arrangement.spacedBy(KlinaraMetrics.sm),
-            ) {
-                row.forEach { stat ->
-                    KlinaraStatCard(
-                        stat = stat,
-                        isLoading = isLoading,
-                        modifier = Modifier.weight(1f).fillMaxHeight(),
-                    )
-                }
-                repeat(COLUMNS - row.size) { Column(Modifier.weight(1f)) {} }
-            }
+    Row(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .height(IntrinsicSize.Min),
+        horizontalArrangement = Arrangement.spacedBy(KlinaraMetrics.sm),
+    ) {
+        stats.forEach { stat ->
+            KlinaraStatCard(
+                stat = stat,
+                isLoading = isLoading,
+                modifier = Modifier.width(CARD_WIDTH).fillMaxHeight(),
+            )
         }
     }
 }
 
-private const val COLUMNS = 2
+/** İki kart ekrana sığar, üçüncünün kenarı görünür kalır. Para değerleri bu genişliğe sığar. */
+internal val CARD_WIDTH = 172.dp
 private val ICON_SIZE = 16.dp
 private val PLACEHOLDER_WIDTH = 96.dp
 private const val HINT_LINES = 2

@@ -27,12 +27,11 @@ class CustomerModelsTest {
     ): T = KlinaraJson.decodeFromString(deserializer, Fixtures.read(path))
 
     @Test
-    @DisplayName("Kart tüm alanlarıyla çözülüyor — adres, kaynak, etiket")
+    @DisplayName("Kart tüm alanlarıyla çözülüyor — adres, etiket")
     fun customerDecodes() {
         val customer = decode("crm/customer-with-tags.json", Customer.serializer())
 
         assertEquals("Ayşe Yılmaz", customer.fullName)
-        assertEquals(CustomerSource.Instagram, customer.source)
         assertEquals(CustomerGender.Female, customer.gender)
         assertEquals("Bağdat Cad. 12, Kadıköy, İstanbul", customer.addressSummary)
         assertEquals(2, customer.tags.size)
@@ -78,12 +77,11 @@ class CustomerModelsTest {
     }
 
     @Test
-    @DisplayName("BİLİNMEYEN kaynak/cinsiyet çözümlemeyi düşürmez — liste boş kalmaz")
+    @DisplayName("BİLİNMEYEN cinsiyet çözümlemeyi düşürmez — liste boş kalmaz")
     fun unknownEnumsFallBack() {
         val customer = decode("crm/customer-forward-compatible.json", Customer.serializer())
 
         // Sunucuya yarın eklenecek bir değer, on bin kayıtlık listeyi düşürmemeli.
-        assertEquals(CustomerSource.Unknown, customer.source)
         assertEquals(CustomerGender.Unknown, customer.gender)
         // Tanımadığımız fazladan alan da sessizce atlanmalı.
         assertEquals("Deniz Yıldız", customer.fullName)

@@ -24,8 +24,6 @@ class LiveCustomerService internal constructor(
                         query.limit?.let { add("limit" to it.toString()) }
                         query.cursor?.let { add("cursor" to it) }
                         query.tagId?.let { add("tagId" to it) }
-                        // Unknown asla sorguya konmaz: sunucunun tanımadığı bir değer 400 verir.
-                        query.source?.takeIf { it != CustomerSource.Unknown }?.let { add("source" to it.wire) }
                     },
             ),
         )

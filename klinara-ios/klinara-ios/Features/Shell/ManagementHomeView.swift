@@ -177,7 +177,7 @@ struct ManagementHomeView: View {
         }
     }
 
-    /// İletişim ayrı bir kart, kasa gibi: gelen kutusu günlük bir resepsiyon
+    /// İletişim ayrı bir kart, kasa gibi: sohbetler günlük bir resepsiyon
     /// işi ama sekme kümesi Faz 3'te donduruldu ve bilgi mimarisini her fazda
     /// yeniden kurmak kullanıcının kas hafızasını sıfırlamak demek.
     private var communicationCard: some View {
@@ -197,14 +197,6 @@ struct ManagementHomeView: View {
             }
             if session.can(Permissions.notificationRead) {
                 KlinaraNavigationRow(
-                    label: "Gelen kutusu",
-                    detail: "Müşterilerin WhatsApp'tan yazdığı mesajlar",
-                    icon: "tray.and.arrow.down"
-                ) {
-                    InboxView(session: session)
-                }
-                KlinaraDivider()
-                KlinaraNavigationRow(
                     label: "Mesaj günlüğü",
                     detail: "Gönderilen, ulaşan ve gönderilmeyen mesajlar",
                     icon: "bubble.left.and.text.bubble.right"
@@ -222,18 +214,10 @@ struct ManagementHomeView: View {
                 KlinaraDivider()
                 KlinaraNavigationRow(
                     label: "Bildirim şablonları",
-                    detail: "Olay ve kanal başına mesaj metni",
+                    detail: "Müşteriye giden mesajlar ve açık/kapalı durumları",
                     icon: "text.quote"
                 ) {
                     NotificationTemplateListView(session: session)
-                }
-                KlinaraDivider()
-                KlinaraNavigationRow(
-                    label: "Bildirim tercihleri",
-                    detail: "Kanal önceliği ve sessiz saatler",
-                    icon: "slider.horizontal.3"
-                ) {
-                    NotificationPreferenceListView(session: session)
                 }
             }
             if session.can(Permissions.notificationManage) {

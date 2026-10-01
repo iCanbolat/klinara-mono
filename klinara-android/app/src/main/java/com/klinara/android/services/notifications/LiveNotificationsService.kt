@@ -42,32 +42,6 @@ class LiveNotificationsService internal constructor(
             ),
         )
 
-    override suspend fun preferences(): List<NotificationPreference> =
-        client.send(ApiRequest.get("notification-preferences"))
-
-    override suspend fun upsertPreference(input: NotificationPreferenceUpsert): NotificationPreference =
-        client.send(
-            ApiRequest.put(
-                "notification-preferences",
-                body =
-                    buildJsonObject {
-                        input.branchId?.let { put("branchId", it) }
-                        put("event", input.event.wire)
-                        put(
-                            "channels",
-                            JsonArray(
-                                input.channels
-                                    .filter { it != NotificationChannel.Unknown }
-                                    .map { JsonPrimitive(it.wire) },
-                            ),
-                        )
-                        // İki uç HER ZAMAN birlikte: sunucu yalnız birini alınca 422 veriyor.
-                        put("quietHoursStart", input.quietHoursStart.wireValue)
-                        put("quietHoursEnd", input.quietHoursEnd.wireValue)
-                    }.asBody(),
-            ),
-        )
-
     override suspend fun reminderSettings(branchId: String): BranchReminderSettings =
         client.send(ApiRequest.get("branches/$branchId/reminder-settings"))
 

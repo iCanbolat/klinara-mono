@@ -12,7 +12,6 @@ import { ReportShell } from './report-shell';
 import { ReportTable, type Column } from './report-table';
 import { useReport } from './use-report';
 
-type AcquisitionRow = RetentionReport['acquisition'][number];
 type CohortRow = RetentionReport['cohorts'][number];
 
 export function RetentionReportView(): ReactNode {
@@ -24,20 +23,6 @@ export function RetentionReportView(): ReactNode {
     preset,
     compare,
   });
-
-  const acquisitionColumns: Column<AcquisitionRow>[] = [
-    {
-      key: 'source',
-      header: t('reports.col.source'),
-      render: (row) => row.source ?? t('reports.sourceUnknown'),
-    },
-    {
-      key: 'customers',
-      header: t('reports.col.customers'),
-      numeric: true,
-      render: (row) => formatNumber(row.customers),
-    },
-  ];
 
   const cohortColumns: Column<CohortRow>[] = [
     {
@@ -115,22 +100,14 @@ export function RetentionReportView(): ReactNode {
 
           <ReportChart
             kind="bar"
-            points={data.acquisition.map((row) => ({
-              label: row.source ?? t('reports.sourceUnknown'),
-              value: row.customers,
+            points={data.cohorts.map((row) => ({
+              label: `${row.withinDays} gün`,
+              value: row.rate,
             }))}
-            format={formatNumber}
+            format={formatPercent}
           />
 
-          <h2 className="mb-2 mt-4 text-sm font-medium text-foreground">{t('reports.col.source')}</h2>
-          <ReportTable
-            caption={t('reports.retention')}
-            columns={acquisitionColumns}
-            rows={data.acquisition}
-            rowKey={(row, index) => row.source ?? `unknown-${index}`}
-          />
-
-          <h2 className="mb-2 mt-6 text-sm font-medium text-foreground">{t('reports.col.returned')}</h2>
+          <h2 className="mb-2 mt-4 text-sm font-medium text-foreground">{t('reports.col.returned')}</h2>
           <ReportTable
             caption={t('reports.col.returned')}
             columns={cohortColumns}

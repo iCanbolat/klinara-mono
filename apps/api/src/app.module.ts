@@ -19,6 +19,7 @@ import { DatabaseModule } from './database/database.module';
 import { IdempotencyModule } from './common/idempotency/idempotency.module';
 import { MailModule } from './lib/mail/mail.module';
 import { QueueModule } from './lib/queue/queue.module';
+import { RealtimeBusModule } from './lib/realtime/realtime.module';
 import { SmsModule } from './lib/sms/sms.module';
 import { StorageModule } from './lib/storage/storage.module';
 import { WhatsAppModule } from './lib/whatsapp/whatsapp.module';
@@ -32,6 +33,7 @@ import { BookingModule } from './modules/booking/booking.module';
 import { BookingPageModule } from './modules/booking-page/booking-page.module';
 import { ConsentModule } from './modules/consent/consent.module';
 import { PublicModule } from './modules/public/public.module';
+import { RealtimeModule } from './modules/realtime/realtime.module';
 import { CrmModule } from './modules/crm/crm.module';
 import { FinanceModule } from './modules/finance/finance.module';
 import { FilesModule } from './modules/files/files.module';
@@ -87,6 +89,7 @@ import { MetricsModule } from './observability/metrics.module';
     SmsModule,
     StorageModule,
     QueueModule,
+    RealtimeBusModule,
     MailModule,
     WhatsAppModule,
     HealthModule,
@@ -103,6 +106,7 @@ import { MetricsModule } from './observability/metrics.module';
     ReportingModule,
     IntegrationsModule,
     NotificationsModule,
+    RealtimeModule,
     StaffModule,
     SchedulingModule,
     TenancyModule,

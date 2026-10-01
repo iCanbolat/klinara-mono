@@ -80,15 +80,19 @@ export function noShowCsv(report: NoShowReportDto): string {
 }
 
 /**
- * Retention'ın CSV'si KAZANIM KAYNAĞI kırılımı.
+ * Retention'ın CSV'si KOHORT geri dönüş tablosu.
  *
- * Kohort oranları ve toplamlar tek satırlık skalerler; onları da aynı dosyaya
- * sıkıştırmak iki farklı şekilli tabloyu üst üste yazmak olurdu ve Excel'de
- * ikisi de bozuk açılırdı. Toplamlar ekranda duruyor, dosya listeyi taşıyor.
+ * Toplamlar tek satırlık skalerler; onları da aynı dosyaya sıkıştırmak iki
+ * farklı şekilli tabloyu üst üste yazmak olurdu ve Excel'de ikisi de bozuk
+ * açılırdı. Toplamlar ekranda duruyor, dosya kohortları taşıyor.
  */
 export function retentionCsv(report: RetentionReportDto): string {
   return toCsv(
-    ['Geliş kaynağı', 'Müşteri'],
-    report.acquisition.map((row) => [row.source ?? 'Belirtilmemiş', row.customers]),
+    ['Süre (gün)', 'Geri dönen', 'Oran (%)'],
+    report.cohorts.map((row) => [
+      row.withinDays,
+      row.returned,
+      String(row.rate).replace('.', ','),
+    ]),
   );
 }

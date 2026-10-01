@@ -55,7 +55,6 @@ class MockCustomerService(
             rows
                 .asSequence()
                 .filter { row -> query.tagId == null || row.tags.any { it.id == query.tagId } }
-                .filter { row -> query.source == null || row.source == query.source }
                 // Sunucunun sırası: createdAt azalan, eşitlikte id azalan.
                 .sortedWith(compareByDescending<Customer> { it.createdAt }.thenByDescending { it.id })
                 .toList()
@@ -145,7 +144,6 @@ class MockCustomerService(
                 district = input.district,
                 city = input.city,
                 postalCode = input.postalCode,
-                source = input.source,
                 // Yeni kayıt EN YENİDİR: listenin başında görünmeli.
                 createdAt = (rows.mapNotNull { it.createdAt }.maxOrNull() ?: Instant.EPOCH).plusSeconds(1),
             )
@@ -178,7 +176,6 @@ class MockCustomerService(
                 district = input.district.resolve(current.district),
                 city = input.city.resolve(current.city),
                 postalCode = input.postalCode.resolve(current.postalCode),
-                source = input.source.resolve(current.source),
             )
         rows[index] = updated
         return updated
@@ -299,7 +296,6 @@ class MockCustomerService(
                 district = target.district ?: source.district,
                 city = target.city ?: source.city,
                 postalCode = target.postalCode ?: source.postalCode,
-                source = target.source ?: source.source,
                 // Etiketler BİRLEŞİR, kimliğe göre tekilleşir.
                 tags = (target.tags + source.tags).distinctBy { it.id },
             )

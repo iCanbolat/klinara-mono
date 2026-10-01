@@ -158,21 +158,13 @@ internal object MockReportBuilders {
         history: List<Visit>,
         window: Set<LocalDate>,
         today: LocalDate,
-        source: (Int) -> String?,
-    ): Triple<RetentionTotals, List<AcquisitionRow>, List<CohortReturn>> {
+    ): Pair<RetentionTotals, List<CohortReturn>> {
         val completed = history.filter { it.status == Status.Completed }
         val visitsByCustomer =
             completed.groupBy { it.customer }.mapValues { (_, rows) -> rows.map { it.date }.sorted() }
         val active = completed.filter { it.date in window }.map { it.customer }.toSet()
         val newcomers = visitsByCustomer.filterValues { it.first() in window }
         val returning = active - newcomers.keys
-
-        val acquisition =
-            newcomers.keys
-                .groupingBy(source)
-                .eachCount()
-                .map { (raw, count) -> AcquisitionRow(raw, count) }
-                .sortedWith(compareByDescending<AcquisitionRow> { it.customers }.thenBy(nullsLast()) { it.source })
 
         val cohorts =
             COHORT_DAYS.map { days ->
@@ -192,7 +184,7 @@ internal object MockReportBuilders {
                 activeCustomers = active.size,
                 returningRate = rate(returning.size.toLong(), active.size.toLong()),
             )
-        return Triple(totals, acquisition, cohorts)
+        return totals to cohorts
     }
 }
 

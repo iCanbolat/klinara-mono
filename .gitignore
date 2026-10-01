@@ -19,3 +19,7 @@ PayTR Direkt API
 .idea/
 .kotlin/
 klinara-android/local.properties
+
+# iOS derleme çıktısı ve kişisel Xcode durumu
+klinara-ios/build/
+xcuserdata/

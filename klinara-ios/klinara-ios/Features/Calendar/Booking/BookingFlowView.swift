@@ -142,7 +142,8 @@ struct BookingFlowView: View {
                 searchPrompt: "Müşteri ara",
                 emptyMessage: "Eşleşen müşteri yok.",
                 createLabel: session.can(Permissions.customerWrite) ? "Yeni müşteri ekle" : nil,
-                onCreate: session.can(Permissions.customerWrite) ? { isCreatingCustomer = true } : nil
+                onCreate: session.can(Permissions.customerWrite) ? { isCreatingCustomer = true } : nil,
+                remoteSearch: { await session.customerStore.lookup($0) }
             )
         } else {
             KlinaraFormSection(title: "Müşteri") {

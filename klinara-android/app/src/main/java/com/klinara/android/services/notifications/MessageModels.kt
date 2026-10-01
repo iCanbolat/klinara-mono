@@ -67,6 +67,12 @@ enum class NotificationEvent(
 
         /** Seçim listelerinde `Unknown` gösterilmez — kullanıcı onu üretemez. */
         val selectable: List<NotificationEvent> = entries.filter { it != Unknown }
+
+        /**
+         * Şablon ekranında görünen olaylar: personel iç bildirimi dışarıda — metnini kiracı değil
+         * platform belirliyor. Mesaj günlüğü süzgeci [selectable]ı kullanır: geçmiş satırlar var.
+         */
+        val templateEvents: List<NotificationEvent> = selectable.filter { it != StaffInternal }
     }
 }
 

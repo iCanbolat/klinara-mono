@@ -114,9 +114,12 @@ class DashboardViewModel(
                 if (access.calendar) active.map { async { attempt { upcomingPage(it, at) } } } else emptyList()
 
             // Ay sınırı ilk şubenin saatinde — web de tek bir "bu ay" aralığı gönderiyor.
+            // Bitiş YARIN (hariç), ay sonu değil: ayın kalan boş günleri doluluğun paydasına,
+            // henüz gelmemiş randevular gelmeme oranının paydasına girerdi ve aynı gün web'le
+            // farklı sayı çıkardı.
             val clock = BranchClock(active.firstOrNull()?.timezone)
             val start = clock.startOfMonth(at)
-            val period = ReportPeriod(start, clock.addingMonths(1, start))
+            val period = ReportPeriod(start, clock.adding(1, clock.startOfDay(at)))
             // Şube verilmiyor: sunucu "erişebildiğin tüm şubeler" için hesaplayıp satırlara bölüyor.
             val compared = ReportQuery(period = period, branchId = null, compareToPrevious = true)
             val plain = ReportQuery(period = period, branchId = null)

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import { CUSTOMER_SOURCES, PERMISSIONS, type Customer, type CustomerTag } from '@klinara/shared';
+import { PERMISSIONS, type Customer, type CustomerTag } from '@klinara/shared';
 import { t } from '@/i18n/tr';
 import { api } from '@/lib/api/client';
 import { useSession } from '@/components/session/session-provider';
@@ -10,6 +10,7 @@ import { DataPage } from '@/components/data-page/data-page';
 import { DataTable, type DataColumn } from '@/components/data-page/data-table';
 import { Button } from '@/components/ui/button';
 import { Field, FieldSelect } from '@/components/ui/field';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useCustomers } from './use-customers';
 import { CustomerFormDialog } from './customer-form';
 import { CustomerListCard } from './customer-list-card';
@@ -58,11 +59,12 @@ export function CustomersPage(): ReactNode {
   const { permissions } = useSession();
   const [query, setQuery] = useState('');
   const [tagId, setTagId] = useState<string | null>(null);
-  const [source, setSource] = useState<string | null>(null);
   const [tags, setTags] = useState<CustomerTag[]>([]);
   const [creating, setCreating] = useState(false);
 
-  const state = useCustomers({ query, tagId, source });
+  // Girdi anında güncellenir; sunucu isteği yazma durunca (300 ms) atılır.
+  const debouncedQuery = useDebouncedValue(query, 300);
+  const state = useCustomers({ query: debouncedQuery, tagId });
   const canWrite = permissions.includes(PERMISSIONS.CUSTOMER_WRITE);
 
   useEffect(() => {
@@ -111,18 +113,6 @@ export function CustomersPage(): ReactNode {
               {tags.map((tag) => (
                 <option key={tag.id} value={tag.id}>
                   {tag.name}
-                </option>
-              ))}
-            </FieldSelect>
-            <FieldSelect
-              label={t('customers.allSources')}
-              value={source ?? ''}
-              onChange={(event) => setSource(event.target.value === '' ? null : event.target.value)}
-            >
-              <option value="">{t('customers.allSources')}</option>
-              {CUSTOMER_SOURCES.map((value) => (
-                <option key={value} value={value}>
-                  {value}
                 </option>
               ))}
             </FieldSelect>

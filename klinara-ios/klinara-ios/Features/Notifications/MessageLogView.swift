@@ -54,22 +54,10 @@ struct MessageLogView: View {
 
     // MARK: Süzgeçler
 
-    /// İki segment seçici üst üste yığılınca listeyi ekranın dışına itiyordu.
-    /// Durum da olay da artık aynı dili konuşan yatay çip satırları.
+    /// Durum süzgeci özet kartlarında (Toplam / Başarısız / Atlandı); burada
+    /// yalnız olay çipleri kalır.
     private func filters(_ store: MessageLogStore) -> some View {
         VStack(alignment: .leading, spacing: KlinaraMetrics.sm) {
-            pillRow {
-                ForEach(MessageStatusFilter.allCases) { option in
-                    KlinaraFilterPill(
-                        title: option.turkishName,
-                        isSelected: option == statusFilter
-                    ) {
-                        statusFilter = option
-                        Task { await apply(store) }
-                    }
-                }
-            }
-
             pillRow {
                 ForEach(NotificationEvent.selectable) { event in
                     KlinaraFilterPill(

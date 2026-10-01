@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { showNotificationToast } from './notification-toast';
 import { useStaffNotifications, type StaffNotification } from './use-staff-notifications';
 
 /** "3 dk önce" — saat/tarih satırı listeyi gereksiz uzatıyordu. */
@@ -66,7 +67,24 @@ export function NotificationBell(): ReactNode {
   const { permissions } = useSession();
   const router = useRouter();
   const allowed = can(permissions, PERMISSIONS.NOTIFICATION_READ);
-  const { notifications, unreadCount, error, markRead } = useStaffNotifications(allowed);
+  const { notifications, unreadCount, error, markRead } = useStaffNotifications(
+    allowed,
+    (fresh) => {
+      // Fırtına olmasın: en fazla 3 toast, kalanı zil sayacında.
+      for (const row of fresh.slice(0, 3)) {
+        const link = row.link;
+        showNotificationToast(
+          row,
+          link === null
+            ? null
+            : () => {
+                markRead([row.id]);
+                router.push(link);
+              },
+        );
+      }
+    },
+  );
 
   if (!allowed) return null;
 

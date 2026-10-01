@@ -7,8 +7,8 @@ import com.klinara.android.services.notifications.BranchReminderSettings
 import com.klinara.android.services.notifications.NotificationChannel
 import com.klinara.android.services.notifications.NotificationEvent
 import com.klinara.android.services.notifications.NotificationEventCatalog
-import com.klinara.android.services.notifications.NotificationPreference
 import com.klinara.android.services.notifications.NotificationTemplate
+import com.klinara.android.services.notifications.TemplateSegment
 import com.klinara.android.services.notifications.ReminderSettingsUpdate
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -21,9 +21,6 @@ import org.junit.jupiter.api.Test
 class NotificationDraftsTest {
     private fun template(path: String) =
         KlinaraJson.decodeFromString(NotificationTemplate.serializer(), Fixtures.read("notifications/$path"))
-
-    private fun preference(path: String) =
-        KlinaraJson.decodeFromString(NotificationPreference.serializer(), Fixtures.read("notifications/$path"))
 
     private fun reminderForm(channel: NotificationChannel = NotificationChannel.WhatsApp) =
         NotificationTemplateForm.editing(
@@ -42,42 +39,51 @@ class NotificationDraftsTest {
     }
 
     @Test
-    @DisplayName("Başka bir olayın değişkeni bu olayda geçersiz — sunucuya gitmeden yakalanır")
-    fun foreignVariableIsUnknown() {
-        val form = reminderForm().copy(body = "{{packageName}} için {{customerName}}")
-
-        assertEquals(listOf("packageName"), form.unknownPlaceholders)
-        assertFalse(form.isValid)
+    @DisplayName("Gövde düz metin ve @Etiket parçalarına ayrılır; tanımsız ad ham @ad olarak kalır")
+    fun segmentsCarryHandles() {
+        val segments = NotificationEventCatalog.segments("Sayın {{customerName}}, {{ serviceName }} {{bilinmeyen}}")
+        assertEquals(
+            listOf(
+                TemplateSegment.text("Sayın "),
+                TemplateSegment.variable("customerName", "@MüşteriAdı"),
+                TemplateSegment.text(", "),
+                TemplateSegment.variable("serviceName", "@HizmetAdı"),
+                TemplateSegment.text(" "),
+                TemplateSegment.variable("bilinmeyen", "@bilinmeyen"),
+            ),
+            segments,
+        )
+        assertEquals("Sayın @MüşteriAdı, @HizmetAdı @bilinmeyen", segments.joinToString("") { it.display })
     }
 
     @Test
-    @DisplayName("WhatsApp konumsal değişkenleri de aynı beyaz listeye tabi")
-    fun whatsappVariablesAreChecked() {
-        val form =
-            reminderForm(NotificationChannel.WhatsApp)
-                .addingWhatsAppVariable("customerName")
-                .addingWhatsAppVariable("remainingSessions")
+    @DisplayName("Sunucunun gönderdiği parçalar gövdeden ayrıştırmaya tercih edilir; yoksa gövde parçalanır")
+    fun serverSegmentsWinAndBodyIsTheFallback() {
+        val fromServer = template("template-default.json")
+        assertTrue(fromServer.segments != null)
+        assertTrue(fromServer.displaySegments.any { it.isVariable && it.handle == "@KlinikAdresi" })
 
-        assertEquals(listOf("remainingSessions"), form.unknownPlaceholders)
+        val withoutSegments = fromServer.copy(segments = null, body = "Selam {{customerName}}")
+        assertEquals(
+            listOf(TemplateSegment.text("Selam "), TemplateSegment.variable("customerName", "@MüşteriAdı")),
+            withoutSegments.displaySegments,
+        )
     }
 
     @Test
-    @DisplayName("Boş ya da 4000 karakteri aşan gövde kaydedilemez")
-    fun bodyBounds() {
-        assertFalse(reminderForm().copy(body = "   ").isValid)
-        assertFalse(reminderForm().copy(body = "a".repeat(NotificationTemplateForm.MAX_BODY + 1)).isValid)
-        assertTrue(reminderForm().copy(body = "a".repeat(NotificationTemplateForm.MAX_BODY)).isValid)
-    }
+    @DisplayName("Yalnız Aktif anahtarı formu kirletir; Meta alanları ve metin olduğu gibi geri gider")
+    fun onlyActiveIsEditable() {
+        val form = template("template-whatsapp.json").let(NotificationTemplateForm::editing)
+        assertFalse(form.isDirty)
 
-    @Test
-    @DisplayName("Meta şablon adı verildiyse dil de zorunlu")
-    fun templateNameNeedsLanguage() {
-        val form =
-            reminderForm(NotificationChannel.WhatsApp)
-                .copy(whatsappTemplateName = "randevu", whatsappTemplateLanguage = "")
+        val toggled = form.copy(isActive = !form.isActive)
+        assertTrue(toggled.isDirty)
+        assertFalse(toggled.copy(isActive = form.isActive).isDirty)
 
-        assertFalse(form.isValid)
-        assertTrue(form.copy(whatsappTemplateLanguage = "tr").isValid)
+        val input = toggled.input()
+        assertEquals(form.body, input.body)
+        assertEquals(form.whatsappTemplateName.takeIf { it.isNotBlank() }, input.whatsappTemplateName)
+        assertEquals(form.whatsappVariables, input.whatsappVariables)
     }
 
     @Test
@@ -94,21 +100,6 @@ class NotificationDraftsTest {
         assertNull(whatsappNoName.whatsappTemplateName)
         assertNull(whatsappNoName.whatsappTemplateLanguage)
         assertEquals(emptyList<String>(), whatsappNoName.whatsappVariables)
-    }
-
-    @Test
-    @DisplayName("Değişken eklemek formu kirletir; konumsal sıra korunur, aynı ad iki kez eklenmez")
-    fun variableOrderAndDirty() {
-        val form = template("template-whatsapp.json").let(NotificationTemplateForm::editing)
-        assertFalse(form.isDirty)
-
-        val appended = form.appendingVariable("branchName")
-        assertTrue(appended.isDirty)
-        assertTrue(appended.body.endsWith("{{branchName}}"))
-
-        val reordered = form.removingWhatsAppVariable(0).addingWhatsAppVariable(form.whatsappVariables.first())
-        assertEquals(form.whatsappVariables.drop(1) + form.whatsappVariables.first(), reordered.whatsappVariables)
-        assertEquals(reordered, reordered.addingWhatsAppVariable(form.whatsappVariables.first()))
     }
 
     @Test
@@ -136,59 +127,6 @@ class NotificationDraftsTest {
         assertEquals(listOf(false), confirmation.rows.map { it.isMissing })
         // Standart template'i olmayan olayın WhatsApp satırı 'Şablon yok' olarak çıkar.
         assertEquals(listOf(true), expiring.rows.map { it.isMissing })
-    }
-
-    // --- Tercih taslağı ---
-
-    @Test
-    @DisplayName("Sessiz saat kapalıyken EŞİT uçlar gider (00:00–00:00) — [S] A8.2 sözleşmesi")
-    fun disabledQuietHoursSendEqualEnds() {
-        val draft = PreferenceDraft.editing(preference("preference-saved.json")).copy(quietHoursEnabled = false)
-        val input = draft.input(activeBranchId = "b1")
-
-        assertEquals(ClockTime(0, 0), input.quietHoursStart)
-        assertEquals(input.quietHoursStart, input.quietHoursEnd)
-        assertNull(input.branchId, "Kiracı kapsamında şube kimliği gönderilmez")
-        assertTrue(draft.isDirty)
-    }
-
-    @Test
-    @DisplayName("Açıkken iki uç birlikte; eşit uçlar açıkken geçersiz, gece yarısı aşımı hata değil")
-    fun quietHoursPair() {
-        val draft = PreferenceDraft.editing(preference("preference-saved.json"))
-
-        assertTrue(draft.quietHoursEnabled)
-        assertTrue(draft.crossesMidnight, "22:00–08:00")
-        assertTrue(draft.isValid)
-        assertFalse(draft.copy(quietEnd = draft.quietStart).isValid)
-        assertEquals("22:00", draft.input(null).quietHoursStart.wireValue)
-    }
-
-    @Test
-    @DisplayName("Eski sunucu `quietHoursEnabled` göndermese de eşit uçlar kapalı okunur")
-    fun legacyEqualEndsAreDisabled() {
-        val legacy =
-            NotificationPreference(
-                event = NotificationEvent.PackageExpiring,
-                quietHoursStart = "00:00",
-                quietHoursEnd = "00:00",
-            )
-
-        assertFalse(legacy.isQuietHoursEnabled)
-        assertNull(legacy.quietHoursLabel)
-        assertFalse(PreferenceDraft.editing(legacy).quietHoursEnabled)
-    }
-
-    @Test
-    @DisplayName("İlk kanal yukarı gitmez; eklenecek kanal kalmaz; şube kapsamı şube kimliğini gönderir")
-    fun channelOrdering() {
-        val draft = PreferenceDraft.editing(preference("preference-saved.json"))
-
-        assertEquals(listOf(NotificationChannel.WhatsApp), draft.channels)
-        assertEquals(draft, draft.movingUp(NotificationChannel.WhatsApp))
-        // Eklenebilecek kanal kalmadı: müşteriye gidebilecek küme yalnız WhatsApp.
-        assertEquals(emptyList<NotificationChannel>(), draft.availableChannels)
-        assertEquals("b1", draft.copy(isBranchScope = true).input("b1").branchId)
     }
 
     // --- Hatırlatma taslağı ---

@@ -8,6 +8,7 @@ import type {
   SendConversationTemplateInput,
 } from '@klinara/shared';
 import { api } from '@/lib/api/client';
+import { onMessageEvent } from '@/lib/messages/message-events';
 import { toMessage } from '@/lib/reports/errors';
 
 /** Açık sohbette yoklama daha sık: müşteri o anda yazıyor olabilir. */
@@ -85,6 +86,9 @@ export function useConversation(
     }, THREAD_POLL_MS);
     return () => clearInterval(timer);
   }, [id, reload]);
+
+  // Gelen mesaj bildirimi → açık sohbet hemen tazelenir.
+  useEffect(() => (id === null ? undefined : onMessageEvent(reload)), [id, reload]);
 
   const append = useCallback((message: ConversationMessage) => {
     setDetail((current) =>

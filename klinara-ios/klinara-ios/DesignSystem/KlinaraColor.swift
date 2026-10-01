@@ -17,6 +17,7 @@ import SwiftUI
 /// | surfaceRaised  | #FFFFFF | #20241F |
 /// | border         | #DFD9D0 | #33383A |
 /// | danger         | #A6483C | #D08074 |
+/// | link           | #2563C9 | #7FB0F5 |
 enum KlinaraColor {
 
     // MARK: Marka
@@ -48,4 +49,6 @@ enum KlinaraColor {
     static let borderFocus = Color("BorderFocus")
     static let disabled = Color("DisabledFill")
     static let danger = Color("Danger")
+    /// Bağlantı ve şablon değişkeni (`@HizmetAdı`) rengi.
+    static let link = Color("Link")
 }

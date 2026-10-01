@@ -23,6 +23,10 @@ struct KlinaraStat: Identifiable {
 /// parçaya bölerdi.
 struct KlinaraStatCard: View {
 
+    /// Şeritteki kart genişliği: iki kart ekrana sığar, üçüncünün kenarı
+    /// görünür kalır. Para değerleri `minimumScaleFactor` ile bu genişliğe iner.
+    static let width: CGFloat = 172
+
     let stat: KlinaraStat
     var isLoading = false
 
@@ -41,7 +45,7 @@ struct KlinaraStatCard: View {
                 .klinaraText(.label)
                 .foregroundStyle(KlinaraColor.charcoalMuted)
                 .lineLimit(1)
-                .minimumScaleFactor(0.85)
+                .minimumScaleFactor(0.7)
                 .padding(.trailing, stat.icon == nil ? 0 : 22)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .overlay(alignment: .trailing) {
@@ -97,27 +101,30 @@ struct KlinaraStatCard: View {
     }
 }
 
-/// Özet kartı şeridi — iki sütunlu ızgara. Telefon genişliğinde dört kart yan
-/// yana sığmaz; web de dar ekranda iki sütuna iner. Kartlar satır bütçesiyle
-/// eşit boyda; tek kalan kart satırın yarısında durur.
+/// Özet kartı şeridi — yatay kaydırılan tek satır. İki sütunlu ızgara dört
+/// kartı ekranın üçte biri kadar dikey alana yayıyordu; tek satır alanı
+/// yarıya indirir, kartlar sabit genişlikte (``KlinaraStatCard/width``) ve bir
+/// sonraki kartın kenarı görünür kalır — kaydırılabildiğini söyleyen ipucu bu.
+///
+/// Kartlar aynı yükseklikte (satır bütçesi); kaydırma alanı sayfanın yan
+/// boşluklarına taşar (`scrollClipDisabled`) ki kart kenarda kesilmesin.
 struct KlinaraStatStrip: View {
 
     let stats: [KlinaraStat]
     var isLoading = false
 
     var body: some View {
-        Grid(alignment: .topLeading, horizontalSpacing: KlinaraMetrics.sm, verticalSpacing: KlinaraMetrics.sm) {
-            ForEach(Array(stride(from: 0, to: stats.count, by: 2)), id: \.self) { start in
-                GridRow {
-                    KlinaraStatCard(stat: stats[start], isLoading: isLoading)
-                    if start + 1 < stats.count {
-                        KlinaraStatCard(stat: stats[start + 1], isLoading: isLoading)
-                    } else {
-                        Color.clear
-                    }
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(alignment: .top, spacing: KlinaraMetrics.sm) {
+                ForEach(stats) { stat in
+                    KlinaraStatCard(stat: stat, isLoading: isLoading)
+                        .frame(width: KlinaraStatCard.width)
                 }
             }
+            .scrollTargetLayout()
         }
+        .scrollTargetBehavior(.viewAligned)
+        .scrollClipDisabled()
     }
 }
 

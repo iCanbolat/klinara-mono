@@ -18,6 +18,20 @@ export interface NotificationJob {
 }
 
 /**
+ * Meta template parametresi BOŞ olamaz (132000/131008): boş değer mesajın
+ * tamamını düşürür. Adresi ya da konum bağlantısı girilmemiş bir şube bu
+ * yüzden mesajı kaybetmez, alanda tire görünür.
+ */
+export function whatsAppParameter(value: string | undefined): string {
+  return value === undefined || value.trim() === '' ? '-' : value;
+}
+
+/** URL butonunun eki de boş olamaz; adresi olmayan şubede genel bir arama açılır. */
+export function mapsQuery(value: string | undefined): string {
+  return value === undefined || value.trim() === '' ? encodeURIComponent('klinik') : value;
+}
+
+/**
  * Bildirim gönderim worker'ı.
  *
  * İş yalnız KİMLİKLERİ taşır; alıcının adresi ve metin işin kendi
@@ -116,8 +130,17 @@ export class NotificationSenderWorker implements OnModuleInit {
             : {
                 templateName,
                 templateLanguage,
-                parameters: variables.map((name) => message.templateVariables?.[name] ?? ''),
+                parameters: variables.map((name) => whatsAppParameter(message.templateVariables?.[name])),
                 buttonPayloads,
+                ...(standard?.urlButton === undefined
+                  ? {}
+                  : {
+                      urlButton: {
+                        // Quick-reply'lar önce gelir; URL butonu onlardan sonraki sıradadır.
+                        index: standard.quickReplies?.length ?? 0,
+                        suffix: mapsQuery(message.templateVariables?.[standard.urlButton.variable]),
+                      },
+                    }),
               };
       }
 

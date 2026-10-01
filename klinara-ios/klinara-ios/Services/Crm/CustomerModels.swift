@@ -36,32 +36,6 @@ extension Nullable where Value == String {
     }
 }
 
-/// Müşterinin kliniğe nereden geldiği. Sunucudaki `CUSTOMER_SOURCES` ile
-/// birebir; sıra da aynı tutuluyor ki seçicideki düzen sunucu belgesine baksın.
-nonisolated enum CustomerSource: String, Codable, Sendable, CaseIterable, Identifiable {
-    case walkIn = "walk_in"
-    case referral
-    case instagram
-    case google
-    case website
-    case whatsapp
-    case other
-
-    var id: String { rawValue }
-
-    var turkishName: String {
-        switch self {
-        case .walkIn: return "Kapıdan"
-        case .referral: return "Tavsiye"
-        case .instagram: return "Instagram"
-        case .google: return "Google"
-        case .website: return "Web sitesi"
-        case .whatsapp: return "WhatsApp"
-        case .other: return "Diğer"
-        }
-    }
-}
-
 /// Kiracı kapsamlı etiket. Tekillik sunucuda **katlanmış ada** göre:
 /// "VIP", "Vip" ve "vıp" aynı etikettir (Ek G).
 nonisolated struct CustomerTag: Codable, Sendable, Identifiable, Equatable, Hashable {
@@ -111,7 +85,6 @@ nonisolated struct Customer: Codable, Sendable, Identifiable, Equatable {
     let district: String?
     let city: String?
     let postalCode: String?
-    let source: CustomerSource?
     /// Bu kayıt birleştirildiyse hayatta kalan kaydın kimliği. Elinde eski
     /// kimliğe link olan bir istemci nereye gideceğini buradan görüyor.
     let mergedIntoCustomerId: String?
@@ -143,7 +116,6 @@ nonisolated struct Customer: Codable, Sendable, Identifiable, Equatable {
             district: district,
             city: city,
             postalCode: postalCode,
-            source: source,
             mergedIntoCustomerId: mergedIntoCustomerId,
             tags: tags,
             createdAt: createdAt
@@ -180,7 +152,6 @@ nonisolated struct CreateCustomerInput: Encodable, Sendable, Equatable {
     var district: String?
     var city: String?
     var postalCode: String?
-    var source: CustomerSource?
 }
 
 /// Her alan üç durumlu: gönderilmedi / değer / `null`.
@@ -196,11 +167,10 @@ nonisolated struct UpdateCustomerInput: Encodable, Sendable, Equatable {
     var district: Nullable<String> = .unchanged
     var city: Nullable<String> = .unchanged
     var postalCode: Nullable<String> = .unchanged
-    var source: Nullable<CustomerSource> = .unchanged
 
     private enum CodingKeys: String, CodingKey {
         case fullName, phone, email, birthDate, gender, notes
-        case addressLine, district, city, postalCode, source
+        case addressLine, district, city, postalCode
     }
 
     func encode(to encoder: any Encoder) throws {
@@ -215,7 +185,6 @@ nonisolated struct UpdateCustomerInput: Encodable, Sendable, Equatable {
         try container.encode(district, forKey: .district)
         try container.encode(city, forKey: .city)
         try container.encode(postalCode, forKey: .postalCode)
-        try container.encode(source, forKey: .source)
     }
 
     /// Gönderilecek bir şey var mı — boş gövde sunucuda no-op ama gereksiz bir
@@ -225,7 +194,7 @@ nonisolated struct UpdateCustomerInput: Encodable, Sendable, Equatable {
             && phone.isUnchanged && email.isUnchanged
             && birthDate.isUnchanged && notes.isUnchanged
             && addressLine.isUnchanged && district.isUnchanged
-            && city.isUnchanged && postalCode.isUnchanged && source.isUnchanged
+            && city.isUnchanged && postalCode.isUnchanged
     }
 }
 

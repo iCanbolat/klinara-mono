@@ -23,6 +23,26 @@ import type {
 } from './dto/invitation.dto';
 import type { LoginResponseDto } from './dto/auth-response.dto';
 
+/**
+ * Davet e-postasının gövdesi: düz metin her zaman, HTML Resend gibi HTML
+ * gönderen sağlayıcılar için. Bağlantı `link` yalnız bizim ürettiğimiz bir URL
+ * (`APP_BASE_URL` + token), yine de HTML'e kaçışlı yazılır.
+ */
+export function invitationMail(link: string, ttlHours: number): { body: string; html: string } {
+  const safe = link.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  return {
+    body: `Klinara ekibine davet edildiniz.\n\nHesabınızı oluşturmak için: ${link}\nBağlantı ${ttlHours} saat geçerlidir.`,
+    html:
+      `<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:480px;color:#2b2b2b">` +
+      `<h2 style="margin:0 0 12px">Klinara ekibine davet edildiniz</h2>` +
+      `<p style="margin:0 0 20px">Hesabınızı oluşturmak için aşağıdaki düğmeye dokunun.</p>` +
+      `<p style="margin:0 0 20px"><a href="${safe}" style="background:#4a6b5d;color:#fff;` +
+      `text-decoration:none;padding:12px 20px;border-radius:8px;display:inline-block">Hesabımı oluştur</a></p>` +
+      `<p style="margin:0;color:#777;font-size:13px">Bağlantı ${ttlHours} saat geçerlidir. ` +
+      `Bu daveti beklemiyorsanız e-postayı yok sayabilirsiniz.</p></div>`,
+  };
+}
+
 @Injectable()
 export class InvitationsService {
   private readonly ttlHours: number;
@@ -103,7 +123,7 @@ export class InvitationsService {
     await this.mail.send({
       to: email,
       subject: 'Klinara ekibine davet edildiniz',
-      body: `Hesabınızı oluşturmak için: ${link}\nBağlantı ${this.ttlHours} saat geçerlidir.`,
+      ...invitationMail(link, this.ttlHours),
     });
 
     return {
@@ -144,11 +164,7 @@ export class InvitationsService {
 
   /** Davet bağlantısının kullanıcıya gönderilmesi (Faz 1'de loga yazılır). */
   async sendInvitationMail(email: string, link: string, subject: string): Promise<void> {
-    await this.mail.send({
-      to: email,
-      subject,
-      body: `Hesabınızı oluşturmak için: ${link}\nBağlantı ${this.ttlHours} saat geçerlidir.`,
-    });
+    await this.mail.send({ to: email, subject, ...invitationMail(link, this.ttlHours) });
   }
 
   /** Üretim dışında davet token'ı yanıtta da döner (e-posta Batch 8.1'de). */

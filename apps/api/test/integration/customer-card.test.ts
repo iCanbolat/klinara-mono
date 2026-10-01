@@ -29,7 +29,6 @@ interface CustomerBody {
   email: string | null;
   notes: string | null;
   city: string | null;
-  source: string | null;
   mergedIntoCustomerId: string | null;
   tags: TagBody[];
 }
@@ -163,6 +162,34 @@ describe('müşteri kartı (Batch 4.1)', () => {
         }
         cursor = page.pageInfo.nextCursor;
       }
+
+      // 5 yeni + fixture'ın açtığı müşteri.
+      expect(seen.size).toBe(6);
+    });
+
+    it('AYNI mikrosaniyede açılan kayıtlar sayfa sınırında kaybolmaz', async () => {
+      for (let i = 0; i < 5; i += 1) {
+        await addCustomer({ fullName: `Toplu ${i}` });
+      }
+      // Tek INSERT / içe aktarma: hepsi aynı `now()`u paylaşır. Milisaniyenin
+      // altında kesir taşıyan bir zaman, `toISOString()`e kırpılmış bir
+      // cursor'da sonraki sayfaları sessizce boşaltıyordu.
+      await database.ownerPool.query(
+        `update customers set created_at = '2026-09-07 10:00:00.123456+00'`,
+      );
+
+      const seen = new Set<string>();
+      let cursor: string | null = null;
+      do {
+        const res = await http(app)
+          .get('/api/v1/customers')
+          .query(cursor === null ? { limit: 2 } : { limit: 2, cursor })
+          .set(ownerAuth())
+          .expect(200);
+        const page = res.body as CustomerPage;
+        for (const row of page.data) seen.add(row.id);
+        cursor = page.pageInfo.nextCursor;
+      } while (cursor !== null);
 
       // 5 yeni + fixture'ın açtığı müşteri.
       expect(seen.size).toBe(6);

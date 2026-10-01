@@ -29,7 +29,6 @@ import {
  */
 
 const POSTGRES_URL = /^postgres(ql)?:\/\//
-const CLOCK_TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 /** `15m`, `30d`, `900s` — jose'un kabul ettiği süre biçimi. */
 const DURATION =
   /^\d+\s?(s|m|h|d|w|y|sec|secs|second|seconds|min|mins|minute|minutes|hour|hours|day|days|week|weeks|year|years)$/;
@@ -504,7 +503,17 @@ export class EnvironmentVariables {
   @IsNotEmpty()
   APP_BASE_URL: string = 'http://localhost:5173';
 
-  // --- E-posta gönderimi (SMTP) — Batch 8.1 ---
+  // --- E-posta gönderimi (Resend / SMTP) — Batch 8.1 ---
+  /**
+   * Resend API anahtarı. Tanımlıysa e-posta Resend ile gider (SMTP göz ardı edilir);
+   * `MAIL_FROM` Resend'de doğrulanmış bir alan adından olmalı. Personel davetleri ve
+   * parola sıfırlama bu yoldan gider.
+   */
+  @Expose()
+  @IsOptional()
+  @IsString()
+  RESEND_API_KEY?: string;
+
   /**
    * Tanımsızsa e-posta GÖNDERİLMEZ; içerik yalnız loga yazılır.
    *
@@ -545,19 +554,6 @@ export class EnvironmentVariables {
   @IsString()
   @IsNotEmpty()
   MAIL_FROM: string = 'Klinara <bildirim@klinara.local>';
-
-  // --- Bildirim çekirdeği — Batch 8.1 ---
-  /**
-   * Kiracı/şube tercihi yoksa geçerli olan sessiz saat penceresi (şube saati).
-   * Gece yarısını aşan pencere geçerlidir: 22:00–09:00.
-   */
-  @Expose()
-  @Matches(CLOCK_TIME, { message: "'HH:MM' biçiminde olmalı" })
-  NOTIFICATION_QUIET_HOURS_START: string = '21:00';
-
-  @Expose()
-  @Matches(CLOCK_TIME, { message: "'HH:MM' biçiminde olmalı" })
-  NOTIFICATION_QUIET_HOURS_END: string = '09:00';
 
   // --- WhatsApp Cloud API — Batch 8.2 ---
   /**

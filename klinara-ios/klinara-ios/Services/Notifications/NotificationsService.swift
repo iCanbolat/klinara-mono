@@ -1,6 +1,6 @@
 import Foundation
 
-/// Bildirim **yapılandırması**: şablonlar, tercihler ve hatırlatma ayarları
+/// Bildirim **yapılandırması**: şablonlar ve hatırlatma ayarları
 /// (Faz 8.1 / 8.4).
 ///
 /// ``MessagesService`` ve ``WhatsAppService``den ayrı, çünkü izin ailesi farklı.
@@ -22,19 +22,6 @@ protocol NotificationsService: Sendable {
     /// sunucu `422 TEMPLATE_INVALID` döner; ``NotificationEventCatalog`` bunu
     /// kaydete basmadan önce yakalamak için var.
     func upsertTemplate(_ input: UpsertNotificationTemplateInput) async throws -> NotificationTemplate
-
-    /// `GET /notification-preferences` — **çıplak dizi**.
-    ///
-    /// Aynı olay için birden çok satır dönebilir: bir kiracı varsayılanı
-    /// (`branchId == nil`) ve şube başına birer override.
-    func preferences() async throws -> [NotificationPreference]
-
-    /// `PUT /notification-preferences` — `(event, branchId)` anahtarıyla upsert.
-    ///
-    /// Sessiz saatin iki ucundan yalnız biri gönderilirse `VALIDATION_FAILED`.
-    func upsertPreference(
-        _ input: UpsertNotificationPreferenceInput
-    ) async throws -> NotificationPreference
 
     /// `GET /branches/:id/reminder-settings` — şube override'ı yoksa kiracı
     /// ayarı **çözülmüş** olarak döner.
@@ -69,16 +56,6 @@ struct LiveNotificationsService: NotificationsService {
         _ input: UpsertNotificationTemplateInput
     ) async throws -> NotificationTemplate {
         try await client.send(APIRequest.put("notification-templates", body: input))
-    }
-
-    func preferences() async throws -> [NotificationPreference] {
-        try await client.send(APIRequest.get("notification-preferences"))
-    }
-
-    func upsertPreference(
-        _ input: UpsertNotificationPreferenceInput
-    ) async throws -> NotificationPreference {
-        try await client.send(APIRequest.put("notification-preferences", body: input))
     }
 
     func reminderSettings(branchId: String) async throws -> BranchReminderSettings {

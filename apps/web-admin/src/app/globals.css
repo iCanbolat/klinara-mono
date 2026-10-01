@@ -59,6 +59,14 @@
   --warning-soft: color-mix(in oklab, var(--warning) 12%, white);
   --destructive-soft: color-mix(in oklab, var(--destructive) 10%, white);
 
+  /*
+   * Bağlantı ve şablon değişkeni (`@HizmetAdı`) mavisi. iOS `Link.colorset`
+   * ve Android `KlinaraColors.link` ile aynı değer (#2563C9); markanın adaçayı
+   * paletinde mavi olmadığı için ayrı bir token.
+   */
+  --link: #2563c9;
+  --link-soft: color-mix(in oklab, var(--link) 10%, white);
+
   /* Grafik serileri — iOS takvim paletinden, birbirinden ayırt edilebilir sıra. */
   --chart-1: #7f9a76;
   --chart-2: #3f6e8c;
@@ -107,6 +115,8 @@
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-destructive-soft: var(--destructive-soft);
+  --color-link: var(--link);
+  --color-link-soft: var(--link-soft);
   --color-success: var(--success);
   --color-success-soft: var(--success-soft);
   --color-warning: var(--warning);

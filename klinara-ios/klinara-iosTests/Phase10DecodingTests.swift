@@ -131,17 +131,6 @@ struct Phase10DecodingTests {
         #expect(report.cohorts.map(\.withinDays) == [30, 60, 90])
     }
 
-    @Test("Kaynağı girilmemiş müşteri NULL gelir ve etiketlenir")
-    func decodesNullAcquisitionSource() throws {
-        let report = try Fixtures.decode(RetentionReport.self, from: ReportFixtures.retention)
-        let unknown = try #require(report.acquisition.first { $0.source == nil })
-
-        // Kimliksiz satır listede kararlı bir `id` almalı, yoksa ForEach
-        // çakışır.
-        #expect(unknown.id == "__unknown__")
-        #expect(unknown.turkishName == "Belirtilmemiş")
-    }
-
     @Test("Yanıt müşteri KİMLİĞİ taşımıyor")
     func retentionCarriesNoCustomerIds() throws {
         // Rapor toplu bir sayıdır; içinden tek tek müşteriye inilememeli.

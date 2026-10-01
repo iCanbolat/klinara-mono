@@ -39,7 +39,6 @@ export class CrmService {
         cursorCreatedAt: cursor?.sortKey,
         cursorId: cursor?.id,
         tagId: query.tagId,
-        source: query.source,
       });
       return { rows: found, tags: await repo.listTagsForCustomers(tx, found.map((r) => r.id)) };
     });
@@ -94,7 +93,6 @@ export class CrmService {
           district: input.district,
           city: input.city,
           postalCode: input.postalCode,
-          source: input.source,
         }),
       )
       .catch((error: unknown) => {
@@ -126,7 +124,6 @@ export class CrmService {
           district: input.district,
           city: input.city,
           postalCode: input.postalCode,
-          source: input.source,
         });
         if (row === undefined) return undefined;
         return { row, tags: await repo.listTagsForCustomers(tx, [id]) };
@@ -289,7 +286,6 @@ export class CrmService {
       'district',
       'city',
       'postalCode',
-      'source',
     ] as const;
 
     for (const field of fields) {
@@ -403,7 +399,6 @@ export class CrmService {
       district: row.district,
       city: row.city,
       postalCode: row.postalCode,
-      source: row.source,
       mergedIntoCustomerId: row.mergedIntoCustomerId,
       tags: tags.map((tag) => CrmService.toTagResponse(tag)),
       createdAt: row.createdAt.toISOString(),

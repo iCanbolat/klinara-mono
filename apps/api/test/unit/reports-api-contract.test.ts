@@ -5,7 +5,6 @@ import {
   OCCUPANCY_GROUPINGS,
   REPORT_LIMITS,
   REVENUE_GROUPINGS,
-  type AcquisitionRow,
   type CohortReturn,
   type NoShowByOrigin,
   type NoShowReport,
@@ -23,7 +22,6 @@ import {
   type StaffPerformanceRow,
 } from '@klinara/shared';
 import {
-  AcquisitionRowDto,
   CohortReturnDto,
   NoShowByOriginDto,
   NoShowReportDto,
@@ -69,7 +67,6 @@ const _keysNoShowTotals: SameKeys<NoShowTotalsDto, NoShowTotals> = true;
 const _keysNoShowRow: SameKeys<NoShowRowDto, NoShowRow> = true;
 const _keysNoShowByOrigin: SameKeys<NoShowByOriginDto, NoShowByOrigin> = true;
 const _keysNoShowReport: SameKeys<NoShowReportDto, NoShowReport> = true;
-const _keysAcquisition: SameKeys<AcquisitionRowDto, AcquisitionRow> = true;
 const _keysRetentionTotals: SameKeys<RetentionTotalsDto, RetentionTotals> = true;
 const _keysCohort: SameKeys<CohortReturnDto, CohortReturn> = true;
 const _keysRetentionReport: SameKeys<RetentionReportDto, RetentionReport> = true;
@@ -102,7 +99,6 @@ describe('rapor sözleşmesi', () => {
       _keysNoShowRow,
       _keysNoShowByOrigin,
       _keysNoShowReport,
-      _keysAcquisition,
       _keysRetentionTotals,
       _keysCohort,
       _keysRetentionReport,

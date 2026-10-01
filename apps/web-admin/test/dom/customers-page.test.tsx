@@ -47,7 +47,6 @@ const customer = (id: string, name: string) => ({
   district: null,
   city: null,
   postalCode: null,
-  source: null,
   mergedIntoCustomerId: null,
   tags: [],
   createdAt: '2026-01-01T00:00:00Z',

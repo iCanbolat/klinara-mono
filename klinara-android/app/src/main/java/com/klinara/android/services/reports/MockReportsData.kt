@@ -1,7 +1,6 @@
 package com.klinara.android.services.reports
 
 import com.klinara.android.services.catalog.MockCatalogService
-import com.klinara.android.services.crm.CustomerSource
 import com.klinara.android.services.formatting.BranchClock
 import com.klinara.android.services.mock.MockIds
 import com.klinara.android.services.staff.MockStaffService
@@ -98,8 +97,6 @@ internal class MockReportsData(
         return visitsOn(days).filter { branchId == null || it.branchId == branchId }
     }
 
-    fun source(customer: Int): String? = SOURCES[customer % SOURCES.size]?.wire
-
     private fun visitsOn(days: List<LocalDate>): List<Visit> {
         val today = localDate(now())
         return days.filter(::isOpen).flatMap { day ->
@@ -161,17 +158,5 @@ internal class MockReportsData(
         private const val NO_SHOW_EVERY = 9
         private const val CANCEL_EVERY = 13
         private const val CANCEL_REMAINDER = 5
-
-        /** `null` bilerek var: kaynağı girilmemiş müşteri "Belirtilmemiş" satırı olmalı. */
-        private val SOURCES =
-            listOf(
-                CustomerSource.Instagram,
-                CustomerSource.Referral,
-                CustomerSource.WalkIn,
-                null,
-                CustomerSource.Google,
-                CustomerSource.Instagram,
-                CustomerSource.WhatsApp,
-            )
     }
 }

@@ -79,7 +79,10 @@ struct PackageTransferSheet: View {
                 isSelected: { $0.id == targetCustomer?.id },
                 onSelect: { targetCustomer = $0 },
                 searchPrompt: "Müşteri ara",
-                emptyMessage: "Eşleşen müşteri yok."
+                emptyMessage: "Eşleşen müşteri yok.",
+                remoteSearch: { term in
+                    await customerStore.lookup(term).filter { $0.id != package.customerId }
+                }
             )
         }
     }

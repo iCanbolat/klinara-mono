@@ -12,7 +12,6 @@ import { ChannelRegistryService } from './channel-registry.service';
 import { STANDARD_TEMPLATE_BY_EVENT } from '../integrations/whatsapp-standard-templates';
 import { CUSTOMER_CHANNELS, EVENT_DEFINITIONS, isCustomerEvent } from './default-templates';
 import * as repo from './notifications.repository';
-import { isQuietHour, nextSendableInstant } from './quiet-hours';
 import { renderTemplate } from './template-renderer';
 
 export interface EnqueueInput {
@@ -25,7 +24,7 @@ export interface EnqueueInput {
   /** Çift gönderim koruması — aynı anahtarla ikinci satır yazılamaz. */
   dedupeKey?: string;
   scheduledFor?: Date;
-  /** Tercihi ezmek için (tekil, elle gönderim). */
+  /** Olayın varsayılan kanallarını ezmek için (tekil, elle gönderim). */
   channels?: NotificationChannel[];
   locale?: string;
   /**
@@ -44,33 +43,14 @@ export type EnqueueResult =
  * Bildirim üretiminin TEK giriş noktası.
  *
  * Randevu, paket ve finans modülleri kanal, şablon ya da sağlayıcı bilmez;
- * yalnız "şu olay, şu alıcı, şu değişkenler" der. Kanal seçimi,
- * sessiz saat ve çift gönderim koruması burada, tek yerde uygulanır — bu
+ * yalnız "şu olay, şu alıcı, şu değişkenler" der. Kanal seçimi
+ * ve çift gönderim koruması burada, tek yerde uygulanır — bu
  * kontrollerin çağıran başına tekrarlanması, er ya da geç yalnız birinde
  * unutulan bir kontrol demekti.
  *
  * İş, ÇAĞIRANIN transaction'ına yazılır: randevu rollback olursa mesaj da
  * yazılmaz (mimari karar 4.6).
  */
-/**
- * Sessiz saatlere TAKILMAYAN olaylar — hepsi bir eylemin anlık sonucu.
- *
- * - `staff_internal`, `auto_reply`: birini sabaha saklamak bildirimin var olma
- *   sebebini, diğerini saklamak konuşmanın kendisini bozardı.
- * - `appointment_confirmation`, `appointment_cancelled`: müşteri online randevuyu
- *   23:00'te alıyor ve onayı O AN ekranda bekliyor; sabah 09:00'da gelen onay
- *   "randevum alındı mı?" sorusunu bütün gece açık bırakıyordu. İptal de aynı:
- *   sabaha kalan iptal, o sabahki randevuya gelmeye hazırlanan müşteriye geç
- *   kalabilir. Personel "müşteriye bildir"i kapatarak gece mesajını
- *   engelleyebiliyor.
- */
-const IMMEDIATE_EVENTS: ReadonlySet<string> = new Set([
-  'staff_internal',
-  'auto_reply',
-  'appointment_confirmation',
-  'appointment_cancelled',
-]);
-
 @Injectable()
 export class NotificationDispatcherService {
   constructor(
@@ -95,8 +75,7 @@ export class NotificationDispatcherService {
       return { status: 'skipped', reason: 'Alıcı bulunamadı' };
     }
 
-    const preference = await repo.findEffectivePreference(tx, { event: input.event, branchId });
-    const requestedChannels = input.channels ?? preference?.channels ?? definition.channels;
+    const requestedChannels = input.channels ?? definition.channels;
 
     // Müşteriye e-posta GİTMEZ. Kural yeni; kiracıların kayıtlı tercih
     // listeleri hâlâ `email` taşıyor olabilir ve süzülmezse ilk sırada duran
@@ -171,15 +150,7 @@ export class NotificationDispatcherService {
       body: renderTemplate(body, input.variables),
     };
 
-    const requested = input.scheduledFor ?? new Date();
-
-    // --- Sessiz saatler --------------------------------------------------
-    // Yalnız PLANLANMIŞ bildirimler (hatırlatma, gelmeme takibi, paket
-    // bakiyesi) sabaha ertelenir. Bir eylemin anlık sonucu olanlar ertelenmez;
-    // bkz. `IMMEDIATE_EVENTS`.
-    const scheduledFor = IMMEDIATE_EVENTS.has(input.event)
-      ? requested
-      : this.applyQuietHours(requested, await repo.resolveTimezone(tx, branchId), preference);
+    const scheduledFor = input.scheduledFor ?? new Date();
 
     try {
       const row = await repo.insertMessage(tx, {
@@ -253,21 +224,5 @@ export class NotificationDispatcherService {
       phone !== undefined &&
       (await repo.isWhatsAppWindowOpen(tx, phone))
     );
-  }
-
-  private applyQuietHours(
-    requested: Date,
-    timezone: string,
-    preference: repo.NotificationPreferenceRow | undefined,
-  ): Date {
-    const start =
-      preference?.quietHoursStart ??
-      this.config.get('NOTIFICATION_QUIET_HOURS_START', { infer: true });
-    const end =
-      preference?.quietHoursEnd ?? this.config.get('NOTIFICATION_QUIET_HOURS_END', { infer: true });
-
-    const window = { start: (start ?? '21:00').slice(0, 5), end: (end ?? '09:00').slice(0, 5) };
-    if (!isQuietHour(requested, timezone, window)) return requested;
-    return nextSendableInstant(requested, timezone, window);
   }
 }

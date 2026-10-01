@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import { TenantTxService } from '../../database/tenant-tx.service';
+import { RealtimeBusService } from '../../lib/realtime/realtime-bus.service';
 import type { Tx } from '../../database/tenant-tx';
 import type { Principal } from '../identity/principal';
 import { formatAppointmentTime } from './appointment-notifier.service';
@@ -34,11 +35,20 @@ export class StaffNotificationsService {
   constructor(
     private readonly tx: TenantTxService,
     private readonly logger: PinoLogger,
+    private readonly realtime: RealtimeBusService,
   ) {}
 
   async emit(tx: Tx, input: repo.InsertStaffNotification): Promise<void> {
     try {
       await repo.insert(tx, input);
+      // Açık paneller anında haberdar olur. Aynı transaction: commit olmazsa
+      // yayın da olmaz.
+      await this.realtime.publish(tx, {
+        tenantId: input.tenantId,
+        branchId: input.branchId ?? null,
+        type: 'staff_notification',
+        kind: input.kind,
+      });
     } catch (error: unknown) {
       // Bildirim yan üründür: yazılamaması randevuyu ya da gelen mesajı
       // düşürmemeli.

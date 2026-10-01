@@ -124,8 +124,8 @@ export class ReportExportController {
   @HttpCode(HttpStatus.OK)
   @ApiProduces('text/csv')
   @ApiOperation({
-    summary: 'Kazanım kaynağı kırılımını CSV olarak indir',
-    description: 'Dosya kazanım kaynaklarını taşır; kohort oranları ekranda kalır.',
+    summary: 'Kohort geri dönüş oranlarını CSV olarak indir',
+    description: 'Dosya kohort oranlarını taşır; toplamlar ekranda kalır.',
   })
   async retentionExport(
     @CurrentUser() principal: Principal,
@@ -133,7 +133,7 @@ export class ReportExportController {
     @Res({ passthrough: true }) response: Response,
   ): Promise<string> {
     const report = await this.performance.retention(principal, unpaged(query));
-    return send(response, 'kazanim', query, retentionCsv(report), report.acquisition.length);
+    return send(response, 'kazanim', query, retentionCsv(report), report.cohorts.length);
   }
 }
 

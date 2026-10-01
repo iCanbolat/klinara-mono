@@ -37,7 +37,6 @@ interface RetentionReport {
     activeCustomers: number;
     returningRate: number;
   };
-  acquisition: { source: string | null; customers: number }[];
   cohorts: { withinDays: number; returned: number; rate: number }[];
 }
 

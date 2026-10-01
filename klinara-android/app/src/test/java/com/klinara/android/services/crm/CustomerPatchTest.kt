@@ -79,9 +79,9 @@ class CustomerPatchTest {
     @Test
     @DisplayName("Enum alanı `wire` değeriyle yazılır, Kotlin adıyla değil")
     fun enumsUseWireValues() {
-        val body = json(UpdateCustomerInput(source = Patch.Set(CustomerSource.WalkIn)))
+        val body = json(UpdateCustomerInput(gender = CustomerGender.Female))
 
-        assertTrue(body.contains("\"source\":\"walk_in\""))
+        assertTrue(body.contains("\"gender\":\"female\""))
     }
 
     @Test

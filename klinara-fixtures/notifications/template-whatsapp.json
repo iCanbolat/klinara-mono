@@ -16,5 +16,29 @@
   "variables": [
     "customerName",
     "appointmentAt"
+  ],
+  "segments": [
+    {
+      "kind": "text",
+      "text": "Sayın "
+    },
+    {
+      "kind": "variable",
+      "name": "customerName",
+      "handle": "@MüşteriAdı"
+    },
+    {
+      "kind": "text",
+      "text": ", "
+    },
+    {
+      "kind": "variable",
+      "name": "appointmentAt",
+      "handle": "@RandevuZamanı"
+    },
+    {
+      "kind": "text",
+      "text": " randevunuzu hatırlatırız."
+    }
   ]
 }

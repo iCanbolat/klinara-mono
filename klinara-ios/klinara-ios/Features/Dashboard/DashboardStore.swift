@@ -138,9 +138,12 @@ final class DashboardStore {
         }
 
         // Ay sınırı ilk şubenin saatinde — web de tek bir "bu ay" aralığı gönderiyor.
+        // Bitiş YARIN (hariç), ay sonu değil: ayın kalan boş günleri doluluğun
+        // paydasına, henüz gelmemiş randevular gelmeme oranının paydasına girerdi
+        // ve aynı gün web'le farklı sayı çıkardı.
         let clock = BranchClock(branch: active.first)
         let from = clock.startOfMonth(at)
-        let to = clock.adding(months: 1, to: from)
+        let to = clock.adding(days: 1, to: clock.startOfDay(at))
 
         // Şube verilmiyor: sunucu "erişebildiğin tüm şubeler" için hesaplayıp
         // `groupBy=branch` ile satırlara bölüyor.

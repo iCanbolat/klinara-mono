@@ -15,6 +15,11 @@ final class CustomerStore {
 
     private let service: any CustomerService
 
+    /// Liste sayfa boyutu — sunucunun varsayılanıyla (50) aynı ama açıkça
+    /// gönderiliyor: sunucu varsayılanı değişirse kaydırma davranışı sessizce
+    /// değişmesin.
+    static let pageSize = 50
+
     private(set) var state: LoadState<[Customer]> = .loading
     private(set) var isSaving = false
 
@@ -50,7 +55,40 @@ final class CustomerStore {
     var customers: [Customer] { state.value ?? [] }
     var tags: [CustomerTag] { tagState.value ?? [] }
 
-    func customer(id: String) -> Customer? { customers.first { $0.id == id } }
+    /// Kimlikle kayıt. Yalnız sayfalanmış listeye BAKMAZ: arama ya da etiket
+    /// filtresiyle bulunan bir müşteri ilk sayfalarda olmayabilir ve o zaman
+    /// listede görünen kaydın kartı "müşteri bulunamadı" diyordu.
+    func customer(id: String) -> Customer? {
+        customers.first { $0.id == id }
+            ?? searchState?.value?.first { $0.id == id }
+            ?? filteredState?.value?.first { $0.id == id }
+            ?? resolved[id]
+    }
+
+    /// Yüklü listelerin dışında kalıp kimlikle ya da aramayla getirilen kayıtlar
+    /// (randevu akışının seçicisi, randevudan açılan kart).
+    private var resolved: [String: Customer] = [:]
+
+    /// Kayıt elde yoksa sunucudan getirir. `false` = gerçekten yok (arşivlenmiş)
+    /// ya da alınamadı.
+    @discardableResult
+    func resolve(id: String) async -> Bool {
+        if customer(id: id) != nil { return true }
+        guard let found = try? await service.customer(id: id) else { return false }
+        resolved[found.id] = found
+        return true
+    }
+
+    /// Seçiciler için sunucu araması — sonuçlar ``customer(id:)`` için saklanır.
+    /// Hata boş sonuçtur: seçici yerel eşleşmeleri göstermeye devam eder.
+    func lookup(_ term: String) async -> [Customer] {
+        let trimmed = term.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 2, let found = try? await service.search(trimmed, limit: 20) else {
+            return []
+        }
+        for customer in found { resolved[customer.id] = customer }
+        return found
+    }
 
     /// Ekranın çizeceği liste: arama etkinse sonucu, değilse sayfalanmış liste.
     ///
@@ -65,30 +103,62 @@ final class CustomerStore {
     }
 
     /// Arama etkinken "daha fazla yükle" gösterilmez — arama sayfalanmıyor.
-    var canLoadMore: Bool {
-        guard searchState == nil else { return false }
-        return selectedTagId == nil ? nextCursor != nil : filteredCursor != nil
+    var canLoadMore: Bool { loadMoreCursor != nil }
+
+    /// Ekrandaki listenin sıradaki sayfa anahtarı. Liste sonundaki tetikleyici
+    /// buna bağlı: her yeni sayfada DEĞİŞTİĞİ için tetikleyici hâlâ görünürken
+    /// (kısa bir sayfa ekranı doldurmadıysa) bir sonraki sayfa da istenir.
+    var loadMoreCursor: String? {
+        guard searchState == nil else { return nil }
+        return selectedTagId == nil ? nextCursor : filteredCursor
     }
 
     // MARK: Okuma
 
     func load(force: Bool = false) async {
         if !force, state.value != nil { return }
-        state = .loading
-        nextCursor = nil
+        // İlk yüklemede iskelet; yenilemede eldeki liste ekranda kalır.
+        //
+        // Yenilemede `.loading`e dönmek `KlinaraScreen`in ScrollView'unu söküp
+        // iskeleti koyuyordu: aşağı çekerek yenileyen `.refreshable` görevi
+        // bununla birlikte iptal oluyor, iptal edilen istek sessiz hata olarak
+        // `.failed`a düşüyor ve o da iskeleti çizmeye devam ediyordu — yani
+        // liste yükleme durumunda takılı kalıyordu.
+        if state.value == nil { state = .loading }
         do {
-            let page = try await service.customers(cursor: nil, limit: nil, tagId: nil, source: nil)
+            let page = try await service.customers(cursor: nil, limit: Self.pageSize, tagId: nil)
             state = .loaded(page.data)
             nextCursor = page.pageInfo.nextCursor
+        } catch let error as APIError where error.isSilent {
+            // İptal hata DEĞİL; eldeki durum olduğu gibi kalır.
+            return
         } catch {
-            state = .failed(error as? APIError ?? .network)
+            guard !Task.isCancelled else { return }
+            // Yenileme hatası yüklü listeyi düşürmez.
+            if state.value == nil { state = .failed(error as? APIError ?? .network) }
         }
     }
 
+    /// Aşağı çekerek yenileme. Görünen liste hangisiyse onu yerinde tazeler:
+    /// etiket filtresi açıkken yalnız süzülmemiş listeyi çekmek ekrandaki
+    /// listeyi hiç değiştirmezdi.
     func reload() async {
         async let list: Void = load(force: true)
+        async let filtered: Void = refreshFiltered()
         async let stats: Void = loadSummary()
-        _ = await (list, stats)
+        _ = await (list, filtered, stats)
+    }
+
+    private func refreshFiltered() async {
+        guard let tagId = selectedTagId else { return }
+        do {
+            let page = try await service.customers(cursor: nil, limit: Self.pageSize, tagId: tagId)
+            guard selectedTagId == tagId else { return }
+            filteredState = .loaded(page.data)
+            filteredCursor = page.pageInfo.nextCursor
+        } catch {
+            // Yenileme hatası eldeki filtreli listeyi düşürmez.
+        }
     }
 
     func loadSummary() async {
@@ -109,9 +179,8 @@ final class CustomerStore {
         do {
             let page = try await service.customers(
                 cursor: cursor,
-                limit: nil,
-                tagId: nil,
-                source: nil
+                limit: Self.pageSize,
+                tagId: nil
             )
             state = .loaded(customers + page.data)
             nextCursor = page.pageInfo.nextCursor
@@ -136,7 +205,7 @@ final class CustomerStore {
         filteredState = .loading
         filterTask = Task { [service] in
             do {
-                let page = try await service.customers(cursor: nil, limit: nil, tagId: next, source: nil)
+                let page = try await service.customers(cursor: nil, limit: Self.pageSize, tagId: next)
                 guard !Task.isCancelled, self.selectedTagId == next else { return }
                 self.filteredState = .loaded(page.data)
                 self.filteredCursor = page.pageInfo.nextCursor
@@ -158,7 +227,7 @@ final class CustomerStore {
         isLoadingMore = true
         defer { isLoadingMore = false }
         do {
-            let page = try await service.customers(cursor: cursor, limit: nil, tagId: tagId, source: nil)
+            let page = try await service.customers(cursor: cursor, limit: Self.pageSize, tagId: tagId)
             guard selectedTagId == tagId else { return }
             filteredState = .loaded(loaded + page.data)
             filteredCursor = page.pageInfo.nextCursor
@@ -317,6 +386,7 @@ final class CustomerStore {
     }
 
     private func replace(_ customer: Customer) {
+        if resolved[customer.id] != nil { resolved[customer.id] = customer }
         state = .loaded(customers.map { $0.id == customer.id ? customer : $0 })
         if let filtered = filteredState?.value {
             filteredState = .loaded(filtered.map { $0.id == customer.id ? customer : $0 })
@@ -327,6 +397,7 @@ final class CustomerStore {
     }
 
     private func remove(_ id: String) {
+        resolved[id] = nil
         state = .loaded(customers.filter { $0.id != id })
         if let filtered = filteredState?.value {
             filteredState = .loaded(filtered.filter { $0.id != id })

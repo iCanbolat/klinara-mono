@@ -7,6 +7,7 @@ import { PERMISSIONS, isAppointmentStatus } from '@klinara/shared';
 import { t } from '@/i18n/tr';
 import { cn } from '@/lib/cn';
 import { formatTime } from '@/lib/calendar/date';
+import { appointmentHref } from '@/lib/calendar/deeplink';
 import { STATUS_LABEL } from '@/lib/calendar/status';
 import {
   availableBranchMetrics,
@@ -267,8 +268,9 @@ function UpcomingCard({
                 <button
                   type="button"
                   onClick={() => {
+                    // Şube önce: takvim açıldığında doğru şubenin gününü okusun.
                     setBranchId(row.branchId);
-                    router.push('/takvim');
+                    router.push(appointmentHref(row.entry, row.timezone));
                   }}
                   className="grid w-full grid-cols-[3.5rem_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-1 py-2.5 text-left transition-colors hover:bg-accent/50"
                 >

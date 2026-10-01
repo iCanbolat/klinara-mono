@@ -40,7 +40,6 @@ fun MessageLogHost(
     MessageLogScreen(
         state = state,
         clock = clock,
-        onStatus = viewModel::setStatus,
         onToggleStatus = viewModel::toggleStatus,
         onEvent = viewModel::toggleEvent,
         onClearFilters = viewModel::clearFilters,
@@ -127,80 +126,20 @@ fun NotificationTemplateEditorHost(
     val canWrite = session.can(Permissions.NOTIFICATION_MANAGE)
     val viewModel: NotificationTemplateEditorViewModel =
         viewModel(
-            key = "template-editor-$rowId",
-            factory = NotificationTemplateEditorViewModel.factory(container, row.template),
+            key = "template-editor-$rowId-${session.activeBranchId}",
+            factory = NotificationTemplateEditorViewModel.factory(container, row.template, session.activeBranchId),
         )
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val back = rememberUnsavedChangesGuard(isDirty = canWrite && state.form.isDirty && !state.saved, onLeave = onBack)
+    val back = rememberUnsavedChangesGuard(
+            isDirty = canWrite && (state.form.isDirty) && !state.saved,
+            onLeave = onBack,
+        )
 
     LaunchedEffect(state.saved) { if (state.saved) onBack() }
 
     NotificationTemplateEditorScreen(
         state = state,
         row = row,
-        canWrite = canWrite,
-        onUpdate = viewModel::update,
-        onSave = viewModel::save,
-        onDismissError = viewModel::dismissError,
-        onBack = back,
-        modifier = modifier,
-    )
-}
-
-@Composable
-fun NotificationPreferenceListHost(
-    session: AppSession,
-    container: ServiceContainer,
-    owner: ViewModelStoreOwner,
-    onOpen: (String) -> Unit,
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier,
-    trailing: @Composable (RowScope.() -> Unit)? = null,
-) {
-    val viewModel = preferencesViewModel(container, owner)
-    val preferences by viewModel.preferences.collectAsStateWithLifecycle()
-    LaunchedEffect(Unit) { viewModel.load() }
-    NotificationPreferenceListScreen(
-        preferences = preferences,
-        branch = session.activeBranch,
-        onOpen = onOpen,
-        onRetry = viewModel::load,
-        onBack = onBack,
-        modifier = modifier,
-        trailing = trailing,
-    )
-}
-
-@Composable
-fun NotificationPreferenceEditorHost(
-    session: AppSession,
-    container: ServiceContainer,
-    owner: ViewModelStoreOwner,
-    rowId: String,
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val list = preferencesViewModel(container, owner)
-    val preference = remember(rowId) { list.preference(rowId) }
-    if (preference == null) {
-        LaunchedEffect(Unit) { onBack() }
-        return
-    }
-    val canWrite = session.can(Permissions.NOTIFICATION_MANAGE)
-    val viewModel: NotificationPreferenceEditorViewModel =
-        viewModel(
-            key = "preference-editor-$rowId-${session.activeBranchId}",
-            factory = NotificationPreferenceEditorViewModel.factory(container, preference, session.activeBranchId),
-        )
-    val state by viewModel.state.collectAsStateWithLifecycle()
-    val back = rememberUnsavedChangesGuard(isDirty = canWrite && state.draft.isDirty && !state.saved, onLeave = onBack)
-
-    LaunchedEffect(state.saved) { if (state.saved) onBack() }
-
-    NotificationPreferenceEditorScreen(
-        state = state,
-        preference = preference,
-        branch = session.activeBranch,
         canWrite = canWrite,
         onUpdate = viewModel::update,
         onSave = viewModel::save,
@@ -269,15 +208,4 @@ private fun templatesViewModel(
         viewModelStoreOwner = owner,
         key = "notification-templates",
         factory = NotificationTemplatesViewModel.factory(container),
-    )
-
-@Composable
-private fun preferencesViewModel(
-    container: ServiceContainer,
-    owner: ViewModelStoreOwner,
-): NotificationPreferencesViewModel =
-    viewModel(
-        viewModelStoreOwner = owner,
-        key = "notification-preferences",
-        factory = NotificationPreferencesViewModel.factory(container),
     )

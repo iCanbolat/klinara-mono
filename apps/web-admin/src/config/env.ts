@@ -58,6 +58,12 @@ export const publicEnv = {
   adminOrigin: (process.env.NEXT_PUBLIC_ADMIN_ORIGIN ?? '').replace(/\/$/, ''),
   /** Varlık galerisinin URL kökü; `storageKey` ile birleştirilir. */
   assetBaseUrl: (process.env.NEXT_PUBLIC_ASSET_BASE_URL ?? '').replace(/\/$/, ''),
+  /**
+   * Anlık olay soketinin adresi. BOŞ = aynı origin (`/api/realtime`, Next
+   * API'ye aktarır). Yalnız kenar proxy'si soketi doğrudan API'ye
+   * yönlendiriyorsa tam bir `wss://` adresi verilir.
+   */
+  realtimeUrl: process.env.NEXT_PUBLIC_REALTIME_URL ?? '',
 } as const;
 
 export const isProduction = serverEnv.nodeEnv === 'production';

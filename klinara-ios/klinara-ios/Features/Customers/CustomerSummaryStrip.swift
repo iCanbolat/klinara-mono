@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Müşteriler listesinin üstündeki kompakt özet: tek kart, dört sütun.
 ///
-/// Dashboard'daki 2×2 ``KlinaraStatStrip`` burada BİLEREK kullanılmıyor —
+/// Dashboard'daki büyük ``KlinaraStatStrip`` burada BİLEREK kullanılmıyor —
 /// listenin asıl içerik olduğu bir ekranda dört büyük kart ilk ekranı
 /// yutardı. `summary == nil` iken sayılar yer tutucuyla çizilir; kart boyu
 /// yükleme bitince değişmez.

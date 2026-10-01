@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Bildirim şablonları — olay ve kanal başına mesaj metni.
+/// Bildirim şablonları — müşteriye giden mesajlar ve açık/kapalı durumları.
 ///
 /// Liste **olaya göre gruplu**: kanal kanal düz bir sıra, "randevu hatırlatması
 /// hangi metinle gidiyor?" sorusunu üç ayrı satıra bölerdi. Kullanıcı olayı
@@ -23,7 +23,7 @@ struct NotificationTemplateListView: View {
             VStack(alignment: .leading, spacing: KlinaraMetrics.lg) {
                 if let store {
                     if !canWrite {
-                        Text("Şablonları görüntüleyebilirsiniz; değiştirmek için bildirim yönetimi izni gerekir.")
+                        Text("Mesajları görüntüleyebilirsiniz; açıp kapatmak için bildirim yönetimi izni gerekir.")
                             .klinaraText(.bodyM)
                             .foregroundStyle(KlinaraColor.charcoalMuted)
                             .fixedSize(horizontal: false, vertical: true)
@@ -101,34 +101,18 @@ struct NotificationTemplateListView: View {
 
                     Spacer(minLength: 0)
 
-                    if template.isDefault {
-                        KlinaraBadge(text: "Varsayılan", tone: .muted)
-                    }
                     if !template.isActive {
-                        KlinaraBadge(text: "Pasif", tone: .warning)
-                    }
-                    // Sağlayıcısı olmayan kanallar (push) kaydedilebilir
-                    // ama gönderim yapmaz; şablonu düzenleyip mesajın neden
-                    // gitmediğini aramak kullanıcının işi olmamalı.
-                    if !template.channel.isDeliverable {
-                        KlinaraBadge(text: "Kanal kurulu değil", tone: .muted)
+                        KlinaraBadge(text: "Kapalı", tone: .warning)
                     }
                 }
 
-                Text(template.body.isEmpty ? "(metin yok)" : template.body)
+                Text(template.segments.isEmpty ? AttributedString("(metin yok)") : template.segments.attributed())
                     .klinaraText(.bodyM)
                     .font(.footnote)
                     .foregroundStyle(KlinaraColor.charcoalMuted)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
-
-                if let name = template.whatsappTemplateName {
-                    Text("Meta şablonu: \(name)")
-                        .klinaraText(.bodyM)
-                        .font(.footnote)
-                        .foregroundStyle(KlinaraColor.charcoalMuted)
-                }
             }
             .padding(KlinaraMetrics.md)
             .contentShape(.rect)

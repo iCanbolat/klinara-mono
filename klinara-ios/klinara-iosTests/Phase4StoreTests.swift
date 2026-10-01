@@ -14,9 +14,9 @@ struct CustomerSearchAndTagTests {
         let graph = MockGraph(scenario: .busyDay)
 
         // Sunucudaki `klinara_fold_tr()` ile aynı harita: aynı sorguya aynı cevap.
-        #expect(try await graph.customers.search("YILMAZ", limit: nil).count == 1)
-        #expect(try await graph.customers.search("yilmaz", limit: nil).count == 1)
-        #expect(try await graph.customers.search("ayse", limit: nil).count == 1)
+        #expect(try await graph.customers.search("AYDIN", limit: nil).count == 1)
+        #expect(try await graph.customers.search("aydin", limit: nil).count == 1)
+        #expect(try await graph.customers.search("sule", limit: nil).count == 1)
         // Telefon rakama indirgenip aranıyor: biçimli yazım da bulmalı.
         #expect(try await graph.customers.search("0532 111 22 33", limit: nil).count == 1)
     }
@@ -34,14 +34,14 @@ struct CustomerSearchAndTagTests {
         let graph = MockGraph(scenario: .busyDay)
 
         let first = try await graph.customers.customers(
-            cursor: nil, limit: 2, tagId: nil, source: nil
+            cursor: nil, limit: 2, tagId: nil
         )
         #expect(first.data.count == 2)
         #expect(first.pageInfo.hasMore)
 
         let cursor = try #require(first.pageInfo.nextCursor)
         let second = try await graph.customers.customers(
-            cursor: cursor, limit: 2, tagId: nil, source: nil
+            cursor: cursor, limit: 2, tagId: nil
         )
 
         // Ofsetle sayfalasaydık araya giren bir kayıt birini iki kez gösterirdi.

@@ -24,6 +24,8 @@ export interface OutboundMessage {
         parameters?: string[] | undefined;
         /** Hızlı yanıt butonlarının tek kullanımlık token'ları, buton sırasıyla. */
         buttonPayloads?: string[] | undefined;
+        /** Dinamik URL butonunun eki (ör. kodlanmış adres). */
+        urlButton?: { index: number; suffix: string } | undefined;
       }
     | undefined;
 }
@@ -64,6 +66,7 @@ export class ChannelRegistryService {
           templateLanguage: message.whatsapp?.templateLanguage,
           parameters: message.whatsapp?.parameters,
           buttonPayloads: message.whatsapp?.buttonPayloads,
+          urlButton: message.whatsapp?.urlButton,
         });
         return { provider: 'whatsapp', providerMessageId: result.messageId };
       }

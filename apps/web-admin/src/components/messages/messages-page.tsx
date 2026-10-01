@@ -243,6 +243,15 @@ function AppointmentActions({
         appointmentId={appointmentId}
         timezone={branch?.timezone ?? 'Europe/Istanbul'}
         services={catalog?.services ?? []}
+        customer={
+          conversation?.customer == null
+            ? null
+            : {
+                id: conversation.customer.id,
+                name: conversation.customer.fullName,
+                phone: conversation.phone,
+              }
+        }
         onClose={onCloseAppointment}
         onChanged={onChanged}
       />

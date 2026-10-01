@@ -53,8 +53,8 @@ struct CalendarStoreTests {
         let entry = try #require(store.entries.first)
         #expect(entry.id == created.id)
         // Müşteri adı detay yanıtında yok; önbellekten kurulmuş olmalı.
-        #expect(entry.customerName == "Ayşe Yılmaz")
-        #expect(entry.serviceSummary == "Bölgesel Lazer Epilasyon")
+        #expect(entry.customerName == "Şule Aydın")
+        #expect(entry.serviceSummary == "Ortodonti Kontrolü")
     }
 
     @Test("Çakışma hatası çağırana ulaşır ve liste bozulmaz")
@@ -229,6 +229,42 @@ struct CustomerStoreTests {
         #expect(store.customers == first)
     }
 
+    @Test("Yenileme iptal edilince ya da düşünce yüklü liste korunur (yükleme durumunda takılmaz)")
+    func refreshFailureKeepsLoadedList() async {
+        let graph = MockGraph(scenario: .busyDay)
+        let flaky = FlakyCustomerService(base: graph.customers)
+        let store = CustomerStore(service: flaky)
+        await store.load()
+        let loaded = store.customers
+        #expect(!loaded.isEmpty)
+
+        // Aşağı çekerek yenileme, `.refreshable` görevi iptal edilince böyle biter.
+        flaky.failure = .cancelled
+        await store.reload()
+        #expect(store.state.value == loaded)
+
+        flaky.failure = .network
+        await store.reload()
+        #expect(store.state.value == loaded)
+
+        // Düzelince yenileme yine çalışır.
+        flaky.failure = nil
+        await store.reload()
+        #expect(store.state.value == loaded)
+    }
+
+    @Test("İlk yükleme hatası listeyi hata durumuna düşürür")
+    func initialFailureIsShown() async {
+        let graph = MockGraph(scenario: .busyDay)
+        let flaky = FlakyCustomerService(base: graph.customers)
+        flaky.failure = .network
+        let store = CustomerStore(service: flaky)
+
+        await store.load()
+
+        #expect(store.state.error != nil)
+    }
+
     @Test("Mükerrer telefon 409 verir ve liste değişmez")
     func rejectsDuplicatePhone() async throws {
         let graph = MockGraph(scenario: .busyDay)
@@ -290,7 +326,7 @@ struct CustomerStoreTests {
             UpdateCustomerInput(notes: .set("Cilt hassasiyeti"))
         )
         #expect(touched.notes == "Cilt hassasiyeti")
-        #expect(touched.email == "ayse@ornek.test")
+        #expect(touched.email == "sule@ornek.test")
         #expect(touched.phone == "+905321112233")
 
         // Şimdi e-postayı açıkça temizle.
@@ -349,4 +385,38 @@ struct CustomerStoreTests {
         #expect(zeynep?.matches("0532 777") == true)  // biçimli telefon
         #expect(zeynep?.matches("bulunamaz") == false)
     }
+}
+
+
+/// Sayfa isteğini isteğe bağlı olarak düşüren sarmalayıcı: yenileme hatalarını
+/// (özellikle iptal) taklit etmek için.
+private final class FlakyCustomerService: CustomerService, @unchecked Sendable {
+
+    let base: any CustomerService
+    /// Yalnız ana aktörden yazılıyor; testler sıralı.
+    var failure: APIError?
+
+    init(base: any CustomerService) { self.base = base }
+
+    func customers(cursor: String?, limit: Int?, tagId: String?) async throws -> Page<Customer> {
+        if let failure { throw failure }
+        return try await base.customers(cursor: cursor, limit: limit, tagId: tagId)
+    }
+
+    func search(_ term: String, limit: Int?) async throws -> [Customer] { try await base.search(term, limit: limit) }
+    func summary() async throws -> CustomerSummary { try await base.summary() }
+    func customer(id: String) async throws -> Customer { try await base.customer(id: id) }
+    func create(_ input: CreateCustomerInput) async throws -> Customer { try await base.create(input) }
+    func update(id: String, _ input: UpdateCustomerInput) async throws -> Customer { try await base.update(id: id, input) }
+    func archive(id: String) async throws -> Customer { try await base.archive(id: id) }
+    func replaceTags(customerId: String, tagIds: [String]) async throws -> Customer {
+        try await base.replaceTags(customerId: customerId, tagIds: tagIds)
+    }
+    func merge(into targetId: String, sourceId: String) async throws -> CustomerMergeResult {
+        try await base.merge(into: targetId, sourceId: sourceId)
+    }
+    func tags() async throws -> [CustomerTag] { try await base.tags() }
+    func createTag(_ input: CustomerTagInput) async throws -> CustomerTag { try await base.createTag(input) }
+    func updateTag(id: String, _ input: CustomerTagInput) async throws -> CustomerTag { try await base.updateTag(id: id, input) }
+    func deleteTag(id: String) async throws { try await base.deleteTag(id: id) }
 }

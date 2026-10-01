@@ -192,7 +192,7 @@ nonisolated struct CalendarEntry: Codable, Sendable, Identifiable, Equatable {
     let totalMinor: Int
     let services: [CalendarEntryServiceLine]
 
-    /// Satırda gösterilecek hizmet özeti: "Tüm Vücut Lazer + Bölgesel Lazer".
+    /// Satırda gösterilecek hizmet özeti: "Kanal Tedavisi + Ortodonti Kontrolü".
     var serviceSummary: String {
         services.sorted { $0.sortOrder < $1.sortOrder }
             .map(\.serviceName)

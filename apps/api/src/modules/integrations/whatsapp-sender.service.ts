@@ -19,6 +19,7 @@ export interface WhatsAppOutbound {
   /** Meta'nın konumsal parametreleri, sırayla. */
   parameters?: string[] | undefined;
   buttonPayloads?: string[] | undefined;
+  urlButton?: { index: number; suffix: string } | undefined;
   /** AUTHENTICATION template'inin kopyalama butonuna giden kod. */
   copyCode?: string | undefined;
 }
@@ -67,6 +68,7 @@ export class WhatsAppSenderService {
         ...(message.buttonPayloads !== undefined
           ? { buttonPayloads: message.buttonPayloads }
           : {}),
+        ...(message.urlButton !== undefined ? { urlButton: message.urlButton } : {}),
         ...(message.copyCode !== undefined ? { copyCode: message.copyCode } : {}),
       });
     }

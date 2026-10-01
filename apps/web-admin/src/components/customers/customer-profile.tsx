@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react';
-import type { Customer, CustomerGender, CustomerSource } from '@klinara/shared';
+import type { Customer, CustomerGender } from '@klinara/shared';
 import { t, type MessageKey } from '@/i18n/tr';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
+import { cn } from '@/lib/cn';
 import { Separator } from '@/components/ui/separator';
 import { formatCalendarDay, formatDate } from '@/lib/customers/format';
 
@@ -13,16 +14,6 @@ export const GENDER_LABEL: Record<CustomerGender, MessageKey> = {
   undisclosed: 'customers.gender.undisclosed',
 };
 
-export const SOURCE_LABEL: Record<CustomerSource, MessageKey> = {
-  walk_in: 'customers.source.walk_in',
-  referral: 'customers.source.referral',
-  instagram: 'customers.source.instagram',
-  google: 'customers.source.google',
-  website: 'customers.source.website',
-  whatsapp: 'customers.source.whatsapp',
-  other: 'customers.source.other',
-};
-
 /**
  * Müşteri künyesi — kartın sol sütunu.
  *
@@ -30,13 +21,19 @@ export const SOURCE_LABEL: Record<CustomerSource, MessageKey> = {
  * yok" ile "bu ekranda e-posta alanı yok"u ayırt edilemez yapardı ve eksik
  * bilgiyi tamamlama ihtiyacı görünmez kalırdı.
  */
-export function CustomerProfile({ customer }: { customer: Customer }): ReactNode {
+export function CustomerProfile({
+  customer,
+  className,
+}: {
+  customer: Customer;
+  className?: string;
+}): ReactNode {
   const address = [customer.addressLine, customer.district, customer.city, customer.postalCode]
     .filter((part): part is string => part !== null && part.trim() !== '')
     .join(', ');
 
   return (
-    <Card className="flex flex-col gap-5">
+    <Card className={cn('flex flex-col gap-5', className)}>
       <Section title={t('customers.profile.contact')}>
         <Row label={t('customers.phone')} value={customer.phone} numeric />
         <Row label={t('customers.email')} value={customer.email} />
@@ -53,10 +50,6 @@ export function CustomerProfile({ customer }: { customer: Customer }): ReactNode
         <Row
           label={t('customers.profile.gender')}
           value={customer.gender === null ? null : t(GENDER_LABEL[customer.gender])}
-        />
-        <Row
-          label={t('customers.source')}
-          value={customer.source === null ? null : t(SOURCE_LABEL[customer.source])}
         />
         <Row label={t('customers.profile.since')} value={formatDate(customer.createdAt)} />
       </Section>

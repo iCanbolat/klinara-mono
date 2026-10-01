@@ -3,13 +3,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Conversation, ConversationPage } from '@klinara/shared';
 import { api } from '@/lib/api/client';
+import { onMessageEvent } from '@/lib/messages/message-events';
 import { toMessage } from '@/lib/reports/errors';
 
 export type ConversationFilter = 'open' | 'unread' | 'closed';
 
 /**
- * Liste yoklaması. WebSocket yok: sunucuda yayın altyapısı yok ve resepsiyon
- * ekranı için 15 saniyelik gecikme kabul edilebilir. Sekme gizliyken yoklama
+ * Liste yoklaması — güvenlik ağı. Gelen mesaj soket üzerinden anında
+ * tazeletiyor (`message-events`); yoklama soketin kopuk olduğu anları ve
+ * bildirim üretmeyen değişiklikleri kapatıyor. Sekme gizliyken yoklama
  * DURUYOR — açık unutulmuş bir sekme gün boyu istek atmasın.
  */
 const LIST_POLL_MS = 15_000;
@@ -93,6 +95,9 @@ export function useConversations(filter: ConversationFilter): ConversationsState
       document.removeEventListener('visibilitychange', onVisible);
     };
   }, [reload]);
+
+  // Gelen mesaj bildirimi → liste hemen tazelenir.
+  useEffect(() => onMessageEvent(reload), [reload]);
 
   const loadingMoreRef = useRef(false);
   const loadMore = useCallback(() => {

@@ -25,9 +25,12 @@ vi.mock('@/lib/api/client', () => ({
   SessionExpiredError,
 }));
 
+const replace = vi.fn();
+let searchParams = new URLSearchParams();
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: vi.fn(), replace }),
   usePathname: () => '/takvim',
+  useSearchParams: () => searchParams,
 }));
 
 const setBranchId = vi.fn();
@@ -112,6 +115,8 @@ describe('takvim ekranı', () => {
     permissions = [PERMISSIONS.APPOINTMENT_READ_ALL, PERMISSIONS.APPOINTMENT_WRITE];
     window.localStorage.clear();
     setBranchId.mockReset();
+    replace.mockReset();
+    searchParams = new URLSearchParams();
     mockRoutes();
   });
 
@@ -267,5 +272,50 @@ describe('takvim ekranı', () => {
     } finally {
       Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });
     }
+  });
+
+  describe('derin bağlantı (dashboard → takvim)', () => {
+    const OTHER_DAY = '2026-11-16';
+
+    it('`gun` ve `randevu` verilince O günü istiyor ve paneli açıyor', async () => {
+      searchParams = new URLSearchParams({ gun: OTHER_DAY, randevu: 'a1' });
+      get.mockImplementation((path: string) => {
+        if (path.startsWith('calendar/')) return Promise.resolve(CALENDAR);
+        if (path === 'appointments/a1') return Promise.reject(new Error('ayrıntı testi değil'));
+        return Promise.resolve({ data: [] });
+      });
+      render(<CalendarPage />);
+
+      await waitFor(() => {
+        const call = get.mock.calls.map((c) => String(c[0])).find((p) => p.startsWith('calendar/'));
+        expect(call).toBeDefined();
+        const params = new URLSearchParams(call?.split('?')[1]);
+        expect(call).toMatch(/^calendar\/day\?/);
+        expect(params.get('date')).toBe(OTHER_DAY);
+      });
+      // Bugünün verisi hiç istenmedi: ilk çizim zaten hedef günle yapıldı.
+      expect(
+        get.mock.calls.some((c) => String(c[0]).includes(`date=${TODAY}`)),
+      ).toBe(false);
+      await waitFor(() => {
+        expect(get.mock.calls.some((c) => c[0] === 'appointments/a1')).toBe(true);
+      });
+    });
+
+    it('parametreler tüketilince adres çubuğundan siliniyor', async () => {
+      searchParams = new URLSearchParams({ gun: OTHER_DAY, randevu: 'a1' });
+      render(<CalendarPage />);
+      await waitFor(() => {
+        expect(replace).toHaveBeenCalledWith('/takvim', { scroll: false });
+      });
+    });
+
+    it('bozuk `gun` yok sayılıyor: bugünle açılıyor, panel açılmıyor', async () => {
+      searchParams = new URLSearchParams({ gun: '2026-02-31' });
+      render(<CalendarPage />);
+      await screen.findByText('Ayşe Yılmaz');
+      expect(get.mock.calls.some((c) => String(c[0]).includes(`date=${TODAY}`))).toBe(true);
+      expect(get.mock.calls.some((c) => String(c[0]).startsWith('appointments/'))).toBe(false);
+    });
   });
 });

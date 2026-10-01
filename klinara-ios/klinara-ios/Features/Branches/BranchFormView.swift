@@ -6,8 +6,8 @@ import SwiftUI
 ///   Oluşturulduktan sonra değişmez ve salt okunur gösterilir.
 /// - Pasife almak geri alınabilir ama etkisi büyük: kaydederken ayrıca onay
 ///   sorulur. Aktif etmek sorulmaz.
-/// - `PATCH` yalnız değişen alanları gönderir; boşaltılan telefon/adres
-///   `null` ile temizlenir.
+/// - `PATCH` yalnız değişen alanları gönderir; boşaltılan telefon/adres/harita
+///   bağlantısı `null` ile temizlenir.
 struct BranchFormView: View {
 
     let session: AppSession
@@ -23,6 +23,7 @@ struct BranchFormView: View {
     @State private var timezone = "Europe/Istanbul"
     @State private var phone = ""
     @State private var address = ""
+    @State private var mapsUrl = ""
     @State private var isActive = true
     @State private var error: APIError?
     @State private var isSaving = false
@@ -39,6 +40,7 @@ struct BranchFormView: View {
     private var canSave: Bool {
         !name.trimmingCharacters(in: .whitespaces).isEmpty
             && (!isCreate || BranchSlug.isValid(slug))
+            && mapsUrlHint == nil
             && isDirty
     }
 
@@ -111,6 +113,13 @@ struct BranchFormView: View {
                         error: error?.fieldErrors["address"],
                         autocapitalization: .sentences
                     )
+                    KlinaraTextField(
+                        label: "Google Maps bağlantısı",
+                        text: $mapsUrl,
+                        placeholder: "https://maps.app.goo.gl/…",
+                        error: error?.fieldErrors["mapsUrl"] ?? mapsUrlHint,
+                        keyboardType: .URL
+                    )
                 }
                 .padding(KlinaraMetrics.md)
             }
@@ -142,6 +151,13 @@ struct BranchFormView: View {
         return "3–50 karakter; küçük harf, rakam ve tire."
     }
 
+    /// Bağlantı müşteriye giden mesaja yazılır: yalnız https kabul edilir.
+    private var mapsUrlHint: String? {
+        let trimmed = mapsUrl.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty, !BranchMapsLink.isValid(trimmed) else { return nil }
+        return "https:// ile başlayan bir bağlantı olmalı."
+    }
+
     private var timeZones: [String] {
         var zones = ["Europe/Istanbul"]
         if !zones.contains(timezone) { zones.append(timezone) }
@@ -158,6 +174,7 @@ struct BranchFormView: View {
         timezone = branch.timezone
         phone = branch.phone ?? ""
         address = branch.address ?? ""
+        mapsUrl = branch.mapsUrl ?? ""
         isActive = branch.isActive
     }
 
@@ -168,6 +185,7 @@ struct BranchFormView: View {
         if timezone != branch.timezone { input.timezone = timezone }
         if phone.trimmingCharacters(in: .whitespaces) != (branch.phone ?? "") { input.phone = .text(phone) }
         if address.trimmingCharacters(in: .whitespaces) != (branch.address ?? "") { input.address = .text(address) }
+        if mapsUrl.trimmingCharacters(in: .whitespaces) != (branch.mapsUrl ?? "") { input.mapsUrl = .text(mapsUrl) }
         if isActive != branch.isActive { input.isActive = isActive }
         return input
     }
@@ -191,12 +209,14 @@ struct BranchFormView: View {
             } else {
                 let trimmedPhone = phone.trimmingCharacters(in: .whitespaces)
                 let trimmedAddress = address.trimmingCharacters(in: .whitespaces)
+                let trimmedMaps = mapsUrl.trimmingCharacters(in: .whitespaces)
                 result = try await session.services.branches.create(CreateBranchInput(
                     slug: slug,
                     name: name.trimmingCharacters(in: .whitespaces),
                     timezone: timezone,
                     phone: trimmedPhone.isEmpty ? nil : trimmedPhone,
-                    address: trimmedAddress.isEmpty ? nil : trimmedAddress
+                    address: trimmedAddress.isEmpty ? nil : trimmedAddress,
+                    mapsUrl: trimmedMaps.isEmpty ? nil : trimmedMaps
                 ))
             }
             onSaved(result)

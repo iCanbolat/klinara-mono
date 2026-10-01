@@ -19,6 +19,8 @@ export interface AppointmentSummary {
   startsAt: Date;
   customerName: string;
   branchName: string;
+  branchAddress: string | null;
+  branchMapsUrl: string | null;
   branchTimezone: string;
   serviceNames: string[];
 }
@@ -30,7 +32,8 @@ export async function findAppointmentSummary(
   const result = await tx.execute<Record<string, unknown>>(sql`
     select a.id, a.branch_id, a.customer_id, a.status::text as status, a.starts_at,
            c.full_name as customer_name,
-           b.name as branch_name, b.timezone as branch_timezone,
+           b.name as branch_name, b.address as branch_address, b.maps_url as branch_maps_url,
+           b.timezone as branch_timezone,
            coalesce(
              (select array_agg(s.name order by asv.sort_order)
                 from appointment_services asv
@@ -57,6 +60,8 @@ export async function findAppointmentSummary(
     startsAt: new Date(row['starts_at'] as string),
     customerName: row['customer_name'] as string,
     branchName: row['branch_name'] as string,
+    branchAddress: (row['branch_address'] as string | null) ?? null,
+    branchMapsUrl: (row['branch_maps_url'] as string | null) ?? null,
     branchTimezone: row['branch_timezone'] as string,
     serviceNames: Array.isArray(rawNames) ? (rawNames as string[]) : [],
   };

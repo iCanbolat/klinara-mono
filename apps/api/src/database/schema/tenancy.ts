@@ -37,6 +37,8 @@ export const branches = pgTable(
     timezone: text('timezone').notNull().default('Europe/Istanbul'),
     phone: text('phone'),
     address: text('address'),
+    /** Google Maps bağlantısı (https). Şube bilgisi; mesajlarda kullanılmaz (harita butonu adresten üretilir). */
+    mapsUrl: text('maps_url'),
     isActive: boolean('is_active').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

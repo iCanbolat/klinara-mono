@@ -35,6 +35,8 @@ data class KlinaraColors(
     val disabled: Color,
     /** Hata, yıkıcı işlem. */
     val danger: Color,
+    /** Bağlantı ve şablon değişkeni (`@HizmetAdı`) rengi. */
+    val link: Color,
     /** Bu paletin karanlık tema olup olmadığı — sistem çubuğu ikonları için. */
     val isDark: Boolean,
 )
@@ -52,6 +54,7 @@ internal val LightKlinaraColors =
         borderFocus = Color(0xFF7F9A76),
         disabled = Color(0xFFEDE9E3),
         danger = Color(0xFFA6483C),
+        link = Color(0xFF2563C9),
         isDark = false,
     )
 
@@ -68,6 +71,7 @@ internal val DarkKlinaraColors =
         borderFocus = Color(0xFF9DB894),
         disabled = Color(0xFF2A2E2C),
         danger = Color(0xFFD08074),
+        link = Color(0xFF7FB0F5),
         isDark = true,
     )
 

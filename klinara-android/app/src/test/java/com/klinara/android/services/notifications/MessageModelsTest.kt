@@ -1,7 +1,6 @@
 package com.klinara.android.services.notifications
 
 import com.klinara.android.services.contracts.ApiErrorCode
-import com.klinara.android.services.integrations.InboxItem
 import com.klinara.android.services.mock.Fixtures
 import com.klinara.android.services.networking.ApiError
 import com.klinara.android.services.networking.KlinaraJson
@@ -118,25 +117,6 @@ class MessageModelsTest {
         assertTrue(row.isFollowup)
         assertEquals("Randevudan 2 saat sonra", row.offsetLabel)
         assertEquals(ScheduledNotificationStatus.Unknown, row.status)
-    }
-
-    @Test
-    @DisplayName("Gelen kutusunun `messageType`'ı enum değil serbest metin; boş gövde tür etiketine düşer")
-    fun decodesInboxItem() {
-        val item =
-            KlinaraJson
-                .decodeFromString(
-                    ListSerializer(InboxItem.serializer()),
-                    """
-                    [{"id": "5c11e229-1a38-425a-92a2-aee85bb7427f", "customerId": null,
-                      "from": "+90********88", "messageType": "sticker", "body": null,
-                      "receivedAt": "2026-08-28T22:36:45.305Z", "handledAt": null}]
-                    """.trimIndent(),
-                ).single()
-
-        assertEquals("sticker", item.messageTypeLabel)
-        assertFalse(item.isHandled)
-        assertEquals("(sticker)", item.preview)
     }
 
     @Test

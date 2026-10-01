@@ -21,6 +21,8 @@ import {
 
 /** Kiracı ve şube kodları URL'de görünür: yalnız küçük harf, rakam ve tire. */
 const SLUG_PATTERN = /^[a-z0-9]([a-z0-9-]{1,48}[a-z0-9])$/;
+/** Mesaja yazılan bağlantı: yalnız https (veritabanı kısıtıyla aynı kural). */
+const HTTPS_URL = /^https:\/\/\S+$/i;
 const SLUG_MESSAGE = 'Yalnız küçük harf, rakam ve tire; tire ile başlayamaz/bitemez';
 
 const TENANT_STATUSES = ['trial', 'active', 'suspended'] as const;
@@ -237,6 +239,13 @@ export class BranchResponseDto {
   @ApiProperty({ nullable: true, type: String })
   address: string | null;
 
+  @ApiProperty({
+    nullable: true,
+    type: String,
+    description: 'Google Maps bağlantısı (https). Şube bilgisi; mesajlarda kullanılmaz (harita butonu adresten üretilir).',
+  })
+  mapsUrl: string | null;
+
   @ApiProperty()
   isActive: boolean;
 
@@ -309,6 +318,13 @@ export class CreateBranchDto {
   @IsString()
   @MaxLength(500)
   address?: string;
+
+  @ApiPropertyOptional({ description: 'Google Maps bağlantısı; yalnız https.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  @Matches(HTTPS_URL, { message: "'https://' ile başlayan bir bağlantı olmalı" })
+  mapsUrl?: string;
 }
 
 export class UpdateBranchDto {
@@ -336,6 +352,14 @@ export class UpdateBranchDto {
   @IsString()
   @MaxLength(500)
   address?: string | null;
+
+  /** `null` gönderildiğinde bağlantı temizlenir. */
+  @ApiPropertyOptional({ nullable: true, type: String })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  @Matches(HTTPS_URL, { message: "'https://' ile başlayan bir bağlantı olmalı" })
+  mapsUrl?: string | null;
 
   @ApiPropertyOptional()
   @IsOptional()

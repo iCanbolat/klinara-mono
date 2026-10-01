@@ -382,16 +382,14 @@ export class PerformanceService {
     const scope = await this.scopes.resolve(principal, query.branchId);
     const period = toPeriod(query.from, query.to);
 
-    const [totals, acquisition, cohorts] = await Promise.all([
+    const [totals, cohorts] = await Promise.all([
       this.retentionTotals(scope, period),
-      this.acquisition(scope, period),
       this.cohorts(scope, period),
     ]);
 
     const report: RetentionReportDto = {
       period: { from: query.from, to: query.to },
       totals,
-      acquisition,
       cohorts,
     };
 
@@ -457,37 +455,6 @@ export class PerformanceService {
       activeCustomers: active,
       returningRate: rate(returning, active),
     };
-  }
-
-  /** Geliş kaynağı kırılımı — `customers.source`. */
-  private async acquisition(
-    scope: ReportScope,
-    period: Period,
-  ): Promise<RetentionReportDto['acquisition']> {
-    const result = await this.tx.run(async (tx) =>
-      tx.execute<Record<string, unknown>>(sql`
-        select c.source, count(distinct c.id)::int as customers
-          from customers c
-         where c.deleted_at is null
-           and c.merged_into_customer_id is null
-           and exists (
-             select 1 from appointments a
-              where a.customer_id = c.id
-                and a.status = 'completed'
-                and a.deleted_at is null
-                and a.starts_at >= ${period.from.toISOString()}::timestamptz
-                and a.starts_at <  ${period.to.toISOString()}::timestamptz
-                and ${branchFilterSql(scope.branchIds, sql`a.branch_id`)}
-           )
-         group by 1
-         order by customers desc, c.source nulls last
-      `),
-    );
-
-    return result.rows.map((row) => ({
-      source: (row.source ?? null) as string | null,
-      customers: Number(row.customers ?? 0),
-    }));
   }
 
   /**

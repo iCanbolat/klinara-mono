@@ -32,7 +32,6 @@ import com.klinara.android.designsystem.components.PhoneNumberField
 import com.klinara.android.services.ServiceContainer
 import com.klinara.android.services.crm.Customer
 import com.klinara.android.services.crm.CustomerGender
-import com.klinara.android.services.crm.CustomerSource
 import com.klinara.android.services.crm.CustomerTag
 import com.klinara.android.services.networking.Loadable
 
@@ -173,13 +172,6 @@ private fun EditorBody(
         )
     }
 
-    KlinaraCard(title = "Geliş kaynağı") {
-        SourceChips(
-            selected = form.source,
-            onSelect = { value -> viewModel.update { it.copy(source = value) } },
-        )
-    }
-
     TagPickerCard(state = state, viewModel = viewModel)
 
     KlinaraCard(title = "Not", footnote = "Bu alan klinik not değildir; herkes görebilir.") {
@@ -199,28 +191,6 @@ private fun EditorBody(
         isLoading = state.isSaving,
         modifier = Modifier.fillMaxWidth(),
     )
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun SourceChips(
-    selected: CustomerSource?,
-    onSelect: (CustomerSource?) -> Unit,
-) {
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(KlinaraMetrics.xs),
-        verticalArrangement = Arrangement.spacedBy(KlinaraMetrics.xs),
-    ) {
-        CustomerSource.selectable.forEach { source ->
-            SelectableChip(
-                label = source.turkishName,
-                isSelected = selected == source,
-                // Seçili olana tekrar dokunmak SEÇİMİ KALDIRIR: kaynağı yanlışlıkla
-                // seçen birinin geri dönebileceği bir yol olmalı.
-                onClick = { onSelect(if (selected == source) null else source) },
-            )
-        }
-    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)

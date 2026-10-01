@@ -13,6 +13,7 @@ struct CustomerListView: View {
 
     @State private var searchText = ""
     @State private var editing: CustomerEditorView.Target?
+    @State private var isLoadMoreVisible = false
 
     private var store: CustomerStore { session.customerStore }
     private var canWrite: Bool { session.can(Permissions.customerWrite) }
@@ -179,9 +180,18 @@ struct CustomerListView: View {
         customer.phone.map(PhoneNumberField.pretty) ?? customer.email
     }
 
-    /// Listenin sonuna gelindiğinde sonraki sayfayı ister. `.onAppear` birden
-    /// çok kez tetiklenebilir; ``CustomerStore/loadMore()`` süren isteği kendi
-    /// eliyor.
+    /// Listenin sonuna gelindiğinde sonraki sayfayı ister.
+    ///
+    /// ⚠️ `.onAppear` KULLANILMIYOR. Liste tembel olmayan bir yığında
+    /// (``KlinaraScreen`` → `ScrollView` → `VStack`) çiziliyor; orada
+    /// `onAppear` ekranda görünmeye değil hiyerarşiye girmeye bağlı. Tetikleyici
+    /// ilk sayfayla birlikte, kaydırılmadan hemen ateşleniyor, sonra hiyerarşide
+    /// KALDIĞI için bir daha ateşlenmiyordu: liste ikinci sayfada takılıyordu.
+    ///
+    /// Görünürlük gerçekten kaydırma alanına göre ölçülüyor ve istek sıradaki
+    /// cursor'a bağlı: yeni sayfa gelince tetikleyici hâlâ görünürse (sayfa
+    /// ekranı doldurmadıysa) bir sonraki de isteniyor. Süren isteği
+    /// ``CustomerStore/loadMore()`` kendi eliyor.
     private var loadMoreTrigger: some View {
         HStack {
             Spacer()
@@ -190,7 +200,33 @@ struct CustomerListView: View {
             Spacer()
         }
         .padding(.vertical, KlinaraMetrics.md)
-        .onAppear { Task { await store.loadMore() } }
+        // Kaydırma alanının görünen dikdörtgeni tetikleyicinin kendi
+        // koordinatlarında ölçülüyor; alt kenara `prefetch` kadar yaklaşınca
+        // "görünür" sayılıyor ki kullanıcı listenin dibine çarpmadan sonraki
+        // sayfa gelsin. (`onScrollVisibilityChange` bu yığında ilk görünürlükte
+        // ateşlenmedi; geometri ölçümü ilk değeri de veriyor.)
+        .onGeometryChange(for: Bool.self) { proxy in
+            guard let viewport = proxy.bounds(of: .scrollView) else { return false }
+            return viewport
+                .insetBy(dx: 0, dy: -Self.prefetch)
+                .intersects(CGRect(origin: .zero, size: proxy.size))
+        } action: { isLoadMoreVisible = $0 }
+        .task(id: LoadMoreKey(visible: isLoadMoreVisible, cursor: store.loadMoreCursor)) {
+            guard isLoadMoreVisible else { return }
+            // İstek görünümün task'ına BAĞLANMIYOR: ``KlinaraScreen`` içeriği
+            // yeniden kurunca tetikleyicinin task'ı iptal ediliyor ve uçuştaki
+            // sayfa isteği `cancelled` ile düşüyordu; yeni örnek de "zaten
+            // yükleniyor" korumasına takılıp hiçbir şey istemiyordu.
+            await Task { await store.loadMore() }.value
+        }
+    }
+
+    /// Listenin dibine bu kadar yaklaşınca sonraki sayfa istenir.
+    private static let prefetch: CGFloat = 300
+
+    private struct LoadMoreKey: Equatable {
+        let visible: Bool
+        let cursor: String?
     }
 }
 

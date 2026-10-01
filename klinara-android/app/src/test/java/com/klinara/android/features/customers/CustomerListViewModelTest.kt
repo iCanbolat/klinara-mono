@@ -51,6 +51,27 @@ class CustomerListViewModelTest {
         }
 
     @Test
+    @DisplayName("Aşağı çekerek yenileme listeyi iskelete döndürmez ve yeni kaydı getirir")
+    fun refreshKeepsListAndPicksUpNewRecords() =
+        runTest {
+            val service = MockCustomerService(latencyEnabled = false)
+            val viewModel = subject(service)
+            viewModel.load()
+            advanceUntilIdle()
+            val before = viewModel.state.value.visible.valueOrNull!!.size
+
+            service.create(CreateCustomerInput(fullName = "Yenileme Testi", phone = "+905559990000"))
+            viewModel.refresh()
+            // Yanıt gelmeden liste yerinde durur.
+            assertTrue(viewModel.state.value.list is Loadable.Loaded)
+            assertTrue(viewModel.state.value.isRefreshing)
+            advanceUntilIdle()
+
+            assertFalse(viewModel.state.value.isRefreshing)
+            assertEquals(before + 1, viewModel.state.value.visible.valueOrNull!!.size)
+        }
+
+    @Test
     @DisplayName("Özet yükleniyor; toplam kayıt sayısıyla tutarlı")
     fun loadsSummary() =
         runTest {

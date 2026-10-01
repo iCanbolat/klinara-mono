@@ -43,7 +43,7 @@ struct ExpiringReportView: View {
         .navigationTitle("Süre dolumu")
         .navigationBarTitleDisplayMode(.inline)
         .task { await store.loadExpiring() }
-        .refreshable { await store.loadExpiring() }
+        .refreshable { await store.loadExpiring(refreshing: true) }
     }
 
     /// Listenin sonuna gelindiğinde sonraki sayfayı ister.

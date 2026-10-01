@@ -38,6 +38,11 @@ nonisolated enum NotificationEvent: String, Codable, Sendable, CaseIterable, Ide
     /// Seçim listelerinde `unknown` gösterilmez — kullanıcı onu üretemez.
     static var selectable: [NotificationEvent] { allCases.filter { $0 != .unknown } }
 
+    /// Şablon ekranında görünen olaylar: personel iç bildirimi dışarıda — metnini
+    /// kiracı değil platform belirliyor (davet, parola sıfırlama e-postaları).
+    /// Mesaj günlüğü süzgeci ise ``selectable``ı kullanır: geçmiş satırlar var.
+    static var templateEvents: [NotificationEvent] { selectable.filter { $0 != .staffInternal } }
+
     var turkishName: String {
         switch self {
         case .appointmentConfirmation: return "Randevu onayı"
@@ -144,11 +149,11 @@ nonisolated enum NotificationEventCatalog {
     static let definitions: [NotificationEvent: Definition] = [
         .appointmentConfirmation: Definition(
             channels: [.whatsapp],
-            variables: ["customerName", "branchName", "appointmentAt", "serviceName"]
+            variables: ["customerName", "branchName", "branchAddress", "appointmentAt", "serviceName"]
         ),
         .appointmentReminder: Definition(
             channels: [.whatsapp],
-            variables: ["customerName", "branchName", "appointmentAt", "serviceName"]
+            variables: ["customerName", "branchName", "branchAddress", "appointmentAt", "serviceName"]
         ),
         .appointmentCancelled: Definition(
             channels: [.whatsapp],
@@ -195,11 +200,117 @@ nonisolated enum NotificationEventCatalog {
         return found
     }
 
+    /// Ekranda görünen `@Etiket`ler; teknik `{{customerName}}` biçimi arayüzde
+    /// geçmez. Sunucudaki `packages/shared/src/notification-templates.ts` ile
+    /// aynı tablo: canlıda parçalar sunucudan gelir, bu tablo yalnız mock'un ve
+    /// `segments` göndermeyen eski bir sunucunun yedeğidir.
+    static let variableHandles: [String: String] = [
+        "customerName": "@MüşteriAdı",
+        "branchName": "@KlinikAdı",
+        "branchAddress": "@KlinikAdresi",
+        "appointmentAt": "@RandevuZamanı",
+        "serviceName": "@HizmetAdı",
+        "packageName": "@PaketAdı",
+        "remainingSessions": "@KalanSeans",
+        "expiresAt": "@SonKullanımTarihi",
+        "message": "@Mesaj",
+        "subject": "@Konu",
+    ]
+
+    /// Tanımsız ad ham haliyle (`@ad`) görünür — sessizce yutulmaz.
+    static func handle(for variable: String) -> String {
+        variableHandles[variable] ?? "@\(variable)"
+    }
+
     /// Metinde geçen ama bu olayda tanımlı olmayan değişkenler.
     /// Boş dönmesi sunucunun `TEMPLATE_INVALID` vermeyeceği anlamına gelir.
     static func unknownPlaceholders(in text: String, event: NotificationEvent) -> [String] {
         let allowed = Set(variables(for: event))
         return placeholders(in: text).filter { !allowed.contains($0) }
+    }
+}
+
+// MARK: - Şablon parçaları
+
+/// Şablon gövdesinin bir parçası: düz metin ya da `@HizmetAdı` gibi bir değişken.
+///
+/// Ekranlar `{{…}}` ayrıştırmaz; sunucunun verdiği parçaları sırayla çizer.
+/// Değişken mavi bağlantı renginde görünür — yazılabilir bir metin değil,
+/// gönderim anında doldurulan tipli bir alandır.
+nonisolated enum TemplateSegment: Decodable, Sendable, Equatable {
+    case text(String)
+    case variable(name: String, handle: String)
+
+    private enum CodingKeys: String, CodingKey {
+        case kind, text, name, handle
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let kind = try container.decode(String.self, forKey: .kind)
+        if kind == "variable" {
+            let name = try container.decodeIfPresent(String.self, forKey: .name) ?? ""
+            let handle = try container.decodeIfPresent(String.self, forKey: .handle)
+                ?? NotificationEventCatalog.handle(for: name)
+            self = .variable(name: name, handle: handle)
+        } else {
+            self = .text(try container.decodeIfPresent(String.self, forKey: .text) ?? "")
+        }
+    }
+
+    /// `Sayın {{customerName}}` → `[.text("Sayın "), .variable(customerName)]`.
+    static func parse(_ body: String) -> [TemplateSegment] {
+        guard let regex = try? NSRegularExpression(pattern: "\\{\\{\\s*([A-Za-z][A-Za-z0-9_]*)\\s*\\}\\}") else {
+            return body.isEmpty ? [] : [.text(body)]
+        }
+        var result: [TemplateSegment] = []
+        var cursor = body.startIndex
+        let range = NSRange(body.startIndex..<body.endIndex, in: body)
+        for match in regex.matches(in: body, range: range) {
+            guard let whole = Range(match.range, in: body),
+                  let nameRange = Range(match.range(at: 1), in: body) else { continue }
+            if whole.lowerBound > cursor {
+                result.append(.text(String(body[cursor..<whole.lowerBound])))
+            }
+            let name = String(body[nameRange])
+            result.append(.variable(name: name, handle: NotificationEventCatalog.handle(for: name)))
+            cursor = whole.upperBound
+        }
+        if cursor < body.endIndex {
+            result.append(.text(String(body[cursor...])))
+        }
+        return result
+    }
+}
+
+extension Sequence where Element == TemplateSegment {
+
+    /// Düz metin olarak: değişkenler `@Etiket` yazısıyla (renksiz).
+    var plainText: String {
+        map {
+            switch $0 {
+            case .text(let text): return text
+            case .variable(_, let handle): return handle
+            }
+        }
+        .joined()
+    }
+
+    /// Değişkenleri mavi bağlantı renginde gösteren metin.
+    func attributed() -> AttributedString {
+        var result = AttributedString()
+        for segment in self {
+            switch segment {
+            case .text(let text):
+                result += AttributedString(text)
+            case .variable(_, let handle):
+                var token = AttributedString(handle)
+                token.foregroundColor = KlinaraColor.link
+                token.inlinePresentationIntent = .stronglyEmphasized
+                result += token
+            }
+        }
+        return result
     }
 }
 
@@ -233,6 +344,12 @@ nonisolated struct NotificationTemplate: Decodable, Sendable, Identifiable, Equa
     let isDefault: Bool
     /// Sunucunun gövdeden ayrıştırdığı yer tutucular.
     let variables: [String]
+    /// Sunucunun parçaladığı gövde. Yalnız eski bir sunucu ya da mock `nil`
+    /// bırakır; ekranlar ``segments``i okur.
+    var providedSegments: [TemplateSegment]? = nil
+
+    /// Ekranın çizdiği gövde: `@Etiket`li parçalar.
+    var segments: [TemplateSegment] { providedSegments ?? TemplateSegment.parse(body) }
 
     /// `(event, channel, locale)` bileşik anahtarı — sunucudaki upsert anahtarı.
     var rowId: String { "\(event.rawValue)|\(channel.rawValue)|\(locale)" }
@@ -244,6 +361,7 @@ nonisolated struct NotificationTemplate: Decodable, Sendable, Identifiable, Equa
         case event, channel, locale, subject, body
         case whatsappTemplateName, whatsappTemplateLanguage, whatsappVariables
         case isActive, isDefault, variables
+        case providedSegments = "segments"
     }
 }
 
@@ -257,54 +375,4 @@ nonisolated struct UpsertNotificationTemplateInput: Encodable, Sendable, Equatab
     var whatsappTemplateLanguage: String?
     var whatsappVariables: [String]?
     var isActive: Bool?
-}
-
-// MARK: - Tercihler
-
-/// `NotificationPreferenceResponseDto`.
-///
-/// `branchId == nil` kiracı varsayılanıdır; şube satırı onu ezer. Sunucu
-/// bileşik bir kimlik döndürmüyor ve varsayılan satırların `id`'si `nil`, bu
-/// yüzden liste `(event, branchId)` ile anahtarlanır.
-nonisolated struct NotificationPreference: Decodable, Sendable, Identifiable, Equatable {
-    /// ``NotificationTemplate/templateId`` ile aynı gerekçeyle `id` değil.
-    let preferenceId: String?
-    /// `nil` = kiracı varsayılanı.
-    let branchId: String?
-    let event: NotificationEvent
-    /// Öncelik sırasında denenecek kanallar. **Boş dizi = olay kapalı.**
-    let channels: [NotificationChannel]
-    /// `"HH:MM"`. Ek M: pencere gece yarısını aşar (21:00–09:00) ve şube saat
-    /// diliminde yorumlanır.
-    let quietHoursStart: String?
-    let quietHoursEnd: String?
-    let isDefault: Bool
-
-    /// `(event, branchId)` — sunucu bileşik bir kimlik döndürmüyor.
-    var rowId: String { "\(event.rawValue)|\(branchId ?? "tenant")" }
-
-    var id: String { rowId }
-
-    var isEnabled: Bool { !channels.isEmpty }
-
-    var quietHoursLabel: String? {
-        guard let start = quietHoursStart, let end = quietHoursEnd else { return nil }
-        return "\(start) – \(end)"
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case preferenceId = "id"
-        case branchId, event, channels, quietHoursStart, quietHoursEnd, isDefault
-    }
-}
-
-nonisolated struct UpsertNotificationPreferenceInput: Encodable, Sendable, Equatable {
-    /// Verilmezse kiracı varsayılanı yazılır.
-    var branchId: String?
-    let event: NotificationEvent
-    let channels: [NotificationChannel]
-    /// Sunucu ikisinden **yalnız biri** verilirse `VALIDATION_FAILED` döner;
-    /// form ikisini birlikte üretir.
-    var quietHoursStart: String?
-    var quietHoursEnd: String?
 }

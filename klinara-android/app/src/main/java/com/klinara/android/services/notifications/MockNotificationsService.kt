@@ -82,8 +82,6 @@ class MockNotificationsService(
 
     private val templateRecords: MutableList<NotificationTemplate> =
         MockNotificationsSeed.tenantTemplates().toMutableList()
-    private val preferenceRecords: MutableList<NotificationPreference> =
-        MockNotificationsSeed.tenantPreferences().toMutableList()
     private var recordCounter: Int = 0
 
     /** Sunucunun birleştirmesi: kod varsayılanları + kiracı satırları; varsayılanı olmayan kanal SONA. */
@@ -141,51 +139,6 @@ class MockNotificationsService(
         templateRecords.removeAll { it.rowId == key }
         templateRecords += saved
         return saved
-    }
-
-    // --- Tercihler (A8.2) ---
-
-    /** Kiracı satırı olmayan her olay için sentez + tüm kayıtlı satırlar; olay adına göre sıralı. */
-    override suspend fun preferences(): List<NotificationPreference> {
-        settle()
-        val covered = preferenceRecords.filter { it.branchId == null }.map { it.event }.toSet()
-        val defaults =
-            NotificationEvent.selectable.filterNot { it in covered }.map { event ->
-                NotificationPreference(
-                    event = event,
-                    channels = NotificationEventCatalog.channels(event),
-                    quietHoursStart = DEFAULT_QUIET_START,
-                    quietHoursEnd = DEFAULT_QUIET_END,
-                    quietHoursEnabled = true,
-                    isDefault = true,
-                )
-            }
-        return (defaults + preferenceRecords.map { it.resolved() }).sortedBy { it.event.wire }
-    }
-
-    override suspend fun upsertPreference(input: NotificationPreferenceUpsert): NotificationPreference {
-        settle()
-        val existing =
-            preferenceRecords.firstOrNull { it.event == input.event && it.branchId == input.branchId }
-        val saved =
-            NotificationPreference(
-                preferenceId = existing?.preferenceId ?: nextId(PREFERENCE_ID),
-                branchId = input.branchId,
-                event = input.event,
-                channels = input.channels,
-                quietHoursStart = input.quietHoursStart.wireValue,
-                quietHoursEnd = input.quietHoursEnd.wireValue,
-            )
-        preferenceRecords.removeAll { it.event == input.event && it.branchId == input.branchId }
-        preferenceRecords += saved
-        return saved.resolved()
-    }
-
-    /** Sunucunun `toPreferenceResponse`'u: kayıtlı `null` pencere varsayılana düşer; eşit uçlar = kapalı. */
-    private fun NotificationPreference.resolved(): NotificationPreference {
-        val start = quietHoursStart ?: DEFAULT_QUIET_START
-        val end = quietHoursEnd ?: DEFAULT_QUIET_END
-        return copy(quietHoursStart = start, quietHoursEnd = end, quietHoursEnabled = start != end, isDefault = false)
     }
 
     // --- Hatırlatma ayarları (A8.2) ---
@@ -256,10 +209,7 @@ class MockNotificationsService(
         val NISANTASI_REMINDER_HOURS = listOf(24, 4)
         const val DEFAULT_FOLLOWUP_DELAY = 2
         const val SECONDS_PER_HOUR = 3_600L
-        const val DEFAULT_QUIET_START = "21:00"
-        const val DEFAULT_QUIET_END = "09:00"
         const val TEMPLATE_ID = "e4100000"
-        const val PREFERENCE_ID = "e5100000"
         const val MIN_LATENCY_MILLIS = 120L
         const val MAX_LATENCY_MILLIS = 400L
         const val SEED_NOW = "2026-09-05T08:30:00Z"

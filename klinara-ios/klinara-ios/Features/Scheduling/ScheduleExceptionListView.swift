@@ -146,7 +146,9 @@ struct ScheduleExceptionListView: View {
             return
         }
 
-        state = .loading
+        // Yenilemede eldeki liste kalır: `.loading`e dönmek `.refreshable`
+        // görevini iptal ettirip ekranı yükleme durumunda takılı bırakır.
+        if state.value == nil { state = .loading }
         actionError = nil
         do {
             // Personel adlarını gösterebilmek için profiller de gerekiyor.
@@ -161,8 +163,11 @@ struct ScheduleExceptionListView: View {
                 )
             )
             state = .loaded(items)
+        } catch let error as APIError where error.isSilent {
+            return
         } catch {
-            state = .failed(error as? APIError ?? .network)
+            guard !Task.isCancelled else { return }
+            if state.value == nil { state = .failed(error as? APIError ?? .network) }
         }
     }
 

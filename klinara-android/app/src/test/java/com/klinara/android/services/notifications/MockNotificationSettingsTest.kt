@@ -76,38 +76,6 @@ class MockNotificationSettingsTest {
         }
 
     @Test
-    @DisplayName("Şube tercihi kiracı satırının YANINDA durur; eşit uçlar sessiz saati kapatır")
-    fun branchPreferenceAndDisabledQuietHours() =
-        runTest {
-            val service = subject()
-            val saved =
-                service.upsertPreference(
-                    NotificationPreferenceUpsert(
-                        branchId = MockIds.BRANCH_NISANTASI,
-                        event = NotificationEvent.AppointmentReminder,
-                        channels = listOf(NotificationChannel.WhatsApp),
-                        quietHoursStart = ClockTime(0, 0),
-                        quietHoursEnd = ClockTime(0, 0),
-                    ),
-                )
-
-            assertFalse(saved.isQuietHoursEnabled)
-            val rows = service.preferences().filter { it.event == NotificationEvent.AppointmentReminder }
-            assertEquals(2, rows.size)
-            assertTrue(rows.first { it.branchId == null }.isQuietHoursEnabled)
-        }
-
-    @Test
-    @DisplayName("Kayıtlı `null` pencere varsayılana düşer ve AÇIK görünür (sunucunun davranışı)")
-    fun nullWindowFallsBackToDefault() =
-        runTest {
-            val expiring = subject().preferences().first { it.event == NotificationEvent.PackageExpiring }
-
-            assertFalse(expiring.isEnabled, "Tohumda paket süre dolumu kapalı")
-            assertEquals("21:00 – 09:00", expiring.quietHoursLabel)
-        }
-
-    @Test
     @DisplayName("Kiracı varsayılanındaki şubede yalnız takibi değiştirmek override YAZMAZ")
     fun partialUpdateKeepsTenantDefault() =
         runTest {

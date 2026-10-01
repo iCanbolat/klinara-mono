@@ -44,27 +44,18 @@ struct RetentionReportView: View {
                 KlinaraRow(label: "Aktif müşteri", value: "\(report.totals.activeCustomers)")
             }
 
-            KlinaraCard {
-                KlinaraChart(
-                    kind: .bar,
-                    points: report.acquisition.map {
-                        KlinaraChartPoint(id: $0.id, label: $0.turkishName, value: Double($0.customers))
-                    },
-                    format: { ReportFormat.number($0) }
-                )
-            }
-
-            KlinaraCard(title: "Geliş kaynağı") {
-                ForEach(Array(report.acquisition.enumerated()), id: \.element.id) { index, row in
-                    if index > 0 { KlinaraDivider() }
-                    KlinaraRow(label: row.turkishName, value: "\(row.customers)")
-                }
-            }
-
             KlinaraCard(
                 title: "Geri dönüş",
                 footnote: "Dönem bugüne yakınsa oranlar düşük görünür: müşterilerin 90 günü henüz dolmamış olabilir."
             ) {
+                KlinaraChart(
+                    kind: .bar,
+                    points: report.cohorts.map {
+                        KlinaraChartPoint(id: "\($0.id)", label: "\($0.withinDays) gün", value: $0.rate)
+                    },
+                    format: { ReportFormat.percent($0) }
+                )
+                KlinaraDivider()
                 ForEach(Array(report.cohorts.enumerated()), id: \.element.id) { index, cohort in
                     if index > 0 { KlinaraDivider() }
                     KlinaraRow(

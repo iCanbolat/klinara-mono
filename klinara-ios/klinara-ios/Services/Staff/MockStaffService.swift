@@ -171,11 +171,11 @@ enum MockStaffSeed {
     }
 
     static func profiles(services: [ClinicService], at now: Date) -> [StaffProfile] {
-        // Ayşe her şeyi yapar; Mehmet yalnız epilasyon — yetkinlik matrisinin
+        // Ayşe her şeyi yapar; Mehmet yalnız genel diş hekimliği — yetkinlik matrisinin
         // "herkes her hizmeti yapamaz" kuralı mock'ta da görünür olmalı.
         let allServiceIDs = services.filter(\.isActive).map(\.id)
         let epilationIDs = services
-            .filter { $0.categoryId == MockCatalogSeed.categoryEpilasyon && $0.isActive }
+            .filter { $0.categoryId == MockCatalogSeed.categoryGenel && $0.isActive }
             .map(\.id)
 
         return [
@@ -186,8 +186,8 @@ enum MockStaffSeed {
                 primaryBranchId: MockIDs.branchNisantasi,
                 // Sahip kiracı kapsamlı: şube üyeliği yok, yalnız ana şube.
                 branchIds: [],
-                title: "Dermatolog", specialties: ["Lazer", "Dolgu", "Botoks"],
-                calendarColor: "#7F9A76", bio: "10 yıllık medikal estetik deneyimi.",
+                title: "Diş Hekimi", specialties: ["Endodonti", "Estetik diş hekimliği", "İmplant"],
+                calendarColor: "#7F9A76", bio: "10 yıllık klinik deneyimi, endodonti ve implant.",
                 isVisibleOnline: true, isActive: true, createdAt: now,
                 services: skills(
                     from: allServiceIDs.map { StaffServiceSkillInput(serviceId: $0) },
@@ -202,7 +202,7 @@ enum MockStaffSeed {
                 // İki şubede çalışıyor: şube süzgecinin "ana şube VEYA üyelik"
                 // kuralı mock'ta da görünür olsun.
                 branchIds: [MockIDs.branchNisantasi, MockIDs.branchBagdat],
-                title: "Lazer Uygulayıcısı", specialties: ["Lazer epilasyon"],
+                title: "Ortodontist", specialties: ["Ortodonti"],
                 calendarColor: "#5E7856", bio: nil,
                 isVisibleOnline: true, isActive: true, createdAt: now,
                 services: skills(

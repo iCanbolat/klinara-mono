@@ -28,6 +28,8 @@ data class BranchDetail(
     val timezone: String = "Europe/Istanbul",
     val phone: String? = null,
     val address: String? = null,
+    /** Google Maps bağlantısı (https); şube bilgisi; mesajlarda kullanılmaz (harita butonu adresten üretilir). */
+    val mapsUrl: String? = null,
     val isActive: Boolean = true,
     @Serializable(with = InstantSerializer::class)
     val createdAt: Instant? = null,
@@ -43,6 +45,7 @@ data class CreateBranchInput(
     val timezone: String? = null,
     val phone: String? = null,
     val address: String? = null,
+    val mapsUrl: String? = null,
 ) {
     fun toJson(): JsonObject =
         buildJsonObject {
@@ -51,21 +54,23 @@ data class CreateBranchInput(
             timezone?.let { put("timezone", it) }
             phone?.let { put("phone", it) }
             address?.let { put("address", it) }
+            mapsUrl?.let { put("mapsUrl", it) }
         }
 }
 
-/** `UpdateBranchDto` — telefon ve adres üç durumlu ([Patch]): boşaltılan alan `null`. */
+/** `UpdateBranchDto` — telefon, adres ve harita bağlantısı üç durumlu ([Patch]): boşaltılan alan `null`. */
 data class UpdateBranchInput(
     val name: String? = null,
     val timezone: String? = null,
     val phone: Patch<String> = Patch.Unchanged,
     val address: Patch<String> = Patch.Unchanged,
+    val mapsUrl: Patch<String> = Patch.Unchanged,
     val isActive: Boolean? = null,
 ) {
     val isEmpty: Boolean
         get() =
             name == null && timezone == null && isActive == null &&
-                phone == Patch.Unchanged && address == Patch.Unchanged
+                phone == Patch.Unchanged && address == Patch.Unchanged && mapsUrl == Patch.Unchanged
 
     fun toJson(): JsonObject =
         buildJsonObject {
@@ -73,8 +78,16 @@ data class UpdateBranchInput(
             timezone?.let { put("timezone", it) }
             putPatchElement("phone", phone) { JsonPrimitive(it) }
             putPatchElement("address", address) { JsonPrimitive(it) }
+            putPatchElement("mapsUrl", mapsUrl) { JsonPrimitive(it) }
             isActive?.let { put("isActive", it) }
         }
+}
+
+/** Harita bağlantısı: sunucu kuralının aynısı (yalnız `https://`, boşluk yok). */
+object BranchMapsLink {
+    private val PATTERN = Regex("^https://\\S+$", RegexOption.IGNORE_CASE)
+
+    fun isValid(url: String): Boolean = PATTERN.matches(url)
 }
 
 /** Şube kodu önerisi ve biçim kontrolü — web `slugify` / iOS `BranchSlug` ile aynı kural. */

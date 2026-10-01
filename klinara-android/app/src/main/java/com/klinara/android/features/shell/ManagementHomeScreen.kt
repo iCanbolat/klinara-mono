@@ -31,11 +31,9 @@ enum class ManagementDestination {
     PackageReports,
     Reports,
     Conversations,
-    Inbox,
     MessageLog,
     ReminderSettings,
     NotificationTemplates,
-    NotificationPreferences,
     WhatsApp,
 }
 
@@ -201,7 +199,6 @@ private fun communicationSection(session: AppSession): ManagementSection? {
                 add(row(ManagementDestination.Conversations, "Sohbetler", "Müşterilerle WhatsApp yazışmaları"))
             }
             if (session.can(Permissions.NOTIFICATION_READ)) {
-                add(row(ManagementDestination.Inbox, "Gelen kutusu", "Müşterilerin WhatsApp'tan yazdığı mesajlar"))
                 add(
                     row(
                         ManagementDestination.MessageLog,
@@ -220,14 +217,7 @@ private fun communicationSection(session: AppSession): ManagementSection? {
                     row(
                         ManagementDestination.NotificationTemplates,
                         "Bildirim şablonları",
-                        "Olay ve kanal başına mesaj metni",
-                    ),
-                )
-                add(
-                    row(
-                        ManagementDestination.NotificationPreferences,
-                        "Bildirim tercihleri",
-                        "Kanal önceliği ve sessiz saatler",
+                        "Müşteriye giden mesajlar ve açık/kapalı durumları",
                     ),
                 )
             }
@@ -282,11 +272,9 @@ val ManagementDestination.icon: Int
             ManagementDestination.PackageReports -> KlinaraIcons.packageReports
             ManagementDestination.Reports -> KlinaraIcons.reports
             ManagementDestination.Conversations -> KlinaraIcons.conversations
-            ManagementDestination.Inbox -> KlinaraIcons.inbox
             ManagementDestination.MessageLog -> KlinaraIcons.messages
             ManagementDestination.ReminderSettings -> KlinaraIcons.reminder
             ManagementDestination.NotificationTemplates -> KlinaraIcons.template
-            ManagementDestination.NotificationPreferences -> KlinaraIcons.preferences
             ManagementDestination.WhatsApp -> KlinaraIcons.link
         }
 

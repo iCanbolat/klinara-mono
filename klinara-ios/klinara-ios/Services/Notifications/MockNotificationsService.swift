@@ -21,7 +21,6 @@ final class MockNotificationsService: NotificationsService, @unchecked Sendable 
     private let booking: any BookingService
 
     private var templateRecords: [NotificationTemplate] = []
-    private var preferenceRecords: [NotificationPreference] = []
     private var branchReminderHours: [String: [Int]] = [:]
     private var branchFollowupEnabled: [String: Bool] = [:]
     private var branchFollowupDelay: [String: Int] = [:]
@@ -37,7 +36,6 @@ final class MockNotificationsService: NotificationsService, @unchecked Sendable 
 
     private func seed() {
         templateRecords = MockNotificationsSeed.tenantTemplates()
-        preferenceRecords = MockNotificationsSeed.tenantPreferences()
         branchReminderHours = MockNotificationsSeed.branchReminderOverrides()
         branchFollowupEnabled = [:]
         branchFollowupDelay = [:]
@@ -134,52 +132,6 @@ final class MockNotificationsService: NotificationsService, @unchecked Sendable 
                 templateRecords[index] = saved
             } else {
                 templateRecords.append(saved)
-            }
-            return saved
-        }
-    }
-
-    // MARK: Tercihler
-
-    func preferences() async throws -> [NotificationPreference] {
-        await latency(0.3)
-        return withLock {
-            // Kiracı satırı OLMAYAN her olay için sentezlenmiş varsayılan +
-            // tüm kayıtlı satırlar (kiracı ve şube). Sunucu da böyle döndürüyor.
-            let tenantEvents = Set(
-                preferenceRecords.filter { $0.branchId == nil }.map(\.event)
-            )
-            let synthesized = NotificationEvent.selectable
-                .filter { !tenantEvents.contains($0) }
-                .map(MockNotificationsSeed.defaultPreference(for:))
-            return (synthesized + preferenceRecords)
-                .sorted { $0.event.rawValue < $1.event.rawValue }
-        }
-    }
-
-    func upsertPreference(
-        _ input: UpsertNotificationPreferenceInput
-    ) async throws -> NotificationPreference {
-        await latency()
-        return try withLock {
-            let hasStart = input.quietHoursStart != nil
-            let hasEnd = input.quietHoursEnd != nil
-            guard hasStart == hasEnd else {
-                throw validation("Sessiz saatin başlangıcı ve bitişi birlikte verilmeli")
-            }
-            let saved = NotificationPreference(
-                preferenceId: MockIDs.uuid(),
-                branchId: input.branchId,
-                event: input.event,
-                channels: input.channels,
-                quietHoursStart: input.quietHoursStart,
-                quietHoursEnd: input.quietHoursEnd,
-                isDefault: false
-            )
-            if let index = preferenceRecords.firstIndex(where: { $0.rowId == saved.rowId }) {
-                preferenceRecords[index] = saved
-            } else {
-                preferenceRecords.append(saved)
             }
             return saved
         }

@@ -311,6 +311,16 @@ const RULES: readonly Rule[] = [
   // burada da kapalı kalıyor.
   { methods: ['GET'], pattern: /^staff-notifications$/ },
   { methods: ['POST'], pattern: /^staff-notifications\/read$/ },
+  // Anlık olay soketinin bileti. Yanıt bir token ama OTURUM token'ı değil:
+  // REST'te geçersiz, 60 sn ömürlü ve yalnız içeriksiz olay kanalını açıyor —
+  // tarayıcıya inmesi BFF'in korumasını delmiyor.
+  { methods: ['POST'], pattern: /^realtime\/ticket$/ },
+
+  // --- Mesaj şablonları — okuma `notification:read`, yazma `notification:manage` ---
+  // Şablon SAYFASI yalnız gönderim anahtarını (`isActive`) yazıyor; metin ve
+  // Meta eşlemesi mobildeki gibi olduğu gibi geri gidiyor. `messages` (ham
+  // ileti kaydı) ve `reminder-settings` hâlâ kapalı.
+  { methods: ['GET', 'PUT'], pattern: /^notification-templates$/ },
 ];
 
 /**

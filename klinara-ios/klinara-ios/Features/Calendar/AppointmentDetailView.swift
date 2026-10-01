@@ -74,6 +74,11 @@ struct AppointmentDetailView: View {
                 }
             }
             .task { await load() }
+            // Müşteri listenin ilk sayfalarında olmayabilir; yoksa ad yerine
+            // "Müşteri" yazıyordu.
+            .task(id: state.value?.customerId) {
+                if let id = state.value?.customerId { await session.customerStore.resolve(id: id) }
+            }
             .sheet(item: $bindingLine) { line in
                 if let appointment = state.value {
                     BindPackageSheet(

@@ -5,7 +5,6 @@ import {
   jsonb,
   pgTable,
   text,
-  time,
   timestamp,
   uniqueIndex,
   uuid,
@@ -77,23 +76,6 @@ export const notificationTemplates = pgTable(
     ),
   ],
 );
-
-export const notificationPreferences = pgTable('notification_preferences', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  tenantId: uuid('tenant_id')
-    .notNull()
-    .references(() => tenants.id, { onDelete: 'cascade' }),
-  /** `null` = kiracı varsayılanı; şube satırı onu ezer. */
-  branchId: uuid('branch_id').references(() => branches.id, { onDelete: 'cascade' }),
-  event: text('event').$type<NotificationEvent>().notNull(),
-  /** Denenecek kanallar, öncelik sırasında. Boş dizi = olay kapalı. */
-  channels: textArray('channels').$type<NotificationChannel[]>().notNull(),
-  /** Şube saat diliminde yorumlanır; gece yarısını aşan pencere geçerlidir. */
-  quietHoursStart: time('quiet_hours_start'),
-  quietHoursEnd: time('quiet_hours_end'),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
 
 export const messageLog = pgTable(
   'message_log',

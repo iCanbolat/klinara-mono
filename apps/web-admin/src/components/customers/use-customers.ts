@@ -28,7 +28,6 @@ interface Filters {
   /** En az 2 karakter; altındaysa arama YAPILMIYOR (sunucu 400 verir). */
   query: string;
   tagId: string | null;
-  source: string | null;
 }
 
 export interface CustomersState {
@@ -57,7 +56,7 @@ export function useCustomers(filters: Filters): CustomersState {
 
   const query = filters.query.trim();
   const searching = query.length >= MIN_QUERY;
-  const filterKey = `${searching ? query : ''}|${filters.tagId ?? ''}|${filters.source ?? ''}`;
+  const filterKey = `${searching ? query : ''}|${filters.tagId ?? ''}`;
 
   // Süzgeç değişince yığın render sırasında sıfırlanıyor — effect'te yapmak
   // bir istek boyunca eski cursor'la yeni süzgeci birleştirirdi.
@@ -93,7 +92,6 @@ export function useCustomers(filters: Filters): CustomersState {
         const params = new URLSearchParams({ limit: PAGE_SIZE });
         if (cursor !== null) params.set('cursor', cursor);
         if (filters.tagId !== null) params.set('tagId', filters.tagId);
-        if (filters.source !== null) params.set('source', filters.source);
 
         const result = await api.get<Page<Customer>>(`customers?${params.toString()}`, {
           signal: controller.signal,
@@ -108,7 +106,7 @@ export function useCustomers(filters: Filters): CustomersState {
     })();
 
     return () => controller.abort();
-  }, [searching, query, cursor, filters.tagId, filters.source, nonce]);
+  }, [searching, query, cursor, filters.tagId, nonce]);
 
   const next = useCallback(() => {
     if (nextCursor === null) return;

@@ -34,7 +34,7 @@ struct BookingDraftTests {
         #expect(!draft.canQueryAvailability)
 
         draft.customerId = MockCustomerSeed.ayse
-        draft.toggle(serviceId: MockCatalogSeed.serviceLazerBolgesel)
+        draft.toggle(serviceId: MockCatalogSeed.serviceOrtodontiKontrol)
         #expect(draft.canQueryAvailability)
         // Slot seçilmeden hâlâ geçersiz.
         #expect(!draft.isValid)
@@ -52,7 +52,7 @@ struct BookingDraftTests {
         draft.select(customerId: MockCustomerSeed.ayse)
         #expect(draft.missingStepsHint == "Devam etmek için hizmet ve saat seçin.")
 
-        draft.toggle(serviceId: MockCatalogSeed.serviceLazerBolgesel)
+        draft.toggle(serviceId: MockCatalogSeed.serviceOrtodontiKontrol)
         draft.select(slot: slot(at: 11))
         #expect(draft.missingStepsHint == nil)
     }
@@ -60,30 +60,30 @@ struct BookingDraftTests {
     @Test("Hizmet seçim sırası korunur")
     func preservesServiceOrder() {
         var draft = BookingDraft(branchId: MockIDs.branchNisantasi)
-        draft.toggle(serviceId: MockCatalogSeed.serviceHydrafacial)
-        draft.toggle(serviceId: MockCatalogSeed.serviceLazerBolgesel)
+        draft.toggle(serviceId: MockCatalogSeed.serviceDisTasiTemizligi)
+        draft.toggle(serviceId: MockCatalogSeed.serviceOrtodontiKontrol)
 
         // Sunucu bu sırayı ardışık işlem zinciri için kullanıyor; sıralamak
         // ya da kümeye çevirmek randevunun akışını değiştirirdi.
         #expect(draft.serviceIds == [
-            MockCatalogSeed.serviceHydrafacial,
-            MockCatalogSeed.serviceLazerBolgesel,
+            MockCatalogSeed.serviceDisTasiTemizligi,
+            MockCatalogSeed.serviceOrtodontiKontrol,
         ])
 
-        draft.toggle(serviceId: MockCatalogSeed.serviceHydrafacial)
-        #expect(draft.serviceIds == [MockCatalogSeed.serviceLazerBolgesel])
+        draft.toggle(serviceId: MockCatalogSeed.serviceDisTasiTemizligi)
+        #expect(draft.serviceIds == [MockCatalogSeed.serviceOrtodontiKontrol])
     }
 
     @Test("Hizmet değişince slot seçimi düşer")
     func resetsSlotWhenLineupChanges() {
         var draft = BookingDraft(branchId: MockIDs.branchNisantasi)
-        draft.toggle(serviceId: MockCatalogSeed.serviceLazerBolgesel)
+        draft.toggle(serviceId: MockCatalogSeed.serviceOrtodontiKontrol)
         draft.select(slot: slot(at: 11))
         #expect(draft.slot != nil)
 
         // Süre değişti; eski slot artık geçerli olmayabilir. Sessizce taşımak
         // kullanıcıya sormadan başka bir saate randevu yazmak olurdu.
-        draft.toggle(serviceId: MockCatalogSeed.serviceHydrafacial)
+        draft.toggle(serviceId: MockCatalogSeed.serviceDisTasiTemizligi)
         #expect(draft.slot == nil)
 
         draft.select(slot: slot(at: 11))
@@ -94,13 +94,13 @@ struct BookingDraftTests {
     @Test("Süre ve tutar seçili hizmetlerden hesaplanır")
     func computesTotals() {
         var draft = BookingDraft(branchId: MockIDs.branchNisantasi)
-        draft.toggle(serviceId: MockCatalogSeed.serviceLazerBolgesel)  // 30 dk, 5/10, 900 ₺
+        draft.toggle(serviceId: MockCatalogSeed.serviceOrtodontiKontrol)  // 30 dk, 5/10, 900 ₺
 
         #expect(draft.visibleMinutes(services: services) == 30)
         #expect(draft.occupiedMinutes(services: services) == 45)
         #expect(draft.totalMinor(services: services) == 90_000)
 
-        draft.toggle(serviceId: MockCatalogSeed.serviceHydrafacial)    // 60 dk, 5/10, 1800 ₺
+        draft.toggle(serviceId: MockCatalogSeed.serviceDisTasiTemizligi)    // 60 dk, 5/10, 1800 ₺
         #expect(draft.visibleMinutes(services: services) == 90)
         #expect(draft.occupiedMinutes(services: services) == 45 + 75)
         #expect(draft.totalMinor(services: services) == 270_000)
@@ -108,11 +108,11 @@ struct BookingDraftTests {
 
     @Test("Şube override'ı süre ve fiyata yansır")
     func appliesBranchOverride() {
-        // Bağdat şubesinde tüm vücut lazer 90 değil 75 dakika ve daha pahalı.
+        // Bağdat şubesinde kanal tedavisi 90 değil 75 dakika ve daha pahalı.
         var main = BookingDraft(branchId: MockIDs.branchNisantasi)
-        main.toggle(serviceId: MockCatalogSeed.serviceLazerTumVucut)
+        main.toggle(serviceId: MockCatalogSeed.serviceKanalTedavisi)
         var other = BookingDraft(branchId: MockIDs.branchBagdat)
-        other.toggle(serviceId: MockCatalogSeed.serviceLazerTumVucut)
+        other.toggle(serviceId: MockCatalogSeed.serviceKanalTedavisi)
 
         #expect(main.visibleMinutes(services: services) == 90)
         #expect(other.visibleMinutes(services: services) == 75)
@@ -123,7 +123,7 @@ struct BookingDraftTests {
     @Test("Slot seçimi aday personel yoksa ilk adayı atar")
     func picksCandidateStaff() {
         var draft = BookingDraft(branchId: MockIDs.branchNisantasi)
-        draft.toggle(serviceId: MockCatalogSeed.serviceLazerBolgesel)
+        draft.toggle(serviceId: MockCatalogSeed.serviceOrtodontiKontrol)
 
         draft.select(slot: slot(at: 11, staff: [
             MockStaffSeed.profileMehmet,
@@ -144,9 +144,9 @@ struct BookingDraftTests {
     @Test("Yalnız hepsini verebilen personel aday olur")
     func filtersEligibleStaff() {
         var draft = BookingDraft(branchId: MockIDs.branchNisantasi)
-        draft.toggle(serviceId: MockCatalogSeed.serviceHydrafacial)
+        draft.toggle(serviceId: MockCatalogSeed.serviceDisTasiTemizligi)
 
-        // Mehmet yalnız Bağdat şubesinde epilasyon yapıyor.
+        // Mehmet yalnız Bağdat şubesinde genel diş hekimliği hizmetlerini veriyor.
         let eligible = draft.eligibleStaff(profiles).map(\.id)
         #expect(eligible == [MockStaffSeed.profileAyse])
     }
@@ -155,8 +155,8 @@ struct BookingDraftTests {
     func buildsCreateInput() throws {
         var draft = BookingDraft(branchId: MockIDs.branchNisantasi)
         draft.customerId = MockCustomerSeed.ayse
-        draft.toggle(serviceId: MockCatalogSeed.serviceLazerBolgesel)
-        draft.toggle(serviceId: MockCatalogSeed.serviceHydrafacial)
+        draft.toggle(serviceId: MockCatalogSeed.serviceOrtodontiKontrol)
+        draft.toggle(serviceId: MockCatalogSeed.serviceDisTasiTemizligi)
         draft.select(slot: slot(at: 11))
         draft.notes = "  İlk seans  "
 
@@ -176,7 +176,7 @@ struct BookingDraftTests {
     @Test("Eksik seçimde gövde üretilmez")
     func refusesIncompleteInput() {
         var draft = BookingDraft(branchId: MockIDs.branchNisantasi)
-        draft.toggle(serviceId: MockCatalogSeed.serviceLazerBolgesel)
+        draft.toggle(serviceId: MockCatalogSeed.serviceOrtodontiKontrol)
         draft.select(slot: slot(at: 11))
         // Müşteri seçilmedi.
         #expect(draft.createInput(clock: clock) == nil)
@@ -207,25 +207,25 @@ struct BookingDraftTests {
     func carriesPackageBinding() throws {
         var draft = BookingDraft(branchId: MockIDs.branchNisantasi)
         draft.select(customerId: MockCustomerSeed.ayse)
-        draft.toggle(serviceId: MockCatalogSeed.serviceLazerBolgesel)
-        draft.toggle(serviceId: MockCatalogSeed.serviceHydrafacial)
+        draft.toggle(serviceId: MockCatalogSeed.serviceOrtodontiKontrol)
+        draft.toggle(serviceId: MockCatalogSeed.serviceDisTasiTemizligi)
         draft.select(slot: slot(at: 11))
         draft.selectPackageItem(
-            MockPackagesSeed.soldAyseItemLazer,
-            for: MockCatalogSeed.serviceLazerBolgesel
+            MockPackagesSeed.soldAyseItemKontrol,
+            for: MockCatalogSeed.serviceOrtodontiKontrol
         )
 
         let input = try #require(draft.createInput(clock: clock))
-        let lazer = input.services.first { $0.serviceId == MockCatalogSeed.serviceLazerBolgesel }
-        let bakim = input.services.first { $0.serviceId == MockCatalogSeed.serviceHydrafacial }
-        #expect(lazer?.customerPackageItemId == MockPackagesSeed.soldAyseItemLazer)
+        let lazer = input.services.first { $0.serviceId == MockCatalogSeed.serviceOrtodontiKontrol }
+        let bakim = input.services.first { $0.serviceId == MockCatalogSeed.serviceDisTasiTemizligi }
+        #expect(lazer?.customerPackageItemId == MockPackagesSeed.soldAyseItemKontrol)
         // Seçilmeyen hizmet paketsiz gider; `nil` "paketten düşme" demek.
         #expect(bakim?.customerPackageItemId == nil)
 
         // Aynı kaleme ikinci dokunuş seçimi kaldırır.
         draft.selectPackageItem(
-            MockPackagesSeed.soldAyseItemLazer,
-            for: MockCatalogSeed.serviceLazerBolgesel
+            MockPackagesSeed.soldAyseItemKontrol,
+            for: MockCatalogSeed.serviceOrtodontiKontrol
         )
         #expect(try #require(draft.createInput(clock: clock))
             .services.allSatisfy { $0.customerPackageItemId == nil })
@@ -235,11 +235,11 @@ struct BookingDraftTests {
     func packageBindingResetsWithCustomer() throws {
         var draft = BookingDraft(branchId: MockIDs.branchNisantasi)
         draft.select(customerId: MockCustomerSeed.ayse)
-        draft.toggle(serviceId: MockCatalogSeed.serviceLazerBolgesel)
+        draft.toggle(serviceId: MockCatalogSeed.serviceOrtodontiKontrol)
         draft.select(slot: slot(at: 11))
         draft.selectPackageItem(
-            MockPackagesSeed.soldAyseItemLazer,
-            for: MockCatalogSeed.serviceLazerBolgesel
+            MockPackagesSeed.soldAyseItemKontrol,
+            for: MockCatalogSeed.serviceOrtodontiKontrol
         )
 
         // Haklar müşteriye özeldir: taşınan bir seçim BAŞKASININ paketinden
@@ -254,12 +254,12 @@ struct BookingDraftTests {
     @Test("Hizmet çıkarılınca paket bağı da düşer")
     func packageBindingDropsWithService() {
         var draft = BookingDraft(branchId: MockIDs.branchNisantasi)
-        draft.toggle(serviceId: MockCatalogSeed.serviceLazerBolgesel)
+        draft.toggle(serviceId: MockCatalogSeed.serviceOrtodontiKontrol)
         draft.selectPackageItem(
-            MockPackagesSeed.soldAyseItemLazer,
-            for: MockCatalogSeed.serviceLazerBolgesel
+            MockPackagesSeed.soldAyseItemKontrol,
+            for: MockCatalogSeed.serviceOrtodontiKontrol
         )
-        draft.toggle(serviceId: MockCatalogSeed.serviceLazerBolgesel)
+        draft.toggle(serviceId: MockCatalogSeed.serviceOrtodontiKontrol)
 
         #expect(draft.packageItemIds.isEmpty)
     }

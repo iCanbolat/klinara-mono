@@ -64,48 +64,6 @@ struct Phase8DecodingTests {
         #expect(Set(templates.map(\.rowId)).count == 2)
     }
 
-    // MARK: Tercihler
-
-    @Test("Sessiz saat bir zaman damgası değil, `\"HH:MM\"` metni")
-    func decodesPreferenceQuietHours() throws {
-        let preference = try decode(
-            NotificationPreference.self,
-            Fixtures.notificationPreferenceDefault
-        )
-
-        #expect(preference.quietHoursStart == "21:00")
-        #expect(preference.quietHoursEnd == "09:00")
-        #expect(preference.quietHoursLabel == "21:00 – 09:00")
-        #expect(preference.isDefault)
-        #expect(preference.branchId == nil)
-        #expect(preference.id == "appointment_cancelled|tenant")
-    }
-
-    @Test("Kanal önceliği gönderildiği sırada çözülür")
-    func decodesPreferenceChannelOrder() throws {
-        let preference = try decode(
-            NotificationPreference.self,
-            Fixtures.notificationPreferenceSaved
-        )
-
-        #expect(preference.channels == [.whatsapp])
-        #expect(preference.isEnabled)
-    }
-
-    @Test("Boş kanal listesi \"olay kapalı\" demek")
-    func emptyChannelsMeansDisabled() throws {
-        let json = """
-        {
-          "id": null, "branchId": null, "event": "package_expiring",
-          "channels": [], "quietHoursStart": null, "quietHoursEnd": null, "isDefault": false
-        }
-        """
-        let preference = try decode(NotificationPreference.self, json)
-
-        #expect(!preference.isEnabled)
-        #expect(preference.quietHoursLabel == nil)
-    }
-
     // MARK: Hatırlatma ve çizelge
 
     @Test("Şube override'ı yokken çözülmüş kiracı ayarı döner")
@@ -289,31 +247,6 @@ struct Phase8DecodingTests {
         #expect(failed.error != nil)
     }
 
-    @Test("Gelen kutusunun `messageType`'ı enum değil serbest metin")
-    func decodesInboxItem() throws {
-        // Meta'nın alanı serbest geçiyor; kapalı bir enum bilinmeyen bir türde
-        // tüm gelen kutusunu çözemez hâle getirirdi.
-        let json = """
-        [{
-          "id": "5c11e229-1a38-425a-92a2-aee85bb7427f",
-          "customerId": null,
-          "from": "+90********88",
-          "messageType": "sticker",
-          "body": null,
-          "receivedAt": "2026-08-28T22:36:45.305Z",
-          "handledAt": null
-        }]
-        """
-        let item = try #require(try decode([InboxItem].self, json).first)
-
-        #expect(item.messageType == "sticker")
-        #expect(item.messageTypeLabel == "sticker")
-        #expect(!item.isHandled)
-        // Gövde boş gelebiliyor; listede boş satır göstermemek için tür
-        // etiketine düşüyoruz.
-        #expect(item.preview == "(sticker)")
-    }
-
     // MARK: Hata kodları
 
     @Test("Faz 8 hata kodları çözülür ve kullanıcıya ne yapacağını söyler")
@@ -323,10 +256,6 @@ struct Phase8DecodingTests {
         // `detail` izinli değişkenleri sayıyor; genel bir cümle kullanıcıya
         // hangi adı yazacağını söylemezdi.
         #expect(APIError.problem(templateInvalid).displayMessage.contains("customerName"))
-
-        let quietHours = try decode(ProblemDetails.self, Fixtures.quietHoursProblem)
-        #expect(quietHours.code == .validationFailed)
-        #expect(quietHours.status == 422)
     }
 
     @Test("Kota hatası GEÇİCİ; diğer WhatsApp hataları kalıcı")

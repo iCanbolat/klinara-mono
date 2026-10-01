@@ -65,8 +65,12 @@ final class PackageDefinitionStore {
 
     func load(force: Bool = false) async {
         if !force, state.value != nil { return }
-        state = .loading
-        nextCursor = nil
+        // İlk yüklemede iskelet; yenilemede eldeki liste ekranda kalır.
+        // Yenilemede `.loading`e dönmek `KlinaraScreen`in ScrollView'unu söküp
+        // iskeleti koyar: aşağı çekerek yenileyen `.refreshable` görevi iptal
+        // olur, iptal sessiz hata olarak `.failed`a düşer ve ekran yükleme
+        // durumunda takılı kalır.
+        if state.value == nil { state = .loading }
         do {
             let page = try await service.definitions(
                 cursor: nil,
@@ -77,8 +81,11 @@ final class PackageDefinitionStore {
             )
             state = .loaded(page.data)
             nextCursor = page.pageInfo.nextCursor
+        } catch let error as APIError where error.isSilent {
+            return
         } catch {
-            state = .failed(error as? APIError ?? .network)
+            guard !Task.isCancelled else { return }
+            if state.value == nil { state = .failed(error as? APIError ?? .network) }
         }
     }
 

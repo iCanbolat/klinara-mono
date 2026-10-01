@@ -9,30 +9,12 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * WhatsApp entegrasyonu ve gelen kutusu — iOS `WhatsAppService` paritesi.
- *
- * **Gelen kutusu burada**, bildirim servisinde değil: gelen mesajlar webhook'tan
- * (`integrations` modülü) düşüyor ve sunucuda da oradalar. Gelen kutusu A8.1'de, hesap,
- * doğrulama ve test gönderimi A8.3'te geldi.
+ * WhatsApp entegrasyonu — iOS `WhatsAppService` paritesi.
  *
  * İzinler: hesap `notification:manage`, şablon listesi `notification:read`, test gönderimi
- * ve "işlendi" `notification:send`.
+ * `notification:send`.
  */
 interface WhatsAppService {
-    /**
-     * `GET inbox?onlyUnhandled=&limit=` — **çıplak dizi**, sayfalama YOK (sunucu cursor vermiyor).
-     *
-     * [onlyUnhandled] her zaman gönderilir: sunucu `"false"` dışındaki her şeyi `true` sayıyor
-     * ve parametreyi atlamak "yalnız işlenmemişler" demek olurdu.
-     */
-    suspend fun inbox(
-        onlyUnhandled: Boolean,
-        limit: Int? = null,
-    ): List<InboxItem>
-
-    /** `POST inbox/:id/handle` — 204, gövdesiz. */
-    suspend fun markInboxHandled(id: String)
-
     /**
      * `GET integrations/whatsapp` — kurulmamışken **boş gövdeli 200** (`sendOptional`). `null` bir
      * hata değil, "henüz kurulmadı" demek; ekran boş durumu gösterir, kırmızı bant değil.
@@ -55,23 +37,6 @@ interface WhatsAppService {
 class LiveWhatsAppService internal constructor(
     private val client: ApiClient,
 ) : WhatsAppService {
-    override suspend fun inbox(
-        onlyUnhandled: Boolean,
-        limit: Int?,
-    ): List<InboxItem> =
-        client.send(
-            ApiRequest.get(
-                "inbox",
-                query =
-                    buildList {
-                        add("onlyUnhandled" to onlyUnhandled.toString())
-                        limit?.let { add("limit" to it.toString()) }
-                    },
-            ),
-        )
-
-    override suspend fun markInboxHandled(id: String) = client.sendVoid(ApiRequest.post("inbox/$id/handle"))
-
     override suspend fun account(): WhatsAppAccount? = client.sendOptional(ApiRequest.get(ACCOUNT_PATH))
 
     override suspend fun upsertAccount(input: WhatsAppAccountUpsert): WhatsAppAccount =

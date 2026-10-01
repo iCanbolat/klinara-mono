@@ -2,7 +2,6 @@ package com.klinara.android.features.customers
 
 import com.klinara.android.services.crm.Customer
 import com.klinara.android.services.crm.CustomerGender
-import com.klinara.android.services.crm.CustomerSource
 import com.klinara.android.services.crm.CustomerTag
 import com.klinara.android.services.crm.Patch
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -23,7 +22,6 @@ class CustomerFormTest {
             email = "ayse@ornek.com",
             city = "İstanbul",
             gender = CustomerGender.Female,
-            source = CustomerSource.Instagram,
             tags = listOf(CustomerTag(id = "t1", name = "VIP")),
         )
 

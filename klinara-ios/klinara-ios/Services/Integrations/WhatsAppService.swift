@@ -1,10 +1,9 @@
 import Foundation
 
-/// WhatsApp entegrasyonu ve gelen kutusu (Faz 8.2 / 8.3).
+/// WhatsApp entegrasyonu (Faz 8.2 / 8.3).
 ///
 /// ``NotificationsService``den ayrı: burada `notification:manage` (kimlik
-/// bilgileri) ile `notification:send` (test gönderimi, gelen mesajı işlendi
-/// işaretleme) iç içe geçiyor ve ekran ailesi bir *entegrasyon kurulumu*,
+/// bilgileri) ile `notification:send` (test gönderimi) iç içe geçiyor ve ekran ailesi bir *entegrasyon kurulumu*,
 /// bir bildirim ayarı değil.
 ///
 /// Webhook uçları (`GET|POST /webhooks/whatsapp`) burada YOK: onlar Meta'nın
@@ -34,13 +33,6 @@ protocol WhatsAppService: Sendable {
     /// gönderiyor; değişken bekleyen şablon Meta tarafından reddedilir.
     /// Kalıcı hatalar `422`, geçici hatalar `503` olarak gelir.
     func sendTest(_ input: SendTestMessageInput) async throws -> SendTestMessageResult
-
-    /// `GET /inbox` — **çıplak dizi**, sayfalama YOK: sunucu yalnız `limit`
-    /// alıyor, cursor vermiyor. Ekran sonsuz kaydırma sunmamalı.
-    func inbox(onlyUnhandled: Bool, limit: Int?) async throws -> [InboxItem]
-
-    /// `POST /inbox/:id/handle` — yanıt gövdesiz (`204`).
-    func markInboxHandled(id: String) async throws
 }
 
 struct LiveWhatsAppService: WhatsAppService {
@@ -69,15 +61,5 @@ struct LiveWhatsAppService: WhatsAppService {
 
     func sendTest(_ input: SendTestMessageInput) async throws -> SendTestMessageResult {
         try await client.send(APIRequest.post("integrations/whatsapp/test", body: input))
-    }
-
-    func inbox(onlyUnhandled: Bool, limit: Int?) async throws -> [InboxItem] {
-        var query = [URLQueryItem(name: "onlyUnhandled", value: onlyUnhandled ? "true" : "false")]
-        if let limit { query.append(URLQueryItem(name: "limit", value: String(limit))) }
-        return try await client.send(APIRequest.get("inbox", query: query))
-    }
-
-    func markInboxHandled(id: String) async throws {
-        try await client.send(APIRequest.post("inbox/\(id)/handle"))
     }
 }

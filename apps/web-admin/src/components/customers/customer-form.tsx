@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
-import { CUSTOMER_GENDERS, CUSTOMER_SOURCES, type Customer } from '@klinara/shared';
+import { CUSTOMER_GENDERS, type Customer } from '@klinara/shared';
 import { t } from '@/i18n/tr';
 import { api } from '@/lib/api/client';
 import { Alert } from '@/components/ui/alert';
@@ -16,9 +16,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldDate, FieldSelect } from '@/components/ui/field';
+import { Field, FieldDate, FieldSelect, FieldTextarea } from '@/components/ui/field';
 import { errorFor, toFormErrors, type FormErrors } from '@/lib/forms/field-errors';
-import { GENDER_LABEL, SOURCE_LABEL } from './customer-profile';
+import { GENDER_LABEL } from './customer-profile';
 
 const NO_ERRORS: FormErrors = { message: null, fields: {}, requestId: null };
 
@@ -28,7 +28,6 @@ interface Draft {
   email: string;
   birthDate: string;
   gender: string;
-  source: string;
   addressLine: string;
   city: string;
 }
@@ -40,7 +39,6 @@ function toDraft(customer: Customer | null): Draft {
     email: customer?.email ?? '',
     birthDate: customer?.birthDate ?? '',
     gender: customer?.gender ?? '',
-    source: customer?.source ?? '',
     addressLine: customer?.addressLine ?? '',
     city: customer?.city ?? '',
   };
@@ -109,10 +107,9 @@ export function CustomerFormDialog({
         phone: optional(draft.phone),
         email: optional(draft.email),
         birthDate: optional(draft.birthDate),
-        // `gender` ve `source` enum: `null` kabul etmiyorlar, yalnız
-        // atlanabiliyorlar. Boş seçim = alanı gönderme.
+        // `gender` enum: `null` kabul etmiyor, yalnız atlanabiliyor. Boş
+        // seçim = alanı gönderme.
         ...(draft.gender === '' ? {} : { gender: draft.gender }),
-        ...(draft.source === '' ? {} : { source: draft.source }),
         addressLine: optional(draft.addressLine),
         city: optional(draft.city),
       };
@@ -187,27 +184,6 @@ export function CustomerFormDialog({
                 </option>
               ))}
             </FieldSelect>
-            <FieldSelect
-              label={t('customers.source')}
-              value={draft.source}
-              disabled={busy}
-              error={errorFor(errors, 'source')}
-              onChange={(event) => set('source', event.target.value)}
-            >
-              <option value="">—</option>
-              {CUSTOMER_SOURCES.map((value) => (
-                <option key={value} value={value}>
-                  {t(SOURCE_LABEL[value])}
-                </option>
-              ))}
-            </FieldSelect>
-            <Field
-              label="Adres"
-              value={draft.addressLine}
-              disabled={busy}
-              error={errorFor(errors, 'addressLine')}
-              onChange={(event) => set('addressLine', event.target.value)}
-            />
             <Field
               label="Şehir"
               value={draft.city}
@@ -215,6 +191,16 @@ export function CustomerFormDialog({
               error={errorFor(errors, 'city')}
               onChange={(event) => set('city', event.target.value)}
             />
+            <div className="sm:col-span-2">
+              <FieldTextarea
+                label="Adres"
+                rows={3}
+                value={draft.addressLine}
+                disabled={busy}
+                error={errorFor(errors, 'addressLine')}
+                onChange={(event) => set('addressLine', event.target.value)}
+              />
+            </div>
           </div>
 
           {errors.message !== null ? (

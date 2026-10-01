@@ -14,11 +14,8 @@ import com.klinara.android.features.integrations.WhatsAppEditorHost
 import com.klinara.android.features.integrations.WhatsAppSettingsHost
 import com.klinara.android.features.integrations.WhatsAppTemplatesHost
 import com.klinara.android.features.integrations.WhatsAppTestHost
-import com.klinara.android.features.notifications.InboxScreen
 import com.klinara.android.features.notifications.MessageDetailHost
 import com.klinara.android.features.notifications.MessageLogHost
-import com.klinara.android.features.notifications.NotificationPreferenceEditorHost
-import com.klinara.android.features.notifications.NotificationPreferenceListHost
 import com.klinara.android.features.notifications.NotificationTemplateEditorHost
 import com.klinara.android.features.notifications.NotificationTemplateListHost
 import com.klinara.android.features.notifications.ReminderSettingsHost
@@ -58,16 +55,6 @@ internal fun NavGraphBuilder.communicationDestinations(
         )
     }
 
-    composable<ShellRoutes.Inbox> {
-        InboxScreen(
-            session = session,
-            container = container,
-            onBack = { navController.popBackStack() },
-            onOpenCustomer = openCustomer,
-            onOpenConversations = { navController.navigate(ShellRoutes.Conversations) },
-        )
-    }
-
     composable<ShellRoutes.MessageLog> { entry ->
         MessageLogHost(
             session = session,
@@ -94,7 +81,7 @@ internal fun NavGraphBuilder.communicationDestinations(
     whatsAppDestinations(navController, session, container)
 }
 
-/** Hatırlatma, şablon ve tercih hedefleri (A8.2). */
+/** Hatırlatma ve şablon hedefleri (A8.2). */
 private fun NavGraphBuilder.notificationSettingsDestinations(
     navController: NavHostController,
     session: AppSession,
@@ -124,29 +111,6 @@ private fun NavGraphBuilder.notificationSettingsDestinations(
         val route = entry.toRoute<ShellRoutes.NotificationTemplateEditor>()
         val owner = remember(entry) { navController.getBackStackEntry<ShellRoutes.NotificationTemplates>() }
         NotificationTemplateEditorHost(
-            session = session,
-            container = container,
-            owner = owner,
-            rowId = route.rowId,
-            onBack = { navController.popBackStack() },
-        )
-    }
-
-    composable<ShellRoutes.NotificationPreferences> { entry ->
-        NotificationPreferenceListHost(
-            session = session,
-            container = container,
-            owner = entry,
-            onOpen = { navController.navigate(ShellRoutes.NotificationPreferenceEditor(it)) },
-            onBack = { navController.popBackStack() },
-            trailing = trailing,
-        )
-    }
-
-    composable<ShellRoutes.NotificationPreferenceEditor> { entry ->
-        val route = entry.toRoute<ShellRoutes.NotificationPreferenceEditor>()
-        val owner = remember(entry) { navController.getBackStackEntry<ShellRoutes.NotificationPreferences>() }
-        NotificationPreferenceEditorHost(
             session = session,
             container = container,
             owner = owner,

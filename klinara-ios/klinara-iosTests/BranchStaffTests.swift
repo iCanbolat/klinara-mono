@@ -26,6 +26,26 @@ struct BranchStaffDecodingTests {
         #expect(list.data.count == 2)
         #expect(list.data[1].summary.isActive == false)
         #expect(list.data[1].phone == nil)
+        // Eski sunucu yanıtında `mapsUrl` yok: boş sayılır.
+        #expect(list.data[0].mapsUrl == nil)
+    }
+
+    @Test("Şube yanıtı Google Maps bağlantısını taşır")
+    func decodesBranchMapsUrl() throws {
+        let branch = try decode(BranchDetail.self, """
+        {"id":"b1","tenantId":"t1","slug":"nisantasi","name":"Nişantaşı","timezone":"Europe/Istanbul",
+         "phone":null,"address":"Teşvikiye Cad.","mapsUrl":"https://maps.app.goo.gl/abc123","isActive":true,
+         "createdAt":"2026-04-01T08:00:00.000Z"}
+        """)
+        #expect(branch.mapsUrl == "https://maps.app.goo.gl/abc123")
+    }
+
+    @Test("Harita bağlantısı yalnız https kabul eder; boşluklu ya da http bağlantı reddedilir")
+    func mapsLinkMustBeHttps() {
+        #expect(BranchMapsLink.isValid("https://maps.app.goo.gl/abc123"))
+        #expect(!BranchMapsLink.isValid("http://maps.app.goo.gl/abc123"))
+        #expect(!BranchMapsLink.isValid("https://maps.app.goo.gl/a b"))
+        #expect(!BranchMapsLink.isValid("maps.app.goo.gl/abc"))
     }
 
     @Test("Personel profili branchIds taşır; eski sunucu yanıtında alan yoksa boş sayılır")

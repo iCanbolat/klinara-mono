@@ -30,8 +30,13 @@ struct KlinaraSearchablePicker<Value: Identifiable>: View {
     var emptyMessage = "Sonuç yok."
     var createLabel: String?
     var onCreate: (() -> Void)?
+    /// `options` sunucudaki kümenin yalnız bir sayfasıysa (müşteriler) verilir:
+    /// terim sunucuda da aranır ve sonuç yerel eşleşmelere eklenir. Yoksa
+    /// ilk sayfada olmayan kayıt hiçbir aramayla bulunamıyordu.
+    var remoteSearch: ((String) async -> [Value])?
 
     @State private var term = ""
+    @State private var remote: [Value] = []
 
     private var isCollapsed: Bool {
         term.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -41,11 +46,13 @@ struct KlinaraSearchablePicker<Value: Identifiable>: View {
     private var visible: [Value] {
         let trimmed = term.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return isCollapsed ? [] : options }
-        return options.filter { option in
+        let local = options.filter { option in
             SearchText.matches(label(option), term: term)
                 || detail(option).map { SearchText.matches($0, term: term) } ?? false
                 || SearchText.matchesDigits(detail(option), term: term)
         }
+        let known = Set(local.map(\.id))
+        return local + remote.filter { !known.contains($0.id) }
     }
 
     var body: some View {
@@ -82,6 +89,20 @@ struct KlinaraSearchablePicker<Value: Identifiable>: View {
                 }
                 .buttonStyle(.plain)
             }
+        }
+        .task(id: term) {
+            guard let remoteSearch else { return }
+            let trimmed = term.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard trimmed.count >= 2 else {
+                remote = []
+                return
+            }
+            // Her tuşa bir istek atılmasın; terim değişince görev iptal olur.
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else { return }
+            let found = await remoteSearch(trimmed)
+            guard !Task.isCancelled else { return }
+            remote = found
         }
     }
 

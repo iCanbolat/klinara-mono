@@ -4,14 +4,15 @@
   "channel": "whatsapp",
   "locale": "tr",
   "subject": null,
-  "body": "Merhaba {{customerName}}, {{appointmentAt}} tarihindeki {{serviceName}} randevunuz oluşturuldu. Sizi {{branchName}} şubemizde bekliyoruz.",
-  "whatsappTemplateName": "klinara_randevu_olusturuldu",
+  "body": "Merhaba {{customerName}}, {{appointmentAt}} tarihindeki {{serviceName}} randevunuz başarıyla oluşturuldu. Sizi {{branchName}} şubemizde bekliyoruz.\n\nŞubemize kolayca ulaşabilmeniz için adres bilgimizi paylaşıyor, konumu aşağıdaki butonla açabilmenizi sağlıyoruz.\n\nAdres: {{branchAddress}}\n\nRandevunuzla ilgili bir değişiklik olursa bu mesajı yanıtlayarak bize ulaşabilirsiniz. Görüşmek üzere!",
+  "whatsappTemplateName": "klinara_randevu_olusturuldu_v3",
   "whatsappTemplateLanguage": "tr",
   "whatsappVariables": [
     "customerName",
     "appointmentAt",
     "serviceName",
-    "branchName"
+    "branchName",
+    "branchAddress"
   ],
   "isActive": true,
   "isDefault": true,
@@ -19,6 +20,58 @@
     "customerName",
     "appointmentAt",
     "serviceName",
-    "branchName"
+    "branchName",
+    "branchAddress"
+  ],
+  "segments": [
+    {
+      "kind": "text",
+      "text": "Merhaba "
+    },
+    {
+      "kind": "variable",
+      "name": "customerName",
+      "handle": "@MüşteriAdı"
+    },
+    {
+      "kind": "text",
+      "text": ", "
+    },
+    {
+      "kind": "variable",
+      "name": "appointmentAt",
+      "handle": "@RandevuZamanı"
+    },
+    {
+      "kind": "text",
+      "text": " tarihindeki "
+    },
+    {
+      "kind": "variable",
+      "name": "serviceName",
+      "handle": "@HizmetAdı"
+    },
+    {
+      "kind": "text",
+      "text": " randevunuz başarıyla oluşturuldu. Sizi "
+    },
+    {
+      "kind": "variable",
+      "name": "branchName",
+      "handle": "@KlinikAdı"
+    },
+    {
+      "kind": "text",
+      "text": " şubemizde bekliyoruz.\n\nŞubemize kolayca ulaşabilmeniz için adres bilgimizi paylaşıyor, konumu aşağıdaki butonla açabilmenizi sağlıyoruz.\n\nAdres: "
+    },
+    {
+      "kind": "variable",
+      "name": "branchAddress",
+      "handle": "@KlinikAdresi"
+    },
+    {
+      "kind": "text",
+      "text": "\n\nRandevunuzla ilgili bir değişiklik olursa bu mesajı yanıtlayarak bize ulaşabilirsiniz. Görüşmek üzere!"
+    }
   ]
 }

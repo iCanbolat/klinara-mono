@@ -21,6 +21,8 @@ struct CustomerDetailView: View {
     @State private var composingNote = false
     @State private var editingNoteId: NoteReference?
     @State private var error: APIError?
+    /// Kayıt yüklü listelerde yokken sunucudan getiriliyor.
+    @State private var isResolving = true
 
     private var store: CustomerStore { session.customerStore }
     private var clock: BranchClock { session.clock }
@@ -50,6 +52,8 @@ struct CustomerDetailView: View {
                     .padding(.horizontal, KlinaraMetrics.screenInset)
                     .padding(.vertical, KlinaraMetrics.lg)
                 }
+            } else if isResolving {
+                ProgressView()
             } else {
                 EmptyStateView(
                     icon: "person.crop.circle.badge.questionmark",
@@ -61,6 +65,13 @@ struct CustomerDetailView: View {
         .navigationTitle(customer?.fullName ?? "Müşteri")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbarContent }
+        .task(id: customerId) {
+            // Önce kaydın kendisi: listenin ilk sayfalarında olmayabilir
+            // (randevudan ya da aramadan açılan kart).
+            isResolving = true
+            await store.resolve(id: customerId)
+            isResolving = false
+        }
         .task(id: customerId) { await setUpRecord() }
         .sheet(isPresented: $isEditing) {
             if let customer {
@@ -131,10 +142,6 @@ struct CustomerDetailView: View {
             if let address = customer.addressSummary {
                 KlinaraDivider()
                 KlinaraRow(label: "Adres", detail: address)
-            }
-            if let source = customer.source {
-                KlinaraDivider()
-                KlinaraRow(label: "Geliş kaynağı", value: source.turkishName)
             }
             KlinaraDivider()
             KlinaraRow(label: "Kayıt", value: clock.formatDate(customer.createdAt))

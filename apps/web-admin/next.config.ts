@@ -25,6 +25,12 @@ function assetPattern(): NonNullable<NonNullable<NextConfig['images']>['remotePa
   ];
 }
 
+/** `src/config/env.ts`teki `apiInternalUrl` ile aynı varsayılan. */
+const apiInternalUrl = (process.env.API_INTERNAL_URL ?? 'http://localhost:3000/api/v1').replace(
+  /\/$/,
+  '',
+);
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   // Kökteki `eslint.config.js` tek otorite — bkz. web-booking'deki aynı yorum.
@@ -32,6 +38,18 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   images: { remotePatterns: assetPattern() },
   typedRoutes: true,
+  /**
+   * Anlık olay soketi (WebSocket). Route Handler bağlantı yükseltemediği için
+   * `/api/a` proxy'sinden geçemiyor; Next'in rewrite'ı yükseltmeyi API'ye
+   * aktarıyor ve tarayıcı yine YALNIZ kendi origin'ini görüyor. Yol sabit ve
+   * tek: bu bir tünel değil. Kimlik cookie ile değil biletle
+   * (`src/lib/realtime/realtime-client.ts`).
+   *
+   * ⚠️ Hedef DERLEME anında sabitlenir: `API_INTERNAL_URL` `next build`
+   * sırasında da doğru olmalı.
+   */
+  rewrites: () =>
+    Promise.resolve([{ source: '/api/realtime', destination: `${apiInternalUrl}/realtime` }]),
 };
 
 export default nextConfig;

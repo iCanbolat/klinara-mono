@@ -2,27 +2,27 @@ import Foundation
 
 /// Mock paket verisinin başlangıç durumu.
 ///
-/// İki tanım kasıtlı olarak farklı: biri **çok kalemli ve indirimli** (10 lazer
-/// + 2 bakım), diğeri tek kalemli ve süresiz. Faz 5'in var olma sebebi olan
-/// hata — 12 seansın hepsinin lazer olarak tüketilmesi — ancak çok kalemli bir
+/// İki tanım kasıtlı olarak farklı: biri **çok kalemli ve indirimli** (10 ortodonti
+/// kontrolü + 2 temizlik), diğeri tek kalemli ve süresiz. Faz 5'in var olma sebebi olan
+/// hata — 12 seansın hepsinin kontrol olarak tüketilmesi — ancak çok kalemli bir
 /// paketle ekranda sınanabilir.
 enum MockPackagesSeed {
 
-    static let definitionLazer10 = "f1000000-0000-4000-8000-000000000001"
-    static let definitionCilt5 = "f1000000-0000-4000-8000-000000000002"
+    static let definitionOrtodonti10 = "f1000000-0000-4000-8000-000000000001"
+    static let definitionDolgu5 = "f1000000-0000-4000-8000-000000000002"
 
     static let soldAysePackage = "f2000000-0000-4000-8000-000000000001"
-    static let soldAyseItemLazer = "f3000000-0000-4000-8000-000000000001"
-    static let soldAyseItemBakim = "f3000000-0000-4000-8000-000000000002"
+    static let soldAyseItemKontrol = "f3000000-0000-4000-8000-000000000001"
+    static let soldAyseItemTemizlik = "f3000000-0000-4000-8000-000000000002"
 
     static func definitions(at now: Date) -> [PackageDefinition] {
         [
             PackageDefinition(
-                id: definitionLazer10,
+                id: definitionOrtodonti10,
                 branchId: nil,
-                slug: "lazer-10-seans",
-                name: "10 Seans Lazer + 2 Bakım",
-                description: "Bölgesel lazer epilasyon paketi, iki bakım seansı hediye.",
+                slug: "ortodonti-10-kontrol",
+                name: "Ortodonti: 10 Kontrol + 2 Temizlik",
+                description: "Tedavi süresince aylık kontroller, iki diş taşı temizliği dahil.",
                 totalPriceMinor: 1_200_000,
                 // 10 × 120.000 + 2 × 180.000 = 1.560.000 → %23 indirim.
                 listPriceMinor: 1_560_000,
@@ -36,16 +36,16 @@ enum MockPackagesSeed {
                 items: [
                     PackageDefinitionItem(
                         id: "f4000000-0000-4000-8000-000000000001",
-                        serviceId: MockCatalogSeed.serviceLazerBolgesel,
-                        serviceName: "Bölgesel Lazer Epilasyon",
+                        serviceId: MockCatalogSeed.serviceOrtodontiKontrol,
+                        serviceName: "Ortodonti Kontrolü",
                         quantity: 10,
                         unitListPriceMinor: 120_000,
                         sortOrder: 0
                     ),
                     PackageDefinitionItem(
                         id: "f4000000-0000-4000-8000-000000000002",
-                        serviceId: MockCatalogSeed.serviceHydrafacial,
-                        serviceName: "Hydrafacial",
+                        serviceId: MockCatalogSeed.serviceDisTasiTemizligi,
+                        serviceName: "Diş Taşı Temizliği",
                         quantity: 2,
                         unitListPriceMinor: 180_000,
                         sortOrder: 1
@@ -56,10 +56,10 @@ enum MockPackagesSeed {
                 deletedAt: nil
             ),
             PackageDefinition(
-                id: definitionCilt5,
+                id: definitionDolgu5,
                 branchId: MockIDs.branchNisantasi,
-                slug: "cilt-bakimi-5",
-                name: "5 Seans Cilt Bakımı",
+                slug: "kompozit-dolgu-5",
+                name: "5 Kompozit Dolgu",
                 description: nil,
                 totalPriceMinor: 800_000,
                 listPriceMinor: 900_000,
@@ -74,8 +74,8 @@ enum MockPackagesSeed {
                 items: [
                     PackageDefinitionItem(
                         id: "f4000000-0000-4000-8000-000000000003",
-                        serviceId: MockCatalogSeed.serviceKimyasalPeeling,
-                        serviceName: "Kimyasal Peeling",
+                        serviceId: MockCatalogSeed.serviceKompozitDolgu,
+                        serviceName: "Kompozit Dolgu",
                         quantity: 5,
                         unitListPriceMinor: 180_000,
                         sortOrder: 0
@@ -95,8 +95,8 @@ enum MockPackagesSeed {
             id: soldAysePackage,
             customerId: MockCustomerSeed.ayse,
             branchId: MockIDs.branchNisantasi,
-            definitionId: definitionLazer10,
-            name: "10 Seans Lazer + 2 Bakım",
+            definitionId: definitionOrtodonti10,
+            name: "Ortodonti: 10 Kontrol + 2 Temizlik",
             definitionRevision: 1,
             totalPriceMinor: 1_200_000,
             currency: "TRY",
@@ -117,9 +117,9 @@ enum MockPackagesSeed {
             version: 4,
             items: [
                 CustomerPackageItem(
-                    id: soldAyseItemLazer,
-                    serviceId: MockCatalogSeed.serviceLazerBolgesel,
-                    serviceName: "Bölgesel Lazer Epilasyon",
+                    id: soldAyseItemKontrol,
+                    serviceId: MockCatalogSeed.serviceOrtodontiKontrol,
+                    serviceName: "Ortodonti Kontrolü",
                     quantityTotal: 10,
                     remainingSessions: 6,
                     unitListPriceMinor: 120_000,
@@ -128,9 +128,9 @@ enum MockPackagesSeed {
                     sortOrder: 0
                 ),
                 CustomerPackageItem(
-                    id: soldAyseItemBakim,
-                    serviceId: MockCatalogSeed.serviceHydrafacial,
-                    serviceName: "Hydrafacial",
+                    id: soldAyseItemTemizlik,
+                    serviceId: MockCatalogSeed.serviceDisTasiTemizligi,
+                    serviceName: "Diş Taşı Temizliği",
                     quantityTotal: 2,
                     remainingSessions: 1,
                     unitListPriceMinor: 180_000,
@@ -146,7 +146,7 @@ enum MockPackagesSeed {
     /// Satış + dört kullanım + bir düzeltme: defter ekranının bütün satır
     /// tiplerini (ters kayıt dahil) tek pakette gösteriyor.
     static func ledger(for package: CustomerPackage, at now: Date) -> [PackageLedgerEntry] {
-        let lazer = package.items[0]
+        let kontrol = package.items[0]
         let bakim = package.items[1]
         var entries: [PackageLedgerEntry] = []
 
@@ -173,23 +173,23 @@ enum MockPackagesSeed {
             )
         }
 
-        entries.append(entry(lazer, .purchase, 10, daysAgo: 60))
+        entries.append(entry(kontrol, .purchase, 10, daysAgo: 60))
         entries.append(entry(bakim, .purchase, 2, daysAgo: 60))
-        entries.append(entry(lazer, .consume, -1, daysAgo: 50))
-        entries.append(entry(lazer, .consume, -1, daysAgo: 36))
-        entries.append(entry(lazer, .consume, -1, daysAgo: 22))
-        let reversed = entry(lazer, .consume, -1, daysAgo: 14)
+        entries.append(entry(kontrol, .consume, -1, daysAgo: 50))
+        entries.append(entry(kontrol, .consume, -1, daysAgo: 36))
+        entries.append(entry(kontrol, .consume, -1, daysAgo: 22))
+        let reversed = entry(kontrol, .consume, -1, daysAgo: 14)
         entries.append(reversed)
         entries.append(
             entry(
-                lazer, .consume, 1, daysAgo: 14,
+                kontrol, .consume, 1, daysAgo: 14,
                 reason: "Randevu tamamlanmadan işaretlenmiş",
                 reverses: reversed.id
             )
         )
         entries.append(entry(bakim, .consume, -1, daysAgo: 5))
         entries.append(
-            entry(lazer, .manualAdjustment, -1, daysAgo: 2, reason: "Cihaz arızası telafisi")
+            entry(kontrol, .manualAdjustment, -1, daysAgo: 2, reason: "Braket kırığı, ek kontrol")
         )
         return entries.sorted { $0.createdAt > $1.createdAt }
     }

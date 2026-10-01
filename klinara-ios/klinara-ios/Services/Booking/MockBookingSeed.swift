@@ -48,29 +48,29 @@ enum MockBookingSeed {
     ) -> [Appointment] {
         guard scenario != .emptyDay else { return [] }
         guard let ayse = profiles.first(where: { $0.id == MockStaffSeed.profileAyse }),
-              let lazer = services.first(where: { $0.id == MockCatalogSeed.serviceLazerTumVucut }),
+              let kanal = services.first(where: { $0.id == MockCatalogSeed.serviceKanalTedavisi }),
               !customers.isEmpty
         else { return [] }
 
         let clock = BranchClock(timeZoneIdentifier: timezone)
         let today = clock.startOfDay(MockNow.reference)
         let branchId = MockIDs.branchNisantasi
-        let bolgesel = services.first { $0.id == MockCatalogSeed.serviceLazerBolgesel } ?? lazer
+        let kontrol = services.first { $0.id == MockCatalogSeed.serviceOrtodontiKontrol } ?? kanal
 
         var plans: [(ClockTime, ClinicService, AppointmentStatus, Customer)] = [
-            (ClockTime(hour: 9, minute: 30), lazer, .completed, customers[0]),
-            (ClockTime(hour: 11, minute: 0), bolgesel, .arrived, customers[min(1, customers.count - 1)]),
-            (ClockTime(hour: 15, minute: 0), lazer, .scheduled, customers[0]),
+            (ClockTime(hour: 9, minute: 30), kanal, .completed, customers[0]),
+            (ClockTime(hour: 11, minute: 0), kontrol, .arrived, customers[min(1, customers.count - 1)]),
+            (ClockTime(hour: 15, minute: 0), kanal, .scheduled, customers[0]),
         ]
 
         if scenario == .conflictHeavy {
             // Gün neredeyse kapalı: geriye tek tük boşluk kalsın ki çakışma
             // ekranı ve öneri listesi kolayca tetiklenebilsin.
             plans.append(contentsOf: [
-                (ClockTime(hour: 10, minute: 30), bolgesel, .confirmed, customers[0]),
-                (ClockTime(hour: 12, minute: 0), bolgesel, .confirmed, customers[min(1, customers.count - 1)]),
-                (ClockTime(hour: 14, minute: 0), bolgesel, .scheduled, customers[min(2, customers.count - 1)]),
-                (ClockTime(hour: 16, minute: 30), lazer, .cancelled, customers[min(3, customers.count - 1)]),
+                (ClockTime(hour: 10, minute: 30), kontrol, .confirmed, customers[0]),
+                (ClockTime(hour: 12, minute: 0), kontrol, .confirmed, customers[min(1, customers.count - 1)]),
+                (ClockTime(hour: 14, minute: 0), kontrol, .scheduled, customers[min(2, customers.count - 1)]),
+                (ClockTime(hour: 16, minute: 30), kanal, .cancelled, customers[min(3, customers.count - 1)]),
             ])
         }
 
@@ -102,8 +102,8 @@ enum MockBookingSeed {
                 startsAt: start,
                 endsAt: end,
                 origin: index == 2 ? .online : .internal,
-                notes: index == 0 ? "İlk seans, cilt testi yapıldı." : nil,
-                cancellationReason: status == .cancelled ? "Müşteri erteledi" : nil,
+                notes: index == 0 ? "36 numara, ilk seans. Röntgen çekildi." : nil,
+                cancellationReason: status == .cancelled ? "Hasta erteledi" : nil,
                 version: 1,
                 totalMinor: effective.priceMinor,
                 createdAt: clock.adding(days: -3, to: start),

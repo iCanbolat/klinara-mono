@@ -93,38 +93,6 @@ extension Fixtures {
     }
     """
 
-    /// `GET /notification-preferences` satırı — sentezlenmiş varsayılan.
-    /// Sessiz saat `"HH:MM"`, zaman damgası değil.
-    static let notificationPreferenceDefault = """
-    {
-      "id": null,
-      "branchId": null,
-      "event": "appointment_cancelled",
-      "channels": [
-        "whatsapp"
-      ],
-      "quietHoursStart": "21:00",
-      "quietHoursEnd": "09:00",
-      "isDefault": true
-    }
-    """
-
-    /// `PUT /notification-preferences` → 200. `branchId` `null` = kiracı
-    /// varsayılanı; kanal sırası GÖNDERİLDİĞİ gibi geri geliyor.
-    static let notificationPreferenceSaved = """
-    {
-      "id": "5c11e229-1a38-425a-92a2-aee85bb7427f",
-      "branchId": null,
-      "event": "appointment_reminder",
-      "channels": [
-        "whatsapp"
-      ],
-      "quietHoursStart": "22:00",
-      "quietHoursEnd": "08:00",
-      "isDefault": false
-    }
-    """
-
     /// `GET /branches/:id/reminder-settings` — şube override'ı YOK, kiracı
     /// ayarı çözülmüş olarak dönüyor.
     static let reminderSettingsTenantDefault = """
@@ -270,19 +238,6 @@ extension Fixtures {
       "instance": "/api/v1/notification-templates",
       "requestId": "2cff67c7-6a2f-45a8-9132-dc935f387656",
       "detail": "Kullanılabilir değişkenler: customerName, branchName, appointmentAt, serviceName"
-    }
-    """
-
-    /// `PUT /notification-preferences` → 422: sessiz saatin yalnız bir ucu
-    /// gönderildi.
-    static let quietHoursProblem = """
-    {
-      "type": "https://errors.klinara.app/validation-failed",
-      "title": "Sessiz saat başlangıcı ve bitişi birlikte verilmeli",
-      "status": 422,
-      "code": "VALIDATION_FAILED",
-      "instance": "/api/v1/notification-preferences",
-      "requestId": "25fd73e0-5ada-443f-8037-b06930b204d2"
     }
     """
 }

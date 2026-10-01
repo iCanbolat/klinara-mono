@@ -235,16 +235,6 @@ nonisolated struct NoShowReport: Decodable, Sendable, Equatable {
 
 // MARK: - Kazanım ve geri dönüş
 
-nonisolated struct AcquisitionRow: Decodable, Sendable, Identifiable, Equatable {
-    /// `customers.source`; girilmemişse `nil`.
-    let source: String?
-    let customers: Int
-
-    var id: String { source ?? "__unknown__" }
-
-    var turkishName: String { source ?? "Belirtilmemiş" }
-}
-
 nonisolated struct RetentionTotals: Decodable, Sendable, Equatable {
     /// Penceredeki İLK tamamlanmış randevusu olan müşteriler.
     let newCustomers: Int
@@ -281,7 +271,6 @@ nonisolated struct ReportPageQuery: Sendable, Equatable {
 nonisolated struct RetentionReport: Decodable, Sendable, Equatable {
     let period: ReportPeriod
     let totals: RetentionTotals
-    let acquisition: [AcquisitionRow]
     let cohorts: [CohortReturn]
     let previous: RetentionTotals?
     let delta: ReportDelta?

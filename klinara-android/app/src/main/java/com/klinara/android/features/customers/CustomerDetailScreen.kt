@@ -282,7 +282,6 @@ private fun CustomerDetailBody(
         customer.gender?.let { KlinaraRow(label = "Cinsiyet", value = it.turkishName) }
         customer.addressSummary?.let { KlinaraRow(label = "Adres", value = it) }
         customer.postalCode?.let { KlinaraRow(label = "Posta kodu", value = it) }
-        customer.source?.let { KlinaraRow(label = "Geliş kaynağı", value = it.turkishName) }
         customer.createdAt?.let { KlinaraRow(label = "Kayıt tarihi", value = clock.formatDateTime(it)) }
     }
 

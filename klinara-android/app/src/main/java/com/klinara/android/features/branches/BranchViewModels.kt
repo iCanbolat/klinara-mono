@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.klinara.android.services.ServiceContainer
 import com.klinara.android.services.branches.BranchDetail
+import com.klinara.android.services.branches.BranchMapsLink
 import com.klinara.android.services.branches.BranchSlug
 import com.klinara.android.services.branches.BranchesService
 import com.klinara.android.services.branches.CreateBranchInput
@@ -63,6 +64,7 @@ data class BranchDraft(
     val timezone: String = original?.timezone ?: "Europe/Istanbul",
     val phone: String = original?.phone.orEmpty(),
     val address: String = original?.address.orEmpty(),
+    val mapsUrl: String = original?.mapsUrl.orEmpty(),
     val isActive: Boolean = original?.isActive ?: true,
 ) {
     val isCreate: Boolean get() = original == null
@@ -83,8 +85,17 @@ data class BranchDraft(
     val isDirty: Boolean
         get() = if (original == null) name.isNotBlank() || slug.isNotBlank() else !updateInput(original).isEmpty
 
+    /** Bağlantı müşteriye giden mesaja yazılır: yalnız https kabul edilir. */
+    val mapsUrlError: String?
+        get() =
+            if (mapsUrl.isNotBlank() && !BranchMapsLink.isValid(mapsUrl.trim())) {
+                "https:// ile başlayan bir bağlantı olmalı."
+            } else {
+                null
+            }
+
     val isValid: Boolean
-        get() = name.isNotBlank() && (!isCreate || BranchSlug.isValid(slug))
+        get() = name.isNotBlank() && (!isCreate || BranchSlug.isValid(slug)) && mapsUrlError == null
 
     /** Aktif bir şubeyi pasife almak — kaydetmeden önce ayrıca onay istenir. */
     val deactivates: Boolean get() = original?.isActive == true && !isActive
@@ -96,6 +107,7 @@ data class BranchDraft(
             timezone = timezone,
             phone = phone.trim().ifEmpty { null },
             address = address.trim().ifEmpty { null },
+            mapsUrl = mapsUrl.trim().ifEmpty { null },
         )
 
     fun updateInput(from: BranchDetail): UpdateBranchInput =
@@ -104,6 +116,7 @@ data class BranchDraft(
             timezone = timezone.takeIf { it != from.timezone },
             phone = if (phone.trim() != from.phone.orEmpty()) Patch.text(phone) else Patch.Unchanged,
             address = if (address.trim() != from.address.orEmpty()) Patch.text(address) else Patch.Unchanged,
+            mapsUrl = if (mapsUrl.trim() != from.mapsUrl.orEmpty()) Patch.text(mapsUrl) else Patch.Unchanged,
             isActive = isActive.takeIf { it != from.isActive },
         )
 }

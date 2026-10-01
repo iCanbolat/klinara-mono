@@ -37,12 +37,24 @@ export interface EventDefinition {
 export const EVENT_DEFINITIONS: Record<NotificationEvent, EventDefinition> = {
   appointment_confirmation: {
     channels: ['whatsapp'],
-    variables: ['customerName', 'branchName', 'appointmentAt', 'serviceName'],
+    variables: [
+      'customerName',
+      'branchName',
+      'branchAddress',
+      'appointmentAt',
+      'serviceName',
+    ],
     templates: {},
   },
   appointment_reminder: {
     channels: ['whatsapp'],
-    variables: ['customerName', 'branchName', 'appointmentAt', 'serviceName'],
+    variables: [
+      'customerName',
+      'branchName',
+      'branchAddress',
+      'appointmentAt',
+      'serviceName',
+    ],
     templates: {},
   },
   appointment_cancelled: {
@@ -101,10 +113,14 @@ export const ALL_EVENTS = Object.keys(EVENT_DEFINITIONS) as NotificationEvent[];
  * Şablon ve tercih ekranlarında görünen olaylar.
  *
  * `staff_reply` dışarıda: metni resepsiyon her seferinde kendisi yazıyor,
- * kanal tercihi de yok (sohbet WhatsApp'ta).
+ * kanal tercihi de yok (sohbet WhatsApp'ta). `staff_internal` de dışarıda:
+ * alıcısı müşteri değil personel, metni kiracı değil platform belirliyor
+ * (davet, parola sıfırlama gibi e-postalar `MailModule`den platformun kendi
+ * adresiyle gidiyor). Olay tanımı kalıyor çünkü mesaj günlüğünde geçmiş
+ * `staff_internal` satırları var.
  */
 export const CONFIGURABLE_EVENTS: NotificationEvent[] = ALL_EVENTS.filter(
-  (event) => event !== 'staff_reply',
+  (event) => event !== 'staff_reply' && event !== 'staff_internal',
 );
 
 /**

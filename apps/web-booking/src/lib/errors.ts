@@ -45,6 +45,16 @@ const MESSAGES: Record<string, { message: string; recovery: Recovery }> = {
     message: 'Seçtiğiniz uygulayıcı artık uygun değil. Listeyi yeniledik.',
     recovery: 'refresh-slots',
   },
+  // Slot listelendikten sonra çalışma saati ya da personelin izni değişmiş:
+  // kullanıcı için sonuç "bu saat artık yok"tur, jenerik hata değil.
+  [ERROR_CODES.OUTSIDE_WORKING_HOURS]: {
+    message: 'Seçtiğiniz saat artık uygun değil. Uygun saatleri yeniledik.',
+    recovery: 'refresh-slots',
+  },
+  [ERROR_CODES.RESOURCE_UNAVAILABLE]: {
+    message: 'Seçtiğiniz uygulayıcı bu saatte uygun değil. Uygun saatleri yeniledik.',
+    recovery: 'refresh-slots',
+  },
   [ERROR_CODES.HOLD_INVALID]: {
     message: 'Seçiminiz kayboldu. Lütfen saati yeniden seçin.',
     recovery: 'reset-hold',

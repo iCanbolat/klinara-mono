@@ -17,6 +17,8 @@ nonisolated struct BranchDetail: Decodable, Sendable, Identifiable, Equatable {
     let timezone: String
     let phone: String?
     let address: String?
+    /// Google Maps bağlantısı (https); şube bilgisi; mesajlarda kullanılmaz (harita butonu adresten üretilir).
+    var mapsUrl: String? = nil
     let isActive: Bool
     let createdAt: Date
 
@@ -33,19 +35,21 @@ nonisolated struct CreateBranchInput: Encodable, Sendable, Equatable {
     var timezone: String?
     var phone: String?
     var address: String?
+    var mapsUrl: String?
 }
 
-/// `UpdateBranchDto` — telefon ve adres ``Nullable``: boşaltılan alan `null`
+/// `UpdateBranchDto` — telefon, adres ve harita bağlantısı ``Nullable``: boşaltılan alan `null`
 /// ile temizlenir, dokunulmayan alan hiç gönderilmez.
 nonisolated struct UpdateBranchInput: Encodable, Sendable, Equatable {
     var name: String?
     var timezone: String?
     var phone: Nullable<String> = .unchanged
     var address: Nullable<String> = .unchanged
+    var mapsUrl: Nullable<String> = .unchanged
     var isActive: Bool?
 
     private enum CodingKeys: String, CodingKey {
-        case name, timezone, phone, address, isActive
+        case name, timezone, phone, address, mapsUrl, isActive
     }
 
     func encode(to encoder: any Encoder) throws {
@@ -54,11 +58,21 @@ nonisolated struct UpdateBranchInput: Encodable, Sendable, Equatable {
         try container.encodeIfPresent(timezone, forKey: .timezone)
         try container.encode(phone, forKey: .phone)
         try container.encode(address, forKey: .address)
+        try container.encode(mapsUrl, forKey: .mapsUrl)
         try container.encodeIfPresent(isActive, forKey: .isActive)
     }
 
     var isEmpty: Bool {
-        name == nil && timezone == nil && phone.isUnchanged && address.isUnchanged && isActive == nil
+        name == nil && timezone == nil && phone.isUnchanged && address.isUnchanged
+            && mapsUrl.isUnchanged && isActive == nil
+    }
+}
+
+enum BranchMapsLink {
+
+    /// Sunucu kuralının aynısı: yalnız `https://`, boşluk yok.
+    nonisolated static func isValid(_ url: String) -> Bool {
+        url.range(of: "^https://\\S+$", options: [.regularExpression, .caseInsensitive]) != nil
     }
 }
 

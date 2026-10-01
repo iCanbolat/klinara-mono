@@ -14,7 +14,7 @@ import com.klinara.android.services.networking.Page
  */
 interface CustomerService {
     /**
-     * `GET customers?limit&cursor&tagId&source`
+     * `GET customers?limit&cursor&tagId`
      *
      * Cursor **opaktır**: ayrıştırılmaz, saklanır ve aynen geri gönderilir. Sunucu
      * `(createdAt, id)` üzerinde keyset kullanıyor ama bu bir uygulama detayıdır ve
@@ -111,12 +111,11 @@ interface CustomerService {
 /**
  * Liste sorgusu.
  *
- * Ayrı bir tip, çünkü dört isteğe bağlı parametreyi imzada taşımak çağrı yerlerinde
- * `list(null, null, tagId, null)` gibi okunmaz satırlar üretirdi.
+ * Ayrı bir tip, çünkü üç isteğe bağlı parametreyi imzada taşımak çağrı yerlerinde
+ * `list(null, null, tagId)` gibi okunmaz satırlar üretirdi.
  */
 data class CustomerListQuery(
     val limit: Int? = null,
     val cursor: String? = null,
     val tagId: String? = null,
-    val source: CustomerSource? = null,
 )

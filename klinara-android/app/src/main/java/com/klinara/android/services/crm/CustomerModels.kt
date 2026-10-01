@@ -10,59 +10,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import java.time.Instant
 
-/**
- * Müşterinin geliş kaynağı.
- *
- * [Unknown] dalı zorunlu: sunucuya yarın eklenecek bir kaynak (`tiktok`, `referral_v2`…)
- * müşteri listesinin TAMAMINI çözümleme hatasıyla düşürmemeli. Randevu durumundaki
- * (`AppointmentStatus`) kararın aynısı.
- */
-@Serializable(with = CustomerSourceSerializer::class)
-enum class CustomerSource(val wire: String) {
-    WalkIn("walk_in"),
-    Referral("referral"),
-    Instagram("instagram"),
-    Google("google"),
-    Website("website"),
-    WhatsApp("whatsapp"),
-    Other("other"),
-
-    /** Sunucu tanımadığımız bir kaynak gönderdi. */
-    Unknown("unknown"),
-    ;
-
-    val turkishName: String
-        get() =
-            when (this) {
-                WalkIn -> "Kapıdan geldi"
-                Referral -> "Tavsiye"
-                Instagram -> "Instagram"
-                Google -> "Google"
-                Website -> "Web sitesi"
-                WhatsApp -> "WhatsApp"
-                Other -> "Diğer"
-                Unknown -> "Bilinmeyen kaynak"
-            }
-
-    companion object {
-        fun from(wire: String): CustomerSource = entries.firstOrNull { it.wire == wire } ?: Unknown
-
-        /** Kullanıcıya SEÇTİRİLEBİLECEK kaynaklar — [Unknown] bir seçenek değildir. */
-        val selectable: List<CustomerSource> = entries.filter { it != Unknown }
-    }
-}
-
-internal object CustomerSourceSerializer : KSerializer<CustomerSource> {
-    override val descriptor = PrimitiveSerialDescriptor("CustomerSource", PrimitiveKind.STRING)
-
-    override fun deserialize(decoder: Decoder): CustomerSource = CustomerSource.from(decoder.decodeString())
-
-    override fun serialize(
-        encoder: Encoder,
-        value: CustomerSource,
-    ) = encoder.encodeString(value.wire)
-}
-
 /** Cinsiyet. Sunucu kolonu nullable DEĞİL — bu yüzden `PATCH` ile temizlenemez. */
 @Serializable(with = CustomerGenderSerializer::class)
 enum class CustomerGender(val wire: String) {
@@ -149,7 +96,6 @@ data class Customer(
     val district: String? = null,
     val city: String? = null,
     val postalCode: String? = null,
-    val source: CustomerSource? = null,
     /** Bu kayıt birleştirildiyse hayatta kalan kaydın kimliği. */
     val mergedIntoCustomerId: String? = null,
     val tags: List<CustomerTag> = emptyList(),

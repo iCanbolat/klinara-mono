@@ -2,35 +2,35 @@ import Foundation
 
 /// Mock katalogun başlangıç verisi.
 ///
-/// Gerçek bir medikal estetik merkezinin hizmet listesine benzemesi kasıtlı:
+/// Gerçek bir diş kliniğinin hizmet listesine benzemesi kasıtlı:
 /// tasarım kararları (satır yüksekliği, uzun hizmet adının kırpılması, buffer'lı
 /// hizmetin görünümü) ancak gerçekçi metinle sınanabilir.
 enum MockCatalogSeed {
 
-    static let categoryEpilasyon = "d1000000-0000-4000-8000-000000000001"
-    static let categoryCilt = "d1000000-0000-4000-8000-000000000002"
-    static let categoryEnjeksiyon = "d1000000-0000-4000-8000-000000000003"
+    static let categoryGenel = "d1000000-0000-4000-8000-000000000001"
+    static let categoryKoruyucu = "d1000000-0000-4000-8000-000000000002"
+    static let categoryEstetik = "d1000000-0000-4000-8000-000000000003"
 
-    static let serviceLazerTumVucut = "e1000000-0000-4000-8000-000000000001"
-    static let serviceLazerBolgesel = "e1000000-0000-4000-8000-000000000002"
-    static let serviceHydrafacial = "e1000000-0000-4000-8000-000000000003"
-    static let serviceKimyasalPeeling = "e1000000-0000-4000-8000-000000000004"
-    static let serviceBotoks = "e1000000-0000-4000-8000-000000000005"
-    static let serviceDolgu = "e1000000-0000-4000-8000-000000000006"
+    static let serviceKanalTedavisi = "e1000000-0000-4000-8000-000000000001"
+    static let serviceOrtodontiKontrol = "e1000000-0000-4000-8000-000000000002"
+    static let serviceDisTasiTemizligi = "e1000000-0000-4000-8000-000000000003"
+    static let serviceKompozitDolgu = "e1000000-0000-4000-8000-000000000004"
+    static let serviceBeyazlatma = "e1000000-0000-4000-8000-000000000005"
+    static let serviceImplant = "e1000000-0000-4000-8000-000000000006"
 
     static func categories(at now: Date) -> [ServiceCategory] {
         [
             ServiceCategory(
-                id: categoryEpilasyon, tenantId: MockIDs.tenant, slug: "epilasyon",
-                name: "Epilasyon", sortOrder: 0, isActive: true, createdAt: now
+                id: categoryGenel, tenantId: MockIDs.tenant, slug: "genel-dis-hekimligi",
+                name: "Genel Diş Hekimliği", sortOrder: 0, isActive: true, createdAt: now
             ),
             ServiceCategory(
-                id: categoryCilt, tenantId: MockIDs.tenant, slug: "cilt-bakimi",
-                name: "Cilt Bakımı", sortOrder: 1, isActive: true, createdAt: now
+                id: categoryKoruyucu, tenantId: MockIDs.tenant, slug: "koruyucu-restoratif",
+                name: "Koruyucu ve Restoratif", sortOrder: 1, isActive: true, createdAt: now
             ),
             ServiceCategory(
-                id: categoryEnjeksiyon, tenantId: MockIDs.tenant, slug: "enjeksiyon",
-                name: "Enjeksiyon İşlemleri", sortOrder: 2, isActive: true, createdAt: now
+                id: categoryEstetik, tenantId: MockIDs.tenant, slug: "estetik-cerrahi",
+                name: "Estetik ve Cerrahi", sortOrder: 2, isActive: true, createdAt: now
             ),
         ]
     }
@@ -38,16 +38,16 @@ enum MockCatalogSeed {
     static func services(at now: Date) -> [ClinicService] {
         [
             service(
-                id: serviceLazerTumVucut, category: categoryEpilasyon,
-                slug: "tum-vucut-lazer", name: "Tüm Vücut Lazer Epilasyon",
-                description: "Buz başlıklı alexandrite lazer, tüm vücut seansı.",
+                id: serviceKanalTedavisi, category: categoryGenel,
+                slug: "kanal-tedavisi", name: "Kanal Tedavisi",
+                description: "Tek kanallı dişte tek seans kanal tedavisi.",
                 duration: 90, before: 10, after: 15, price: 250_000,
                 color: "#7F9A76", at: now,
                 overrides: [
-                    // Bağdat Caddesi şubesi daha yeni cihazla çalışıyor: daha kısa, daha pahalı.
+                    // Bağdat Caddesi şubesinde mikroskoplu endodonti: daha kısa, daha pahalı.
                     BranchServiceOverride(
                         id: MockIDs.uuid(), tenantId: MockIDs.tenant,
-                        serviceId: serviceLazerTumVucut, branchId: MockIDs.branchBagdat,
+                        serviceId: serviceKanalTedavisi, branchId: MockIDs.branchBagdat,
                         durationMinutes: 75, bufferBeforeMinutes: nil, bufferAfterMinutes: nil,
                         priceMinor: 285_000, vatRateBasisPoints: nil,
                         isOnlineBookable: nil, isActive: nil, createdAt: now
@@ -55,38 +55,38 @@ enum MockCatalogSeed {
                 ]
             ),
             service(
-                id: serviceLazerBolgesel, category: categoryEpilasyon,
-                slug: "bolgesel-lazer", name: "Bölgesel Lazer Epilasyon",
-                description: "Koltuk altı, bikini veya bacak bölgesi.",
+                id: serviceOrtodontiKontrol, category: categoryGenel,
+                slug: "ortodonti-kontrolu", name: "Ortodonti Kontrolü",
+                description: "Braket veya şeffaf plak aylık kontrolü.",
                 duration: 30, before: 5, after: 10, price: 90_000,
                 color: "#9DB894", at: now
             ),
             service(
-                id: serviceHydrafacial, category: categoryCilt,
-                slug: "hydrafacial", name: "Hydrafacial",
-                description: "Derin temizlik, peeling ve nemlendirme.",
+                id: serviceDisTasiTemizligi, category: categoryKoruyucu,
+                slug: "dis-tasi-temizligi", name: "Diş Taşı Temizliği",
+                description: "Detertraj ve polisaj.",
                 duration: 60, before: 5, after: 10, price: 180_000,
                 color: "#5E7856", at: now
             ),
             service(
-                id: serviceKimyasalPeeling, category: categoryCilt,
-                slug: "kimyasal-peeling", name: "Kimyasal Peeling",
+                id: serviceKompozitDolgu, category: categoryKoruyucu,
+                slug: "kompozit-dolgu", name: "Kompozit Dolgu",
                 description: nil,
                 duration: 45, before: 5, after: 15, price: 140_000,
                 color: "#A6483C", at: now, isOnlineBookable: false
             ),
             service(
-                id: serviceBotoks, category: categoryEnjeksiyon,
-                slug: "botoks-ust-yuz", name: "Botoks — Üst Yüz",
-                description: "Alın, glabella ve kaz ayağı bölgesi.",
-                duration: 30, before: 10, after: 10, price: 650_000,
+                id: serviceBeyazlatma, category: categoryEstetik,
+                slug: "ofis-tipi-beyazlatma", name: "Diş Beyazlatma — Ofis Tipi",
+                description: "Tek seans, iki çene.",
+                duration: 60, before: 10, after: 10, price: 650_000,
                 color: "#2E3532", at: now, isOnlineBookable: false
             ),
             service(
-                id: serviceDolgu, category: categoryEnjeksiyon,
-                slug: "dudak-dolgusu", name: "Dudak Dolgusu",
-                description: "Hyaluronik asit, 1 ml.",
-                duration: 45, before: 10, after: 15, price: 900_000,
+                id: serviceImplant, category: categoryEstetik,
+                slug: "implant-cerrahisi", name: "İmplant Cerrahisi",
+                description: "Tek diş implant uygulaması.",
+                duration: 90, before: 15, after: 15, price: 2_500_000,
                 color: "#6E7A74", at: now, isOnlineBookable: false, isActive: false
             ),
         ]

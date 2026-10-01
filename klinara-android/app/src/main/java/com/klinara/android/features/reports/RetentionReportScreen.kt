@@ -67,31 +67,21 @@ fun RetentionReportScreen(
                 detail = ReportFormat.deltaLabel(report.delta, "activeCustomers"),
             )
         }
-        if (report.acquisition.isNotEmpty()) {
-            if (report.acquisition.size > 1) {
-                KlinaraCard(title = "Yeni müşteri — geliş kaynağı") {
-                    KlinaraChart(
-                        kind = KlinaraChartKind.Bar,
-                        points =
-                            report.acquisition.map {
-                                KlinaraChartPoint(it.id, it.turkishName, it.customers.toDouble())
-                            },
-                        format = ReportFormat::number,
-                        integerValues = true,
-                    )
-                }
-            }
-            KlinaraCard(title = "Geliş kaynağı") {
-                report.acquisition.forEachIndexed { index, row ->
-                    if (index > 0) KlinaraDivider()
-                    KlinaraRow(label = row.turkishName, value = "${row.customers} müşteri")
-                }
-            }
-        }
         KlinaraCard(
             title = "Geri dönüş",
             footnote = "Dönem bugüne yakınsa oranlar düşük görünür: müşterilerin 90 günü henüz dolmamış olabilir.",
         ) {
+            if (report.cohorts.isNotEmpty()) {
+                KlinaraChart(
+                    kind = KlinaraChartKind.Bar,
+                    points =
+                        report.cohorts.map {
+                            KlinaraChartPoint("${it.withinDays}", "${it.withinDays} gün", it.rate)
+                        },
+                    format = ReportFormat::percent,
+                )
+                KlinaraDivider()
+            }
             report.cohorts.forEachIndexed { index, cohort ->
                 if (index > 0) KlinaraDivider()
                 KlinaraRow(

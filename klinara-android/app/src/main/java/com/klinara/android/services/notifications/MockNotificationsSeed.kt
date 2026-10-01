@@ -1,7 +1,6 @@
 package com.klinara.android.services.notifications
 
 import com.klinara.android.services.contracts.ApiErrorCode
-import com.klinara.android.services.integrations.InboxItem
 import com.klinara.android.services.integrations.WhatsAppAccount
 import com.klinara.android.services.integrations.WhatsAppAccountStatus
 import com.klinara.android.services.integrations.WhatsAppTemplate
@@ -30,9 +29,6 @@ internal object MockNotificationsSeed {
     const val MESSAGE_REMINDER_FAILED = "e1000000-0000-4000-8000-000000000004"
     const val MESSAGE_STAFF_INTERNAL = "e1000000-0000-4000-8000-000000000005"
 
-    const val INBOX_AYSE = "e2000000-0000-4000-8000-000000000001"
-    const val INBOX_UNKNOWN = "e2000000-0000-4000-8000-000000000002"
-    const val INBOX_HANDLED = "e2000000-0000-4000-8000-000000000003"
 
 
     val AYSE: String get() = MockCustomers.at(0).id
@@ -125,35 +121,6 @@ internal object MockNotificationsSeed {
             ),
         )
 
-    fun inbox(now: Instant): List<InboxItem> =
-        listOf(
-            InboxItem(
-                id = INBOX_AYSE,
-                customerId = AYSE,
-                from = "+90**********33",
-                messageType = "text",
-                body = "Merhaba, yarınki randevumu bir saat öne alabilir miyiz?",
-                receivedAt = now.ago(minutes = 45),
-            ),
-            // Tanınmayan numara: sunucu bilerek eşleştirmiyor — yanlış müşteriye bağlamak
-            // yanlış kartı açardı.
-            InboxItem(
-                id = INBOX_UNKNOWN,
-                from = "+90**********88",
-                messageType = "text",
-                body = "Fiyat listeniz var mı?",
-                receivedAt = now.ago(hours = 3),
-            ),
-            InboxItem(
-                id = INBOX_HANDLED,
-                customerId = ZEYNEP,
-                from = "+90**********34",
-                messageType = "image",
-                receivedAt = now.ago(days = 2),
-                handledAt = now.ago(days = 2, minutes = -30),
-            ),
-        )
-
     const val TEMPLATE_REMINDER_WHATSAPP = "e4000000-0000-4000-8000-000000000001"
 
     /**
@@ -195,13 +162,23 @@ internal object MockNotificationsSeed {
         listOf(
             whatsapp(
                 NotificationEvent.AppointmentConfirmation,
-                "Merhaba {{customerName}}, {{appointmentAt}} tarihindeki {{serviceName}} randevunuz oluşturuldu. " +
-                    "Sizi {{branchName}} şubemizde bekliyoruz.",
+                "Merhaba {{customerName}}, {{appointmentAt}} tarihindeki {{serviceName}} " +
+                    "randevunuz başarıyla oluşturuldu. " +
+                    "Sizi {{branchName}} şubemizde bekliyoruz.\n\n" +
+                    "Şubemize kolayca ulaşabilmeniz için adres bilgimizi paylaşıyor, konumu aşağıdaki " +
+                    "butonla açabilmenizi sağlıyoruz.\n\n" +
+                    "Adres: {{branchAddress}}\n\n" +
+                    "Randevunuzla ilgili bir değişiklik olursa bu mesajı yanıtlayarak bize ulaşabilirsiniz. " +
+                    "Görüşmek üzere!",
             ),
             whatsapp(
                 NotificationEvent.AppointmentReminder,
                 "Merhaba {{customerName}}, {{appointmentAt}} tarihindeki {{serviceName}} randevunuzu hatırlatırız. " +
-                    "Adres: {{branchName}} şubemiz. Katılımınızı aşağıdaki butonlarla bildirebilirsiniz.",
+                    "Sizi {{branchName}} şubemizde bekliyoruz.\n\n" +
+                    "Şubemize kolayca ulaşabilmeniz için adres bilgimizi paylaşıyor, konumu aşağıdaki " +
+                    "butonla açabilmenizi sağlıyoruz.\n\n" +
+                    "Adres: {{branchAddress}}\n\n" +
+                    "Katılımınızı aşağıdaki butonlarla bildirebilirsiniz.",
             ),
             whatsapp(
                 NotificationEvent.AppointmentCancelled,
@@ -219,33 +196,12 @@ internal object MockNotificationsSeed {
                     "Randevu için bu mesajı yanıtlayabilirsiniz.",
             ),
             whatsapp(NotificationEvent.AutoReply, "{{message}}"),
-            Triple(NotificationEvent.StaffInternal, NotificationChannel.Email, "{{message}}"),
         )
 
     private fun whatsapp(
         event: NotificationEvent,
         body: String,
     ) = Triple(event, NotificationChannel.WhatsApp, body)
-
-    /**
-     * Kiracı paket süre dolumu mesajını kapatmış (`channels: []`) ve randevu hatırlatmasında
-     * sessiz saati daraltmış. Kalan olaylar sunucunun sentezlediği varsayılanla gelir.
-     */
-    fun tenantPreferences(): List<NotificationPreference> =
-        listOf(
-            NotificationPreference(
-                preferenceId = "e5000000-0000-4000-8000-000000000001",
-                event = NotificationEvent.AppointmentReminder,
-                channels = listOf(NotificationChannel.WhatsApp),
-                quietHoursStart = "22:00",
-                quietHoursEnd = "08:00",
-            ),
-            NotificationPreference(
-                preferenceId = "e5000000-0000-4000-8000-000000000002",
-                event = NotificationEvent.PackageExpiring,
-                channels = emptyList(),
-            ),
-        )
 
     fun account(now: Instant): WhatsAppAccount =
         WhatsAppAccount(

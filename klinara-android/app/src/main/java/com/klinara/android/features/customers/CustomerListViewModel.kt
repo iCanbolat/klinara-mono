@@ -29,6 +29,8 @@ data class CustomerListUiState(
     val search: Loadable<List<Customer>>? = null,
     val term: String = "",
     val isLoadingMore: Boolean = false,
+    /** Aşağı çekerek yenileme sürüyor; liste yerinde KALIR (iskelete dönülmez). */
+    val isRefreshing: Boolean = false,
     /**
      * Sonraki sayfa alınamadı.
      *
@@ -113,12 +115,47 @@ class CustomerListViewModel(
         }
         reloadJob =
             viewModelScope.launch {
-                val page = Loadable.of { customers.list(CustomerListQuery(tagId = tagId)) }
+                val page = Loadable.of { customers.list(CustomerListQuery(limit = PAGE_SIZE, tagId = tagId)) }
                 _state.update {
                     it.copy(
                         list = page.map { result -> result.data },
                         nextCursor = page.valueOrNull?.pageInfo?.nextCursor,
                     )
+                }
+            }
+    }
+
+    /**
+     * Aşağı çekerek yenileme. [reload]un aksine eldeki liste iskelete dönmez; yanıt gelince
+     * yerini alır, hata gelirse eldeki liste ve imleç korunur. Liste henüz yüklenmemişse
+     * (ilk yükleme hatası) [reload] yoluna düşer.
+     */
+    fun refresh() {
+        val current = _state.value
+        if (current.isRefreshing) return
+        if (current.list !is Loadable.Loaded) {
+            reload()
+            loadSummary()
+            return
+        }
+        reloadJob?.cancel()
+        loadMoreJob?.cancel()
+        val tagId = current.selectedTagId
+        _state.update { it.copy(isRefreshing = true, isLoadingMore = false, loadMoreError = null) }
+        loadSummary()
+        reloadJob =
+            viewModelScope.launch {
+                val page = Loadable.of { customers.list(CustomerListQuery(limit = PAGE_SIZE, tagId = tagId)) }
+                _state.update {
+                    when (page) {
+                        is Loadable.Loaded ->
+                            it.copy(
+                                list = Loadable.Loaded(page.value.data),
+                                nextCursor = page.value.pageInfo.nextCursor,
+                                isRefreshing = false,
+                            )
+                        else -> it.copy(isRefreshing = false)
+                    }
                 }
             }
     }
@@ -162,7 +199,7 @@ class CustomerListViewModel(
         _state.update { it.copy(isLoadingMore = true, loadMoreError = null) }
         loadMoreJob =
             viewModelScope.launch {
-                val query = CustomerListQuery(cursor = cursor, tagId = current.selectedTagId)
+                val query = CustomerListQuery(limit = PAGE_SIZE, cursor = cursor, tagId = current.selectedTagId)
                 when (val page = Loadable.of { customers.list(query) }) {
                     is Loadable.Loaded ->
                         _state.update {
@@ -238,6 +275,12 @@ class CustomerListViewModel(
     companion object {
         private const val MIN_SEARCH_LENGTH = 2
         private const val SEARCH_DEBOUNCE_MILLIS = 250L
+
+        /**
+         * Sayfa boyutu — sunucu varsayılanıyla (50) aynı ama açıkça gönderiliyor: sunucu
+         * varsayılanı değişirse kaydırma davranışı sessizce değişmesin (iOS paritesi).
+         */
+        internal const val PAGE_SIZE = 50
 
         fun factory(container: ServiceContainer): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {

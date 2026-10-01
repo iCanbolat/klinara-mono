@@ -1,11 +1,8 @@
 import { and, eq, sql } from 'drizzle-orm';
 import {
-  branches,
   customers,
   messageLog,
-  notificationPreferences,
   notificationTemplates,
-  tenants,
   users,
   type MessageStatus,
   type NotificationChannel,
@@ -14,7 +11,6 @@ import {
 import type { Tx } from '../../database/tenant-tx';
 
 export type NotificationTemplateRow = typeof notificationTemplates.$inferSelect;
-export type NotificationPreferenceRow = typeof notificationPreferences.$inferSelect;
 export type MessageLogRow = typeof messageLog.$inferSelect;
 
 /** Gönderim için gereken asgari alıcı bilgisi. */
@@ -104,110 +100,6 @@ export async function upsertTemplate(
     })
     .returning();
   return row as NotificationTemplateRow;
-}
-
-// ---------------------------------------------------------------------------
-// Tercihler
-// ---------------------------------------------------------------------------
-
-export async function listPreferences(tx: Tx): Promise<NotificationPreferenceRow[]> {
-  return tx
-    .select()
-    .from(notificationPreferences)
-    .orderBy(notificationPreferences.event, notificationPreferences.branchId);
-}
-
-/**
- * Geçerli tercih: ÖNCE şube satırı, yoksa kiracı satırı.
- *
- * İki sorgu yerine tek sorgu + sıralama: `branch_id is not null` önce gelsin
- * diye sıralanıyor, ilk satır kazanan.
- */
-export async function findEffectivePreference(
-  tx: Tx,
-  input: { event: NotificationEvent; branchId: string | null },
-): Promise<NotificationPreferenceRow | undefined> {
-  const result = await tx.execute<Record<string, unknown>>(sql`
-    select *
-      from notification_preferences
-     where event = ${input.event}::notification_event
-       and (branch_id is null or branch_id = ${input.branchId}::uuid)
-     order by (branch_id is not null) desc
-     limit 1
-  `);
-  const row = result.rows[0];
-  return row === undefined ? undefined : hydratePreference(row);
-}
-
-export async function upsertPreference(
-  tx: Tx,
-  tenantId: string,
-  values: {
-    branchId: string | null;
-    event: NotificationEvent;
-    channels: NotificationChannel[];
-    quietHoursStart: string | null;
-    quietHoursEnd: string | null;
-  },
-): Promise<NotificationPreferenceRow> {
-  // Kısmi tekil indeksler iki ayrı hedef demek (`branch_id is null` /
-  // `is not null`); `onConflictDoUpdate` tek hedef aldığı için üst satır elle
-  // aranıp güncelleniyor.
-  const existing = await tx.execute<Record<string, unknown>>(sql`
-    select id from notification_preferences
-     where event = ${values.event}::notification_event
-       and branch_id is not distinct from ${values.branchId}::uuid
-     limit 1
-  `);
-
-  const existingId = existing.rows[0]?.['id'] as string | undefined;
-  const channels = sql`${`{${values.channels.join(',')}}`}::notification_channel[]`;
-
-  const result =
-    existingId === undefined
-      ? await tx.execute<Record<string, unknown>>(sql`
-          insert into notification_preferences
-            (tenant_id, branch_id, event, channels, quiet_hours_start, quiet_hours_end)
-          values (${tenantId}::uuid, ${values.branchId}::uuid,
-                  ${values.event}::notification_event, ${channels},
-                  ${values.quietHoursStart}::time, ${values.quietHoursEnd}::time)
-          returning *
-        `)
-      : await tx.execute<Record<string, unknown>>(sql`
-          update notification_preferences
-             set channels = ${channels},
-                 quiet_hours_start = ${values.quietHoursStart}::time,
-                 quiet_hours_end   = ${values.quietHoursEnd}::time
-           where id = ${existingId}::uuid
-          returning *
-        `);
-
-  return hydratePreference(result.rows[0] as Record<string, unknown>);
-}
-
-function hydratePreference(row: Record<string, unknown>): NotificationPreferenceRow {
-  // Sürücü `notification_channel[]` sütununu çoğu zaman JS dizisi olarak
-  // verir; ham `{sms,email}` metni gelme ihtimaline karşı iki biçim de
-  // karşılanıyor (`columns.ts`teki dizi tiplerinin aynı gerekçesi).
-  const rawChannels: unknown = row['channels'];
-  const channels = Array.isArray(rawChannels)
-    ? (rawChannels as NotificationChannel[])
-    : (String(typeof rawChannels === 'string' ? rawChannels : '')
-        .replace(/^\{|\}$/g, '')
-        .split(',')
-        .filter((part) => part.length > 0) as NotificationChannel[]);
-
-  return {
-    id: row['id'] as string,
-    tenantId: row['tenant_id'] as string,
-    branchId: (row['branch_id'] as string | null) ?? null,
-    event: row['event'] as NotificationEvent,
-    channels,
-    quietHoursStart: (row['quiet_hours_start'] as string | null) ?? null,
-    quietHoursEnd: (row['quiet_hours_end'] as string | null) ?? null,
-    createdAt: new Date(row['created_at'] as string),
-    updatedAt: new Date(row['updated_at'] as string),
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -362,20 +254,6 @@ export async function findUserContact(
     .where(eq(users.id, userId))
     .limit(1);
   return row;
-}
-
-/** Şube saat dilimi; şube verilmediyse kiracınınki. */
-export async function resolveTimezone(tx: Tx, branchId: string | null): Promise<string> {
-  if (branchId !== null) {
-    const [row] = await tx
-      .select({ timezone: branches.timezone })
-      .from(branches)
-      .where(eq(branches.id, branchId))
-      .limit(1);
-    if (row !== undefined) return row.timezone;
-  }
-  const [tenant] = await tx.select({ timezone: tenants.timezone }).from(tenants).limit(1);
-  return tenant?.timezone ?? 'Europe/Istanbul';
 }
 
 /**

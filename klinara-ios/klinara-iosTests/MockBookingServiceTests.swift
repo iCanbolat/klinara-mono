@@ -34,8 +34,8 @@ struct MockBookingServiceTests {
             graph.createInput(
                 at: graph.workingTuesday(hour: 11),
                 serviceIds: [
-                    MockCatalogSeed.serviceLazerBolgesel,   // 30 dk, 5 önce / 10 sonra
-                    MockCatalogSeed.serviceHydrafacial,     // 60 dk, 5 önce / 10 sonra
+                    MockCatalogSeed.serviceOrtodontiKontrol,   // 30 dk, 5 önce / 10 sonra
+                    MockCatalogSeed.serviceDisTasiTemizligi,     // 60 dk, 5 önce / 10 sonra
                 ]
             ),
             idempotencyKey: UUID().uuidString
@@ -114,7 +114,7 @@ struct MockBookingServiceTests {
             _ = try await graph.booking.create(
                 graph.createInput(
                     at: graph.workingTuesday(),
-                    serviceIds: [MockCatalogSeed.serviceHydrafacial],
+                    serviceIds: [MockCatalogSeed.serviceDisTasiTemizligi],
                     staffProfileId: MockStaffSeed.profileMehmet
                 ),
                 idempotencyKey: UUID().uuidString
@@ -132,7 +132,7 @@ struct MockBookingServiceTests {
             _ = try await graph.booking.create(
                 graph.createInput(
                     at: graph.workingTuesday(),
-                    serviceIds: [MockCatalogSeed.serviceDolgu]  // isActive: false
+                    serviceIds: [MockCatalogSeed.serviceImplant]  // isActive: false
                 ),
                 idempotencyKey: UUID().uuidString
             )
@@ -391,7 +391,7 @@ struct MockBookingServiceTests {
         let day = graph.clock.startOfDay(graph.workingTuesday())
         let response = try await graph.booking.availability(AvailabilityQuery(
             branchId: MockGraph.branchId,
-            serviceIds: [MockCatalogSeed.serviceLazerBolgesel],
+            serviceIds: [MockCatalogSeed.serviceOrtodontiKontrol],
             from: day,
             to: graph.clock.adding(days: 1, to: day)
         ))
@@ -418,7 +418,7 @@ struct MockBookingServiceTests {
         func slots() async throws -> [AvailabilitySlot] {
             try await graph.booking.availability(AvailabilityQuery(
                 branchId: MockGraph.branchId,
-                serviceIds: [MockCatalogSeed.serviceLazerBolgesel],
+                serviceIds: [MockCatalogSeed.serviceOrtodontiKontrol],
                 from: day,
                 to: graph.clock.adding(days: 1, to: day)
             )).slots
@@ -441,7 +441,7 @@ struct MockBookingServiceTests {
 
         let response = try await graph.booking.availability(AvailabilityQuery(
             branchId: MockGraph.branchId,
-            serviceIds: [MockCatalogSeed.serviceLazerBolgesel],
+            serviceIds: [MockCatalogSeed.serviceOrtodontiKontrol],
             from: day,
             to: graph.clock.adding(days: 1, to: day),
             staffProfileId: MockStaffSeed.profileAyse

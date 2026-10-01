@@ -941,10 +941,8 @@ private fun ManagementDestination.route(): Any =
         ManagementDestination.PackageReports -> ShellRoutes.PackageReportsHome
         ManagementDestination.Reports -> ShellRoutes.ReportsHome
         ManagementDestination.Conversations -> ShellRoutes.Conversations
-        ManagementDestination.Inbox -> ShellRoutes.Inbox
         ManagementDestination.MessageLog -> ShellRoutes.MessageLog
         ManagementDestination.ReminderSettings -> ShellRoutes.ReminderSettings
         ManagementDestination.NotificationTemplates -> ShellRoutes.NotificationTemplates
-        ManagementDestination.NotificationPreferences -> ShellRoutes.NotificationPreferences
         ManagementDestination.WhatsApp -> ShellRoutes.WhatsAppSettings
     }

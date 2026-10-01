@@ -12,7 +12,13 @@ import type { EnvironmentVariables } from '../../config/env.validation';
  * gibi kullanılabilir, yani ikinci faktör tamamen atlanabilirdi. Aynı şey
  * kiracı seçimi bekleyen token için de geçerli — kiracı seçmeden veri okunurdu.
  */
-export type TokenType = 'access' | 'tenant_select' | 'mfa';
+export type TokenType = 'access' | 'tenant_select' | 'mfa' | 'realtime';
+
+/**
+ * Yayın bileti ömrü. Bilet yalnız soketi AÇMAYA yarar; açıldıktan sonra
+ * oturumun geçerliliğini gateway kendisi yokluyor.
+ */
+export const REALTIME_TICKET_TTL_SECONDS = 60;
 
 const ISSUER = 'klinara';
 const AUDIENCE = 'klinara-api';
@@ -90,6 +96,31 @@ export class TokenService {
     return this.sign(
       { sub: input.userId, tid: input.tenantId, tv: input.tokenVersion, typ: 'mfa' },
       this.challengeTtl,
+    );
+  }
+
+  /**
+   * WebSocket el sıkışması bileti.
+   *
+   * Access token'ın kendisi sokete TAŞINMAZ: web panelinde tarayıcı o token'ı
+   * hiç görmüyor (BFF). Bu bilet REST'te geçersizdir (`typ`), kısa ömürlüdür
+   * ve yalnız yayın kanalını açar.
+   */
+  signRealtime(input: {
+    userId: string;
+    tenantId: string;
+    sessionId: string;
+    tokenVersion: number;
+  }): Promise<string> {
+    return this.sign(
+      {
+        sub: input.userId,
+        tid: input.tenantId,
+        sid: input.sessionId,
+        tv: input.tokenVersion,
+        typ: 'realtime',
+      },
+      `${REALTIME_TICKET_TTL_SECONDS}s`,
     );
   }
 

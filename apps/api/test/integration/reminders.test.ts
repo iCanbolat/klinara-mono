@@ -323,7 +323,7 @@ describe('hatırlatma zamanlaması (Batch 8.4)', () => {
         .handle({ tenantId: clinic.tenant.id, messageId: message?.id ?? '' });
 
       expect(sentToMeta()).toHaveLength(1);
-      expect(JSON.stringify(sentToMeta()[0]?.body)).toContain('klinara_randevu_hatirlatma');
+      expect(JSON.stringify(sentToMeta()[0]?.body)).toContain('klinara_randevu_hatirlatma_v3');
       expect(message?.body).toContain('hatırlatırız');
     });
   });

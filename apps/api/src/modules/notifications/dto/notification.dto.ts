@@ -10,7 +10,6 @@ import {
   IsOptional,
   IsString,
   IsUUID,
-  Matches,
   Max,
   MaxLength,
   Min,
@@ -21,14 +20,31 @@ import type {
   NotificationChannel,
   NotificationEvent,
 } from '../../../database/schema';
+import type { TemplateSegment } from '@klinara/shared';
 import { ALL_CHANNELS, ALL_EVENTS } from '../default-templates';
 
-const CLOCK = /^([01]\d|2[0-3]):[0-5]\d$/;
 const MESSAGE_STATUSES = ['queued', 'sending', 'sent', 'delivered', 'read', 'failed', 'skipped'];
 
 // ---------------------------------------------------------------------------
 // Şablonlar
 // ---------------------------------------------------------------------------
+
+export class TemplateSegmentDto {
+  @ApiProperty({ enum: ['text', 'variable'] })
+  kind: 'text' | 'variable';
+
+  @ApiPropertyOptional({ description: 'Yalnız `text` parçasında: düz metin' })
+  text?: string;
+
+  @ApiPropertyOptional({ description: 'Yalnız `variable` parçasında: değişkenin teknik adı', example: 'serviceName' })
+  name?: string;
+
+  @ApiPropertyOptional({
+    description: 'Yalnız `variable` parçasında: ekranda görünen `@` etiketi',
+    example: '@HizmetAdı',
+  })
+  handle?: string;
+}
 
 export class NotificationTemplateResponseDto {
   @ApiPropertyOptional({ format: 'uuid', description: 'Kiracı satırı yoksa null — varsayılan şablon' })
@@ -69,6 +85,13 @@ export class NotificationTemplateResponseDto {
 
   @ApiProperty({ type: [String], description: 'Metnin beklediği değişkenler' })
   variables: string[];
+
+  @ApiProperty({
+    type: [TemplateSegmentDto],
+    description:
+      'Gövdenin parçalanmış hâli: düz metin ve `@Etiket` değişkenleri. İstemciler `{{…}}` ayrıştırmaz, bunu çizer.',
+  })
+  segments: TemplateSegment[];
 }
 
 export class UpsertNotificationTemplateDto {
@@ -124,83 +147,6 @@ export class UpsertNotificationTemplateDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
-}
-
-// ---------------------------------------------------------------------------
-// Tercihler
-// ---------------------------------------------------------------------------
-
-export class NotificationPreferenceResponseDto {
-  @ApiPropertyOptional({ format: 'uuid', nullable: true })
-  id: string | null;
-
-  @ApiPropertyOptional({ format: 'uuid', nullable: true, description: 'null = kiracı varsayılanı' })
-  branchId: string | null;
-
-  @ApiProperty({ enum: ALL_EVENTS })
-  event: NotificationEvent;
-
-  @ApiProperty({ type: [String], description: 'Denenecek kanallar, öncelik sırasında' })
-  channels: NotificationChannel[];
-
-  @ApiPropertyOptional({ nullable: true, example: '21:00' })
-  quietHoursStart: string | null;
-
-  @ApiPropertyOptional({ nullable: true, example: '09:00' })
-  quietHoursEnd: string | null;
-
-  /**
-   * Türetilmiş: `quietHoursStart !== quietHoursEnd`.
-   *
-   * Kayıtlı pencere `null` ise platform varsayılanı döner ve dispatcher de onu
-   * uygular — yani "sessiz saat yok" `null` ile ifade EDİLEMEZ. Sözleşme: eşit
-   * başlangıç ve bitiş (`00:00`–`00:00`) boş penceredir (`isQuietHour` zaten
-   * `start === end` için `false` döner). Bu alan istemcinin o kuralı kendisi
-   * yeniden yazmaması için var.
-   */
-  @ApiProperty({ description: 'Sessiz saat uygulanıyor mu? Eşit başlangıç/bitiş = kapalı' })
-  quietHoursEnabled: boolean;
-
-  @ApiProperty({ description: 'Kiracı satırı yoksa kod içindeki varsayılan geçerlidir' })
-  isDefault: boolean;
-}
-
-export class UpsertNotificationPreferenceDto {
-  @ApiPropertyOptional({ format: 'uuid', description: 'Verilmezse kiracı varsayılanı yazılır' })
-  @IsOptional()
-  @IsUUID()
-  branchId?: string;
-
-  @ApiProperty({ enum: ALL_EVENTS })
-  @IsIn(ALL_EVENTS)
-  event: NotificationEvent;
-
-  /**
-   * Kabul kümesi burada `ALL_CHANNELS`, çünkü geçerli kanal **olaya bağlı**:
-   * müşteri olaylarında yalnız `CUSTOMER_CHANNELS`, `staff_internal`'da e-posta.
-   * Bir dekoratör kardeş alanı (`event`) göremediğinden kural
-   * `NotificationSettingsService.upsertPreference` içinde duruyor.
-   */
-  @ApiProperty({
-    type: [String],
-    enum: ALL_CHANNELS,
-    description: 'Boş dizi = olay kapalı. Müşteri olaylarında yalnız whatsapp kabul edilir.',
-  })
-  @IsArray()
-  @ArrayMaxSize(4)
-  @IsIn(ALL_CHANNELS, { each: true })
-  channels: NotificationChannel[];
-
-  /** Başlangıç ile bitiş EŞİTSE (`00:00`–`00:00`) sessiz saat uygulanmaz. */
-  @ApiPropertyOptional({ example: '21:00', nullable: true })
-  @IsOptional()
-  @Matches(CLOCK, { message: "'HH:MM' biçiminde olmalı" })
-  quietHoursStart?: string;
-
-  @ApiPropertyOptional({ example: '09:00', nullable: true })
-  @IsOptional()
-  @Matches(CLOCK, { message: "'HH:MM' biçiminde olmalı" })
-  quietHoursEnd?: string;
 }
 
 // ---------------------------------------------------------------------------

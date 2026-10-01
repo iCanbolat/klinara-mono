@@ -275,7 +275,6 @@ enum Fixtures {
           "district": "Kadıköy",
           "city": "İstanbul",
           "postalCode": "34710",
-          "source": "instagram",
           "mergedIntoCustomerId": null,
           "tags": [
             {
@@ -299,7 +298,6 @@ enum Fixtures {
           "district": null,
           "city": null,
           "postalCode": null,
-          "source": null,
           "mergedIntoCustomerId": null,
           "tags": [
             {
@@ -329,7 +327,6 @@ enum Fixtures {
       "district": null,
       "city": null,
       "postalCode": null,
-      "source": null,
       "mergedIntoCustomerId": null,
       "tags": [
         {
@@ -359,7 +356,6 @@ enum Fixtures {
           "district": null,
           "city": null,
           "postalCode": null,
-          "source": null,
           "mergedIntoCustomerId": null,
           "tags": [
             {
@@ -398,7 +394,6 @@ enum Fixtures {
         "district": "Kadıköy",
         "city": "İstanbul",
         "postalCode": "34710",
-        "source": "instagram",
         "mergedIntoCustomerId": null,
         "tags": [
           {

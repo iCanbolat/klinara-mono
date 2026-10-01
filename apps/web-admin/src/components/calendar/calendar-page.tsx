@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Plus } from 'lucide-react';
 import { PERMISSIONS, type Service, type StaffProfile } from '@klinara/shared';
 import { t } from '@/i18n/tr';
@@ -21,6 +22,11 @@ import {
   weekStart,
   type DayKey,
 } from '@/lib/calendar/date';
+import {
+  CALENDAR_APPOINTMENT_PARAM,
+  CALENDAR_DAY_PARAM,
+  parseDayParam,
+} from '@/lib/calendar/deeplink';
 import { CreateAppointmentDialog } from './appointment-form/create-dialog';
 import { AgendaList } from './agenda-list';
 import { ConsentStatusProvider } from '@/components/consent/consent-status-context';
@@ -57,13 +63,46 @@ export function CalendarPage(): ReactNode {
   const { branches, setBranchId } = useBranch();
   const [view, setView] = useState<CalendarView>('day');
   const [mode, setMode] = useCalendarMode();
-  const [day, setDay] = useState<DayKey>(() => todayKey('Europe/Istanbul'));
+  const router = useRouter();
+  const params = useSearchParams();
+  // Derin bağlantı (`?gun=…&randevu=…`, bkz. `lib/calendar/deeplink.ts`):
+  // ilk çizimde okunuyor ki bugünün verisi bir kez çekilip hemen atılmasın.
+  const [day, setDay] = useState<DayKey>(
+    () => parseDayParam(params.get(CALENDAR_DAY_PARAM)) ?? todayKey('Europe/Istanbul'),
+  );
   const [staffProfileId, setStaffProfileId] = useState<string | null>(null);
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(() =>
+    params.get(CALENDAR_APPOINTMENT_PARAM),
+  );
   const [creating, setCreating] = useState(false);
 
   const [services, setServices] = useState<Service[]>([]);
   const [staff, setStaff] = useState<StaffProfile[]>([]);
+
+  // Sayfa ZATEN açıkken gelen bir derin bağlantı (aynı rotaya gezinme mount
+  // etmez): parametreler değişince state render sırasında uyarlanıyor —
+  // efektte `setState` gereksiz bir ara çizim demek. İlk açılış yukarıdaki
+  // ilk değerlerle zaten karşılandı, o yüzden başlangıç anahtarı bugünkü.
+  const dayParam = parseDayParam(params.get(CALENDAR_DAY_PARAM));
+  const appointmentParam = params.get(CALENDAR_APPOINTMENT_PARAM);
+  const linkKey = `${dayParam ?? ''}|${appointmentParam ?? ''}`;
+  const [handledLink, setHandledLink] = useState(linkKey);
+  if (linkKey !== handledLink) {
+    setHandledLink(linkKey);
+    if (dayParam !== null) {
+      setDay(dayParam);
+      setView('day');
+    }
+    if (appointmentParam !== null) setSelected(appointmentParam);
+  }
+
+  // Parametreler tüketilince adres çubuğundan siliniyor: yenileme ya da geri
+  // tuşu paneli tekrar açmasın, kullanıcı başka güne geçtikten sonra da URL
+  // yalan söylemesin.
+  useEffect(() => {
+    if (dayParam === null && appointmentParam === null) return;
+    router.replace('/takvim', { scroll: false });
+  }, [dayParam, appointmentParam, router]);
 
   const state = useCalendar({ view, day, staffProfileId });
   const timezone = state.data?.timezone ?? 'Europe/Istanbul';
@@ -99,6 +138,11 @@ export function CalendarPage(): ReactNode {
   const staffNames = useMemo(
     () => new Map(staff.map((profile) => [profile.id, profile.userFullName])),
     [staff],
+  );
+
+  const selectedEntry = useMemo(
+    () => state.data?.appointments.find((entry) => entry.id === selected) ?? null,
+    [state.data, selected],
   );
 
   const appointmentIds = useMemo(
@@ -220,6 +264,16 @@ export function CalendarPage(): ReactNode {
         appointmentId={selected}
         timezone={timezone}
         services={services}
+        customer={
+          selectedEntry === null
+            ? null
+            : {
+                id: selectedEntry.customerId,
+                name: selectedEntry.customerName,
+                phone: selectedEntry.customerPhone,
+              }
+        }
+        staffNames={staffNames}
         onClose={() => setSelected(null)}
         onChanged={state.reload}
       />

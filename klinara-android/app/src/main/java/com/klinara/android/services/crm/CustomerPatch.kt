@@ -109,7 +109,6 @@ data class UpdateCustomerInput(
     val district: Patch<String> = Patch.Unchanged,
     val city: Patch<String> = Patch.Unchanged,
     val postalCode: Patch<String> = Patch.Unchanged,
-    val source: Patch<CustomerSource> = Patch.Unchanged,
 ) {
     /**
      * Hiçbir alan değişmemiş mi?
@@ -121,7 +120,7 @@ data class UpdateCustomerInput(
         get() =
             fullName == null &&
                 gender == null &&
-                listOf(phone, email, birthDate, notes, addressLine, district, city, postalCode, source)
+                listOf(phone, email, birthDate, notes, addressLine, district, city, postalCode)
                     .all { it == Patch.Unchanged }
 
     fun toJson(): JsonObject =
@@ -136,7 +135,6 @@ data class UpdateCustomerInput(
             putPatch("district", district) { it }
             putPatch("city", city) { it }
             putPatch("postalCode", postalCode) { it }
-            putPatch("source", source) { it.wire }
         }
 }
 
@@ -157,7 +155,6 @@ data class CreateCustomerInput(
     val district: String? = null,
     val city: String? = null,
     val postalCode: String? = null,
-    val source: CustomerSource? = null,
 ) {
     fun toJson(): JsonObject =
         buildJsonObject {
@@ -171,7 +168,6 @@ data class CreateCustomerInput(
             district?.let { put("district", it) }
             city?.let { put("city", it) }
             postalCode?.let { put("postalCode", it) }
-            source?.let { put("source", it.wire) }
         }
 }
 

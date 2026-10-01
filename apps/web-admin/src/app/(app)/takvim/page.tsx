@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { Suspense, type ReactNode } from 'react';
 import { PERMISSIONS } from '@klinara/shared';
 import { PermissionGate } from '@/components/session/permission-gate';
 import { CalendarPage } from '@/components/calendar/calendar-page';
@@ -13,7 +13,10 @@ export default function Page(): ReactNode {
       required={[]}
       anyOf={[PERMISSIONS.APPOINTMENT_READ_ALL, PERMISSIONS.APPOINTMENT_READ_OWN]}
     >
-      <CalendarPage />
+      {/* Derin bağlantı `?gun=`/`?randevu=` okuyor; `useSearchParams` Suspense sınırı ister. */}
+      <Suspense>
+        <CalendarPage />
+      </Suspense>
     </PermissionGate>
   );
 }

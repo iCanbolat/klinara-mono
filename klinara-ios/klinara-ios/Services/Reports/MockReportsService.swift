@@ -165,7 +165,6 @@ final class MockReportsService: ReportsService, @unchecked Sendable {
         RetentionReport(
             period: period(from: from, to: to),
             totals: MockReportsSeed.retentionTotals,
-            acquisition: MockReportsSeed.acquisition,
             cohorts: MockReportsSeed.cohorts,
             previous: compareToPrevious ? MockReportsSeed.retentionPrevious : nil,
             delta: compareToPrevious ? ["newCustomers": 25.0] : nil

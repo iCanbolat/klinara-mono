@@ -137,7 +137,7 @@ export class WhatsAppTestResultDto {
 }
 
 export class WhatsAppProvisionItemDto {
-  @ApiProperty({ example: 'klinara_randevu_hatirlatma' })
+  @ApiProperty({ example: 'klinara_randevu_hatirlatma_v3' })
   name: string;
 
   @ApiProperty({ enum: ['created', 'exists', 'failed'] })

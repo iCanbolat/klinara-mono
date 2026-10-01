@@ -80,7 +80,7 @@ struct MockGraph {
 
     func createInput(
         at start: Date,
-        serviceIds: [String] = [MockCatalogSeed.serviceLazerBolgesel],
+        serviceIds: [String] = [MockCatalogSeed.serviceOrtodontiKontrol],
         staffProfileId: String = MockStaffSeed.profileAyse,
         customerId: String = MockCustomerSeed.ayse,
         notes: String? = nil

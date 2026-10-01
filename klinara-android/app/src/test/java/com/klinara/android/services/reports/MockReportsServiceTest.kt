@@ -163,14 +163,13 @@ class MockReportsServiceTest {
         }
 
     @Test
-    @DisplayName("Kazanım: yeni + geri gelen = aktif; kaynak kırılımı yeni müşterileri sayar; kaynaksız en sonda")
+    @DisplayName("Kazanım: yeni + geri gelen = aktif; kohortlar 30/60/90")
     fun retentionAddsUp() =
         runTest {
             val report = service().retention(ReportQuery(august, null))
 
             with(report.totals) { assertEquals(activeCustomers, newCustomers + returningCustomers) }
             assertTrue(report.totals.newCustomers > 0)
-            assertEquals(report.totals.newCustomers, report.acquisition.sumOf { it.customers })
             assertEquals(listOf(30, 60, 90), report.cohorts.map { it.withinDays })
             // Uzun pencere daha çok geri dönüşü kapsar.
             assertTrue(report.cohorts.zipWithNext().all { (a, b) -> a.returned <= b.returned })

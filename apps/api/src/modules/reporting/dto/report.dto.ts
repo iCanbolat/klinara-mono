@@ -221,12 +221,6 @@ export class NoShowReportDto {
   @ApiPropertyOptional({ type: Object }) delta?: Record<string, number | null>;
 }
 
-export class AcquisitionRowDto {
-  @ApiProperty({ nullable: true, type: String, description: '`customers.source`' })
-  source: string | null;
-  @ApiProperty() customers: number;
-}
-
 export class RetentionTotalsDto {
   @ApiProperty({ description: 'Penceredeki İLK tamamlanmış randevusu olan müşteriler.' })
   newCustomers: number;
@@ -247,7 +241,6 @@ export class CohortReturnDto {
 export class RetentionReportDto {
   @ApiProperty({ type: ReportPeriodDto }) period: ReportPeriodDto;
   @ApiProperty({ type: RetentionTotalsDto }) totals: RetentionTotalsDto;
-  @ApiProperty({ type: [AcquisitionRowDto] }) acquisition: AcquisitionRowDto[];
   @ApiProperty({
     type: [CohortReturnDto],
     description:

@@ -1,6 +1,5 @@
 package com.klinara.android.features.notifications
 
-import com.klinara.android.services.integrations.MockWhatsAppService
 import com.klinara.android.services.formatting.BranchClock
 import com.klinara.android.services.networking.Loadable
 import com.klinara.android.services.notifications.Message
@@ -238,50 +237,6 @@ class MessageLogViewModelTest {
             val first = viewModel.state.value.messages.valueOrNull!!.first()
             assertEquals(first, viewModel.message(first.id))
             assertNull(viewModel.message("yok"))
-        }
-
-    @Test
-    @DisplayName("Gelen kutusu: işlenmemiş süzgecinde işaretlenen satır DÜŞER, 'Tümü'nde damgalanır")
-    fun inboxMarkHandled() =
-        runTest(dispatcher) {
-            val unhandled = InboxViewModel(MockWhatsAppService(latencyEnabled = false, now = { now }), now = { now })
-            unhandled.load()
-            advanceUntilIdle()
-            assertEquals(2, unhandled.state.value.items.valueOrNull?.size)
-
-            unhandled.markHandled(MockNotificationsSeed.INBOX_AYSE)
-            advanceUntilIdle()
-            assertEquals(
-                listOf(MockNotificationsSeed.INBOX_UNKNOWN),
-                unhandled.state.value.items.valueOrNull
-                    ?.map { it.id },
-            )
-
-            val all = InboxViewModel(MockWhatsAppService(latencyEnabled = false, now = { now }), now = { now })
-            all.setFilter(InboxFilter.All)
-            advanceUntilIdle()
-            all.markHandled(MockNotificationsSeed.INBOX_UNKNOWN)
-            advanceUntilIdle()
-            val rows = all.state.value.items.valueOrNull.orEmpty()
-            assertEquals(3, rows.size)
-            assertTrue(rows.first { it.id == MockNotificationsSeed.INBOX_UNKNOWN }.isHandled)
-            assertFalse(all.state.value.isSaving)
-        }
-
-    @Test
-    @DisplayName("Gelen kutusu işaretleme hatası YUTULMAZ, liste yerinde kalır")
-    fun inboxMarkFailure() =
-        runTest(dispatcher) {
-            val service = MockWhatsAppService(latencyEnabled = false, now = { now })
-            val viewModel = InboxViewModel(service, now = { now })
-            viewModel.load()
-            advanceUntilIdle()
-
-            viewModel.markHandled("bilinmeyen")
-            advanceUntilIdle()
-
-            assertNotNull(viewModel.state.value.error)
-            assertEquals(2, viewModel.state.value.items.valueOrNull?.size)
         }
 
     @Test

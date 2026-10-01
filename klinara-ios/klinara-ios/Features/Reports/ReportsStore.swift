@@ -242,8 +242,8 @@ final class ReportsStore {
         }
     }
 
-    /// Geri dönüş raporunun kırılım LİSTESİ YOK: `acquisition` müşteri kaynağı
-    /// sayısıyla, `cohorts` üç satırla sınırlı. Sayfalamak, olmayan bir
+    /// Geri dönüş raporunun kırılım LİSTESİ YOK: `cohorts` üç satırla
+    /// sınırlı. Sayfalamak, olmayan bir
     /// listeye sayfa numarası vermek olurdu.
     func loadRetention() async {
         retention = .loading

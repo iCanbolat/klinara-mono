@@ -19,7 +19,6 @@ struct CustomerForm: Equatable {
     var district: String
     var city: String
     var postalCode: String
-    var source: CustomerSource?
     /// Seçili etiket kimlikleri. Etiketler ayrı bir uca (`PUT .../tags`)
     /// yazılıyor; form onları taşır ama gövdesine koymaz.
     var tagIds: Set<String>
@@ -37,7 +36,6 @@ struct CustomerForm: Equatable {
         var district: String
         var city: String
         var postalCode: String
-        var source: CustomerSource?
         var tagIds: Set<String>
     }
 
@@ -53,7 +51,6 @@ struct CustomerForm: Equatable {
             district: trimmed(district),
             city: trimmed(city),
             postalCode: trimmed(postalCode),
-            source: source,
             tagIds: tagIds
         )
     }
@@ -73,7 +70,6 @@ struct CustomerForm: Equatable {
         district = existing?.district ?? ""
         city = existing?.city ?? ""
         postalCode = existing?.postalCode ?? ""
-        source = existing?.source
         tagIds = Set(existing?.tags.map(\.id) ?? [])
 
         original = Snapshot(
@@ -87,7 +83,6 @@ struct CustomerForm: Equatable {
             district: existing?.district ?? "",
             city: existing?.city ?? "",
             postalCode: existing?.postalCode ?? "",
-            source: existing?.source,
             tagIds: Set(existing?.tags.map(\.id) ?? [])
         )
     }
@@ -132,8 +127,7 @@ struct CustomerForm: Equatable {
             addressLine: nilIfEmpty(addressLine),
             district: nilIfEmpty(district),
             city: nilIfEmpty(city),
-            postalCode: nilIfEmpty(postalCode),
-            source: source
+            postalCode: nilIfEmpty(postalCode)
         )
     }
 
@@ -154,8 +148,7 @@ struct CustomerForm: Equatable {
             addressLine: Nullable.text(addressLine),
             district: Nullable.text(district),
             city: Nullable.text(city),
-            postalCode: Nullable.text(postalCode),
-            source: source.map { Nullable.set($0) } ?? .clear
+            postalCode: Nullable.text(postalCode)
         )
     }
 }

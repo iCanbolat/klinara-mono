@@ -200,23 +200,7 @@ fun BranchEditorScreen(
                 }
             }
 
-            KlinaraCard(title = "İletişim") {
-                KlinaraTextField(
-                    label = "Telefon",
-                    value = draft.phone,
-                    onValueChange = { value -> viewModel.update { it.copy(phone = value) } },
-                    placeholder = "+90 212 000 00 00",
-                    error = state.fieldErrors["phone"],
-                    keyboardType = KeyboardType.Phone,
-                )
-                KlinaraTextField(
-                    label = "Adres",
-                    value = draft.address,
-                    onValueChange = { value -> viewModel.update { it.copy(address = value) } },
-                    placeholder = "Cadde, no, ilçe",
-                    error = state.fieldErrors["address"],
-                )
-            }
+            ContactCard(draft, state.fieldErrors, viewModel::update)
 
             KlinaraCard(title = "Saat dilimi", footnote = "Randevu ve çalışma saatleri bu dilime göre tutulur.") {
                 zones.forEach { zone ->
@@ -278,3 +262,37 @@ internal fun timeZoneOptions(current: String): List<String> =
 
 private val COMMON_ZONES =
     listOf("Europe/Istanbul", "Europe/London", "Europe/Berlin", "Europe/Amsterdam", "Asia/Dubai", "Asia/Baku")
+
+/** Telefon, adres ve Google Maps bağlantısı — bağlantı müşteriye giden randevu mesajlarına yazılır. */
+@Composable
+private fun ContactCard(
+    draft: BranchDraft,
+    fieldErrors: Map<String, String>,
+    onUpdate: ((BranchDraft) -> BranchDraft) -> Unit,
+) {
+    KlinaraCard(title = "İletişim") {
+        KlinaraTextField(
+            label = "Telefon",
+            value = draft.phone,
+            onValueChange = { value -> onUpdate { it.copy(phone = value) } },
+            placeholder = "+90 212 000 00 00",
+            error = fieldErrors["phone"],
+            keyboardType = KeyboardType.Phone,
+        )
+        KlinaraTextField(
+            label = "Adres",
+            value = draft.address,
+            onValueChange = { value -> onUpdate { it.copy(address = value) } },
+            placeholder = "Cadde, no, ilçe",
+            error = fieldErrors["address"],
+        )
+        KlinaraTextField(
+            label = "Google Maps bağlantısı",
+            value = draft.mapsUrl,
+            onValueChange = { value -> onUpdate { it.copy(mapsUrl = value) } },
+            placeholder = "https://maps.app.goo.gl/…",
+            error = fieldErrors["mapsUrl"] ?: draft.mapsUrlError,
+            keyboardType = KeyboardType.Uri,
+        )
+    }
+}

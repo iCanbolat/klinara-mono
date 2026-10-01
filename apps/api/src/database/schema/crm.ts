@@ -18,16 +18,6 @@ import { tenants } from './tenancy';
 /** Müşteri cinsiyeti — KVKK açısından zorunlu değil, bu yüzden `undisclosed` var. */
 export type CustomerGender = 'female' | 'male' | 'other' | 'undisclosed';
 
-/** Müşterinin kliniğe nereden geldiği — pazarlama harcamasının karşılığı burada okunur. */
-export type CustomerSource =
-  | 'walk_in'
-  | 'referral'
-  | 'instagram'
-  | 'google'
-  | 'website'
-  | 'whatsapp'
-  | 'other';
-
 export const customers = pgTable(
   'customers',
   {
@@ -46,7 +36,6 @@ export const customers = pgTable(
     district: text('district'),
     city: text('city'),
     postalCode: text('postal_code'),
-    source: text('source').$type<CustomerSource>(),
     /** Birleştirilen kayıt arşivlenir ve hayatta kalana işaret eder. */
     mergedIntoCustomerId: uuid('merged_into_customer_id'),
     /**

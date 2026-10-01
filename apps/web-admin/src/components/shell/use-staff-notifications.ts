@@ -1,7 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { api } from '@/lib/api/client';
+import { emitMessageEvent } from '@/lib/messages/message-events';
+import {
+  isRealtimeConnected,
+  onRealtimeStatus,
+  subscribeRealtime,
+} from '@/lib/realtime/realtime-client';
 import { toMessage } from '@/lib/reports/errors';
 
 export type StaffNotificationKind =
@@ -27,10 +33,11 @@ interface Feed {
 }
 
 /**
- * Bildirim yoklaması — sohbet listesiyle aynı kalıp (`use-conversations`):
- * sunucuda yayın altyapısı yok, sekme gizliyken yoklama duruyor.
+ * Bildirimler soketten ANINDA tetikleniyor (`realtime-client`); yoklama yalnız
+ * güvenlik ağı. Soket bağlıyken seyrek, kopukken sık — sekme gizliyken duruyor.
  */
-const POLL_MS = 30_000;
+const POLL_MS = 15_000;
+const POLL_CONNECTED_MS = 60_000;
 
 export interface StaffNotificationsState {
   notifications: StaffNotification[];
@@ -39,7 +46,17 @@ export interface StaffNotificationsState {
   markRead: (ids?: string[]) => void;
 }
 
-export function useStaffNotifications(enabled: boolean): StaffNotificationsState {
+export function useStaffNotifications(
+  enabled: boolean,
+  onNew?: (fresh: StaffNotification[]) => void,
+): StaffNotificationsState {
+  // İlk yükleme toast basmaz (oturum açılışında eski okunmamışlar yağmasın);
+  // sonrasında yalnız daha önce görülmemiş VE okunmamış satırlar bildirilir.
+  const seen = useRef<Set<string> | null>(null);
+  const onNewRef = useRef(onNew);
+  useEffect(() => {
+    onNewRef.current = onNew;
+  });
   const [feed, setFeed] = useState<Feed>({ data: [], unreadCount: 0 });
   const [error, setError] = useState<string | null>(null);
   const [nonce, setNonce] = useState(0);
@@ -55,6 +72,14 @@ export function useStaffNotifications(enabled: boolean): StaffNotificationsState
           signal: controller.signal,
         });
         if (controller.signal.aborted) return;
+        const known = seen.current;
+        seen.current = new Set(page.data.map((row) => row.id));
+        if (known !== null) {
+          const fresh = page.data.filter((row) => row.readAt === null && !known.has(row.id));
+          if (fresh.length > 0) onNewRef.current?.(fresh);
+          if (fresh.some((row) => row.kind === 'inbound_message' || row.kind === 'delivery_failed'))
+            emitMessageEvent();
+        }
         setFeed(page);
         setError(null);
       } catch (caught) {
@@ -65,11 +90,30 @@ export function useStaffNotifications(enabled: boolean): StaffNotificationsState
     return () => controller.abort();
   }, [enabled, nonce]);
 
+  // Soket içerik taşımıyor: olay gelince akış yeniden okunuyor, toast ve
+  // sayaç yukarıdaki fark hesabından çıkıyor.
+  const live = useSyncExternalStore(onRealtimeStatus, isRealtimeConnected, () => false);
   useEffect(() => {
     if (!enabled) return;
-    const timer = setInterval(() => {
-      if (!document.hidden) reload();
-    }, POLL_MS);
+    return subscribeRealtime((message) => {
+      // Sohbet ekranı zil akışını beklemeden tazelensin.
+      if (
+        message.type === 'staff_notification' &&
+        (message.kind === 'inbound_message' || message.kind === 'delivery_failed')
+      )
+        emitMessageEvent();
+      reload();
+    });
+  }, [enabled, reload]);
+
+  useEffect(() => {
+    if (!enabled) return;
+    const timer = setInterval(
+      () => {
+        if (!document.hidden) reload();
+      },
+      live ? POLL_CONNECTED_MS : POLL_MS,
+    );
     const onVisible = (): void => {
       if (!document.hidden) reload();
     };
@@ -78,7 +122,7 @@ export function useStaffNotifications(enabled: boolean): StaffNotificationsState
       clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [enabled, reload]);
+  }, [enabled, live, reload]);
 
   const markRead = useCallback(
     (ids?: string[]) => {

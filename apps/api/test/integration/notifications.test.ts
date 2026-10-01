@@ -35,6 +35,8 @@ interface TemplateBody {
   body: string;
   isDefault: boolean;
   variables: string[];
+  segments: { kind: string; name?: string; handle?: string; text?: string }[];
+  whatsappTemplateName: string | null;
 }
 
 describe('bildirim çekirdeği (Batch 8.1)', () => {
@@ -94,6 +96,8 @@ describe('bildirim çekirdeği (Batch 8.1)', () => {
     variables: {
       customerName: 'Ayşe Yılmaz',
       branchName: 'Merkez',
+      branchAddress: 'Bağdat Cad. No:1, Kadıköy',
+          branchMapsQuery: 'Merkez%20Ba%C4%9Fdat',
       appointmentAt: '7 Eylül 14:00',
       serviceName: 'Lazer',
     },
@@ -129,9 +133,6 @@ describe('bildirim çekirdeği (Batch 8.1)', () => {
     await http(app).post('/api/v1/integrations/whatsapp/verify').set(ownerAuth()).expect(200);
     graph.reset();
   };
-
-  const setPreference = (body: Record<string, unknown>) =>
-    http(app).put('/api/v1/notification-preferences').set(ownerAuth()).send(body);
 
   // -------------------------------------------------------------------------
   describe('gönderim akışı', () => {
@@ -234,7 +235,7 @@ describe('bildirim çekirdeği (Batch 8.1)', () => {
   });
 
   // -------------------------------------------------------------------------
-  describe('çift gönderim ve sessiz saatler', () => {
+  describe('çift gönderim ve zamanlama', () => {
     beforeEach(() => activateWhatsApp());
 
     it('aynı `dedupeKey` ile ikinci mesaj YAZILAMAZ', async () => {
@@ -248,77 +249,19 @@ describe('bildirim çekirdeği (Batch 8.1)', () => {
       expect((listed.body as { data: MessageBody[] }).data).toHaveLength(1);
     });
 
-    it('sessiz saatte üretilen mesaj SABAHA ertelenir', async () => {
-      // 7 Eylül 23:30 İstanbul.
-      const queued = await enqueue(
-        reminder({ scheduledFor: new Date('2026-09-07T20:30:00Z') }),
-      );
-      if (queued.status !== 'queued') throw new Error('kuyruğa yazılmalıydı');
-
-      expect(queued.scheduledFor.toISOString()).toBe('2026-09-08T06:00:00.000Z');
-    });
-
-    it('randevu ONAYI ve İPTALİ sessiz saatte bile ANINDA gider', async () => {
-      // 7 Eylül 23:30 İstanbul — müşteri online randevuyu gece alıyor.
+    it('gece üretilen mesaj ERTELENMEZ — planlandığı anda gider', async () => {
+      // 7 Eylül 23:30 İstanbul. Sessiz saat kaldırıldı: hatırlatma, onay ve iptal
+      // dahil hiçbir mesaj sabaha ötelenmez.
       const at = new Date('2026-09-07T20:30:00Z');
-      for (const event of ['appointment_confirmation', 'appointment_cancelled'] as const) {
-        const queued = await enqueue(
-          reminder({ event, scheduledFor: at, dedupeKey: `${event}:gece` }),
-        );
+      for (const event of [
+        'appointment_reminder',
+        'appointment_confirmation',
+        'appointment_cancelled',
+      ] as const) {
+        const queued = await enqueue(reminder({ event, scheduledFor: at, dedupeKey: `${event}:gece` }));
         if (queued.status !== 'queued') throw new Error('kuyruğa yazılmalıydı');
         expect(queued.scheduledFor.toISOString()).toBe(at.toISOString());
       }
-    });
-
-    it('şube tercihindeki sessiz saat penceresi kiracı varsayılanını EZER', async () => {
-      await setPreference({
-        branchId: clinic.branch.id,
-        event: 'appointment_reminder',
-        channels: ['whatsapp'],
-        quietHoursStart: '23:00',
-        quietHoursEnd: '07:00',
-      }).expect(200);
-
-      // 22:00 İstanbul — kiracı varsayılanında (21:00) sessiz, şube
-      // penceresinde (23:00) değil.
-      const queued = await enqueue(reminder({ scheduledFor: new Date('2026-09-07T19:00:00Z') }));
-      if (queued.status !== 'queued') throw new Error('kuyruğa yazılmalıydı');
-      expect(queued.scheduledFor.toISOString()).toBe('2026-09-07T19:00:00.000Z');
-    });
-
-    it('eşit başlangıç ve bitiş sessiz saati KAPATIR — gece üretilen mesaj ertelenmez', async () => {
-      const saved = await setPreference({
-        branchId: clinic.branch.id,
-        event: 'appointment_reminder',
-        channels: ['whatsapp'],
-        quietHoursStart: '00:00',
-        quietHoursEnd: '00:00',
-      }).expect(200);
-      expect((saved.body as { quietHoursEnabled: boolean }).quietHoursEnabled).toBe(false);
-
-      // 23:30 İstanbul — varsayılan pencerede (21:00–09:00) sabaha kalırdı.
-      const queued = await enqueue(reminder({ scheduledFor: new Date('2026-09-07T20:30:00Z') }));
-      if (queued.status !== 'queued') throw new Error('kuyruğa yazılmalıydı');
-      expect(queued.scheduledFor.toISOString()).toBe('2026-09-07T20:30:00.000Z');
-
-      const listed = await http(app)
-        .get('/api/v1/notification-preferences')
-        .set(ownerAuth())
-        .expect(200);
-      const rows = listed.body as {
-        event: string;
-        branchId: string | null;
-        quietHoursEnabled: boolean;
-      }[];
-      // Kiracı varsayılanı hâlâ açık; kapatılan yalnız şube satırı.
-      expect(
-        rows.find((r) => r.event === 'appointment_reminder' && r.branchId === null)
-          ?.quietHoursEnabled,
-      ).toBe(true);
-      expect(
-        rows.find((r) => r.event === 'appointment_reminder' && r.branchId === clinic.branch.id)
-          ?.quietHoursEnabled,
-      ).toBe(false);
     });
 
     it('personele giden iç bildirim ERTELENMEZ', async () => {
@@ -335,7 +278,7 @@ describe('bildirim çekirdeği (Batch 8.1)', () => {
   });
 
   // -------------------------------------------------------------------------
-  describe('şablonlar ve tercihler', () => {
+  describe('şablonlar', () => {
     it('varsayılan şablonlar kiracı satırı olmadan da listelenir', async () => {
       const listed = await http(app)
         .get('/api/v1/notification-templates')
@@ -348,9 +291,29 @@ describe('bildirim çekirdeği (Batch 8.1)', () => {
       );
       expect(reminderTemplate?.isDefault).toBe(true);
       expect(reminderTemplate?.variables).toContain('customerName');
+      // Ekranlar `{{…}}` ayrıştırmaz: parçalar sunucudan gelir ve etiketleri
+      // `@HizmetAdı` biçimindedir; adres ve konum bağlantısı da gövdededir.
+      expect(reminderTemplate?.segments).toEqual(
+        expect.arrayContaining([
+          { kind: 'variable', name: 'serviceName', handle: '@HizmetAdı' },
+          { kind: 'variable', name: 'branchAddress', handle: '@KlinikAdresi' },
+        ]),
+      );
+      expect(reminderTemplate?.whatsappTemplateName).toBe('klinara_randevu_hatirlatma_v3');
       // SMS müşteriye kapalı; doğum günü (pazarlama) olayı yok.
       expect(templates.some((row) => row.channel === 'sms')).toBe(false);
       expect(templates.some((row) => row.event === 'birthday')).toBe(false);
+      // Personel bildirimi platformun e-postasıdır, kiracı şablonu değil.
+      expect(templates.some((row) => row.event === 'staff_internal')).toBe(false);
+      expect(templates.some((row) => row.event === 'staff_reply')).toBe(false);
+    });
+
+    it('personel iç bildirimi için şablon yazılamaz', async () => {
+      await http(app)
+        .put('/api/v1/notification-templates')
+        .set(ownerAuth())
+        .send({ event: 'staff_internal', channel: 'email', subject: 'x', body: '{{message}}' })
+        .expect(422);
     });
 
     it('kiracının eşlediği template varsayılanın YERİNE geçer', async () => {
@@ -381,7 +344,6 @@ describe('bildirim çekirdeği (Batch 8.1)', () => {
 
     it('SMS kanalı artık kabul edilmez', async () => {
       // Kanal kümesinde yok: istek gövde doğrulamasında düşer.
-      await setPreference({ event: 'appointment_reminder', channels: ['sms'] }).expect(400);
       await http(app)
         .put('/api/v1/notification-templates')
         .set(ownerAuth())
@@ -416,39 +378,6 @@ describe('bildirim çekirdeği (Batch 8.1)', () => {
         .expect(422);
     });
 
-    it('aynı kiracı tercihi ikinci kez yazıldığında TEK satır kalır', async () => {
-      await setPreference({ event: 'no_show_followup', channels: ['whatsapp'] }).expect(200);
-      await setPreference({ event: 'no_show_followup', channels: [] }).expect(200);
-
-      const rows = await database.ownerPool.query<{ count: string }>(
-        `select count(*)::text as count from notification_preferences where event = 'no_show_followup'`,
-      );
-      expect(rows.rows[0]?.count).toBe('1');
-    });
-
-    it('tercih kanal sırasını belirler; adresi olmayan kanal atlanır', async () => {
-      await activateWhatsApp();
-      await setPreference({
-        event: 'appointment_reminder',
-        channels: ['whatsapp'],
-      }).expect(200);
-
-      // Kanal override'ı OLMADAN: seçim tamamen tercihe kalsın.
-      const base = reminder();
-      delete (base as { channels?: unknown }).channels;
-      const queued = await enqueue(base);
-      if (queued.status !== 'queued') throw new Error('kuyruğa yazılmalıydı');
-      expect(queued.channel).toBe('whatsapp');
-    });
-
-    it('müşteri olayının tercihine e-posta YAZILAMAZ', async () => {
-      const rejected = await setPreference({
-        event: 'appointment_reminder',
-        channels: ['email', 'whatsapp'],
-      }).expect(422);
-      expect((rejected.body as Problem).code).toBe('VALIDATION_FAILED');
-    });
-
     it('müşteri olayına e-posta ŞABLONU yazılamaz', async () => {
       const rejected = await http(app)
         .put('/api/v1/notification-templates')
@@ -463,11 +392,10 @@ describe('bildirim çekirdeği (Batch 8.1)', () => {
       expect((rejected.body as Problem).code).toBe('VALIDATION_FAILED');
     });
 
-    it('şablon listesi müşteri olaylarında e-posta satırı DÖNDÜRMEZ', async () => {
+    it('şablon listesi hiçbir e-posta satırı DÖNDÜRMEZ', async () => {
       const listed = await http(app).get('/api/v1/notification-templates').set(ownerAuth()).expect(200);
       const rows = listed.body as { event: string; channel: string }[];
-      expect(rows.some((row) => row.channel === 'email' && row.event !== 'staff_internal')).toBe(false);
-      expect(rows.some((row) => row.channel === 'email' && row.event === 'staff_internal')).toBe(true);
+      expect(rows.some((row) => row.channel === 'email')).toBe(false);
     });
   });
 

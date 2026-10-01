@@ -61,7 +61,7 @@ final class MockConversationsService: ConversationsService, @unchecked Sendable 
             Conversation(
                 id: Self.openId,
                 phone: "+905321234567",
-                customer: ConversationCustomer(id: MockCustomerSeed.ayse, fullName: "Ayşe Yılmaz"),
+                customer: ConversationCustomer(id: MockCustomerSeed.ayse, fullName: "Şule Aydın"),
                 status: .open,
                 lastMessageAt: ago(4),
                 lastMessagePreview: "Yarınki randevumu 15:00'e alabilir miyiz?",
@@ -85,7 +85,7 @@ final class MockConversationsService: ConversationsService, @unchecked Sendable 
             Conversation(
                 id: Self.archivedId,
                 phone: "+905337654321",
-                customer: ConversationCustomer(id: MockCustomerSeed.mehmet, fullName: "Mehmet Demir"),
+                customer: ConversationCustomer(id: MockCustomerSeed.mehmet, fullName: "Can Öztürk"),
                 status: .closed,
                 lastMessageAt: ago(60 * 50),
                 lastMessagePreview: "Teşekkürler, görüşmek üzere.",
@@ -99,7 +99,7 @@ final class MockConversationsService: ConversationsService, @unchecked Sendable 
         threads = [
             Self.openId: [
                 message("m-1", .inbound, "Merhaba, randevum için yazıyorum.", ago(60 * 26)),
-                message("m-2", .auto("appointment_reminder"), "Sayın Ayşe Yılmaz, yarın 11:00 randevunuzu hatırlatırız.", ago(60 * 20)),
+                message("m-2", .auto("appointment_reminder"), "Sayın Şule Aydın, yarın 11:00 randevunuzu hatırlatırız.", ago(60 * 20)),
                 message("m-3", .inbound, "Yarınki randevumu 15:00'e alabilir miyiz?", ago(4)),
             ],
             Self.closedWindowId: [
@@ -307,7 +307,7 @@ final class MockConversationsService: ConversationsService, @unchecked Sendable 
                 throw problem(.notFound, "Sohbet bulunamadı", status: 404)
             }
             let row = records[index]
-            let names = [MockCustomerSeed.ayse: "Ayşe Yılmaz", MockCustomerSeed.mehmet: "Mehmet Demir"]
+            let names = [MockCustomerSeed.ayse: "Şule Aydın", MockCustomerSeed.mehmet: "Can Öztürk"]
             records[index] = Conversation(
                 id: row.id,
                 phone: row.phone,

@@ -57,13 +57,11 @@ class ManagementSectionsTest {
             val card = managementSections(ShellSessions.forRole(role)).firstOrNull { it.title == "İletişim" }
             assertEquals(
                 listOf(
-                    ManagementDestination.Inbox,
                     ManagementDestination.MessageLog,
                     ManagementDestination.ReminderSettings,
                     ManagementDestination.NotificationTemplates,
-                    ManagementDestination.NotificationPreferences,
                 ),
-                card?.rows?.map { it.destination }?.filterNot { it == ManagementDestination.Conversations }?.take(5),
+                card?.rows?.map { it.destination }?.filterNot { it == ManagementDestination.Conversations }?.take(3),
                 role,
             )
         }

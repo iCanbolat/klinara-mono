@@ -139,13 +139,12 @@ class MockReportsService(
         val history = data.history(query.branchId)
         val today = data.localDate(now())
         fun compute(period: ReportPeriod) =
-            MockReportBuilders.retention(history, data.days(period).toSet(), today, data::source)
-        val (totals, acquisition, cohorts) = compute(query.period)
+            MockReportBuilders.retention(history, data.days(period).toSet(), today)
+        val (totals, cohorts) = compute(query.period)
         val previous = query.previous()?.let { compute(it).first }
         return RetentionReport(
             period = echo(query.period),
             totals = totals,
-            acquisition = acquisition,
             cohorts = cohorts,
             previous = previous,
             delta = previous?.let(totals::delta),
