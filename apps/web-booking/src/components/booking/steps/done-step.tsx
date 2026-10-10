@@ -8,12 +8,12 @@ import { formatDateTime } from '../slot-grouping';
 import { t } from '@/i18n/tr';
 
 export function DoneStep({
-  manageToken,
+  manageHref,
   selection,
   startsAt,
   branchPhone,
 }: {
-  manageToken: string;
+  manageHref: string;
   selection: SelectionSummary;
   /** Hold temizlendiği için saat AYRICA taşınıyor. */
   startsAt: string | null;
@@ -47,7 +47,7 @@ export function DoneStep({
       </Card>
 
       <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
-        <LinkButton href={`/r/${manageToken}`} size="lg">
+        <LinkButton href={manageHref} size="lg">
           {t('booking.done.manage')}
         </LinkButton>
         {branchPhone !== null && (

@@ -28,7 +28,7 @@ export class PublicResolveController {
   @ApiOperation({
     summary: 'Konak adı → randevu sayfası slug’ı',
     description:
-      'Yayınlanmamış site ve doğrulanmamış alan adı için `404`. Kanonik adres, kiracının birincil konak adıdır.',
+      'Doğrulanmamış alan adı için `404`. Kanonik adres, kiracının birincil konak adıdır; sayfası yayında olmayan platform subdomain’i için `directUrl` döner.',
   })
   async resolve(
     @Query('host') host: string | undefined,

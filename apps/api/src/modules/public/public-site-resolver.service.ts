@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppError } from '../../common/errors/app-error';
+import { directBookingUrl } from '../../common/host';
 import { RequestContextService } from '../../common/request-context';
 import { TenantTxService } from '../../database/tenant-tx.service';
 import type { EnvironmentVariables } from '../../config/env.validation';
@@ -34,9 +35,8 @@ export class PublicSiteResolverService {
   /**
    * Slug'ı çözer ve kiracıyı istek bağlamına yazar.
    *
-   * Bulunamayan slug ile yayınlanmamış slug AYNI yanıtı alır (`404`).
-   * Ayrıştırmak, "hangi klinikler bizim müşterimiz" sorusunu numaralandıran
-   * bir orakl yaratırdı.
+   * Yayınlanmamış site de çözülür: doğrudan randevu bağlantısı sayfa içeriği
+   * olmadan çalışıyor. Yayın durumunu İÇERİK ucu (`getSite`) uygular.
    */
   async adopt(slug: string): Promise<PublicSiteContext> {
     const site = await this.tx.runAsPublicLookup((tx) => repo.findSiteBySlug(tx, slug));
@@ -46,11 +46,23 @@ export class PublicSiteResolverService {
     return site;
   }
 
-  /** Konak adı → slug + kanonik adres. Next.js soğuk render'da bir kez çağırır. */
-  async resolveHost(host: string): Promise<{ slug: string; canonicalUrl: string } | undefined> {
+  /**
+   * Konak adı → slug + kanonik adres. Next.js soğuk render'da bir kez çağırır.
+   *
+   * Sayfası yayında olmayan bir kliniğin PLATFORM subdomain'inde gösterilecek
+   * bir şey yok; `directUrl` web'e "buraya yönlendir" der. Özel alan adı
+   * yönlendirilmez — klinik kendi adresini bağladıysa randevu akışı orada açılır.
+   */
+  async resolveHost(
+    host: string,
+  ): Promise<{ slug: string; canonicalUrl: string; directUrl: string | null } | undefined> {
     const row = await this.tx.runAsPublicLookup((tx) => repo.findByHost(tx, host));
     if (row === undefined) return undefined;
-    return { slug: row.slug, canonicalUrl: `https://${row.canonicalHost}` };
+    if (row.status !== 'published' && row.kind === 'platform_subdomain') {
+      const directUrl = directBookingUrl(row.slug, this.rootDomain);
+      return { slug: row.slug, canonicalUrl: directUrl, directUrl };
+    }
+    return { slug: row.slug, canonicalUrl: `https://${row.canonicalHost}`, directUrl: null };
   }
 
   /**

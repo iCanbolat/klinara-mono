@@ -31,7 +31,7 @@ describe('kenar çubuğu', () => {
     sessionState.permissions = [];
     sessionState.loading = false;
     renderSidebar();
-    expect(screen.queryByRole('link', { name: 'Alan adları' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Randevu sayfası' })).not.toBeInTheDocument();
     // İzin gerektirmeyen "Genel bakış" ve "Hesabım" her rolde duruyor.
     expect(screen.getByRole('link', { name: 'Genel bakış' })).toHaveAttribute('href', '/dashboard');
     expect(screen.getByRole('link', { name: 'Hesabım' })).toBeInTheDocument();
@@ -41,7 +41,7 @@ describe('kenar çubuğu', () => {
     sessionState.permissions = [PERMISSIONS.BOOKING_PAGE_READ];
     sessionState.loading = false;
     renderSidebar();
-    expect(screen.getByRole('link', { name: 'Alan adları' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Randevu sayfası' })).toBeInTheDocument();
   });
 
   it('bulunulan bölümü aria-current ile işaretliyor', () => {

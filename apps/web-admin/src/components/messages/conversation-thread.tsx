@@ -167,7 +167,15 @@ export function ConversationThread({
         </Button>
       </header>
 
-      <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto bg-muted/40 px-3 py-4 md:px-6">
+      {/*
+        `relative`: balonlardaki `sr-only` (absolute) etiketlerin içerdiği blok
+        bu kaydırıcı olsun. Yoksa en yakın konumlu ata gövde oluyor ve sohbetin
+        kaydırılmış ucundaki etiket belgeyi binlerce piksel aşağı uzatıyordu.
+      */}
+      <div
+        ref={scroller}
+        className="relative min-h-0 flex-1 overflow-y-auto bg-muted/40 px-3 py-4 md:px-6"
+      >
         {error !== null ? (
           <Alert tone="danger" className="mb-3">
             {error}

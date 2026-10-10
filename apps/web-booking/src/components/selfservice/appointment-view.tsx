@@ -9,6 +9,7 @@ import type {
 } from '@klinara/shared';
 import { bookingApi } from '@/lib/booking-fetch';
 import { describeError, type UserFacingError } from '@/lib/errors';
+import { bookingHref } from '@/lib/site-links';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { SlotPicker } from '@/components/booking/slot-picker';
@@ -27,10 +28,13 @@ export function AppointmentView({
   site,
   categories,
   token,
+  direct = false,
 }: {
   site: PublicSitePayload;
   categories: PublicCategory[];
   token: string;
+  /** Doğrudan randevu bağlantısı — bağlantılar `klinik` parametresini taşır. */
+  direct?: boolean;
 }) {
   /**
    * İlk yükleme sonucu tek bir state'te: state yalnız asenkron callback'te
@@ -113,7 +117,7 @@ export function AppointmentView({
         <p className="mt-3 text-sm opacity-75">
           {error?.message ?? 'Bağlantı artık geçerli değil.'}
         </p>
-        <a className="mt-6 inline-block underline underline-offset-4" href="/randevu">
+        <a className="mt-6 inline-block underline underline-offset-4" href={bookingHref(site, direct)}>
           Yeni randevu al
         </a>
       </section>

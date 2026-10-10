@@ -1,14 +1,9 @@
-'use client';
+import { redirect } from 'next/navigation';
 
-import type { ReactNode } from 'react';
-import { PERMISSIONS } from '@klinara/shared';
-import { PermissionGate } from '@/components/session/permission-gate';
-import { DomainsPage } from '@/components/domains/domains-page';
-
-export default function Page(): ReactNode {
-  return (
-    <PermissionGate required={[PERMISSIONS.BOOKING_PAGE_READ]}>
-      <DomainsPage />
-    </PermissionGate>
-  );
+/**
+ * Alan adları artık "Randevu sayfası"nın bir sekmesi. Eski yer imleri ve
+ * paylaşılmış bağlantılar kırılmasın diye rota yönlendirme olarak kalıyor.
+ */
+export default function Page(): never {
+  redirect('/sayfa?tab=alan-adlari');
 }

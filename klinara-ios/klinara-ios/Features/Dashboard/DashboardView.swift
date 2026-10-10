@@ -16,6 +16,8 @@ struct DashboardView: View {
 
     @State private var store: DashboardStore?
     @State private var picked: BranchMetric?
+    /// Dokunulan sıradaki randevu — takvimin detay sheet'i AYNI ekranda açılır.
+    @State private var selectedAppointment: UpcomingItem?
     /// Sekme her görünüşünde `.task` yeniden koşuyor; veri yalnız ilk açılışta
     /// ve şube değişiminde çekilir, sekmeler arası gidip gelmek istek atmaz.
     @State private var loadedGeneration: Int?
@@ -44,6 +46,21 @@ struct DashboardView: View {
                 }
             }
             .refreshable { await store?.load() }
+            // Takvimin kendi detay ekranı: durum, erteleme, iptal kuralları tek
+            // yerde. Kapanınca özet yenilenir — durum değişikliği sayıları etkiler.
+            .sheet(item: $selectedAppointment, onDismiss: {
+                Task { await store?.load() }
+            }) { item in
+                AppointmentDetailView(session: session, entryId: item.id)
+                    // Hizmet ve personel adları oturum ömürlü katalog/personel
+                    // listelerinden çözülüyor; takvim açılmadan gelindiyse
+                    // yüklü değiller ve satırda "Hizmet · Personel" kalıyordu.
+                    .task {
+                        async let catalog: Void = session.catalogStore.load()
+                        async let staff: Void = session.staffStore.load()
+                        _ = await (catalog, staff)
+                    }
+            }
         }
         .tint(KlinaraColor.sage)
         .task(id: session.branchGeneration) {
@@ -198,7 +215,14 @@ struct DashboardView: View {
             }
             ForEach(Array(upcoming.enumerated()), id: \.element.id) { index, item in
                 if index > 0 { KlinaraDivider() }
-                UpcomingRow(item: item, showsBranch: multiBranch, now: snapshot.fetchedAt)
+                Button {
+                    selectedAppointment = item
+                } label: {
+                    UpcomingRow(item: item, showsBranch: multiBranch, now: snapshot.fetchedAt)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Randevu ayrıntılarını açar")
             }
             if snapshot.upcomingHasMore {
                 KlinaraDivider()

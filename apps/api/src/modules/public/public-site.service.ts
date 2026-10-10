@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { ERROR_CODES } from '@klinara/shared';
 import { AppError } from '../../common/errors/app-error';
 import { contentETag } from '../../common/http/cache';
+import { directBookingUrl } from '../../common/host';
 import type { EnvironmentVariables } from '../../config/env.validation';
 import { TenantTxService } from '../../database/tenant-tx.service';
 import { loadTenantDefaults, resolveSettings } from '../booking-page/booking-page.service';
@@ -27,7 +28,15 @@ export interface PublicSiteView {
   currency: string;
   locales: string[];
   defaultBranchId: string | null;
-  /** Kanonik adres — `is_primary` alan adından. Boş olabilir (alan adı yoksa). */
+  /**
+   * Sayfa içeriği yayında mı. `false` ise yalnız randevu akışı var: `sections`
+   * boş gelir ve web pazarlama sayfası yerine doğrudan akışı gösterir.
+   */
+  published: boolean;
+  /**
+   * Kanonik adres — `is_primary` alan adından. Boş olabilir (alan adı yoksa).
+   * Sayfa yayında değilse ve özel alan adı yoksa doğrudan randevu bağlantısı.
+   */
   canonicalUrl: string;
   branches: PublicBranchView[];
   theme: unknown;
@@ -81,14 +90,23 @@ export class PublicSiteService {
   /**
    * Yayınlanmış sayfanın tamamı — tek çağrıda render edilebilir.
    *
+   * SAYFA YAYINDA DEĞİLSE 404 değil, İÇERİKSİZ bir görünüm döner
+   * (`published: false`): klinik sayfa hazırlamadan da doğrudan bağlantıyla
+   * randevu alabiliyor. Taslak içerik bu yoldan ASLA çıkmaz — bloklar ve SEO
+   * boşaltılıyor, yalnız (varsa) son yayınlanan temanın logosu ve renkleri
+   * kalıyor. KVKK metni yayında değilse site yine `404`: akış onaysız
+   * tamamlanamayacağı için açmanın anlamı yok.
+   *
    * `ETag` içerik hash'inden türüyor: yayın `content_hash`i değiştirir,
    * validator değişir, CDN kendiliğinden yeniden doğrular. Açık bir purge
    * mekanizmasına Faz 9'da ihtiyaç yok.
    */
   async getSite(site: PublicSiteContext): Promise<{ view: PublicSiteView; etag: string }> {
     const payload = await this.tx.run(async (tx) => {
-      const published = await repo.findPublishedSite(tx, site.siteId);
-      if (published === undefined || published.revisionId === null) return undefined;
+      const row = await repo.findPublishedSite(tx, site.siteId);
+      if (row === undefined) return undefined;
+      const live = row.status === 'published' && row.revisionId !== null;
+      const published = live ? row : toContentless(row);
 
       const settingsRow = await pageRepo.findSettings(tx, site.siteId);
       const branches = await repo.listPublicBranches(tx);
@@ -97,12 +115,20 @@ export class PublicSiteService {
       const tenantDefaults = await loadTenantDefaults(tx);
       const canonicalHost = await repo.findCanonicalHost(tx, site.siteId);
       const consent = await findActiveConsent(tx, site.siteId);
-      return { published, settingsRow, branches, assets, tenantDefaults, canonicalHost, consent };
+      if (!live && consent === undefined) return undefined;
+      return {
+        published,
+        live,
+        settingsRow,
+        branches,
+        assets,
+        tenantDefaults,
+        canonicalHost,
+        consent,
+      };
     });
 
     if (payload === undefined) {
-      // Politika yayınlanmamış siteyi zaten gizliyor; buraya ancak yayında
-      // ama içeriği silinmiş bir site düşebilir.
       throw new AppError(
         404,
         ERROR_CODES.SITE_NOT_PUBLISHED,
@@ -113,7 +139,11 @@ export class PublicSiteService {
     const view = this.buildView(site.slug, payload);
     return {
       view,
-      etag: contentETag(payload.published.revisionNumber ?? 0, payload.published.contentHash ?? ''),
+      // İçeriksiz görünümün sürümü yok; validator onam metninden türüyor ki
+      // metin değiştiğinde akışın elindeki kopya bayatlamasın.
+      etag: payload.live
+        ? contentETag(payload.published.revisionNumber ?? 0, payload.published.contentHash ?? '')
+        : contentETag(0, payload.consent?.sha256 ?? ''),
     };
   }
 
@@ -156,7 +186,17 @@ export class PublicSiteService {
       const tenantDefaults = await loadTenantDefaults(tx);
       const canonicalHost = await repo.findCanonicalHost(tx, siteId);
       const consent = await findActiveConsent(tx, siteId);
-      return { published, settingsRow, branches, assets, tenantDefaults, canonicalHost, consent };
+      return {
+        published,
+        // Önizleme her zaman içeriği çizer; yayın durumu editörün meselesi değil.
+        live: true,
+        settingsRow,
+        branches,
+        assets,
+        tenantDefaults,
+        canonicalHost,
+        consent,
+      };
     });
 
     if (payload === undefined) {
@@ -171,15 +211,16 @@ export class PublicSiteService {
     slug: string,
     payload: {
       published: repo.PublicSiteRow;
+      live: boolean;
       settingsRow: Awaited<ReturnType<typeof pageRepo.findSettings>>;
       branches: Awaited<ReturnType<typeof repo.listPublicBranches>>;
       assets: Awaited<ReturnType<typeof repo.findAssetsByIds>>;
       tenantDefaults: Awaited<ReturnType<typeof loadTenantDefaults>>;
-      canonicalHost: string | undefined;
+      canonicalHost: { host: string; kind: string } | undefined;
       consent: ActiveConsentRow | undefined;
     },
   ): PublicSiteView {
-    const { published, settingsRow, branches, assets, tenantDefaults, canonicalHost, consent } =
+    const { published, live, settingsRow, branches, assets, tenantDefaults, canonicalHost, consent } =
       payload;
     const assetBaseUrl = this.config.get('PUBLIC_ASSET_BASE_URL', { infer: true });
     const index = buildAssetIndex(assets, assetBaseUrl);
@@ -192,7 +233,8 @@ export class PublicSiteService {
       currency: published.currency,
       locales: resolved.locales,
       defaultBranchId: published.defaultBranchId,
-      canonicalUrl: canonicalHost === undefined ? '' : `https://${canonicalHost}`,
+      published: live,
+      canonicalUrl: this.canonicalUrl(slug, live, canonicalHost),
       branches: branches.map(presentBranch),
       theme: resolveAssets(published.theme, index),
       sections: resolveAssets(published.sections, index) as unknown[],
@@ -203,6 +245,22 @@ export class PublicSiteService {
         contentHash: published.contentHash ?? '',
       },
     };
+  }
+
+  /**
+   * Platform subdomain'i yalnız sayfa yayındayken bir şey gösteriyor; yayında
+   * değilken kliniğin adresi doğrudan randevu bağlantısıdır. Özel alan adı her
+   * iki hâlde de kliniğin kendi adresi.
+   */
+  private canonicalUrl(
+    slug: string,
+    live: boolean,
+    canonicalHost: { host: string; kind: string } | undefined,
+  ): string {
+    if (!live && canonicalHost?.kind !== 'custom') {
+      return directBookingUrl(slug, this.config.get('PUBLIC_BOOKING_DOMAIN', { infer: true }));
+    }
+    return canonicalHost === undefined ? '' : `https://${canonicalHost.host}`;
   }
 
   /** Online randevuya açık katalog, kategoriye göre gruplanmış. */
@@ -232,6 +290,20 @@ export class PublicSiteService {
       });
     });
   }
+}
+
+/** Yayında olmayan sitenin dışarı verilen hâli: bloklar ve SEO yok, sürüm yok. */
+function toContentless(row: repo.PublicSiteRow): repo.PublicSiteRow {
+  return {
+    ...row,
+    // Tema yalnız son YAYINLANAN sürümden gelir (`findPublishedSite`); hiç
+    // yayınlanmamış sitede zaten boş ve web varsayılan temaya düşer.
+    sections: [],
+    seo: {},
+    revisionId: null,
+    revisionNumber: null,
+    contentHash: null,
+  };
 }
 
 function toPublicSettings(

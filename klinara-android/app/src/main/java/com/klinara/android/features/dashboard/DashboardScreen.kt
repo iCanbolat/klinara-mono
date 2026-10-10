@@ -24,6 +24,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.compose.foundation.clickable
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -82,6 +84,8 @@ fun DashboardHost(
     /** Personel performansı raporunu açar; "Personel cirosu → Tümünü gör". */
     onOpenStaffReport: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Sıradaki randevunun detayını AYNI sekmede açar (takvimin detay ekranı). */
+    onOpenAppointment: (String) -> Unit = {},
     trailing: @Composable (RowScope.() -> Unit)? = null,
 ) {
     val access = remember(session.profile.permissions) { DashboardAccess.of(session::can) }
@@ -92,6 +96,15 @@ fun DashboardHost(
             factory = DashboardViewModel.factory(container, session.branches, access),
         )
     val state by viewModel.state.collectAsStateWithLifecycle()
+    // Detaydan dönünce özet yenilenir: durum değişikliği sayıları ve listeyi etkiler.
+    var openedAppointment by rememberSaveable { mutableStateOf(false) }
+    LifecycleResumeEffect(openedAppointment) {
+        if (openedAppointment) {
+            openedAppointment = false
+            viewModel.reload()
+        }
+        onPauseOrDispose { }
+    }
     val subtitle =
         remember(session.activeBranch?.timezone) {
             val clock = BranchClock(session.activeBranch?.timezone)
@@ -103,7 +116,11 @@ fun DashboardHost(
         access = access,
         greeting = "Merhaba, ${session.profile.user.fullName}",
         subtitle = subtitle,
-        actions = DashboardActions(viewModel::reload, onOpenCalendar, onOpenStaffReport),
+        actions =
+            DashboardActions(viewModel::reload, onOpenCalendar, onOpenStaffReport) { id ->
+                openedAppointment = true
+                onOpenAppointment(id)
+            },
         modifier = modifier,
         trailing = trailing,
     )
@@ -113,6 +130,7 @@ data class DashboardActions(
     val onReload: () -> Unit,
     val onOpenCalendar: () -> Unit,
     val onOpenStaffReport: () -> Unit,
+    val onOpenAppointment: (String) -> Unit = {},
 )
 
 private val TODAY_LABEL: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMMM EEEE", TrLocale)
@@ -159,7 +177,7 @@ fun DashboardScreen(
             ).joinToString(" ")
         if (warning.isNotEmpty()) ErrorBanner(message = warning, onRetry = actions.onReload)
 
-        if (access.calendar) UpcomingCard(data, actions.onOpenCalendar)
+        if (access.calendar) UpcomingCard(data, actions.onOpenCalendar, actions.onOpenAppointment)
         if (access.staff) StaffRevenueCard(data, actions.onOpenStaffReport)
         BranchChartCard(data)
     }
@@ -238,6 +256,7 @@ private fun deltaDetail(value: Double?): String? = ReportFormat.delta(value)?.le
 private fun UpcomingCard(
     data: DashboardData,
     onOpenCalendar: () -> Unit,
+    onOpenAppointment: (String) -> Unit,
 ) {
     val upcoming = data.upcoming
     val multiBranch = data.summaries.size > 1
@@ -247,7 +266,7 @@ private fun UpcomingCard(
         }
         upcoming.forEachIndexed { index, item ->
             if (index > 0) KlinaraDivider()
-            UpcomingRow(item, multiBranch, data.fetchedAt)
+            UpcomingRow(item, multiBranch, data.fetchedAt, onClick = { onOpenAppointment(item.entry.id) })
         }
         if (data.upcomingHasMore) {
             KlinaraDivider()
@@ -261,6 +280,7 @@ private fun UpcomingRow(
     item: UpcomingItem,
     multiBranch: Boolean,
     now: Instant,
+    onClick: () -> Unit,
 ) {
     val colors = KlinaraTheme.colors
     val detail =
@@ -273,6 +293,7 @@ private fun UpcomingRow(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .clickable(onClickLabel = "Randevu ayrıntılarını aç", onClick = onClick)
                 .padding(vertical = KlinaraMetrics.xs)
                 .semantics(mergeDescendants = true) { },
         verticalAlignment = Alignment.CenterVertically,

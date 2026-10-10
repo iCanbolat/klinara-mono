@@ -12,6 +12,7 @@ import { bookingApi } from '@/lib/booking-fetch';
 import { describeError, invalidatesHold } from '@/lib/errors';
 import { clearHold, readHold, writeHold, type StoredHold } from '@/lib/hold-storage';
 import { newIdempotencyKey } from '@/lib/idempotency';
+import { manageHref } from '@/lib/site-links';
 import { useHoldCountdown } from '@/hooks/use-hold-countdown';
 import { Alert } from '@/components/ui/alert';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
@@ -55,9 +56,12 @@ const HEADINGS: Record<Step, { title: string; subtitle?: string }> = {
 export function BookingFlow({
   site,
   categories,
+  direct = false,
 }: {
   site: PublicSitePayload;
   categories: PublicCategory[];
+  /** Doğrudan randevu bağlantısı — bağlantılar `klinik` parametresini taşır. */
+  direct?: boolean;
 }) {
   const steps = stepsFor(site.settings);
   const [state, dispatch] = useReducer(
@@ -298,7 +302,7 @@ export function BookingFlow({
   if (state.step === 'done' && state.result !== null) {
     return (
       <DoneStep
-        manageToken={state.result.manageToken}
+        manageHref={manageHref(site, state.result.manageToken, direct)}
         selection={selection}
         startsAt={state.hold?.startsAt ?? null}
         branchPhone={branch?.phone ?? null}

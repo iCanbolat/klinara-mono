@@ -165,7 +165,7 @@ export class BookingPageDto {
   @ApiPropertyOptional({ nullable: true })
   publishedAt: string | null;
 
-  @ApiProperty({ description: 'Kiracının kanonik adresi (birincil konak adı).' })
+  @ApiProperty({ description: 'Kiracının adresi: birincil konak adı; sayfa yayında değilken doğrudan randevu bağlantısı.' })
   canonicalUrl: string;
 
   @ApiProperty({ description: 'Yayınlanacak bir taslak içerik var mı.' })

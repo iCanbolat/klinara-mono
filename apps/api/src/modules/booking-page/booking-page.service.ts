@@ -1,9 +1,12 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { sql } from 'drizzle-orm';
 import { ERROR_CODES } from '@klinara/shared';
 import { canonicalJson } from '../../common/canonical-json';
 import { sha256 } from '../../common/crypto/tokens';
 import { AppError } from '../../common/errors/app-error';
+import { directBookingUrl } from '../../common/host';
+import type { EnvironmentVariables } from '../../config/env.validation';
 import { versionConflict } from '../../common/http/etag';
 import { RequestContextService } from '../../common/request-context';
 import { CONTENT_SCHEMA_VERSION } from '../../database/schema';
@@ -36,6 +39,7 @@ export class BookingPageService {
     private readonly requestContext: RequestContextService,
     private readonly provisioner: BookingSiteProvisioner,
     private readonly queue: QueueService,
+    private readonly config: ConfigService<EnvironmentVariables, true>,
   ) {}
 
   async getPage(): Promise<BookingPageDto> {
@@ -263,6 +267,23 @@ export class BookingPageService {
     return revision?.revisionNumber ?? 0;
   }
 
+  /**
+   * Kliniğin paylaşacağı adres. Sayfa yayında değilken platform subdomain'i
+   * boş; o hâlde doğrudan randevu bağlantısı gösterilir (public tarafla aynı
+   * kural — `PublicSiteService.canonicalUrl`).
+   */
+  private canonicalUrl(
+    site: repo.BookingSiteRow,
+    primary: domainRepo.BookingSiteDomainRow | undefined,
+  ): string {
+    const live = site.status === 'published' && site.publishedRevisionId !== null;
+    const custom = primary?.kind === 'custom' && primary.verificationStatus === 'active';
+    if (!live && !custom) {
+      return directBookingUrl(site.slug, this.config.get('PUBLIC_BOOKING_DOMAIN', { infer: true }));
+    }
+    return primary === undefined ? '' : `https://${primary.host}`;
+  }
+
   private present(payload: {
     site: repo.BookingSiteRow;
     settings: repo.BookingSiteSettingsRow | undefined;
@@ -279,7 +300,7 @@ export class BookingPageService {
       status: site.status,
       defaultBranchId: site.defaultBranchId,
       publishedAt: site.publishedAt?.toISOString() ?? null,
-      canonicalUrl: primary === undefined ? '' : `https://${primary.host}`,
+      canonicalUrl: this.canonicalUrl(site, primary),
       hasUnpublishedChanges:
         site.draftRevisionId !== null && site.draftRevisionId !== site.publishedRevisionId,
       settings: resolveSettings(settings, tenantDefaults, consent),

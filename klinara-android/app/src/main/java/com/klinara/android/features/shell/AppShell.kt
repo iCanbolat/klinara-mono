@@ -216,6 +216,7 @@ private fun DashboardTab(
                 onOpenCalendar = onOpenCalendar,
                 onOpenStaffReport = { navController.navigate(ShellRoutes.Report(ReportKind.StaffPerformance.name)) },
                 trailing = trailing,
+                onOpenAppointment = { navController.navigate(ShellRoutes.AppointmentDetail(it)) },
             )
         }
 
@@ -231,6 +232,10 @@ private fun DashboardTab(
                 branchId = null,
             )
         }
+
+        // Sıradaki randevuya dokunmak detayı BU sekmede açar; geri tuşu
+        // dashboard'a döner (takvim sekmesine geçilmez).
+        appointmentDestinations(navController, session, container)
     }
 }
 

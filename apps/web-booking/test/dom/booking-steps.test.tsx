@@ -35,6 +35,7 @@ const site = (overrides: Partial<PublicBookingSettings> = {}): PublicSitePayload
   currency: 'TRY',
   locales: ['tr'],
   defaultBranchId: 'b1',
+  published: true,
   canonicalUrl: '',
   branches: [
     { id: 'b1', name: 'Kadıköy', timezone: 'Europe/Istanbul', phone: null, address: 'Moda' },

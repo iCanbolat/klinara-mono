@@ -72,7 +72,8 @@ describe('randevu sayfası: site, alan adı ve public çözümleme (Batch 9.1)',
 
       expect(body.slug).toBe('klinik-x');
       expect(body.status).toBe('draft');
-      expect(body.canonicalUrl).toBe(`https://klinik-x.${ROOT_DOMAIN}`);
+      // Sayfa yayında değil: paylaşılacak adres doğrudan randevu bağlantısı.
+      expect(body.canonicalUrl).toBe(`https://${ROOT_DOMAIN}/randevu?klinik=klinik-x`);
 
       const domains = await http(app)
         .get('/api/v1/booking-page/domains')
@@ -107,7 +108,9 @@ describe('randevu sayfası: site, alan adı ve public çözümleme (Batch 9.1)',
 
       const res = await http(app).get('/api/v1/booking-page').set(ownerAuth()).expect(200);
       expect((res.body as PageBody).slug).toBe('klinik-y');
-      expect((res.body as PageBody).canonicalUrl).toBe(`https://klinik-y.${ROOT_DOMAIN}`);
+      expect((res.body as PageBody).canonicalUrl).toBe(
+        `https://${ROOT_DOMAIN}/randevu?klinik=klinik-y`,
+      );
     });
 
     it('resepsiyon sayfayı OKUR ama yönetemez', async () => {
@@ -220,11 +223,19 @@ describe('randevu sayfası: site, alan adı ve public çözümleme (Batch 9.1)',
       await http(app).post('/api/v1/booking-page/publish').set(ownerAuth()).expect(200);
     }
 
-    it('yayınlanmamış site için 404 döner', async () => {
+    it('yayınlanmamış sitenin subdomain’i doğrudan randevu bağlantısına yönlendirilir', async () => {
       await http(app).get('/api/v1/booking-page').set(ownerAuth()).expect(200);
-      await http(app)
+      const res = await http(app)
         .get(`/api/v1/public/resolve?host=klinik-x.${ROOT_DOMAIN}`)
-        .expect(404);
+        .expect(200);
+      const directUrl = `https://${ROOT_DOMAIN}/randevu?klinik=klinik-x`;
+      expect(res.body).toEqual({ slug: 'klinik-x', canonicalUrl: directUrl, directUrl });
+    });
+
+    it('yayından sonra sayfanın adresi platform subdomain’idir', async () => {
+      await publish();
+      const res = await http(app).get('/api/v1/booking-page').set(ownerAuth()).expect(200);
+      expect((res.body as PageBody).canonicalUrl).toBe(`https://klinik-x.${ROOT_DOMAIN}`);
     });
 
     it('yayınlandıktan sonra slug ve kanonik adres döner', async () => {
@@ -235,6 +246,7 @@ describe('randevu sayfası: site, alan adı ve public çözümleme (Batch 9.1)',
       expect(res.body).toEqual({
         slug: 'klinik-x',
         canonicalUrl: `https://klinik-x.${ROOT_DOMAIN}`,
+        directUrl: null,
       });
     });
 

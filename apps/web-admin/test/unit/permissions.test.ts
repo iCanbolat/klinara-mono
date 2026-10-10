@@ -43,11 +43,12 @@ describe('izne göre navigasyon', () => {
     expect(visibleNav([READ])[0]?.path).toBe('/dashboard');
   });
 
-  it('booking_page:read olan kullanıcı üç bölümü de görüyor', () => {
+  it('booking_page:read olan kullanıcı iki bölümü de görüyor', () => {
     const paths = visibleNav([READ]).map((item) => item.path);
     expect(paths).toContain('/sayfa');
     expect(paths).toContain('/icerik');
-    expect(paths).toContain('/alan-adlari');
+    // Alan adları `/sayfa` içinde bir sekme; ayrı menü ögesi yok.
+    expect(paths).not.toContain('/alan-adlari');
   });
 
   it('yalnız MANAGE taşıyan kullanıcı menüde içerik GÖRMÜYOR', () => {

@@ -133,6 +133,8 @@ export const MESSAGES = {
 
   // --- Randevu sayfası ayarları ---
   'page.title': 'Randevu sayfası',
+  'page.description': 'Sayfanın adresi, randevu davranışı ve kendi alan adlarınız.',
+  'page.tabSettings': 'Ayarlar',
   'page.status.draft': 'Taslak',
   'page.status.published': 'Yayında',
   'page.status.unpublished': 'Yayından kaldırıldı',
@@ -158,6 +160,27 @@ export const MESSAGES = {
   'editor.revisions': 'Sürüm geçmişi',
   'editor.revisionCurrent': 'Yayında',
   'editor.rollback': 'Bu sürüme dön',
+  'revisions.description':
+    'İçeriği her kaydettiğinizde yeni bir sürüm oluşur. Bir sürüme dönmek o hâli editöre geri yükler; eski sürümler silinmez.',
+  'revisions.back': 'İçerik ve tema',
+  'revisions.number': 'Sürüm {number}',
+  'revisions.draft': 'Editörde',
+  'revisions.livePublished': 'Yayındaki sürüm',
+  'revisions.liveNone': 'Sayfa yayında değil',
+  'revisions.draftCurrent': 'Editördeki taslak',
+  'revisions.draftSame': 'Yayındakiyle aynı',
+  'revisions.today': 'Bugün',
+  'revisions.yesterday': 'Dün',
+  'revisions.limit': 'Son {limit} sürüm gösterilir; daha eskileri listede yer almaz.',
+  'revisions.emptyTitle': 'Henüz sürüm yok',
+  'revisions.emptyMessage': 'İçerik editöründe kaydettiğiniz her değişiklik burada bir sürüm olarak listelenir.',
+  'revisions.openEditor': 'Editöre git',
+  'revisions.confirmTitle': 'Sürüm {number} geri yüklensin mi?',
+  'revisions.confirmLive':
+    'Sayfa yayında: bu sürüm HEMEN yayına alınır ve editördeki taslağın yerine geçer. Mevcut taslak silinmez, geçmişte kalır.',
+  'revisions.confirmDraft':
+    'Bu sürüm editöre taslak olarak yüklenir. Sayfa yayında olmadığı için ziyaretçiler etkilenmez.',
+  'revisions.restored': 'Sürüm {number} geri yüklendi',
   'editor.conflictTitle': 'Bu sayfa başka bir kullanıcı tarafından değiştirildi',
   'editor.conflictDescription':
     'Siz düzenlerken başka biri kaydetti. Üzerine yazarsanız onun değişiklikleri kaybolur.',
@@ -783,9 +806,8 @@ export const MESSAGES = {
   'home.desc./katalog': 'Hizmetler, kategoriler ve şubeye özel fiyatlar.',
   'home.desc./personel': 'Personel profilleri ve hizmet yetkinlikleri.',
   'home.desc./calisma-saatleri': 'Şube saatleri, personel planı ve izinler.',
-  'home.desc./sayfa': 'Randevu sayfasının adresi, görünürlüğü ve randevu davranışı.',
+  'home.desc./sayfa': 'Randevu sayfasının adresi, görünürlüğü, randevu davranışı ve alan adları.',
   'home.desc./icerik': 'Sayfa blokları, görseller, tema ve SEO ayarları.',
-  'home.desc./alan-adlari': 'Kendi alan adınızı bağlayın, DNS ve sertifika durumunu izleyin.',
   'home.desc./raporlar': 'Doluluk, ciro, personel performansı, gelmeme ve kazanım.',
 
   // --- Durumlar ---
@@ -804,6 +826,8 @@ export const MESSAGES = {
 
   // --- Randevu sayfası ayarları ---
   'page.noDomain': 'Henüz bir alan adı yok.',
+  'page.directLinkHint':
+    'Sayfa yayında değilken bu bağlantı doğrudan randevu ekranını açar. KVKK aydınlatma metni yayınlanmış olmalıdır.',
   'page.behaviour': 'Randevu davranışı',
   'page.showStaffSelection': 'Uygulayıcı seçimi gösterilsin',
   'page.showPrices': 'Fiyatlar gösterilsin',

@@ -52,14 +52,21 @@ extension View {
     ///
     /// `isVisible` false ise hiçbir şey çizilmez — izni olmayan kullanıcıya
     /// dokunulduğunda 403 veren bir düğme gösterilmez.
+    ///
+    /// `reservesSpace` false ise FAB içeriğin ÜSTÜNDE yüzer (`overlay`) ve
+    /// listenin sonunda FAB boyu kadar boş şerit kalmaz. Son satırın sağ ucu
+    /// (yalnız chevron) en dipte FAB'ın altına girebilir; satırın tamamı
+    /// dokunulabilir olduğu için kaybolan bir eylem yok. Satırın sağında
+    /// kendi düğmesi olan listelerde varsayılan (`true`) kalmalı.
     @ViewBuilder
     func klinaraFAB(
         isVisible: Bool = true,
+        reservesSpace: Bool = true,
         accessibilityLabel: String,
         systemImage: String = "plus",
         action: @escaping () -> Void
     ) -> some View {
-        klinaraFAB(isVisible: isVisible) {
+        klinaraFAB(isVisible: isVisible, reservesSpace: reservesSpace) {
             KlinaraFloatingActionButton(
                 accessibilityLabel: accessibilityLabel,
                 systemImage: systemImage,
@@ -70,9 +77,19 @@ extension View {
 
     /// Özel FAB içeriği (ör. `Menu { … } label: { KlinaraFABLabel() }`).
     @ViewBuilder
-    func klinaraFAB<FAB: View>(isVisible: Bool = true, @ViewBuilder fab: () -> FAB) -> some View {
-        if isVisible {
+    func klinaraFAB<FAB: View>(
+        isVisible: Bool = true,
+        reservesSpace: Bool = true,
+        @ViewBuilder fab: () -> FAB
+    ) -> some View {
+        if isVisible && reservesSpace {
             safeAreaInset(edge: .bottom, alignment: .trailing, spacing: 0) {
+                fab()
+                    .padding(.trailing, KlinaraMetrics.md)
+                    .padding(.bottom, KlinaraMetrics.md)
+            }
+        } else if isVisible {
+            overlay(alignment: .bottomTrailing) {
                 fab()
                     .padding(.trailing, KlinaraMetrics.md)
                     .padding(.bottom, KlinaraMetrics.md)

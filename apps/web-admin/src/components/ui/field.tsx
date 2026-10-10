@@ -62,14 +62,39 @@ function ErrorText({ id, error }: { id: string; error: string }): ReactNode {
   );
 }
 
-export type FieldProps = Omit<ComponentProps<'input'>, 'id'> & FieldShellProps;
+export type FieldProps = Omit<ComponentProps<'input'>, 'id'> &
+  FieldShellProps & {
+    /** Alanın içinde, sağda duran birim (₺, dk…). Ekran okuyucuya etiket yeter. */
+    suffix?: ReactNode;
+  };
 
-export function Field({ label, hint, error, className, ...props }: FieldProps): ReactNode {
+export function Field({ label, hint, error, className, suffix, ...props }: FieldProps): ReactNode {
   const { id, describedBy, invalid } = useWiring(hint, error);
+  const input = (
+    <Input
+      id={id}
+      className={cn('bg-card ', suffix !== undefined && 'pr-9', className)}
+      aria-invalid={invalid}
+      {...describedBy}
+      {...props}
+    />
+  );
   return (
     <div className="flex flex-col gap-1.5">
       <Label htmlFor={id}>{label}</Label>
-      <Input id={id} className={cn('bg-card ',className)} aria-invalid={invalid} {...describedBy} {...props} />
+      {suffix === undefined ? (
+        input
+      ) : (
+        <div className="relative">
+          {input}
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-muted-foreground"
+          >
+            {suffix}
+          </span>
+        </div>
+      )}
       {hint !== undefined ? <Hint id={id} hint={hint} /> : null}
       {error !== undefined ? <ErrorText id={id} error={error} /> : null}
     </div>

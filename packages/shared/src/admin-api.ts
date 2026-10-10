@@ -71,7 +71,10 @@ export interface BookingPage {
   status: BookingSiteStatus;
   defaultBranchId: string | null;
   publishedAt: string | null;
-  /** Kiracının kanonik adresi (birincil konak adı). Yoksa boş dize. */
+  /**
+   * Kiracının adresi (birincil konak adı). Sayfa yayında değilken doğrudan
+   * randevu bağlantısı (`{kök}/randevu?klinik={slug}`).
+   */
   canonicalUrl: string;
   hasUnpublishedChanges: boolean;
   settings: BookingSiteSettings;

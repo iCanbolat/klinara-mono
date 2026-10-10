@@ -95,7 +95,15 @@ export interface PublicSitePayload {
   currency: string;
   locales: string[];
   defaultBranchId: string | null;
-  /** `<link rel="canonical">`in kaynağı. Alan adı yoksa boş dize. */
+  /**
+   * Sayfa içeriği yayında mı. `false` ise `sections` boş gelir ve yalnız
+   * randevu akışı gösterilir (doğrudan randevu bağlantısı).
+   */
+  published: boolean;
+  /**
+   * `<link rel="canonical">`in kaynağı. Alan adı yoksa boş dize; sayfa yayında
+   * değilse ve özel alan adı yoksa doğrudan randevu bağlantısı.
+   */
   canonicalUrl: string;
   branches: PublicBranch[];
   theme: Theme;
@@ -108,6 +116,8 @@ export interface PublicSitePayload {
 export interface HostResolution {
   slug: string;
   canonicalUrl: string;
+  /** Sayfası yayında olmayan platform subdomain'inin yönlendirileceği adres. */
+  directUrl: string | null;
 }
 
 /** Personel seçimi — kimlik yerine opak `staffRef`. */

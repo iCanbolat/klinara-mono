@@ -9,6 +9,15 @@ export class HostResolutionDto {
     description: 'Kiracının birincil adresi — `<link rel="canonical">` ve 301 için.',
   })
   canonicalUrl: string;
+
+  @ApiProperty({
+    example: 'https://klinara.app/randevu?klinik=klinik-x',
+    nullable: true,
+    type: String,
+    description:
+      'Sayfası yayında olmayan kliniğin platform subdomain’i için doğrudan randevu bağlantısı; web buraya yönlendirir. Aksi hâlde `null`.',
+  })
+  directUrl: string | null;
 }
 
 export class EdgeAuthorizationDto {

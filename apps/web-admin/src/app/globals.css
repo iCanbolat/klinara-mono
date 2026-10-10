@@ -262,3 +262,19 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/*
+ * Özel (toast.custom) bildirimler kendi kartını çiziyor. Toaster'ın genel
+ * `toast` sınıfları (kenarlık, dolgu, gölge) dış `li`ye de uygulanıyordu ve
+ * kart, ikinci bir kartın içinde görünüyordu. Seçici iki sınıf + öznitelik:
+ * genel `!` yardımcılarını özgüllükle eziyor.
+ */
+@layer utilities {
+  /* Katmanlı `!important` katmansız olanı yener; kural aynı katmanda olmalı. */
+  li[data-sonner-toast].klinara-custom-toast {
+    padding: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+}

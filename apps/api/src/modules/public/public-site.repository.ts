@@ -18,9 +18,10 @@ export interface ResolvedSite {
 /**
  * Slug → site.
  *
- * `status = 'published'` filtresi BURADA YOK — politika (`booking_sites_public_lookup`,
- * 0035) hallediyor. Uygulama katmanına kopyalamak, iki yerde tutulan ve bir
- * gün ayrışacak bir kural yaratırdı.
+ * `status` filtresi YOK ve politika da (`booking_sites_public_lookup`, 0057)
+ * artık aramıyor: yayınlanmamış site doğrudan randevu bağlantısıyla
+ * (`{kök}/randevu?klinik=`) randevu alabiliyor. Yayın durumu yalnız İÇERİĞİ
+ * kapatıyor — bkz. `PublicSiteService.getSite`.
  */
 export async function findSiteBySlug(tx: Tx, slug: string): Promise<ResolvedSite | undefined> {
   const [row] = await tx
@@ -40,6 +41,7 @@ export interface ResolvedHost {
   host: string;
   slug: string;
   status: string;
+  kind: string;
   /** Kiracının kanonik adresi — 301 ve `<link rel="canonical">` için. */
   canonicalHost: string;
 }
@@ -57,6 +59,7 @@ export async function findByHost(tx: Tx, host: string): Promise<ResolvedHost | u
     select d.host,
            s.slug,
            s.status::text as status,
+           d.kind::text as kind,
            coalesce(
              (select p.host
                 from booking_site_domains p
@@ -77,6 +80,7 @@ export async function findByHost(tx: Tx, host: string): Promise<ResolvedHost | u
     host: row['host'] as string,
     slug: row['slug'] as string,
     status: row['status'] as string,
+    kind: row['kind'] as string,
     canonicalHost: row['canonical_host'] as string,
   };
 }

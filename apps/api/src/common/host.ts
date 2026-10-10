@@ -55,6 +55,17 @@ export function platformHost(slug: string, rootDomain: string): string {
 }
 
 /**
+ * `{root}/randevu?klinik={slug}` — doğrudan randevu bağlantısı.
+ *
+ * Sayfa içeriği yayında değilken kliniğin paylaşacağı adres: platform
+ * subdomain'i o hâlde gösterecek bir sayfaya sahip değil, yalnız randevu akışı
+ * var.
+ */
+export function directBookingUrl(slug: string, rootDomain: string): string {
+  return `https://${rootDomain}/randevu?klinik=${slug}`;
+}
+
+/**
  * Konak adı platformun kök alan adının altında mı.
  *
  * Özel alan adı olarak talep edilemeyecek adresler bunlar: bir kiracı

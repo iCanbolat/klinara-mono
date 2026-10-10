@@ -44,7 +44,6 @@ import com.klinara.android.designsystem.KlinaraTheme
 import com.klinara.android.designsystem.KlinaraType
 import com.klinara.android.designsystem.components.EmptyStateView
 import com.klinara.android.designsystem.components.ErrorBanner
-import com.klinara.android.designsystem.components.FabContentClearance
 import com.klinara.android.designsystem.components.KlinaraCard
 import com.klinara.android.designsystem.components.KlinaraFab
 import com.klinara.android.designsystem.components.KlinaraFabBox
@@ -167,7 +166,9 @@ fun CustomerListScreen(
                     onRetry = if (state.isSearching) viewModel::retrySearch else viewModel::reload,
                     onLoadMore = viewModel::loadMore,
                     onRetryLoadMore = viewModel::retryLoadMore,
-                    bottomClearance = if (onCreateCustomer != null) FabContentClearance else 0.dp,
+                    // FAB listenin üstünde yüzüyor; dipte FAB boyu kadar boş şerit
+                    // bırakılmıyor (iOS ile aynı). Satırların sağında eylem yok.
+                    bottomClearance = 0.dp,
                     onCreateCustomer = onCreateCustomer,
                 )
             }

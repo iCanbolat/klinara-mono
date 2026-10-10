@@ -70,6 +70,7 @@ describe('hizmet listesi — showPrices', () => {
       currency: 'TRY',
       locales: ['tr'],
       defaultBranchId: null,
+      published: true,
       canonicalUrl: '',
       branches: [],
       theme: {},

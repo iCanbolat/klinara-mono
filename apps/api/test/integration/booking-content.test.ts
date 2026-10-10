@@ -20,8 +20,11 @@ interface PublicSiteBody {
   name: string;
   currency: string;
   branches: { id: string; name: string; phone: string | null; address: string | null; timezone: string }[];
+  published: boolean;
+  canonicalUrl: string;
   theme: Record<string, unknown>;
   sections: unknown[];
+  seo: Record<string, unknown>;
   settings: Record<string, unknown>;
   revision: { number: number; contentHash: string };
 }
@@ -252,10 +255,54 @@ describe('randevu sayfası içeriği, teması ve public okuma (Batch 9.2)', () =
       await publish().expect(200);
       await http(app).post('/api/v1/booking-page/unpublish').set(ownerAuth()).expect(200);
 
-      await http(app).get('/api/v1/public/sites/klinik-x').expect(404);
+      // Yayından kalkan sayfa İÇERİKSİZ döner: yalnız randevu akışı kalır.
+      const down = await http(app).get('/api/v1/public/sites/klinik-x').expect(200);
+      expect((down.body as PublicSiteBody).published).toBe(false);
+      expect((down.body as PublicSiteBody).sections).toEqual([]);
 
       await publish().expect(200);
-      await http(app).get('/api/v1/public/sites/klinik-x').expect(200);
+      const up = await http(app).get('/api/v1/public/sites/klinik-x').expect(200);
+      expect((up.body as PublicSiteBody).published).toBe(true);
+      expect((up.body as PublicSiteBody).sections).toHaveLength(1);
+    });
+  });
+
+  describe('doğrudan randevu (sayfa yayında değil)', () => {
+    const directUrl = `https://${ROOT_DOMAIN}/randevu?klinik=klinik-x`;
+
+    it('TASLAK içerik dışarı çıkmaz: bloklar, SEO ve sürüm boş döner', async () => {
+      await saveDraft({
+        theme: { primaryColor: '#0F766E' },
+        sections: [{ type: 'hero', title: 'Henüz yayınlanmadı' }],
+        seo: { title: 'Gizli başlık' },
+      }).expect(200);
+
+      const res = await http(app).get('/api/v1/public/sites/klinik-x').expect(200);
+      const body = res.body as PublicSiteBody;
+
+      expect(body.published).toBe(false);
+      expect(body.sections).toEqual([]);
+      expect(body.seo).toEqual({});
+      expect(body.theme).toEqual({});
+      expect(body.revision).toEqual({ number: 0, contentHash: '' });
+      expect(body.canonicalUrl).toBe(directUrl);
+      expect(JSON.stringify(body)).not.toContain('Henüz yayınlanmadı');
+      // Akışın ihtiyaç duyduğu her şey yerinde.
+      expect(body.branches.length).toBeGreaterThan(0);
+      expect(body.settings['consent']).not.toBeNull();
+    });
+
+    it('katalog yayınlanmamış sitede de okunur', async () => {
+      await http(app).get('/api/v1/booking-page').set(ownerAuth()).expect(200);
+      const res = await http(app).get('/api/v1/public/sites/klinik-x/services').expect(200);
+      expect((res.body as unknown[]).length).toBeGreaterThan(0);
+    });
+
+    it('yayınlanınca kanonik adres platform subdomain’ine döner', async () => {
+      await saveDraft({ sections: [{ type: 'hero', title: 'Klinik X' }] }).expect(200);
+      await publish().expect(200);
+      const res = await http(app).get('/api/v1/public/sites/klinik-x').expect(200);
+      expect((res.body as PublicSiteBody).canonicalUrl).toBe(`https://klinik-x.${ROOT_DOMAIN}`);
     });
   });
 
@@ -279,6 +326,7 @@ describe('randevu sayfası içeriği, teması ve public okuma (Batch 9.2)', () =
         'defaultBranchId',
         'locales',
         'name',
+        'published',
         'revision',
         'sections',
         'seo',
@@ -296,7 +344,7 @@ describe('randevu sayfası içeriği, teması ve public okuma (Batch 9.2)', () =
       ]);
     });
 
-    it('yayınlanmamış sayfa 404 — "yok" ile ayırt edilemez', async () => {
+    it('var olmayan slug 404', async () => {
       await http(app).get('/api/v1/public/sites/hic-yok').expect(404);
     });
 
@@ -350,6 +398,14 @@ describe('randevu sayfası içeriği, teması ve public okuma (Batch 9.2)', () =
         .set(auth(bare.owner.tokens))
         .expect(409);
       expect((res.body as Problem).code).toBe('CONSENT_REQUIRED');
+    });
+
+    it('onam metni yayında değilken doğrudan randevu da AÇILMAZ', async () => {
+      const bare = await setupClinic(app, { slug: 'klinik-z' });
+      await http(app).get('/api/v1/booking-page').set(auth(bare.owner.tokens)).expect(200);
+
+      const res = await http(app).get('/api/v1/public/sites/klinik-z').expect(404);
+      expect((res.body as Problem).code).toBe('SITE_NOT_PUBLISHED');
     });
   });
 

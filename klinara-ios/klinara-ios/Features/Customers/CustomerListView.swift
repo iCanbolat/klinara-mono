@@ -86,7 +86,11 @@ struct CustomerListView: View {
                 .frame(minHeight: 0, maxHeight: .infinity, alignment: .top)
             }
             .background(KlinaraColor.surface)
-            .klinaraFAB(isVisible: canWrite, accessibilityLabel: "Yeni müşteri") { editing = .create }
+            // FAB yüzer: liste dibinde FAB boyu kadar boş şerit bırakmıyor.
+            // Satırların sağında yalnız chevron var (bkz. `reservesSpace`).
+            .klinaraFAB(isVisible: canWrite, reservesSpace: false, accessibilityLabel: "Yeni müşteri") {
+                editing = .create
+            }
             .navigationTitle("Müşteriler")
             // Görünür başlık ``RootToolbarTitle``; `navigationTitle` geri
             // düğmesi etiketi ve VoiceOver için kalıyor.

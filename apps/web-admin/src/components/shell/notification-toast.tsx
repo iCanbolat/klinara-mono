@@ -84,6 +84,6 @@ export function showNotificationToast(
 ): void {
   toast.custom(
     (id) => <NotificationToast toastId={id} notification={notification} onOpen={onOpen} />,
-    { id: notification.id, duration: 8000 },
+    { id: notification.id, duration: 8000, className: 'klinara-custom-toast' },
   );
 }

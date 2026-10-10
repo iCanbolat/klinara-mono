@@ -268,16 +268,19 @@ export async function findAssetsByIds(tx: Tx, ids: string[]): Promise<PublicAsse
  * TÜRETMESİ yanlış olurdu, çünkü ziyaretçinin geldiği adres kanonik olan
  * olmayabilir.
  */
-export async function findCanonicalHost(tx: Tx, siteId: string): Promise<string | undefined> {
-  const result = await tx.execute<{ host: string }>(sql`
-    select host
+export async function findCanonicalHost(
+  tx: Tx,
+  siteId: string,
+): Promise<{ host: string; kind: string } | undefined> {
+  const result = await tx.execute<{ host: string; kind: string }>(sql`
+    select host, kind::text as kind
       from booking_site_domains
      where booking_site_id = ${siteId}
        and verification_status in ('active', 'dns_verified')
      order by is_primary desc, kind = 'platform_subdomain' desc, created_at
      limit 1
   `);
-  return result.rows[0]?.host;
+  return result.rows[0];
 }
 
 export interface OnlineStaffRow {

@@ -11,7 +11,6 @@ import { can } from '@/lib/permissions';
 import { useSession } from '@/components/session/session-provider';
 import { t } from '@/i18n/tr';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PageHeader } from '@/components/ui/page-header';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -133,7 +132,6 @@ export function DomainsPage(): ReactNode {
 
   return (
     <div className="flex max-w-3xl flex-col gap-4">
-      <PageHeader title={t('domains.title')} />
       {error !== null ? <Alert tone="danger">{error}</Alert> : null}
 
       {domains === null ? (

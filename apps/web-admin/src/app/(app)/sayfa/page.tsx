@@ -14,6 +14,8 @@ import { PageHeader } from '@/components/ui/page-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Field, FieldSwitch } from '@/components/ui/field';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DomainsPage } from '@/components/domains/domains-page';
 
 /** Batch 11.5 — randevu sayfası davranış ayarları. */
 function Settings(): ReactNode {
@@ -63,7 +65,6 @@ function Settings(): ReactNode {
       <Alert tone="danger">{error}</Alert>
     ) : (
       <div className="flex max-w-2xl flex-col gap-4" aria-busy="true">
-        <Skeleton className="h-9 w-64" />
         <Skeleton className="h-28 rounded-xl" />
         <Skeleton className="h-64 rounded-xl" />
       </div>
@@ -74,7 +75,6 @@ function Settings(): ReactNode {
 
   return (
     <div className="flex max-w-2xl flex-col gap-4">
-      <PageHeader title={t('page.title')} />
       {error !== null ? <Alert tone="danger">{error}</Alert> : null}
 
       <Card>
@@ -92,6 +92,9 @@ function Settings(): ReactNode {
           {t(`page.status.${page.status}` as 'page.status.draft')}
           {page.hasUnpublishedChanges ? ` · ${t('page.unpublishedChanges')}` : ''}
         </p>
+        {page.status === 'published' ? null : (
+          <p className="mt-2 text-sm text-muted-foreground">{t('page.directLinkHint')}</p>
+        )}
       </Card>
 
       <Card>
@@ -171,10 +174,78 @@ function toMessage(caught: unknown): string {
     : networkError().message;
 }
 
+/**
+ * Randevu sayfası: davranış ayarları ve alan adları tek rotada, iki sekme.
+ *
+ * Seçili sekme `?tab=` ile adreste (bkz. `StaffPage`): eski `/alan-adlari`
+ * bağlantıları `?tab=alan-adlari`ya yönleniyor. `history.replaceState`, çünkü
+ * sekme değişimi bir gezinme değil.
+ */
+const TABS = ['ayarlar', 'alan-adlari'] as const;
+type PageTab = (typeof TABS)[number];
+
+function readTab(): PageTab {
+  try {
+    const value = new URLSearchParams(globalThis.location?.search ?? '').get('tab');
+    return (TABS as readonly string[]).includes(value ?? '') ? (value as PageTab) : 'ayarlar';
+  } catch {
+    return 'ayarlar';
+  }
+}
+
+function BookingPageScreen(): ReactNode {
+  const [tab, setTab] = useState<PageTab>('ayarlar');
+  useEffect(() => {
+    // İlk render sunucuyla aynı olmalı; adresteki sekme mount sonrası okunuyor.
+    void (async () => {
+      await Promise.resolve();
+      const initial = readTab();
+      if (initial !== 'ayarlar') setTab(initial);
+    })();
+  }, []);
+
+  function changeTab(next: string): void {
+    const value = next as PageTab;
+    setTab(value);
+    try {
+      const url = new URL(globalThis.location.href);
+      if (value === 'ayarlar') url.searchParams.delete('tab');
+      else url.searchParams.set('tab', value);
+      globalThis.history.replaceState(globalThis.history.state, '', url);
+    } catch {
+      // Adres güncellenemiyorsa sekme yine değişiyor; kaybolan yalnız paylaşım.
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <PageHeader title={t('page.title')} description={t('page.description')} className="mb-0" />
+      <Tabs value={tab} onValueChange={changeTab} className="gap-5">
+        <div className="-mx-1 overflow-x-auto px-1">
+          <TabsList className="h-10">
+            <TabsTrigger value="ayarlar" className="px-3">
+              {t('page.tabSettings')}
+            </TabsTrigger>
+            <TabsTrigger value="alan-adlari" className="px-3">
+              {t('domains.title')}
+            </TabsTrigger>
+          </TabsList>
+        </div>
+        <TabsContent value="ayarlar">
+          <Settings />
+        </TabsContent>
+        <TabsContent value="alan-adlari">
+          <DomainsPage />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
 export default function Page(): ReactNode {
   return (
     <PermissionGate required={[PERMISSIONS.BOOKING_PAGE_READ]}>
-      <Settings />
+      <BookingPageScreen />
     </PermissionGate>
   );
 }

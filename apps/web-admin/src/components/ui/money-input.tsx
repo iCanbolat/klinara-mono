@@ -52,7 +52,7 @@ export function MoneyInput({
       value={text}
       disabled={disabled ?? false}
       error={error}
-      hint="₺"
+      suffix="₺"
       onChange={(event) => {
         const next = event.target.value;
         setText(next);
