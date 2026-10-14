@@ -128,7 +128,6 @@ describe('yönetim proxy beyaz listesi', () => {
       'discounts',
       'commission-rules',
       'commission-periods',
-      'package-definitions',
       'customer-packages',
       `customer-packages/${UUID}/refund`,
       // Faz 7 daraltılınca bu tablo HİÇ yazılmadı; ucu yok, kapısı da kapalı.
@@ -302,6 +301,18 @@ describe('yönetim proxy beyaz listesi', () => {
       expect(isAllowedProxyPath(`services/${UUID}`, 'DELETE')).toBe(true);
       expect(isAllowedProxyPath('service-categories', 'POST')).toBe(true);
       expect(isAllowedProxyPath(`service-categories/${UUID}`, 'PATCH')).toBe(true);
+    });
+
+    it('paket TANIMLARI açıldı; satış yüzeyi kapalı', () => {
+      expect(isAllowedProxyPath('package-definitions', 'GET')).toBe(true);
+      expect(isAllowedProxyPath('package-definitions', 'POST')).toBe(true);
+      expect(isAllowedProxyPath(`package-definitions/${UUID}`, 'GET')).toBe(true);
+      expect(isAllowedProxyPath(`package-definitions/${UUID}`, 'PATCH')).toBe(true);
+      expect(isAllowedProxyPath(`package-definitions/${UUID}`, 'DELETE')).toBe(true);
+      expect(isAllowedProxyPath('package-definitions', 'DELETE')).toBe(false);
+      expect(isAllowedProxyPath(`package-definitions/${UUID}`, 'PUT')).toBe(false);
+      expect(isAllowedProxyPath(`package-definitions/${UUID}/sell`, 'POST')).toBe(false);
+      expect(isAllowedProxyPath('customer-packages', 'POST')).toBe(false);
     });
 
     it('personel YAZMA ve yetkinlik matrisi açıldı', () => {

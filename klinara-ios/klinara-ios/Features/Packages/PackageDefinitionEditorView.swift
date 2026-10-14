@@ -278,39 +278,14 @@ struct PackageDefinitionEditorView: View {
     // MARK: Hizmet seçici
 
     private var servicePicker: some View {
-        NavigationStack {
-            KlinaraSearchablePicker(
-                title: "Hizmet ekle",
-                options: selectableServices,
-                label: { $0.name },
-                detail: { service in
-                    Money.format(minor: service.effective(in: session.selectedBranchId).priceMinor)
-                },
-                isSelected: { service in form.items.contains { $0.serviceId == service.id } },
-                onSelect: { service in
-                    form.add(service: service, in: session.selectedBranchId)
-                    isPickingService = false
-                },
-                searchPrompt: "Hizmet ara",
-                emptyMessage: "Eklenebilecek aktif hizmet yok."
-            )
-            .navigationTitle("Hizmet ekle")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Kapat") { isPickingService = false }
-                        .klinaraText(.bodyM)
-                        .foregroundStyle(KlinaraColor.charcoalMuted)
-                }
+        PackageServicePickerSheet(
+            session: session,
+            existingServiceIds: Set(form.items.map(\.serviceId))
+        ) { services in
+            for service in services {
+                form.add(service: service, in: session.selectedBranchId)
             }
         }
-        .tint(KlinaraColor.sage)
-    }
-
-    private var selectableServices: [ClinicService] {
-        session.catalogStore.catalog.services
-            .filter(\.isActive)
-            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 
     // MARK: Kaydetme

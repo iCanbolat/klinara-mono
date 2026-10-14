@@ -193,6 +193,125 @@ describe('katalog', () => {
   });
 });
 
+const PACKAGE = {
+  id: 'pk1',
+  branchId: null,
+  slug: 'lazer-10',
+  name: '10 Seans Lazer',
+  description: null,
+  totalPriceMinor: 400000,
+  listPriceMinor: 500000,
+  currency: 'TRY',
+  validityDays: 365,
+  isTransferable: true,
+  isOnlineSellable: false,
+  isActive: true,
+  version: 3,
+  items: [
+    {
+      id: 'i1',
+      serviceId: 's1',
+      serviceName: 'Lazer',
+      quantity: 10,
+      unitListPriceMinor: 50000,
+      sortOrder: 0,
+    },
+  ],
+};
+
+describe('paketler sekmesi', () => {
+  beforeEach(() => {
+    get.mockReset();
+    post.mockReset();
+    patch.mockReset();
+    del.mockReset();
+    mockRoutes();
+    const base = get.getMockImplementation();
+    get.mockImplementation((path: string, options?: unknown) => {
+      if (path.startsWith('package-definitions')) {
+        return Promise.resolve({ data: [PACKAGE], pageInfo: { nextCursor: null, hasMore: false } });
+      }
+      return base?.(path, options);
+    });
+    permissions = [
+      PERMISSIONS.SERVICE_READ,
+      PERMISSIONS.PACKAGE_READ,
+      PERMISSIONS.PACKAGE_WRITE,
+    ];
+  });
+
+  it('paket izni yoksa sekme görünmüyor', async () => {
+    permissions = [PERMISSIONS.SERVICE_READ];
+    render(<CatalogPage />);
+    await screen.findByText('Lazer');
+    expect(screen.queryByRole('tab', { name: 'Paketler' })).not.toBeInTheDocument();
+  });
+
+  it('paketleri indirimiyle listeliyor', async () => {
+    const user = userEvent.setup();
+    render(<CatalogPage />);
+    await user.click(await screen.findByRole('tab', { name: 'Paketler' }));
+    expect(await screen.findByText('10 Seans Lazer')).toBeInTheDocument();
+    expect(screen.getByText('%20 indirim')).toBeInTheDocument();
+  });
+
+  it('yeni paket: çoklu hizmet seçimi, adet ve fiyatla POST', async () => {
+    const user = userEvent.setup();
+    post.mockResolvedValue(PACKAGE);
+    render(<CatalogPage />);
+    await user.click(await screen.findByRole('tab', { name: 'Paketler' }));
+    await screen.findByText('10 Seans Lazer');
+
+    await user.click(screen.getByRole('button', { name: 'Yeni paket' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText('Paket adı'), 'Lazer Kür');
+    expect(within(dialog).getByLabelText('Kod (slug)')).toHaveValue('lazer-kur');
+
+    await user.click(within(dialog).getByRole('button', { name: 'Hizmet ekle' }));
+    await user.click(within(dialog).getByRole('checkbox', { name: /Lazer/ }));
+    await user.click(within(dialog).getByRole('checkbox', { name: /Cilt bakımı/ }));
+    await user.click(within(dialog).getByRole('button', { name: '2 hizmeti ekle' }));
+
+    await user.click(within(dialog).getByRole('button', { name: 'Lazer — Seans +1' }));
+    await user.type(within(dialog).getByLabelText('Satış fiyatı'), '1200');
+
+    await user.click(within(dialog).getByRole('button', { name: 'Kaydet' }));
+    await waitFor(() => expect(post).toHaveBeenCalled());
+    expect(post).toHaveBeenCalledWith(
+      'package-definitions',
+      expect.objectContaining({
+        slug: 'lazer-kur',
+        name: 'Lazer Kür',
+        totalPriceMinor: 120000,
+        items: [
+          { serviceId: 's1', quantity: 2 },
+          { serviceId: 's2', quantity: 1 },
+        ],
+      }),
+    );
+  });
+
+  it('düzenleme If-Match ile PATCH; slug kilitli', async () => {
+    const user = userEvent.setup();
+    patch.mockResolvedValue(PACKAGE);
+    render(<CatalogPage />);
+    await user.click(await screen.findByRole('tab', { name: 'Paketler' }));
+    await screen.findByText('10 Seans Lazer');
+
+    await user.click(screen.getByRole('button', { name: 'Düzenle' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByLabelText('Kod (slug)')).toBeDisabled();
+    await user.click(within(dialog).getByRole('button', { name: 'Kaydet' }));
+
+    await waitFor(() => expect(patch).toHaveBeenCalled());
+    expect(patch).toHaveBeenCalledWith(
+      'package-definitions/pk1',
+      expect.objectContaining({ items: [{ serviceId: 's1', quantity: 10 }], validityDays: 365 }),
+      { ifMatch: 'W/"3"' },
+    );
+  });
+});
+
 describe('personel', () => {
   beforeEach(() => {
     get.mockReset();

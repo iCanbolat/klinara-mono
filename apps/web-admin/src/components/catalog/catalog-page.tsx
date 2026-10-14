@@ -14,9 +14,12 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { ConfirmButton } from '@/components/ui/confirm-button';
 import { Field, FieldSelect } from '@/components/ui/field';
+import { PageHeader } from '@/components/ui/page-header';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatMoney } from '@/lib/format/money';
 import { ServiceCard } from './service-card';
 import { ServiceFormDialog } from './service-form';
+import { PackagesTab } from './packages-tab';
 
 /**
  * Hizmet katalogu.
@@ -35,22 +38,45 @@ import { ServiceFormDialog } from './service-form';
  * `GET /services` sayfalanmıyor: tüm liste elde, süzme ve sayfalama istemcide.
  */
 
+const TABS = ['services', 'packages'] as const;
+type CatalogTab = (typeof TABS)[number];
+
+/** Seçili sekme `?tab=` ile adreste — bkz. `staff-page.tsx`. */
+function readTab(): CatalogTab {
+  try {
+    const value = new URLSearchParams(globalThis.location?.search ?? '').get('tab');
+    return (TABS as readonly string[]).includes(value ?? '') ? (value as CatalogTab) : 'services';
+  } catch {
+    return 'services';
+  }
+}
+
+/**
+ * Hizmetler sayfası: iki sekme.
+ *   - **Hizmetler** (`service:read`, sayfanın kapısı).
+ *   - **Paketler** (`package:read`): paket tanımları hizmetlerden kurulur,
+ *     bu yüzden ayrı bir menü ögesi değil, kataloğun bir parçası. Hizmet ve
+ *     kategori listesi burada BİR KEZ çekilip iki sekmeye veriliyor.
+ */
 export function CatalogPage(): ReactNode {
   const { permissions } = useSession();
+  const canPackages = permissions.includes(PERMISSIONS.PACKAGE_READ);
   const [services, setServices] = useState<Service[] | null>(null);
   const [categories, setCategories] = useState<ServiceCategorySummary[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [editing, setEditing] = useState<Service | null>(null);
-  const [creating, setCreating] = useState(false);
-  const [busy, setBusy] = useState<string | null>(null);
   const [nonce, setNonce] = useState(0);
+  const [tab, setTab] = useState<CatalogTab>('services');
 
-  const [query, setQuery] = useState('');
-  const [categoryId, setCategoryId] = useState('');
-  const [status, setStatus] = useState<StatusFilter>('all');
-
-  const canWrite = permissions.includes(PERMISSIONS.SERVICE_WRITE);
   const reload = useCallback(() => setNonce((value) => value + 1), []);
+
+  useEffect(() => {
+    // İlk render sunucuyla aynı olmalı; adresteki sekme mount sonrası okunuyor.
+    void (async () => {
+      await Promise.resolve();
+      const initial = readTab();
+      if (initial !== 'services') setTab(initial);
+    })();
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -73,6 +99,88 @@ export function CatalogPage(): ReactNode {
     })();
     return () => controller.abort();
   }, [nonce]);
+
+  function changeTab(next: string): void {
+    const value = next as CatalogTab;
+    setTab(value);
+    try {
+      const url = new URL(globalThis.location.href);
+      if (value === 'services') url.searchParams.delete('tab');
+      else url.searchParams.set('tab', value);
+      globalThis.history.replaceState(globalThis.history.state, '', url);
+    } catch {
+      // Adres güncellenemiyorsa sekme yine değişiyor; kaybolan yalnız paylaşım.
+    }
+  }
+
+  const servicesTab = (
+    <ServicesTab
+      services={services}
+      categories={categories}
+      loadError={error}
+      reload={reload}
+    />
+  );
+
+  if (!canPackages) {
+    return (
+      <div className="flex flex-col gap-6">
+        <PageHeader title={t('catalog.title')} className="mb-0" />
+        {servicesTab}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title={t('catalog.title')}
+        description={t('catalog.pageDescription')}
+        className="mb-0"
+      />
+      <Tabs value={tab} onValueChange={changeTab} className="gap-5">
+        <div className="-mx-1 overflow-x-auto px-1">
+          <TabsList className="h-10">
+            <TabsTrigger value="services" className="px-3">
+              {t('catalog.tabServices')}
+            </TabsTrigger>
+            <TabsTrigger value="packages" className="px-3">
+              {t('catalog.tabPackages')}
+            </TabsTrigger>
+          </TabsList>
+        </div>
+        <TabsContent value="services">{servicesTab}</TabsContent>
+        <TabsContent value="packages">
+          <PackagesTab services={services ?? []} categories={categories} />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+function ServicesTab({
+  services,
+  categories,
+  loadError,
+  reload,
+}: {
+  services: Service[] | null;
+  categories: ServiceCategorySummary[];
+  loadError: string | null;
+  reload: () => void;
+}): ReactNode {
+  const { permissions } = useSession();
+  const [actionError, setError] = useState<string | null>(null);
+  const error = loadError ?? actionError;
+  const [editing, setEditing] = useState<Service | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const [query, setQuery] = useState('');
+  const [categoryId, setCategoryId] = useState('');
+  const [status, setStatus] = useState<StatusFilter>('all');
+
+  const canWrite = permissions.includes(PERMISSIONS.SERVICE_WRITE);
 
   async function deactivate(service: Service): Promise<void> {
     setBusy(service.id);
@@ -175,7 +283,6 @@ export function CatalogPage(): ReactNode {
   return (
     <>
       <DataPage
-        title={t('catalog.title')}
         {...(canWrite
           ? {
               actions: (

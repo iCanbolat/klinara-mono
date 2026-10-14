@@ -24,7 +24,7 @@
  *   proxy'sinin sertifika sorusudur, `platform/*` kiracı-üstüdür.
  * - **`public/*`**: bu uygulamanın public yüzeyi okumak için hiçbir sebebi yok;
  *   taslak önizlemenin yetkili karşılığı `booking-page/preview`.
- * - **Paket, bildirim, denetim** (`packages`, `customer-packages`, `messages`,
+ * - **Paket satışı, bildirim, denetim** (`packages`, `customer-packages`, `messages`,
  *   `audit*`) ve API'den kaldırılmış finans uçları (`payments`, `charges`,
  *   `cash`, `commission*`): Faz 12 bunların HİÇBİRİNİ istemiyor. Kural aynı: uç buraya yazılmadıkça
  *   geçmez. `consent-records` de burada: Faz 7 daraltılınca o tablo HİÇ
@@ -251,6 +251,13 @@ const RULES: readonly Rule[] = [
   { methods: ['PATCH', 'DELETE'], pattern: new RegExp(`^services/${UUID}$`) },
   { methods: ['POST'], pattern: /^service-categories$/ },
   { methods: ['PATCH', 'DELETE'], pattern: new RegExp(`^service-categories/${UUID}$`) },
+
+  // --- Paket TANIMLARI (Hizmetler › Paketler) ---
+  // Yalnız katalog tarafı: tanım satılmış bir paket DEĞİL, bir şablon. Satış,
+  // bakiye, iade ve devir (`customer-packages/*`) PARA yüzeyi ve hâlâ kapalı.
+  // `DELETE` satılmamışsa arşivler, satılmışsa yalnız pasife alır.
+  { methods: ['GET', 'POST'], pattern: /^package-definitions$/ },
+  { methods: ['GET', 'PATCH', 'DELETE'], pattern: new RegExp(`^package-definitions/${UUID}$`) },
 
   // --- Personel YAZMA (12.4) ---
   { methods: ['POST'], pattern: /^staff$/ },
