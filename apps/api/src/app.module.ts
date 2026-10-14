@@ -27,6 +27,7 @@ import { HealthModule } from './modules/health/health.module';
 import { IdentityModule } from './modules/identity/identity.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { AvailabilityCacheModule } from './modules/booking/availability-cache.module';
+import { BookingPageCacheModule } from './modules/booking-page/booking-page-cache.module';
 import { PackagesModule } from './modules/packages/packages.module';
 import { ReportingModule } from './modules/reporting/reporting.module';
 import { BookingModule } from './modules/booking/booking.module';
@@ -84,6 +85,7 @@ import { MetricsModule } from './observability/metrics.module';
     MetricsModule,
     DatabaseModule,
     AvailabilityCacheModule,
+    BookingPageCacheModule,
     BranchAccessModule,
     IdempotencyModule,
     SmsModule,

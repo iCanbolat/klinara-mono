@@ -62,6 +62,17 @@ export const EVENT_DEFINITIONS: Record<NotificationEvent, EventDefinition> = {
     variables: ['customerName', 'branchName', 'appointmentAt'],
     templates: {},
   },
+  appointment_rescheduled: {
+    channels: ['whatsapp'],
+    variables: [
+      'customerName',
+      'branchName',
+      'branchAddress',
+      'appointmentAt',
+      'serviceName',
+    ],
+    templates: {},
+  },
   no_show_followup: {
     channels: ['whatsapp'],
     variables: ['customerName', 'branchName'],

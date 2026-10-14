@@ -358,6 +358,13 @@ class MockBookingService(
         val shift = clock.minutes(existing.startsAt, startsAt).toLong()
         val moved =
             existing.copy(
+                // Sunucudaki kural: müşterinin onayı eski saate aitti, taşınınca düşer.
+                status =
+                    if (existing.status == AppointmentStatus.Confirmed) {
+                        AppointmentStatus.Scheduled
+                    } else {
+                        existing.status
+                    },
                 startsAt = startsAt,
                 endsAt = clock.addingMinutes(shift, existing.endsAt),
                 services =

@@ -13,6 +13,9 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -59,6 +62,7 @@ import com.klinara.android.designsystem.components.klinaraClickable
 import com.klinara.android.features.auth.AppSession
 import com.klinara.android.services.ServiceContainer
 import com.klinara.android.services.booking.Appointment
+import com.klinara.android.services.booking.AppointmentStatus
 import com.klinara.android.services.booking.AvailabilitySlot
 import com.klinara.android.services.contracts.Permissions
 import com.klinara.android.services.formatting.BranchClock
@@ -203,19 +207,41 @@ private fun CustomerSection(
             onValueChange = viewModel::searchCustomers,
             placeholder = "Ad ya da telefon",
         )
-        if (state.customerQuery.isNotBlank()) {
-            state.customers.forEachIndexed { index, customer ->
-                if (index > 0) KlinaraDivider()
-                SelectableRow(
-                    title = customer.fullName,
-                    detail = customer.phone,
-                    isSelected = false,
-                    onClick = {
-                        // Arama alanı seçimle kalkıyor; klavye açık kalmasın.
-                        focusManager.clearFocus()
-                        viewModel.selectCustomer(customer.id)
-                    },
-                )
+        val query = state.customerQuery.trim()
+        val hint =
+            when {
+                query.length < CUSTOMER_SEARCH_MIN_LENGTH ->
+                    "Aramak için en az $CUSTOMER_SEARCH_MIN_LENGTH karakter yazın."
+                state.customers.isNotEmpty() -> null
+                state.searchedCustomerQuery != query -> "Aranıyor…"
+                else -> "Eşleşen müşteri yok."
+            }
+        if (hint != null) {
+            Text(hint, style = KlinaraType.bodyM, color = KlinaraTheme.colors.charcoalMuted)
+        } else {
+            // Sonuçlar SABİT yükseklikte, kendi içinde kayan bir alanda: uzun bir
+            // liste hizmet ve saat kartlarını ekranın çok altına itiyordu; sabit
+            // yükseklik yazarken kartın boyunun zıplamasını da önlüyor.
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(CUSTOMER_RESULTS_HEIGHT)
+                        .verticalScroll(rememberScrollState()),
+            ) {
+                state.customers.forEachIndexed { index, customer ->
+                    if (index > 0) KlinaraDivider()
+                    SelectableRow(
+                        title = customer.fullName,
+                        detail = customer.phone,
+                        isSelected = false,
+                        onClick = {
+                            // Arama alanı seçimle kalkıyor; klavye açık kalmasın.
+                            focusManager.clearFocus()
+                            viewModel.selectCustomer(customer.id)
+                        },
+                    )
+                }
             }
         }
     }
@@ -602,6 +628,20 @@ private fun NotesSection(
                 onValueChange = viewModel::setReason,
                 placeholder = "Müşteri talebi…",
             )
+            KlinaraDivider()
+            KlinaraToggleRow(
+                label = "Müşteriye bildir",
+                // Müşterinin onayı ESKİ saate aitti; sunucu onu düşürüyor ve yeni saat
+                // mesajı yeniden onay istiyor. Kullanıcı bunu düğmeye basmadan bilmeli.
+                detail =
+                    if (state.draft.rescheduling?.status == AppointmentStatus.Confirmed) {
+                        "Müşterinin onayı eski saate aitti; yeni saat WhatsApp ile bildirilir ve yeniden onay istenir."
+                    } else {
+                        "Müşteriye WhatsApp ile yeni saat bildirilir ve onay istenir."
+                    },
+                isOn = state.draft.notifyCustomer,
+                onToggle = viewModel::setNotifyCustomer,
+            )
         }
     } else {
         KlinaraCard(title = "Not") {
@@ -698,3 +738,5 @@ private const val NARROWED_STAFF_NOTE =
     "Yalnız seçtiğiniz hizmetlerin HEPSİNDE yetkin personel listeleniyor."
 
 private const val SLOT_COLUMNS = 4
+
+private val CUSTOMER_RESULTS_HEIGHT = 264.dp

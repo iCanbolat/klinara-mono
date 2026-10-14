@@ -143,7 +143,9 @@ struct BookingFlowView: View {
                 emptyMessage: "Eşleşen müşteri yok.",
                 createLabel: session.can(Permissions.customerWrite) ? "Yeni müşteri ekle" : nil,
                 onCreate: session.can(Permissions.customerWrite) ? { isCreatingCustomer = true } : nil,
-                remoteSearch: { await session.customerStore.lookup($0) }
+                remoteSearch: { await session.customerStore.lookup($0) },
+                minSearchLength: 3,
+                resultsHeight: 264
             )
         } else {
             KlinaraFormSection(title: "Müşteri") {
@@ -407,15 +409,25 @@ struct BookingFlowView: View {
                 autocapitalization: .sentences
             )
             .padding(KlinaraMetrics.md)
-            if !draft.isRescheduling {
-                KlinaraDivider()
-                KlinaraToggleRow(
-                    label: "Müşteriye bildir",
-                    detail: "Müşteriye WhatsApp ile randevu onayı gönderilir.",
-                    isOn: $draft.notifyCustomer
-                )
-            }
+            KlinaraDivider()
+            KlinaraToggleRow(
+                label: "Müşteriye bildir",
+                detail: notifyDetail,
+                isOn: $draft.notifyCustomer
+            )
         }
+    }
+
+    /// Ertelemede müşterinin onayı ESKİ saate aitti; sunucu onu düşürüyor ve
+    /// yeni saat mesajı yeniden onay istiyor. Kullanıcı bunu düğmeye basmadan
+    /// bilmeli.
+    private var notifyDetail: String {
+        guard let rescheduling = draft.rescheduling else {
+            return "Müşteriye WhatsApp ile randevu onayı gönderilir."
+        }
+        return rescheduling.status == .confirmed
+            ? "Müşterinin onayı eski saate aitti; yeni saat WhatsApp ile bildirilir ve yeniden onay istenir."
+            : "Müşteriye WhatsApp ile yeni saat bildirilir ve onay istenir."
     }
 
     // MARK: Veri

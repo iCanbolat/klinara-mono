@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { Check, Loader2 } from 'lucide-react';
+import { Check, CheckCircle2, Clock, Loader2 } from 'lucide-react';
 import type { AppointmentStatus } from '@klinara/shared';
 import { t } from '@/i18n/tr';
 import { cn } from '@/lib/cn';
@@ -10,7 +10,10 @@ import { STATUS_LABEL, type StatusAction } from '@/lib/calendar/status';
 /**
  * Randevunun ilerleme şeridi — aynı zamanda durum DEĞİŞTİRME denetimi.
  *
- * Mutlu yol: planlandı → onaylandı → geldi → işlemde → tamamlandı. Her adım
+ * Mutlu yol: planlandı → geldi → tamamlandı. `onaylandı` bir ADIM DEĞİL:
+ * onu müşteri WhatsApp'taki düğmeyle veriyor ve personelin ilerletmesi
+ * gereken bir şey değil — şeritte `planlandı` adımında durur, yanında
+ * ``ConfirmationBadge`` çizilir. Her adım
  * üç durumdan birinde:
  *   - GEÇİLDİ / ŞU AN: bilgi, tıklanmıyor.
  *   - GİDİLEBİLİR: sunucunun geçiş tablosunda var (`statusActions`), tıklanınca
@@ -19,25 +22,51 @@ import { STATUS_LABEL, type StatusAction } from '@/lib/calendar/status';
  *   - KİLİTLİ: gidilemez.
  *
  * İzinsiz geçiş (`allowed: false`) etkisiz ama GÖRÜNÜR — bkz. `status.ts`.
- * `tamamlandı`dan `işlemde`ye geri alma da bu yüzden şeritte bir adım olarak
+ * `tamamlandı`dan `geldi`ye geri alma da bu yüzden şeritte bir adım olarak
  * çıkıyor: geçildi görünümünde değil, yetkiliyse tıklanabilir bir düğme.
  *
  * `gelmedi` ve `iptal` mutlu yolun DIŞINDA; onlar şeritte değil, panelin ayrı
  * düğmelerinde (geri alınamaz oldukları için ayrı bir onay istiyorlar).
  */
 
-export const STATUS_FLOW = [
-  'scheduled',
-  'confirmed',
-  'arrived',
-  'in_progress',
-  'completed',
-] as const satisfies readonly AppointmentStatus[];
+export const STATUS_FLOW = ['scheduled', 'arrived', 'completed'] as const satisfies readonly AppointmentStatus[];
 
-type Flow = (typeof STATUS_FLOW)[number];
+type Flow = (typeof STATUS_FLOW)[number] | 'confirmed';
 
 export function isFlowStatus(status: AppointmentStatus): status is Flow {
-  return (STATUS_FLOW as readonly string[]).includes(status);
+  return status === 'confirmed' || (STATUS_FLOW as readonly string[]).includes(status);
+}
+
+/** Onaylanmış randevu şeritte `planlandı` adımında durur. */
+function flowStep(status: Flow): (typeof STATUS_FLOW)[number] {
+  return status === 'confirmed' ? 'scheduled' : status;
+}
+
+/**
+ * Müşterinin onayı — WhatsApp hatırlatmasındaki "Onaylıyorum" düğmesi.
+ *
+ * Yalnız gelinmemiş randevuda anlamlı. Onay yokken "bekleniyor" demek
+ * resepsiyona kimi araması gerektiğini söylüyor; randevu taşınınca onay
+ * düşer (sunucu `confirmed → scheduled`) ve rozet yeniden bekler.
+ */
+export function ConfirmationBadge({ status }: { status: AppointmentStatus }): ReactNode {
+  if (status !== 'scheduled' && status !== 'confirmed') return null;
+  const confirmed = status === 'confirmed';
+  return (
+    <span
+      className={cn(
+        'inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium',
+        confirmed ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground',
+      )}
+    >
+      {confirmed ? (
+        <CheckCircle2 className="size-3.5" aria-hidden="true" />
+      ) : (
+        <Clock className="size-3.5" aria-hidden="true" />
+      )}
+      {t(confirmed ? 'calendar.confirmation.confirmed' : 'calendar.confirmation.pending')}
+    </span>
+  );
 }
 
 export function StatusStepper({
@@ -52,10 +81,10 @@ export function StatusStepper({
   busy: string | null;
   onSelect: (to: AppointmentStatus) => void;
 }): ReactNode {
-  const current = STATUS_FLOW.indexOf(status);
+  const current = STATUS_FLOW.indexOf(flowStep(status));
 
   return (
-    <ol aria-label={t('calendar.detail.flow')} className="grid grid-cols-5">
+    <ol aria-label={t('calendar.detail.flow')} className="grid grid-cols-3">
       {STATUS_FLOW.map((step, index) => {
         const action = actions.find((candidate) => candidate.to === step);
         const isCurrent = index === current;

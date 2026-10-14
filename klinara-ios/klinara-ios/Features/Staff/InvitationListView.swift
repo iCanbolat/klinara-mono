@@ -204,25 +204,23 @@ struct InviteStaffView: View {
 
             KlinaraFormSection(title: "Rol ve şube") {
                 VStack(alignment: .leading, spacing: KlinaraMetrics.md) {
-                    Picker("Rol", selection: $roleKey) {
-                        ForEach(roles) { role in
-                            Text(role.name).tag(role.key)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .tint(KlinaraColor.sageDeep)
+                    KlinaraPickerField(
+                        label: "Rol",
+                        options: roles.map(\.key),
+                        selection: $roleKey,
+                        title: { key in roles.first { $0.key == key }?.name ?? key }
+                    )
 
                     if tenantScoped {
                         KlinaraRow(label: "Şube", value: "Kurum geneli")
                     } else {
-                        Picker("Şube", selection: $branchId) {
-                            Text("Şube seçin").tag(String?.none)
-                            ForEach(branches) { branch in
-                                Text(branch.name).tag(Optional(branch.id))
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .tint(KlinaraColor.sageDeep)
+                        KlinaraPickerField(
+                            label: "Şube",
+                            options: branches.map { Optional($0.id) },
+                            selection: $branchId,
+                            title: { id in branches.first { $0.id == id }?.name ?? "" },
+                            placeholder: "Şube seçin"
+                        )
                     }
                 }
                 .klinaraText(.bodyM)

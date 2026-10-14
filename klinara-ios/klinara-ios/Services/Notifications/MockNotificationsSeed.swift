@@ -78,6 +78,8 @@ enum MockNotificationsSeed {
             return "Merhaba {{customerName}}, {{appointmentAt}} tarihindeki {{serviceName}} randevunuzu hatırlatırız. Sizi {{branchName}} şubemizde bekliyoruz.\n\nŞubemize kolayca ulaşabilmeniz için adres bilgimizi paylaşıyor, konumu aşağıdaki butonla açabilmenizi sağlıyoruz.\n\nAdres: {{branchAddress}}\n\nKatılımınızı aşağıdaki butonlarla bildirebilirsiniz."
         case .appointmentCancelled:
             return "Sayın {{customerName}}, {{appointmentAt}} tarihli randevunuz iptal edilmiştir."
+        case .appointmentRescheduled:
+            return "Merhaba {{customerName}}, {{serviceName}} randevunuzun saati değiştirildi. Yeni randevu zamanınız {{appointmentAt}}. Sizi {{branchName}} şubemizde bekliyoruz.\n\nAdres: {{branchAddress}}\n\nYeni saate katılımınızı aşağıdaki butonlarla bildirebilirsiniz."
         case .noShowFollowup:
             return "Sayın {{customerName}}, randevunuza katılamadınız. {{branchName}} şubemizden yeni bir randevu alabilirsiniz."
         case .packageBalance:

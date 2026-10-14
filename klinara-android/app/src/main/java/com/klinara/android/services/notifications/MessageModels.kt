@@ -50,6 +50,11 @@ enum class NotificationEvent(
         "Randevu iptali",
         "Randevu iptal edildiğinde müşteriye gider.",
     ),
+    AppointmentRescheduled(
+        "appointment_rescheduled",
+        "Randevu saati değişikliği",
+        "Randevu başka bir saate alındığında müşteriye yeni saati bildirir ve onay ister.",
+    ),
     NoShowFollowup(
         "no_show_followup",
         "Gelmedi takibi",

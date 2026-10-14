@@ -183,7 +183,8 @@ struct BookingDraft: Equatable {
                     customerPackageItemId: packageItemIds[$0]
                 )
             },
-            reason: trimmed.isEmpty ? nil : trimmed
+            reason: trimmed.isEmpty ? nil : trimmed,
+            notifyCustomer: notifyCustomer ? nil : false
         )
     }
 

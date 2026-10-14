@@ -76,10 +76,14 @@ struct KlinaraSkeletonBar: View {
     var cornerRadius: CGFloat = 6
 
     var body: some View {
+        // Genişlik bir TAVAN, sabit değil: sabit genişlikli çubuklar dar
+        // ekranda toplamda ekrandan geniş bir satır kuruyordu (takvim ajandası
+        // 408pt istiyordu, iPhone 17 Pro 402pt). Taşan iskelet dış yığını da
+        // genişletiyor ve veri gelince başlık yatayda kayıyordu.
         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
             .fill(KlinaraColor.border.opacity(0.55))
-            .frame(width: width, height: height)
-            .frame(maxWidth: width == nil ? .infinity : nil, alignment: .leading)
+            .frame(minWidth: 0, idealWidth: width, maxWidth: width ?? .infinity, alignment: .leading)
+            .frame(height: height)
     }
 }
 
@@ -334,15 +338,13 @@ struct KlinaraSkeletonBody: View {
             }
 
         case .agenda:
-            ForEach(0..<max(1, style.count), id: \.self) { index in
-                HStack(alignment: .top, spacing: KlinaraMetrics.md) {
-                    // Saat sütunu: ajandanın sol kenarı sabit genişlikte ve
-                    // veri gelince kaymamalı.
-                    KlinaraSkeletonBar(width: 44, height: 13)
-                        .padding(.top, KlinaraMetrics.md)
-                    KlinaraSkeletonCard {
-                        KlinaraSkeletonRow(hasValue: true, seed: index)
-                    }
+            // ``AgendaListView`` ile aynı düzen: TEK kart, içinde ayraçlı
+            // satırlar; saat sütunu kartın içinde. Ayrı kartlar ve dışarıda
+            // duran saat sütunu, veri gelince bütün listeyi yeniden diziyordu.
+            KlinaraSkeletonCard {
+                ForEach(0..<max(1, style.count), id: \.self) { index in
+                    if index > 0 { KlinaraDivider() }
+                    agendaRow(seed: index)
                 }
             }
 
@@ -353,15 +355,30 @@ struct KlinaraSkeletonBody: View {
 
     /// Yatay filtre hapı şeridi — müşterilerde etiket, takvimde personel.
     private var pillRow: some View {
-        HStack(spacing: KlinaraMetrics.sm) {
-            ForEach(0..<4, id: \.self) { index in
-                Capsule()
-                    .fill(KlinaraColor.border.opacity(0.55))
-                    .frame(width: [56, 88, 72, 96][index], height: 34)
+        KlinaraSkeletonPills.Shapes()
+    }
+
+    /// ``AgendaListView`` satırı: başlangıç/bitiş saati, personel noktası,
+    /// müşteri + hizmet + durum rozeti, ok.
+    private func agendaRow(seed: Int) -> some View {
+        HStack(alignment: .top, spacing: KlinaraMetrics.md) {
+            VStack(alignment: .leading, spacing: 5) {
+                KlinaraSkeletonBar(width: 40, height: 13)
+                KlinaraSkeletonBar(width: 30, height: 9)
             }
+            .frame(width: 46, alignment: .leading)
+
+            KlinaraSkeletonCircle(size: 10)
+                .padding(.top, 3)
+
+            VStack(alignment: .leading, spacing: 7) {
+                KlinaraSkeletonBar(width: [148, 120, 168, 132, 156][seed % 5], height: 13)
+                KlinaraSkeletonBar(width: [104, 128, 88, 116, 96][seed % 5], height: 11)
+                KlinaraSkeletonBar(width: 64, height: 18, cornerRadius: 9)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .clipped()
+        .padding(KlinaraMetrics.md)
     }
 
     /// ``KlinaraStatStrip`` ile aynı düzen: tek satır, sabit genişlikli kartlar.
@@ -435,10 +452,17 @@ struct KlinaraSkeletonView: View {
                 .tint(KlinaraColor.sage)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            KlinaraSkeletonBody(style: style)
-                .padding(.horizontal, KlinaraMetrics.screenInset)
-                .padding(.vertical, KlinaraMetrics.lg)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            // Dolu dal gibi bir `ScrollView` içinde (kaydırması kapalı): iskelet
+            // ekrandan uzun olduğunda düz bir yığın taşan yüksekliği iki yana
+            // bölüştürüp ORTALANIYORDU ve üstteki başlık (takvimde mod seçici)
+            // yükleme boyunca yukarı kayıyor, veri gelince geri iniyordu.
+            ScrollView {
+                KlinaraSkeletonBody(style: style)
+                    .padding(.horizontal, KlinaraMetrics.screenInset)
+                    .padding(.vertical, KlinaraMetrics.lg)
+            }
+            .scrollDisabled(true)
+            .scrollIndicators(.hidden)
         }
     }
 }
@@ -464,6 +488,36 @@ struct KlinaraSkeletonChips: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Yükleniyor")
         .allowsHitTesting(false)
+    }
+}
+
+/// Filtre hapı şeridinin yer tutucusu — ekranın İSKELETİNİN DIŞINDA kalan
+/// başlık şeritleri için (takvimde personel hapları).
+///
+/// Takvim başlığındaki personel şeridi yalnız personel listesi gelince
+/// çiziliyordu: o ana kadar yoktu, gelince gövdeyi 42pt aşağı itiyordu.
+struct KlinaraSkeletonPills: View {
+
+    var body: some View {
+        Shapes()
+            .klinaraSkeletonPulse()
+            .accessibilityHidden(true)
+            .allowsHitTesting(false)
+    }
+
+    /// Nabızsız çıplak şekiller — ``KlinaraSkeletonBody`` kendi nabzını uyguluyor.
+    struct Shapes: View {
+        var body: some View {
+            HStack(spacing: KlinaraMetrics.sm) {
+                ForEach(0..<4, id: \.self) { index in
+                    Capsule()
+                        .fill(KlinaraColor.border.opacity(0.55))
+                        .frame(width: [56, 88, 72, 96][index], height: 34)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .clipped()
+        }
     }
 }
 

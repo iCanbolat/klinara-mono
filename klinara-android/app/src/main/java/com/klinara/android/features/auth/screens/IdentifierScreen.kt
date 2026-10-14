@@ -1,12 +1,9 @@
 package com.klinara.android.features.auth.screens
 
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.Box
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import com.klinara.android.designsystem.KlinaraPreviews
@@ -15,7 +12,6 @@ import com.klinara.android.designsystem.components.AuthScaffold
 import com.klinara.android.designsystem.components.ErrorBanner
 import com.klinara.android.designsystem.components.KlinaraButton
 import com.klinara.android.designsystem.components.KlinaraButtonKind
-import com.klinara.android.designsystem.components.KlinaraLogoMark
 import com.klinara.android.designsystem.components.KlinaraTextField
 import com.klinara.android.designsystem.components.PhoneNumberField
 import com.klinara.android.features.auth.AuthEvent
@@ -41,6 +37,9 @@ fun IdentifierScreen(
         modifier = modifier,
         title = "Giriş yap",
         subtitle = "Kliniğinize erişmek için hesabınızla devam edin.",
+        showsLogo = true,
+        // Uzun basma bilerek logoda: bkz. sınıf notu.
+        onLogoLongPress = onOpenDeveloperMenu,
         actions = {
             KlinaraButton(
                 title = "Devam et",
@@ -60,23 +59,6 @@ fun IdentifierScreen(
             )
         },
     ) {
-        // Marka işareti başlığın üstünde değil içerikte: uzun basma jesti için bir
-        // hedefe ihtiyaç var ve AuthScaffold'ın başlığı ortak.
-        Box(
-            modifier =
-                Modifier.then(
-                    if (onOpenDeveloperMenu != null) {
-                        Modifier.pointerInput(Unit) {
-                            detectTapGestures(onLongPress = { onOpenDeveloperMenu() })
-                        }
-                    } else {
-                        Modifier
-                    },
-                ),
-        ) {
-            KlinaraLogoMark()
-        }
-
         state.error?.let { error ->
             ErrorBanner(
                 message = error.message,

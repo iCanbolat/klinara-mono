@@ -27,6 +27,10 @@ const EVENT_TEXT: Readonly<Record<string, { title: MessageKey; help: MessageKey 
     title: 'templates.event.appointment_cancelled',
     help: 'templates.event.appointment_cancelled.help',
   },
+  appointment_rescheduled: {
+    title: 'templates.event.appointment_rescheduled',
+    help: 'templates.event.appointment_rescheduled.help',
+  },
   no_show_followup: {
     title: 'templates.event.no_show_followup',
     help: 'templates.event.no_show_followup.help',

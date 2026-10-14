@@ -427,7 +427,10 @@ final class MockBookingService: BookingService, @unchecked Sendable {
         return try withLock {
             // Kendi eski slotuyla çakışmamalı: erteleme kendi yerini serbest bırakır.
             try assertFree(plan, excludingAppointmentId: id)
+            // Sunucudaki kural: müşterinin onayı eski saate aitti, taşınınca düşer.
+            let resetsConfirmation = old.status == .confirmed
             let updated = old.with(
+                status: resetsConfirmation ? .scheduled : nil,
                 startsAt: plan.visibleStart,
                 endsAt: plan.visibleEnd,
                 services: plan.lines,
@@ -442,6 +445,15 @@ final class MockBookingService: BookingService, @unchecked Sendable {
                 oldStartsAt: old.startsAt,
                 newStartsAt: updated.startsAt
             )
+            if resetsConfirmation {
+                append(
+                    .statusChanged,
+                    to: id,
+                    reason: "Saat değişti; yeni saat için müşteri onayı bekleniyor",
+                    from: .confirmed,
+                    to: .scheduled
+                )
+            }
             return updated
         }
     }

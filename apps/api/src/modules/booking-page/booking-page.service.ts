@@ -13,8 +13,7 @@ import { CONTENT_SCHEMA_VERSION } from '../../database/schema';
 import { TenantTxService } from '../../database/tenant-tx.service';
 import type { Tx } from '../../database/tenant-tx';
 import { BookingSiteProvisioner } from './booking-site.provisioner';
-import { QUEUES } from '../../lib/queue/queue.constants';
-import { QueueService } from '../../lib/queue/queue.service';
+import { BookingPageCacheService } from './booking-page-cache.service';
 import * as domainRepo from './domains.repository';
 import * as repo from './booking-page.repository';
 import type {
@@ -38,7 +37,7 @@ export class BookingPageService {
     private readonly tx: TenantTxService,
     private readonly requestContext: RequestContextService,
     private readonly provisioner: BookingSiteProvisioner,
-    private readonly queue: QueueService,
+    private readonly cache: BookingPageCacheService,
     private readonly config: ConfigService<EnvironmentVariables, true>,
   ) {}
 
@@ -83,6 +82,9 @@ export class BookingPageService {
         if (input[key] !== undefined) patch[key] = input[key];
       }
       if (Object.keys(patch).length > 0) await repo.updateSettings(tx, site.id, patch);
+      // Fiyat/personel seçimi görünürlüğü ve varsayılan şube sunucu kabuğunda
+      // render ediliyor; ayar değişimi de yayın kadar görünür olmalı.
+      await this.cache.schedule(tx, site.slug, 'settings');
     });
 
     return this.getPage();
@@ -194,7 +196,7 @@ export class BookingPageService {
         publishedRevisionId: target,
         publishedAt: new Date(),
       });
-      await this.schedulePurge(tx, site.slug, 'publish');
+      await this.cache.schedule(tx, site.slug, 'publish');
     });
     return this.getPage();
   }
@@ -205,7 +207,7 @@ export class BookingPageService {
       // `publishedRevisionId` KORUNUYOR: yayından kaldırma bir silme değil,
       // bir görünürlük değişikliği. Yeniden yayınlamak aynı sürüme dönmek.
       await repo.updateSite(tx, site.id, { status: 'unpublished' });
-      await this.schedulePurge(tx, site.slug, 'unpublish');
+      await this.cache.schedule(tx, site.slug, 'unpublish');
     });
     return this.getPage();
   }
@@ -227,29 +229,9 @@ export class BookingPageService {
           ? { publishedRevisionId: revision.id, publishedAt: new Date() }
           : {}),
       });
-      if (site.status === 'published') await this.schedulePurge(tx, site.slug, 'rollback');
+      if (site.status === 'published') await this.cache.schedule(tx, site.slug, 'rollback');
     });
     return this.getContent();
-  }
-
-  /**
-   * Yayın sonrası web cache'ini düşürecek işi kuyruğa yazar.
-   *
-   * İş çağıranın TRANSACTION'INA yazılıyor (`send(tx, …)`): pointer taşıma geri
-   * alınırsa purge de yazılmaz. `QUEUE_ENABLED=false` iken `send` sessizce
-   * dönüyor ve yayın yine başarılı olur — kuyruk bir ön koşul değil.
-   *
-   * `singletonKey` art arda yapılan yayınların tek bir purge'e katlanmasını
-   * sağlıyor; editörde "kaydet-yayınla-kaydet-yayınla" yapan bir kullanıcı
-   * web'e istek yağdırmamalı.
-   */
-  private async schedulePurge(tx: Tx, slug: string, reason: string): Promise<void> {
-    await this.queue.send(
-      tx,
-      QUEUES.BOOKING_PAGE_PURGE,
-      { slug, reason },
-      { singletonKey: `purge:${slug}`, retryLimit: 5, retryBackoff: true, expireInSeconds: 120 },
-    );
   }
 
   async listRevisions(): Promise<RevisionSummaryDto[]> {

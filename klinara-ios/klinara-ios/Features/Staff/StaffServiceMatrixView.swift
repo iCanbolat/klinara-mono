@@ -117,15 +117,12 @@ struct StaffServiceMatrixView: View {
             if isEnabled {
                 VStack(alignment: .leading, spacing: KlinaraMetrics.sm) {
                     if session.branches.count > 1 {
-                        Picker("Kapsam", selection: binding.branchId) {
-                            Text("Tüm şubeler").tag(String?.none)
-                            ForEach(session.branches) { branch in
-                                Text(branch.name).tag(Optional(branch.id))
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .tint(KlinaraColor.sageDeep)
-                        .klinaraText(.bodyM)
+                        KlinaraPickerField(
+                            label: "Kapsam",
+                            options: [nil] + session.branches.map { Optional($0.id) },
+                            selection: binding.branchId,
+                            title: { id in id.flatMap { id in session.branches.first { $0.id == id }?.name } ?? "Tüm şubeler" }
+                        )
                     }
 
                     KlinaraToggleRow(

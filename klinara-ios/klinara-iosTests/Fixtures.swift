@@ -58,7 +58,7 @@ enum Fixtures {
           "customerId": "44444444-0000-4000-8000-000000000001",
           "customerName": "Ayşe Yılmaz",
           "customerPhone": "+905321112233",
-          "status": "in_progress",
+          "status": "no_show",
           "startsAt": "2026-09-07T14:00:00+03:00",
           "endsAt": "2026-09-07T15:00:00+03:00",
           "notes": null,

@@ -486,7 +486,7 @@ describe('klinikte imzalı onam (0053)', () => {
       const appointmentId = await createAppointment();
       await toArrived(appointmentId);
 
-      const blocked = await setStatus(appointmentId, { status: 'in_progress' });
+      const blocked = await setStatus(appointmentId, { status: 'completed' });
       expect(blocked.status).toBe(409);
       expect((blocked.body as Problem).code).toBe('CONSENT_MISSING');
       expect((blocked.body as Problem).missing?.map((item) => item.title)).toEqual([
@@ -494,10 +494,11 @@ describe('klinikte imzalı onam (0053)', () => {
       ]);
 
       await setStatus(appointmentId, {
-        status: 'in_progress',
+        status: 'completed',
         consentOverrideReason: 'Hasta imzayı kağıda attı, sonra taranacak.',
       }).expect(200);
-      // Gerekçe bir kez yeter: tamamlamada yeniden sorulmaz.
+      // Gerekçe bir kez yeter: geri açılıp yeniden tamamlanınca sorulmaz.
+      await setStatus(appointmentId, { status: 'arrived', reason: 'yanlis tamamlandi' }).expect(200);
       await setStatus(appointmentId, { status: 'completed' }).expect(200);
 
       const { rows } = await database.ownerPool.query<{ reason: string }>(
@@ -511,7 +512,7 @@ describe('klinikte imzalı onam (0053)', () => {
       await publishConsent(app, clinic.owner.tokens);
       const appointmentId = await createAppointment();
       await toArrived(appointmentId);
-      await setStatus(appointmentId, { status: 'in_progress' }).expect(200);
+      await setStatus(appointmentId, { status: 'completed' }).expect(200);
     });
 
     it('işlem onamı imzalanmışsa gerekçe sorulmaz', async () => {
@@ -523,7 +524,7 @@ describe('klinikte imzalı onam (0053)', () => {
       expect((await sign(appointmentId, item)).status).toBe(201);
 
       await toArrived(appointmentId);
-      await setStatus(appointmentId, { status: 'in_progress' }).expect(200);
+      await setStatus(appointmentId, { status: 'completed' }).expect(200);
     });
   });
 

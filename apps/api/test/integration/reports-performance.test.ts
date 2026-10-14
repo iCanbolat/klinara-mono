@@ -99,7 +99,7 @@ describe('performans, no-show ve retention raporları (Batch 10.1)', () => {
 
   /** `scheduled` → `completed`; ara durumlar zorunlu. */
   const complete = async (id: string): Promise<void> => {
-    for (const status of ['confirmed', 'arrived', 'in_progress', 'completed']) {
+    for (const status of ['confirmed', 'arrived', 'completed']) {
       await setStatus(id, status);
     }
   };

@@ -4,6 +4,7 @@ import { AppError } from '../../common/errors/app-error';
 import { isPgError, PG_ERROR } from '../../common/errors/db-errors';
 import { TenantTxService } from '../../database/tenant-tx.service';
 import { AvailabilityCacheService } from '../booking/availability-cache.service';
+import { BookingPageCacheService } from '../booking-page/booking-page-cache.service';
 import type { Principal } from '../identity/principal';
 import { BranchAccessService } from '../tenancy/branch-access.service';
 import * as repo from './staff.repository';
@@ -22,11 +23,17 @@ export class StaffService {
     private readonly tx: TenantTxService,
     private readonly availabilityCache: AvailabilityCacheService,
     private readonly branchAccess: BranchAccessService,
+    private readonly bookingPage: BookingPageCacheService,
   ) {}
 
-  /** Uygunluğu etkileyen her yazımdan sonra kiracının cache'i düşürülür. */
-  private invalidateAvailability(): void {
+  /**
+   * Uygunluğu etkileyen her yazımdan sonra kiracının cache'i düşürülür.
+   * Online görünürlük ve yetkinlikler randevu sayfasının personel listesini de
+   * belirlediği için sayfa cache'i de purge ediliyor.
+   */
+  private async invalidateAvailability(): Promise<void> {
     this.availabilityCache.invalidateTenant(this.tx.tenantId);
+    await this.bookingPage.invalidate('staff');
   }
 
   async listStaffProfiles(
@@ -145,7 +152,7 @@ export class StaffService {
         throw error;
       });
 
-    this.invalidateAvailability();
+    await this.invalidateAvailability();
     return StaffService.toProfileResponse(
       payload.profile,
       payload.services,
@@ -192,7 +199,7 @@ export class StaffService {
       });
 
     if (payload === undefined) throw AppError.notFound('Personel profili bulunamadı');
-    this.invalidateAvailability();
+    await this.invalidateAvailability();
     return StaffService.toProfileResponse(
       payload.profile,
       payload.services,
@@ -236,7 +243,7 @@ export class StaffService {
       });
 
     if (payload === undefined) throw AppError.notFound('Personel profili bulunamadı');
-    this.invalidateAvailability();
+    await this.invalidateAvailability();
     return StaffService.toProfileResponse(
       payload.profile,
       payload.services,

@@ -1,5 +1,6 @@
 package com.klinara.android.designsystem.components
 
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.klinara.android.designsystem.KlinaraMetrics
@@ -52,6 +54,8 @@ fun AuthScaffold(
     eyebrow: String? = null,
     subtitle: String? = null,
     showsLogo: Boolean = false,
+    /** Logoya uzun basma — yalnız debug'da geliştirici menüsü için. */
+    onLogoLongPress: (() -> Unit)? = null,
     onBack: (() -> Unit)? = null,
     actions: @Composable ColumnScope.() -> Unit = {},
     content: @Composable ColumnScope.() -> Unit,
@@ -82,7 +86,13 @@ fun AuthScaffold(
                     ),
             verticalArrangement = Arrangement.spacedBy(KlinaraMetrics.headerToContent),
         ) {
-            Header(eyebrow = eyebrow, title = title, subtitle = subtitle, showsLogo = showsLogo)
+            Header(
+                eyebrow = eyebrow,
+                title = title,
+                subtitle = subtitle,
+                showsLogo = showsLogo,
+                onLogoLongPress = onLogoLongPress,
+            )
             Column(
                 verticalArrangement = Arrangement.spacedBy(KlinaraMetrics.md),
                 content = content,
@@ -145,11 +155,24 @@ private fun Header(
     title: String,
     subtitle: String?,
     showsLogo: Boolean,
+    onLogoLongPress: (() -> Unit)?,
 ) {
     val colors = KlinaraTheme.colors
     Column(verticalArrangement = Arrangement.spacedBy(KlinaraMetrics.md)) {
+        // Marka işareti ekranın İLK öğesi: başlığın altında kalınca form alanıyla
+        // başlık arasına sıkışıyor ve ekranın kimliği değil bir alan gibi okunuyordu.
         if (showsLogo) {
-            KlinaraLogoMark(size = SCAFFOLD_LOGO_SIZE)
+            KlinaraLogoMark(
+                size = SCAFFOLD_LOGO_SIZE,
+                modifier =
+                    if (onLogoLongPress != null) {
+                        Modifier.pointerInput(onLogoLongPress) {
+                            detectTapGestures(onLongPress = { onLogoLongPress() })
+                        }
+                    } else {
+                        Modifier
+                    },
+            )
         }
         Column(verticalArrangement = Arrangement.spacedBy(KlinaraMetrics.sm)) {
             if (eyebrow != null) {

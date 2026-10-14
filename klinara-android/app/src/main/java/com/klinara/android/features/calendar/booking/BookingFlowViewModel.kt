@@ -37,6 +37,8 @@ data class BookingUiState(
     val staff: Loadable<List<StaffProfile>> = Loadable.Loading,
     val customers: List<Customer> = emptyList(),
     val customerQuery: String = "",
+    /** [customers] hangi aramanın sonucu; `customerQuery` ile ayrışıyorsa istek sürüyor. */
+    val searchedCustomerQuery: String? = null,
     val slots: Loadable<List<AvailabilitySlot>> = Loadable.Loading,
     /** Seçili günün durumu (açık / kapalı / tatil…) — boş slot listesinin NEDENİ. */
     val dayInfo: AvailabilityDay? = null,
@@ -157,12 +159,21 @@ class BookingFlowViewModel(
      */
     fun searchCustomers(query: String) {
         _state.update { it.copy(customerQuery = query) }
-        if (query.isBlank()) return
+        val trimmed = query.trim()
+        // Bir iki harf yüzlerce kaydı eşliyor; eşiğin altında ağa çıkılmaz.
+        if (trimmed.length < CUSTOMER_SEARCH_MIN_LENGTH) return
         viewModelScope.launch {
-            val found = Loadable.of { customers.search(query) }.valueOrNull.orEmpty()
+            val found = Loadable.of { customers.search(trimmed) }.valueOrNull.orEmpty()
+            // Geç dönen eski bir arama, yazılmış yeni terimin sonucunu ezmesin.
+            if (_state.value.customerQuery.trim() != trimmed) return@launch
             // Seçili müşteri listeden düşmemeli: arama daralınca adı kaybolurdu.
             val selected = _state.value.customers.filter { it.id == _state.value.draft.customerId }
-            _state.update { it.copy(customers = (found + selected).distinctBy { c -> c.id }) }
+            _state.update {
+                it.copy(
+                    customers = (found + selected).distinctBy { c -> c.id },
+                    searchedCustomerQuery = trimmed,
+                )
+            }
         }
     }
 
@@ -310,3 +321,6 @@ class BookingFlowViewModel(
             }
     }
 }
+
+/** Müşteri araması bu kadar karakter yazılmadan başlamaz (iOS ile aynı eşik). */
+const val CUSTOMER_SEARCH_MIN_LENGTH = 3

@@ -65,7 +65,6 @@ class MockPackageLedgerTest {
 
     private suspend fun complete(appointmentId: String) {
         booking.changeStatus(appointmentId, AppointmentStatus.Arrived, null)
-        booking.changeStatus(appointmentId, AppointmentStatus.InProgress, null)
         booking.changeStatus(appointmentId, AppointmentStatus.Completed, null)
     }
 
@@ -165,7 +164,7 @@ class MockPackageLedgerTest {
             assertEquals(5, ayse().sortedItems[0].remainingSessions)
             assertLedgerMatches(MockPackagesSeed.SOLD_AYSE_PACKAGE)
 
-            booking.changeStatus(appointment.id, AppointmentStatus.InProgress, "Yanlış tamamlandı")
+            booking.changeStatus(appointment.id, AppointmentStatus.Arrived, "Yanlış tamamlandı")
             val ledger = service.ledger(MockPackagesSeed.SOLD_AYSE_PACKAGE).data
             assertEquals(6, ayse().sortedItems[0].remainingSessions)
             // Satır silinmedi: tüketim YERİNDE, üstüne onu geri alan bir satır eklendi.
@@ -203,11 +202,10 @@ class MockPackageLedgerTest {
             complete(skinFirst)
 
             booking.changeStatus(skinSecond, AppointmentStatus.Arrived, null)
-            booking.changeStatus(skinSecond, AppointmentStatus.InProgress, null)
             val code = codeOf { booking.changeStatus(skinSecond, AppointmentStatus.Completed, null) }
 
             assertEquals(ApiErrorCode.PACKAGE_EXHAUSTED, code)
-            assertEquals(AppointmentStatus.InProgress, booking.appointment(skinSecond).status)
+            assertEquals(AppointmentStatus.Arrived, booking.appointment(skinSecond).status)
             assertEquals(0, ayse().sortedItems[1].remainingSessions)
             assertLedgerMatches(MockPackagesSeed.SOLD_AYSE_PACKAGE)
         }

@@ -364,7 +364,8 @@ private fun ActionsCard(
     canReopen: Boolean,
     viewModel: AppointmentDetailViewModel,
 ) {
-    val transitions = appointment.status.allowedTransitions(canReopen)
+    val transitions = appointment.status.staffActions(canReopen)
+    val confirmation = appointment.status.confirmationLabel
     var isCancelling by rememberSaveable { mutableStateOf(false) }
     var reason by rememberSaveable { mutableStateOf("") }
     var notifyCustomer by rememberSaveable { mutableStateOf(true) }
@@ -373,10 +374,27 @@ private fun ActionsCard(
 
     if (transitions.isNotEmpty()) {
         KlinaraCard(title = "Durum") {
+            // "Onaylandı" bir adım değil, müşterinin WhatsApp yanıtı: rozet olarak durur.
+            confirmation?.let { label ->
+                KlinaraBadge(
+                    text = label,
+                    tone =
+                        if (appointment.status == AppointmentStatus.Confirmed) {
+                            KlinaraBadgeTone.Positive
+                        } else {
+                            KlinaraBadgeTone.Neutral
+                        },
+                )
+            }
             transitions.forEachIndexed { index, status ->
                 if (index > 0) KlinaraDivider()
                 KlinaraNavigationRow(
-                    label = status.turkishName,
+                    label =
+                        if (appointment.status == AppointmentStatus.Completed && status == AppointmentStatus.Arrived) {
+                            "Yeniden aç"
+                        } else {
+                            status.turkishName
+                        },
                     onClick = { viewModel.askStatus(status) },
                 )
             }

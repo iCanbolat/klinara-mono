@@ -125,6 +125,32 @@ export const STANDARD_TEMPLATES: readonly StandardTemplate[] = [
     examples: { customerName: 'Ayşe', appointmentAt: '24.09.2026 14:00', branchName: 'Kadıköy' },
   },
   {
+    // Personel randevuyu başka saate aldığında. Onaylanmış randevunun onayı
+    // taşımayla düşer; yeni saat için düğmelerle yeniden onay istenir.
+    event: 'appointment_rescheduled',
+    name: 'klinara_randevu_saat_degisti',
+    language: 'tr',
+    category: 'UTILITY',
+    body:
+      'Merhaba {{customerName}}, {{serviceName}} randevunuzun saati değiştirildi. ' +
+      'Yeni randevu zamanınız {{appointmentAt}}. Sizi {{branchName}} şubemizde bekliyoruz.\n\n' +
+      'Adres: {{branchAddress}}\n\n' +
+      'Yeni saate katılımınızı aşağıdaki butonlarla bildirebilirsiniz.',
+    variables: ['customerName', 'serviceName', 'appointmentAt', 'branchName', 'branchAddress'],
+    examples: {
+      customerName: 'Ayşe',
+      serviceName: 'Cilt bakımı',
+      appointmentAt: '24.09.2026 14:00',
+      branchName: 'Kadıköy',
+      branchAddress: 'Bağdat Caddesi 1, Kadıköy',
+    },
+    quickReplies: [
+      { text: 'Onaylıyorum', action: 'confirm' },
+      { text: 'İptal etmek istiyorum', action: 'cancel' },
+    ],
+    urlButton: MAPS_BUTTON,
+  },
+  {
     event: 'no_show_followup',
     name: 'klinara_gelmedi_takip',
     language: 'tr',

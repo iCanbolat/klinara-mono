@@ -12,7 +12,7 @@ const TS_NODE = 'ts-node/register/transpile-only';
 const BASE_ENV = {
   NODE_ENV: 'test',
   LOG_LEVEL: 'silent',
-  DATABASE_URL: 'postgres://klinara_app:pw@127.0.0.1:5433/klinara_test',
+  DATABASE_URL: 'postgres://klinara_app:pw@127.0.0.1:5434/klinara_test',
 };
 
 describe('zarif kapanış', () => {

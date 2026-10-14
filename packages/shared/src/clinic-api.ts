@@ -61,7 +61,6 @@ export const APPOINTMENT_STATUSES = [
   'scheduled',
   'confirmed',
   'arrived',
-  'in_progress',
   'completed',
   'no_show',
   'cancelled',
@@ -101,6 +100,11 @@ export interface RescheduleAppointmentInput {
   startsAt: string;
   services?: AppointmentServiceInput[];
   reason?: string;
+  /**
+   * `false` → müşteriye yeni saat bildirilmez. Varsayılan: gider (yalnız ileri
+   * tarihli randevular). Onaylanmış randevu taşınınca onay düşer.
+   */
+  notifyCustomer?: boolean;
 }
 
 export interface CancelAppointmentInput {
@@ -113,7 +117,7 @@ export interface ChangeAppointmentStatusInput {
   status: AppointmentStatus;
   reason?: string;
   /**
-   * Gerekli onam imzalanmadan `in_progress`/`completed`a geçmenin gerekçesi.
+   * Gerekli onam imzalanmadan `completed`a geçmenin gerekçesi.
    * Yoksa ve onam eksikse sunucu `CONSENT_MISSING` döner.
    */
   consentOverrideReason?: string;

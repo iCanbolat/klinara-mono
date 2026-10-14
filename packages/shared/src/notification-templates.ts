@@ -70,6 +70,7 @@ export type NotificationEvent =
   | 'appointment_confirmation'
   | 'appointment_reminder'
   | 'appointment_cancelled'
+  | 'appointment_rescheduled'
   | 'no_show_followup'
   | 'package_balance'
   | 'package_expiring'

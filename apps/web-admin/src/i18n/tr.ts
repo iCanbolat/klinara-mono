@@ -800,8 +800,9 @@ export const MESSAGES = {
   'calendar.status.scheduled': 'Planlandı',
   'calendar.status.confirmed': 'Onaylandı',
   'calendar.status.arrived': 'Geldi',
-  'calendar.status.inProgress': 'İşlemde',
   'calendar.status.completed': 'Tamamlandı',
+  /** Yalnız eski geçmiş satırları için — durum artık üretilmiyor. */
+  'calendar.status.legacyInProgress': 'İşlemde',
   'calendar.status.noShow': 'Gelmedi',
   'calendar.status.cancelled': 'İptal edildi',
   'calendar.status.reopenDenied': 'Tamamlanmış randevuyu geri almak için yetkiniz yok.',
@@ -841,6 +842,12 @@ export const MESSAGES = {
   'calendar.notify.label': 'Müşteriye bildir',
   'calendar.notify.createHint': 'Müşteriye WhatsApp ile randevu onayı gönderilir.',
   'calendar.notify.cancelHint': 'Müşteriye WhatsApp ile iptal bildirimi gönderilir.',
+  'calendar.notify.rescheduleHint':
+    'Müşteriye WhatsApp ile yeni saat bildirilir ve onay istenir.',
+  'calendar.notify.rescheduleConfirmedHint':
+    'Müşterinin onayı eski saate aitti; yeni saat WhatsApp ile bildirilir ve yeniden onay istenir.',
+  'calendar.confirmation.confirmed': 'Müşteri onayladı',
+  'calendar.confirmation.pending': 'Müşteri onayı bekleniyor',
   'calendar.cancel.warning': 'İptal geri alınamaz. Slot serbest kalır.',
 
   'calendar.reschedule.title': 'Randevuyu ertele',
@@ -1178,6 +1185,7 @@ export const MESSAGES = {
   'messages.event.appointmentConfirmation': 'Randevu onayı',
   'messages.event.appointmentReminder': 'Randevu hatırlatması',
   'messages.event.appointmentCancelled': 'İptal bildirimi',
+  'messages.event.appointmentRescheduled': 'Saat değişikliği bildirimi',
   'messages.event.noShowFollowup': 'Gelmedi takibi',
   'messages.event.packageBalance': 'Paket bakiyesi',
   'messages.event.packageExpiring': 'Paket süresi',
@@ -1231,6 +1239,9 @@ export const MESSAGES = {
     'Randevudan önce, hatırlatma ayarındaki saatlerde gider.',
   'templates.event.appointment_cancelled': 'Randevu iptali',
   'templates.event.appointment_cancelled.help': 'Randevu iptal edildiğinde müşteriye gider.',
+  'templates.event.appointment_rescheduled': 'Randevu saati değişikliği',
+  'templates.event.appointment_rescheduled.help':
+    'Randevu başka bir saate alındığında müşteriye yeni saati bildirir ve onay ister.',
   'templates.event.no_show_followup': 'Gelmedi takibi',
   'templates.event.no_show_followup.help':
     'Müşteri gelmediğinde, ayarlanan gecikmeden sonra gider.',

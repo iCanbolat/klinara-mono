@@ -3,6 +3,7 @@ import { ERROR_CODES, ROLES, ROLE_BY_KEY, isRoleKey, type RoleKey } from '@klina
 import { AppError } from '../../common/errors/app-error';
 import { isPgError, PG_ERROR } from '../../common/errors/db-errors';
 import { TenantTxService } from '../../database/tenant-tx.service';
+import { BookingPageCacheService } from '../booking-page/booking-page-cache.service';
 import { BranchAccessService } from '../tenancy/branch-access.service';
 import type { Principal } from './principal';
 import { PrincipalService } from './principal.service';
@@ -22,6 +23,7 @@ export class UsersService {
     private readonly tx: TenantTxService,
     private readonly principals: PrincipalService,
     private readonly branchAccess: BranchAccessService,
+    private readonly bookingPage: BookingPageCacheService,
   ) {}
 
   /**
@@ -96,6 +98,8 @@ export class UsersService {
 
     // Rol/erişim etkileyen değişiklik: cache'i düşür ki sonraki istek güncel olsun.
     this.principals.invalidateUser(id);
+    // Ad ve aktiflik randevu sayfasının personel listesinde görünüyor.
+    await this.bookingPage.invalidate('user');
     return UsersService.toResponse(row);
   }
 
@@ -208,6 +212,8 @@ export class UsersService {
     // yeni rolle çözümlenir. Rol değişiminin ANINDA etkili olması Faz 1'in
     // token tasarımındaki gerekçenin ta kendisi.
     this.principals.invalidateUser(id);
+    // Şube üyeliği, personelin hangi şubede online seçilebildiğini belirliyor.
+    await this.bookingPage.invalidate('memberships');
 
     return rows.map((row) => UsersService.toMembershipResponse(row));
   }

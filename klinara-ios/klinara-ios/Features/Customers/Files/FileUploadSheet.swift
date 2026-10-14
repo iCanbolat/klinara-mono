@@ -179,26 +179,30 @@ struct FileUploadSheet: View {
                 KlinaraDivider()
                 KlinaraRow(label: "Konum", value: position.turkishName)
             } else {
-                Picker("Konum", selection: $position) {
-                    ForEach(FilePosition.allCases) { value in
-                        Text(value.turkishName).tag(value)
+                VStack(alignment: .leading, spacing: KlinaraMetrics.sm) {
+                    Text("Konum")
+                        .klinaraText(.label)
+                        .foregroundStyle(KlinaraColor.charcoalMuted)
+                    Picker("Konum", selection: $position) {
+                        ForEach(FilePosition.allCases) { value in
+                            Text(value.turkishName).tag(value)
+                        }
                     }
+                    .pickerStyle(.segmented)
                 }
-                .pickerStyle(.segmented)
                 .padding(KlinaraMetrics.md)
                 .disabled(isUploading)
 
                 KlinaraDivider()
 
-                Picker("Grup", selection: $groupId) {
-                    Text("Grupsuz").tag(String?.none)
-                    ForEach(record.groups.value ?? []) { group in
-                        Text(group.title).tag(String?.some(group.id))
+                KlinaraPickerField(
+                    label: "Grup",
+                    options: [nil] + (record.groups.value ?? []).map { Optional($0.id) },
+                    selection: $groupId,
+                    title: { id in
+                        id.flatMap { id in record.groups.value?.first { $0.id == id }?.title } ?? "Grupsuz"
                     }
-                }
-                .pickerStyle(.menu)
-                .tint(KlinaraColor.sageDeep)
-                .klinaraText(.bodyM)
+                )
                 .padding(KlinaraMetrics.md)
                 .disabled(isUploading)
             }

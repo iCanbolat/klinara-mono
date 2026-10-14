@@ -9,7 +9,11 @@ import SwiftUI
 /// - **Şerit** (salt okunur): randevunun akıştaki yeri. Dokunulmaz, çünkü
 ///   adımlar arasında atlamak sunucunun geçiş tablosunda zaten yok.
 /// - **Eylemler**: gerçek düğmeler. Tek birincil eylem sıradaki adımı yapar;
-///   yan yollar (onayla, gelmedi, yeniden aç) ikincil düğme olarak durur.
+///   yan yollar (gelmedi, yeniden aç) ikincil düğme olarak durur.
+///
+/// Akış üç adım: Planlandı → Geldi → Tamamlandı. "Onaylandı" bir adım değil,
+/// müşterinin WhatsApp'taki "Onaylıyorum" yanıtı; şeridin altında rozet
+/// olarak durur (``ConfirmationBadge``).
 ///
 /// Hangi düğmenin çizileceğini ``AppointmentStatus/allowedTransitions(canReopen:)``
 /// belirler; burada yalnız o kümenin **sunumu** var. İptal bu karttan bilinçli
@@ -21,7 +25,10 @@ struct AppointmentStatusCard: View {
     let onSelect: (AppointmentStatus) -> Void
 
     private var actions: [AppointmentStatus] {
-        status.allowedTransitions(canReopen: canReopen).filter { $0 != .cancelled }
+        // İptalin kendi düğmesi var. Onay ve onayın geri düşmesi personelin
+        // adımı değil: onayı müşteri veriyor, ertelemede sunucu kaldırıyor.
+        status.allowedTransitions(canReopen: canReopen)
+            .filter { $0 != .cancelled && $0 != .confirmed && $0 != .scheduled }
     }
 
     private var primary: AppointmentStatus? {
@@ -41,6 +48,8 @@ struct AppointmentStatusCard: View {
                     if status.lifecycleIndex != nil {
                         StatusTimeline(current: status)
                     }
+
+                    ConfirmationBadge(status: status)
 
                     VStack(spacing: KlinaraMetrics.sm) {
                         if let primary {
@@ -71,15 +80,13 @@ struct AppointmentStatusCard: View {
 
 // MARK: - Şerit
 
-/// Beş adımlı ana akış. Yan durumlar (gelmedi, iptal) şeritte yer almaz:
+/// Üç adımlı ana akış. Yan durumlar (gelmedi, iptal) şeritte yer almaz:
 /// akışın dışına çıkmışlardır ve zaten eylem alabilecekleri durumlar değil.
 private struct StatusTimeline: View {
 
     let current: AppointmentStatus
 
-    private static let steps: [AppointmentStatus] = [
-        .scheduled, .confirmed, .arrived, .inProgress, .completed,
-    ]
+    private static let steps: [AppointmentStatus] = [.scheduled, .arrived, .completed]
 
     private var currentIndex: Int { current.lifecycleIndex ?? 0 }
 
@@ -152,6 +159,34 @@ private struct StatusTimeline: View {
     }
 }
 
+// MARK: - Onay rozeti
+
+/// Müşterinin onayı — WhatsApp hatırlatmasındaki "Onaylıyorum" düğmesi.
+///
+/// Yalnız gelinmemiş randevuda anlamlı. Onay yokken "bekleniyor" demek
+/// resepsiyona kimi araması gerektiğini söylüyor; randevu başka saate
+/// alınınca onay düşer (sunucu `confirmed → scheduled`) ve rozet yeniden bekler.
+private struct ConfirmationBadge: View {
+
+    let status: AppointmentStatus
+
+    var body: some View {
+        if status == .scheduled || status == .confirmed {
+            let confirmed = status == .confirmed
+            Label(
+                confirmed ? "Müşteri onayladı" : "Müşteri onayı bekleniyor",
+                systemImage: confirmed ? "checkmark.circle.fill" : "clock"
+            )
+            .font(.system(size: 13, weight: .medium))
+            .foregroundStyle(confirmed ? KlinaraColor.sageDeep : KlinaraColor.charcoalMuted)
+            .padding(.horizontal, KlinaraMetrics.md)
+            .padding(.vertical, 6)
+            .background(confirmed ? KlinaraColor.sageSoft : KlinaraColor.surface)
+            .clipShape(.capsule)
+        }
+    }
+}
+
 // MARK: - Sunum
 
 extension AppointmentStatus {
@@ -159,19 +194,19 @@ extension AppointmentStatus {
     /// Ana akıştaki sırası; akış dışı durumlarda (`noShow`, `cancelled`) `nil`.
     fileprivate var lifecycleIndex: Int? {
         switch self {
-        case .scheduled: 0
-        case .confirmed: 1
-        case .arrived: 2
-        case .inProgress: 3
-        case .completed: 4
+        // Onaylanmış randevu şeritte "Planlandı" adımında durur.
+        case .scheduled, .confirmed: 0
+        // Eski veride kalmış olabilir; "Geldi" ile aynı yerde.
+        case .arrived, .inProgress: 1
+        case .completed: 2
         case .noShow, .cancelled: nil
         }
     }
 
-    /// Bu duruma **geçiren** düğmenin metni. Durumun adı ("İşlemde") bir
+    /// Bu duruma **geçiren** düğmenin metni. Durumun adı ("Tamamlandı") bir
     /// eylem değil; düğme fiil söylemeli.
     fileprivate func actionTitle(from source: AppointmentStatus) -> String {
-        if source == .completed && self == .inProgress { return "Yeniden aç" }
+        if source == .completed && self == .arrived { return "Yeniden aç" }
         return switch self {
         case .scheduled: "Planlandı"
         case .confirmed: "Onayla"
@@ -184,7 +219,7 @@ extension AppointmentStatus {
     }
 
     fileprivate func actionIcon(from source: AppointmentStatus) -> String? {
-        if source == .completed && self == .inProgress { return "arrow.uturn.backward" }
+        if source == .completed && self == .arrived { return "arrow.uturn.backward" }
         return switch self {
         case .confirmed: "checkmark.circle"
         case .arrived: "figure.walk.arrival"
@@ -197,13 +232,11 @@ extension AppointmentStatus {
 
     /// `source` durumundayken bu geçişin düğme ağırlığı.
     ///
-    /// Birincil: akışı ileri taşıyan adım. `scheduled`da hem "Onayla" hem
-    /// "Geldi" ileri gidiyor; klinikte pratikte olan "Geldi", onay ise çoğunlukla
-    /// WhatsApp yanıtıyla kendiliğinden düşüyor — bu yüzden onay ikincil.
+    /// Birincil: akışı ileri taşıyan adım.
     fileprivate func actionKind(from source: AppointmentStatus) -> KlinaraButtonKind {
         switch (source, self) {
         case (.scheduled, .arrived), (.confirmed, .arrived),
-             (.arrived, .inProgress), (.inProgress, .completed):
+             (.arrived, .completed), (.inProgress, .completed):
             .primary
         case (_, .noShow):
             .tertiary
@@ -226,8 +259,8 @@ extension AppointmentStatus {
     ScrollView {
         VStack(spacing: KlinaraMetrics.lg) {
             AppointmentStatusCard(status: .scheduled, canReopen: false) { _ in }
+            AppointmentStatusCard(status: .confirmed, canReopen: false) { _ in }
             AppointmentStatusCard(status: .arrived, canReopen: false) { _ in }
-            AppointmentStatusCard(status: .inProgress, canReopen: false) { _ in }
             AppointmentStatusCard(status: .completed, canReopen: true) { _ in }
         }
         .padding(KlinaraMetrics.screenInset)

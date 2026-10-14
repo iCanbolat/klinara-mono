@@ -338,9 +338,15 @@ export class AppointmentsService {
         await repo.deactivateBookings(tx, id);
         await repo.deleteAppointmentServices(tx, id);
 
+        // Müşterinin onayı ESKİ saate aitti: personel randevuyu taşıyınca
+        // randevu yeni saat için yeniden onay bekler (yeni saat mesajında
+        // "Onaylıyorum" düğmesi var). Self-servis ertelemede saati müşteri
+        // kendisi seçti; onay yerinde kalır.
+        const resetsConfirmation = principal !== null && current.status === 'confirmed';
         const updated = await repo.updateWithVersion(tx, id, expectedVersion, {
           startsAt: plan.visibleStart,
           endsAt: plan.visibleEnd,
+          ...(resetsConfirmation ? { status: 'scheduled' as const } : {}),
         });
         if (updated === undefined) return { conflict: true as const };
 
@@ -355,6 +361,17 @@ export class AppointmentsService {
           newStartsAt: plan.visibleStart,
           reason: input.reason ?? null,
         });
+        if (resetsConfirmation) {
+          await repo.insertHistory(tx, {
+            tenantId: this.tx.tenantId,
+            appointmentId: id,
+            actorUserId: principal.userId,
+            action: 'status_changed',
+            fromStatus: 'confirmed',
+            toStatus: 'scheduled',
+            reason: 'Saat değişti; yeni saat için müşteri onayı bekleniyor',
+          });
+        }
 
         // Eski plan `superseded`, yeni saate göre yeniden planlanır.
         await this.reminders.reschedule(tx, {
@@ -364,6 +381,10 @@ export class AppointmentsService {
           startsAt: updated.startsAt,
           status: updated.status,
         });
+
+        if (input.notifyCustomer !== false) {
+          await this.notifier.notifyRescheduled(tx, this.tx.tenantId, id, updated.version);
+        }
 
         const services = await repo.listAppointmentServices(tx, id);
         return { appointment: updated, services };
@@ -491,7 +512,7 @@ export class AppointmentsService {
         // Onam kontrolü YUMUŞAK: eksikse personel gerekçe yazıp geçebilir,
         // gerekçe geçmişe düşer. Self-servis yolu (`principal === null`)
         // işleme geçiremez zaten; kontrol yalnız personel içindir.
-        if (principal !== null && (status === 'in_progress' || status === 'completed')) {
+        if (principal !== null && status === 'completed') {
           await this.assertConsentOrOverride(tx, current, principal, options.consentOverrideReason);
         }
 
@@ -903,8 +924,8 @@ export class AppointmentsService {
    *
    * Eksikse ve gerekçe yoksa `CONSENT_MISSING` (409) — gövdede eksik onam
    * başlıkları var, istemci gerekçe diyaloğunu açıp aynı isteği gerekçeyle
-   * tekrarlar. Gerekçe bir kez yazıldıysa (`in_progress`e geçerken) aynı
-   * randevunun `completed`a geçişinde yeniden sorulmaz.
+   * tekrarlar. Gerekçe bir kez yazıldıysa (tamamlanıp geri açılan
+   * randevuda) aynı randevunun yeniden `completed`a geçişinde sorulmaz.
    *
    * KVKK eksikliği geçişi DURDURMAZ, yalnız rozet ve imza modunda görünür:
    * randevu sayfası olan her kiracıda KVKK metni zaten yayında ve kontrol

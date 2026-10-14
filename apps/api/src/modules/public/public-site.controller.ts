@@ -21,8 +21,16 @@ import type { PublicSiteContext } from './public-site-resolver.service';
 
 /** Sayfa içeriği: tarayıcıda kısa, CDN'de beş dakika. */
 const SITE_CACHE = { maxAge: 60, sMaxAge: 300, staleWhileRevalidate: 600 };
-/** Katalog fiyat ve süre taşır; içerikten daha çabuk bayatlamamalı. */
-const CATALOG_CACHE = { maxAge: 30, sMaxAge: 120, staleWhileRevalidate: 300 };
+/**
+ * Katalog (hizmet, şube, personel) tarayıcıdan `/api/b` proxy'siyle okunuyor.
+ *
+ * `max-age=0` + ETag: tarayıcı her seferinde doğrular, değişmemişse 304 alır.
+ * Önceki `max-age=30, stale-while-revalidate=300` tarayıcıya beş buçuk dakika
+ * eski personel listesini sunma izni veriyordu — admin'deki atama ancak sert
+ * yenilemede görünüyordu. Purge'ün ulaşamadığı bir tarayıcı cache'i burada
+ * TTL'den başka bir şeyle düşürülemez, o yüzden hiç tutulmuyor.
+ */
+const CATALOG_CACHE = { maxAge: 0, sMaxAge: 0 };
 /**
  * Uygunluk 15 saniye cache'lenir.
  *

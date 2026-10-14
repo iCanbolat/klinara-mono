@@ -105,6 +105,7 @@ export const EVENT_LABEL: Partial<Record<string, MessageKey>> = {
   appointment_confirmation: 'messages.event.appointmentConfirmation',
   appointment_reminder: 'messages.event.appointmentReminder',
   appointment_cancelled: 'messages.event.appointmentCancelled',
+  appointment_rescheduled: 'messages.event.appointmentRescheduled',
   no_show_followup: 'messages.event.noShowFollowup',
   package_balance: 'messages.event.packageBalance',
   package_expiring: 'messages.event.packageExpiring',

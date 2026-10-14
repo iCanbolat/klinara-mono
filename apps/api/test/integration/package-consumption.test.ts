@@ -86,7 +86,7 @@ describe('paket tüketimi, iade, devir ve süre dolumu (Batch 5.3)', () => {
       .send({ status, ...extra });
 
   const advanceTo = async (id: string, target: string) => {
-    for (const status of ['confirmed', 'arrived', 'in_progress']) {
+    for (const status of ['confirmed', 'arrived']) {
       await setStatus(id, status).expect(200);
       if (status === target) return;
     }
@@ -165,18 +165,18 @@ describe('paket tüketimi, iade, devir ve süre dolumu (Batch 5.3)', () => {
 
       const created = await createAppointment(at('10:00'), itemId()).expect(201);
       const id = (created.body as AppointmentBody).id;
-      await advanceTo(id, 'in_progress');
+      await advanceTo(id, 'arrived');
 
       const response = await setStatus(id, 'completed');
       expect(response.status).toBe(409);
       expect((response.body as { code: string }).code).toBe('PACKAGE_EXHAUSTED');
 
-      // Randevu hâlâ in_progress ve yeni defter satırı yok (ownerPool ile).
+      // Randevu hâlâ arrived ve yeni defter satırı yok (ownerPool ile).
       const current = await database.ownerPool.query<{ status: string }>(
         'select status from appointments where id = $1',
         [id],
       );
-      expect(current.rows[0]?.status).toBe('in_progress');
+      expect(current.rows[0]?.status).toBe('arrived');
       expect((await ledgerRows()).filter((row) => row.entry_type === 'consume')).toHaveLength(0);
     });
 
@@ -186,7 +186,7 @@ describe('paket tüketimi, iade, devir ve süre dolumu (Batch 5.3)', () => {
       await advanceTo(id, 'completed');
       expect(await remaining()).toBe(9);
 
-      await setStatus(id, 'in_progress', { reason: 'yanlis tamamlandi' }).expect(200);
+      await setStatus(id, 'arrived', { reason: 'yanlis tamamlandi' }).expect(200);
       expect(await remaining()).toBe(10);
 
       const rows = await ledgerRows();
@@ -211,7 +211,7 @@ describe('paket tüketimi, iade, devir ve süre dolumu (Batch 5.3)', () => {
     it('süresi dolmuş paketten tüketim reddedilir', async () => {
       const created = await createAppointment(at('10:00'), itemId()).expect(201);
       const id = (created.body as AppointmentBody).id;
-      await advanceTo(id, 'in_progress');
+      await advanceTo(id, 'arrived');
 
       await database.ownerPool.query(
         `update customer_packages

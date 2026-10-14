@@ -224,6 +224,7 @@ nonisolated enum ConversationFormat {
         case "appointment_confirmation": return "Randevu onayı"
         case "appointment_reminder": return "Randevu hatırlatması"
         case "appointment_cancelled": return "İptal bildirimi"
+        case "appointment_rescheduled": return "Saat değişikliği bildirimi"
         case "no_show_followup": return "Gelmedi takibi"
         case "package_balance": return "Paket bakiyesi"
         case "package_expiring": return "Paket süresi"

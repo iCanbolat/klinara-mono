@@ -136,13 +136,13 @@ describe('randevu ayrıntı paneli', () => {
     const user = userEvent.setup();
     renderSheet();
 
-    await screen.findByRole('button', { name: 'Onaylandı' });
+    await screen.findByRole('button', { name: 'Geldi' });
     const before = detailCalls();
 
-    await user.click(screen.getByRole('button', { name: 'Onaylandı' }));
+    await user.click(screen.getByRole('button', { name: 'Geldi' }));
 
     await waitFor(() => {
-      expect(post).toHaveBeenCalledWith('appointments/a1/status', { status: 'confirmed' });
+      expect(post).toHaveBeenCalledWith('appointments/a1/status', { status: 'arrived' });
     });
     await waitFor(() => {
       expect(detailCalls()).toBeGreaterThan(before);
@@ -257,7 +257,7 @@ describe('randevu ayrıntı paneli', () => {
     });
     renderSheet();
 
-    const button = await screen.findByRole('button', { name: 'İşlemde' });
+    const button = await screen.findByRole('button', { name: 'Geldi' });
     expect(button).toBeDisabled();
     expect(button).toHaveAttribute('title', expect.stringContaining('yetkiniz yok'));
     expect(post).not.toHaveBeenCalled();
@@ -272,7 +272,7 @@ describe('randevu ayrıntı paneli', () => {
     });
     renderSheet();
 
-    expect(await screen.findByRole('button', { name: 'İşlemde' })).toBeEnabled();
+    expect(await screen.findByRole('button', { name: 'Geldi' })).toBeEnabled();
   });
   describe('durum şeridi ve başlık', () => {
     const withStatus = (status: string, extra: Record<string, unknown> = {}): void => {
@@ -300,13 +300,27 @@ describe('randevu ayrıntı paneli', () => {
       withStatus('confirmed');
       renderSheet();
       await screen.findByRole('button', { name: 'Geldi' });
-      // Şimdiki adım tıklanamaz, `aria-current` taşır.
-      expect(screen.queryByRole('button', { name: 'Onaylandı' })).not.toBeInTheDocument();
-      expect(document.querySelector('[aria-current="step"]')).toHaveTextContent('Onaylandı');
-      // Geri dönüş tablosunda yok: geçilen adım tıklanamaz.
+      // "Onaylandı" bir adım değil: onaylanmış randevu `Planlandı` adımında
+      // durur, müşterinin onayı ayrı bir rozette.
+      expect(document.querySelector('[aria-current="step"]')).toHaveTextContent('Planlandı');
       expect(screen.queryByRole('button', { name: 'Planlandı' })).not.toBeInTheDocument();
-      // Kilitli ileri adım (işlemde `confirmed`dan doğrudan gidilemez).
-      expect(screen.queryByRole('button', { name: 'İşlemde' })).not.toBeInTheDocument();
+      expect(screen.getByText('Müşteri onayladı')).toBeInTheDocument();
+      // Kilitli ileri adım (`confirmed`dan doğrudan tamamlanamaz).
+      expect(screen.queryByRole('button', { name: 'Tamamlandı' })).not.toBeInTheDocument();
+    });
+
+    it('onaylanmamış randevuda rozet "onay bekleniyor" diyor', async () => {
+      withStatus('scheduled');
+      renderSheet();
+      expect(await screen.findByText('Müşteri onayı bekleniyor')).toBeInTheDocument();
+    });
+
+    it('gelmiş randevuda onay rozeti yok', async () => {
+      withStatus('arrived');
+      renderSheet();
+      await screen.findByRole('button', { name: 'Tamamlandı' });
+      expect(screen.queryByText('Müşteri onayladı')).not.toBeInTheDocument();
+      expect(screen.queryByText('Müşteri onayı bekleniyor')).not.toBeInTheDocument();
     });
 
     it('"Gelmedi" onay İSTİYOR; onaylanınca gidiyor', async () => {
@@ -422,7 +436,7 @@ describe('randevu ayrıntı paneli', () => {
       );
       renderSheet();
 
-      await user.click(await screen.findByRole('button', { name: 'İşlemde' }));
+      await user.click(await screen.findByRole('button', { name: 'Tamamlandı' }));
       const dialog = await screen.findByRole('dialog');
       expect(dialog).toHaveTextContent('Botoks onamı');
 
@@ -433,7 +447,7 @@ describe('randevu ayrıntı paneli', () => {
 
       await waitFor(() => {
         expect(post).toHaveBeenLastCalledWith('appointments/a1/status', {
-          status: 'in_progress',
+          status: 'completed',
           consentOverrideReason: 'Kağıt form imzalandı',
         });
       });

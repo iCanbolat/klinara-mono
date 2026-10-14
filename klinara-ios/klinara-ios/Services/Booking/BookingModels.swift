@@ -21,6 +21,9 @@ nonisolated enum AppointmentStatus: String, Codable, Sendable, CaseIterable, Ide
     case scheduled
     case confirmed
     case arrived
+    /// Akıştan çıktı (sunucu 0058): artık üretilmiyor ve hiçbir geçişin hedefi
+    /// değil. Eski `appointment_history` satırları onu taşıdığı için değer
+    /// çözülebilir kalmalı; yoksa geçmiş listesi tümüyle çözülemezdi.
     case inProgress = "in_progress"
     case completed
     case noShow = "no_show"
@@ -62,16 +65,20 @@ nonisolated enum AppointmentStatus: String, Codable, Sendable, CaseIterable, Ide
     /// alacağı bir düğmeyi hiç göstermemek.
     func allowedTransitions(canReopen: Bool) -> [AppointmentStatus] {
         switch self {
+        // `scheduled → confirmed` personelin adımı değil (onayı müşteri
+        // WhatsApp düğmesiyle veriyor), `confirmed → scheduled` de yalnız
+        // ertelemenin yan etkisi. İkisi de tabloda; düğme olarak çizilmezler
+        // (``AppointmentStatusCard``).
         case .scheduled: return [.confirmed, .arrived, .noShow, .cancelled]
-        case .confirmed: return [.arrived, .noShow, .cancelled]
-        case .arrived: return [.inProgress, .noShow, .cancelled]
+        case .confirmed: return [.scheduled, .arrived, .noShow, .cancelled]
+        case .arrived: return [.completed, .noShow, .cancelled]
         case .inProgress: return [.completed, .cancelled]
-        case .completed: return canReopen ? [.inProgress, .cancelled] : []
+        case .completed: return canReopen ? [.arrived, .cancelled] : []
         case .noShow, .cancelled: return []
         }
     }
 
-    /// Erteleme `completed` durumunu da reddeder — `completed → in_progress`
+    /// Erteleme `completed` durumunu da reddeder — `completed → arrived`
     /// geçişi meşru olsa bile. Sunucudaki kural bu.
     var canReschedule: Bool {
         switch self {
@@ -387,6 +394,8 @@ nonisolated struct RescheduleAppointmentInput: Encodable, Sendable, Equatable {
     /// Verilmezse mevcut hizmet ve personel dizilimi korunur.
     var services: [AppointmentServiceInput]?
     var reason: String?
+    /// `false` → müşteriye yeni saat bildirilmez. `nil` gövdeye yazılmaz.
+    var notifyCustomer: Bool?
 }
 
 nonisolated struct CancelAppointmentInput: Encodable, Sendable, Equatable {
@@ -398,7 +407,7 @@ nonisolated struct CancelAppointmentInput: Encodable, Sendable, Equatable {
 nonisolated struct ChangeAppointmentStatusInput: Encodable, Sendable, Equatable {
     let status: AppointmentStatus
     var reason: String?
-    /// Gerekli onam imzalanmadan `in_progress`/`completed`a geçmenin gerekçesi.
+    /// Gerekli onam imzalanmadan `completed`a geçmenin gerekçesi.
     /// Yoksa ve onam eksikse sunucu `409 CONSENT_MISSING` döner; gerekçe randevu
     /// geçmişine yazılır. `nil` gövdeye yazılmaz.
     var consentOverrideReason: String?

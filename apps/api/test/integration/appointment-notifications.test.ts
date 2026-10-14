@@ -11,6 +11,7 @@ interface AppointmentBody {
   id: string;
   status: string;
   startsAt: string;
+  version: number;
 }
 
 interface MessageBody {
@@ -27,7 +28,7 @@ const monday = (offsetDays: number): string => {
   return `${date.toISOString().slice(0, 10)}T11:00:00+03:00`;
 };
 
-describe('randevu oluşturma / iptal bildirimleri', () => {
+describe('randevu oluşturma / iptal / erteleme bildirimleri', () => {
   let database: TestDatabase;
   let app: NestExpressApplication;
   let clinic: ClinicFixture;
@@ -216,6 +217,79 @@ describe('randevu oluşturma / iptal bildirimleri', () => {
         .send({ status: 'confirmed' })
         .expect(200);
       expect(await messages('appointment_cancelled')).toHaveLength(0);
+    });
+  });
+
+  describe('erteleme', () => {
+    const setStatus = (id: string, status: string) =>
+      http(app)
+        .post(`/api/v1/appointments/${id}/status`)
+        .set(ownerAuth())
+        .set(branch())
+        .send({ status })
+        .expect(200);
+
+    /** Aynı gün, iki saat sonrası — çalışma saatleri içinde. */
+    const reschedule = (appointment: AppointmentBody, body: Record<string, unknown> = {}) =>
+      http(app)
+        .post(`/api/v1/appointments/${appointment.id}/reschedule`)
+        .set(ownerAuth())
+        .set(branch())
+        .set('if-match', `W/"${String(appointment.version)}"`)
+        .send({ startsAt: monday(7).replace('T11:00', 'T13:00'), ...body });
+
+    const current = async (id: string): Promise<AppointmentBody> =>
+      (await http(app).get(`/api/v1/appointments/${id}`).set(ownerAuth()).set(branch()).expect(200))
+        .body as AppointmentBody;
+
+    it('yeni saat müşteriye bildirilir', async () => {
+      const appointment = await createAppointment();
+      await reschedule(appointment).expect(200);
+
+      const [message] = await messages('appointment_rescheduled');
+      expect(message?.status).toBe('queued');
+      expect(message?.body).toContain('saati değiştirildi');
+      expect(message?.body).toContain('13:00');
+    });
+
+    it('`notifyCustomer: false` ile yeni saat bildirilmez', async () => {
+      const appointment = await createAppointment();
+      await reschedule(appointment, { notifyCustomer: false }).expect(200);
+      expect(await messages('appointment_rescheduled')).toHaveLength(0);
+    });
+
+    it('onaylanmış randevu taşınınca onay düşer ve geçmişe yazılır', async () => {
+      const appointment = await createAppointment();
+      await setStatus(appointment.id, 'confirmed');
+
+      const moved = (await reschedule(await current(appointment.id)).expect(200))
+        .body as AppointmentBody;
+      expect(moved.status).toBe('scheduled');
+
+      const history = await http(app)
+        .get(`/api/v1/appointments/${appointment.id}/history`)
+        .set(ownerAuth())
+        .set(branch())
+        .expect(200);
+      const entries = (
+        history.body as { data: { action: string; fromStatus: string | null; toStatus: string | null }[] }
+      ).data;
+      expect(entries).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ action: 'rescheduled' }),
+          expect.objectContaining({
+            action: 'status_changed',
+            fromStatus: 'confirmed',
+            toStatus: 'scheduled',
+          }),
+        ]),
+      );
+    });
+
+    it('onaylanmamış randevunun durumu taşımayla değişmez', async () => {
+      const appointment = await createAppointment();
+      const moved = (await reschedule(appointment).expect(200)).body as AppointmentBody;
+      expect(moved.status).toBe('scheduled');
     });
   });
 });

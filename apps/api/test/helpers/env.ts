@@ -4,7 +4,7 @@ import { validateEnv, type EnvironmentVariables } from '../../src/config/env.val
 const BASE: Record<string, string> = {
   NODE_ENV: 'test',
   LOG_LEVEL: 'silent',
-  DATABASE_URL: 'postgres://klinara_app:pw@127.0.0.1:5433/klinara_test',
+  DATABASE_URL: 'postgres://klinara_app:pw@127.0.0.1:5434/klinara_test',
   JWT_SECRET: 'test-ortami-icin-jwt-anahtari-32-karakterden-uzun',
   FIELD_ENCRYPTION_KEY: 'dGVzdC1hbGFuLXNpZnJlbGVtZS1hbmFodGFyaS0zMmI=',
   // argon2 varsayılanı testlerde her giriş için ~50 ms harcar; testler

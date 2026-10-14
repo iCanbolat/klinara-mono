@@ -167,6 +167,9 @@ private fun SkillRow(
 
     // Tek şubeli kiracıda kapsam sorusu yok: "tüm şubeler" ile "bu şube" aynı şey.
     if (branches.size > 1) {
+        // Etiketsiz seçici "Tüm şubeler | Merkez" gibi çıplak bir şerit bırakıyordu;
+        // neyi seçtiği (hizmetin hangi şubede verildiği) okunmuyordu.
+        Text("KAPSAM", style = KlinaraType.label, color = KlinaraTheme.colors.charcoalMuted)
         KlinaraSegmentedPicker(
             options = listOf<String?>(null) + branches.map { it.id },
             selected = row.branchId,

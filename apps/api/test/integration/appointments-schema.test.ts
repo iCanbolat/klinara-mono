@@ -181,15 +181,15 @@ describe('randevu şeması ve çakışma garantisi (Batch 3.1)', () => {
       const id = await createAppointment(db, ctx(), booking('10:00', '10:30'));
       expect((await readAppointment(db, ctx(), id))?.version).toBe(1);
 
-      for (const status of ['confirmed', 'arrived', 'in_progress', 'completed']) {
+      for (const status of ['confirmed', 'arrived', 'completed']) {
         await setStatus(db, ctx(), id, status);
       }
 
       const row = await readAppointment(db, ctx(), id);
       expect(row?.status).toBe('completed');
-      // Dört güncelleme = dört artış. Sayaç trigger'da artar; bir güncelleme
+      // Üç güncelleme = üç artış. Sayaç trigger'da artar; bir güncelleme
       // yolunun onu atlaması mümkün değildir.
-      expect(row?.version).toBe(5);
+      expect(row?.version).toBe(4);
     });
 
     it('geçersiz geçişi K0001 ile reddeder', async () => {
@@ -210,16 +210,16 @@ describe('randevu şeması ve çakışma garantisi (Batch 3.1)', () => {
 
     it('tamamlanmış randevuyu geri açma geçişi TANIMLI ve izne bağlıdır', async () => {
       const id = await createAppointment(db, ctx(), booking('10:00', '10:30'));
-      for (const status of ['confirmed', 'arrived', 'in_progress', 'completed']) {
+      for (const status of ['confirmed', 'arrived', 'completed']) {
         await setStatus(db, ctx(), id, status);
       }
 
-      await expect(setStatus(db, ctx(), id, 'in_progress')).resolves.toBeUndefined();
+      await expect(setStatus(db, ctx(), id, 'arrived')).resolves.toBeUndefined();
 
       const required = await withTenantTx(db, ctx(), async (tx) => {
         const res = await tx.execute<{ required_permission: string | null }>(sql`
           select required_permission from appointment_status_transitions
-           where from_status = 'completed' and to_status = 'in_progress'
+           where from_status = 'completed' and to_status = 'arrived'
         `);
         return res.rows[0]?.required_permission;
       });

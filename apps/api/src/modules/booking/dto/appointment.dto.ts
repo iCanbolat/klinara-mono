@@ -15,11 +15,15 @@ import {
 } from 'class-validator';
 import { CONSENT_LIMITS } from '@klinara/shared';
 
+/**
+ * Wire düzeyi durumlar. DB enum'u `in_progress`i hâlâ taşıyor (geçmiş
+ * `appointment_history` satırları için); akıştan 0058'de çıktı ve API onu
+ * artık ne kabul ediyor ne üretiyor.
+ */
 export const APPOINTMENT_STATUSES = [
   'scheduled',
   'confirmed',
   'arrived',
-  'in_progress',
   'completed',
   'no_show',
   'cancelled',
@@ -112,6 +116,14 @@ export class RescheduleAppointmentDto {
   @IsString()
   @MaxLength(500)
   reason?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'false → müşteriye yeni saat bildirilmez. Varsayılan: gönderilir. Onaylanmış randevu taşınınca onay düşer ve randevu yeni saat için yeniden `scheduled` olur.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  notifyCustomer?: boolean;
 }
 
 export class CancelAppointmentDto {
@@ -150,7 +162,7 @@ export class ChangeAppointmentStatusDto {
   @ApiPropertyOptional({
     maxLength: CONSENT_LIMITS.overrideReason,
     description:
-      'Gerekli onam imzalanmadan `in_progress`/`completed`a geçmenin gerekçesi. Onam eksikse ve bu alan yoksa `CONSENT_MISSING` (409) döner.',
+      'Gerekli onam imzalanmadan `completed`a geçmenin gerekçesi. Onam eksikse ve bu alan yoksa `CONSENT_MISSING` (409) döner.',
   })
   @IsOptional()
   @IsString()

@@ -204,15 +204,12 @@ struct PackageDefinitionEditorView: View {
                 footnote: "Şube seçilirse paket yalnız o şubede satılabilir. "
                     + "Boş bırakılırsa tüm şubelerde satışa açıktır."
             ) {
-                Picker("Şube", selection: $form.branchId) {
-                    Text("Tüm şubeler").tag(String?.none)
-                    ForEach(session.branches) { branch in
-                        Text(branch.name).tag(String?.some(branch.id))
-                    }
-                }
-                .pickerStyle(.menu)
-                .tint(KlinaraColor.sageDeep)
-                .klinaraText(.bodyM)
+                KlinaraPickerField(
+                    label: "Şube",
+                    options: [nil] + session.branches.map { Optional($0.id) },
+                    selection: $form.branchId,
+                    title: { id in id.flatMap { id in session.branches.first { $0.id == id }?.name } ?? "Tüm şubeler" }
+                )
                 .padding(KlinaraMetrics.md)
                 .disabled(isReadOnly)
             }

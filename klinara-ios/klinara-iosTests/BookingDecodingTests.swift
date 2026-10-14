@@ -47,7 +47,7 @@ struct BookingDecodingTests {
         #expect(page.pageInfo.nextCursor == nil)
 
         let first = page.data[0]
-        #expect(first.status == .inProgress)          // "in_progress" → camelCase enum
+        #expect(first.status == .noShow)              // "no_show" → camelCase enum
         #expect(first.customerName == "Ayşe Yılmaz")
         #expect(first.customerPhone == "+905321112233")
         #expect(first.serviceSummary == "Tüm Vücut Lazer")
@@ -164,15 +164,17 @@ struct AppointmentStatusTests {
 
     @Test("Geçiş tablosu sunucudakinin aynısı")
     func mirrorsServerTransitionTable() {
-        // `0018_phase3_appointments.sql` içindeki izinli geçişler.
+        // `0018_phase3_appointments.sql` + `0058_simplify_appointment_status.sql`.
         #expect(AppointmentStatus.scheduled.allowedTransitions(canReopen: false)
             == [.confirmed, .arrived, .noShow, .cancelled])
         #expect(AppointmentStatus.confirmed.allowedTransitions(canReopen: false)
-            == [.arrived, .noShow, .cancelled])
+            == [.scheduled, .arrived, .noShow, .cancelled])
+        // "İşlemde" ara adımı yok: gelen müşteri doğrudan tamamlanır.
         #expect(AppointmentStatus.arrived.allowedTransitions(canReopen: false)
-            == [.inProgress, .noShow, .cancelled])
-        #expect(AppointmentStatus.inProgress.allowedTransitions(canReopen: false)
-            == [.completed, .cancelled])
+            == [.completed, .noShow, .cancelled])
+        #expect(!AppointmentStatus.allCases
+            .flatMap { $0.allowedTransitions(canReopen: true) }
+            .contains(.inProgress))
     }
 
     @Test("Sonlanmış durumlardan çıkış yok")
@@ -190,12 +192,12 @@ struct AppointmentStatusTests {
     func reopenIsGated() {
         #expect(AppointmentStatus.completed.allowedTransitions(canReopen: false).isEmpty)
         #expect(AppointmentStatus.completed.allowedTransitions(canReopen: true)
-            == [.inProgress, .cancelled])
+            == [.arrived, .cancelled])
     }
 
     @Test("Erteleme completed'ı da reddeder")
     func rescheduleRejectsCompleted() {
-        // `completed → in_progress` meşru bir durum geçişi ama erteleme yine
+        // `completed → arrived` meşru bir durum geçişi ama erteleme yine
         // de reddediliyor; ikisini tek kurala indirmek yanlış olurdu.
         #expect(!AppointmentStatus.completed.canReschedule)
         #expect(!AppointmentStatus.cancelled.canReschedule)

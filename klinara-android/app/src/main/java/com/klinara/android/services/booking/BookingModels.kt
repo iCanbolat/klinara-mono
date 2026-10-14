@@ -25,6 +25,11 @@ enum class AppointmentStatus(val wire: String) {
     Scheduled("scheduled"),
     Confirmed("confirmed"),
     Arrived("arrived"),
+
+    /**
+     * Akıştan çıktı (sunucu 0058): artık üretilmiyor ve hiçbir geçişin hedefi değil.
+     * Eski `appointment_history` satırları taşıdığı için çözülebilir kalmalı.
+     */
     InProgress("in_progress"),
     Completed("completed"),
     NoShow("no_show"),
@@ -70,15 +75,35 @@ enum class AppointmentStatus(val wire: String) {
      */
     fun allowedTransitions(canReopen: Boolean): List<AppointmentStatus> =
         when (this) {
+            // `Scheduled → Confirmed` ve `Confirmed → Scheduled` sunucuda var ama
+            // personelin adımı değil: onayı müşteri WhatsApp düğmesiyle veriyor,
+            // geri düşmesi de ertelemenin yan etkisi. Ekran onları [staffActions] ile süzer.
             Scheduled -> listOf(Confirmed, Arrived, NoShow)
-            Confirmed -> listOf(Arrived, NoShow)
-            Arrived -> listOf(InProgress, NoShow)
+            Confirmed -> listOf(Scheduled, Arrived, NoShow)
+            // "İşlemde" ara adımı yok (0058): gelen müşteri doğrudan tamamlanır.
+            Arrived -> listOf(Completed, NoShow)
             InProgress -> listOf(Completed)
             // `appointment:reopen` ayrı bir izin: tamamlanmış bir randevuyu yeniden
             // açmak sunucuda ters kayıt üretiyor (defter düzeltmesi).
-            Completed -> if (canReopen) listOf(InProgress) else emptyList()
+            Completed -> if (canReopen) listOf(Arrived) else emptyList()
             NoShow, Cancelled, Unknown -> emptyList()
         }
+
+    /** Personelin durum kartında düğme olarak gördüğü geçişler. */
+    fun staffActions(canReopen: Boolean): List<AppointmentStatus> =
+        allowedTransitions(canReopen).filter { it != Confirmed && it != Scheduled }
+
+    /**
+     * Müşteri onayı rozeti: yalnız gelinmemiş randevuda anlamlı. `null` → rozet yok.
+     * Onayı müşteri WhatsApp'taki "Onaylıyorum" düğmesiyle veriyor.
+     */
+    val confirmationLabel: String?
+        get() =
+            when (this) {
+                Confirmed -> "Müşteri onayladı"
+                Scheduled -> "Müşteri onayı bekleniyor"
+                else -> null
+            }
 
     /**
      * Pakete bağlanabilir mi (A5.2). İptal ve gelmedi'de seans hiç düşmeyecek; tamamlanmış
@@ -432,6 +457,8 @@ data class RescheduleAppointmentInput(
     val startsAt: String,
     val services: List<AppointmentServiceInput>? = null,
     val reason: String? = null,
+    /** `false` → müşteriye yeni saat bildirilmez. `null` gövdeye yazılmaz (sunucu varsayılanı: gider). */
+    val notifyCustomer: Boolean? = null,
 )
 
 /** `GET calendar/day` sorgusu. [date] ŞUBE dilimindeki yerel tarih. */

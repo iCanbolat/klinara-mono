@@ -189,8 +189,12 @@ struct CalendarHomeView: View {
                 stepButton(1, icon: "chevron.right", label: nextLabel)
             }
 
+            // Personel listesi gelene kadar şeridin YERİ tutulur: şerit sonradan
+            // belirdiğinde başlık uzuyor ve takvim gövdesi aşağı kayıyordu.
             if !session.staffStore.profiles.isEmpty {
                 staffFilterRow
+            } else if session.staffStore.state.isLoading {
+                KlinaraSkeletonPills()
             }
         }
         .padding(.horizontal, KlinaraMetrics.screenInset)

@@ -37,6 +37,8 @@ object NotificationEventCatalog {
                     whatsapp,
                     listOf("customerName", "branchName", "appointmentAt"),
                 ),
+            NotificationEvent.AppointmentRescheduled to
+                Definition(whatsapp, appointmentVariables),
             NotificationEvent.NoShowFollowup to
                 Definition(whatsapp, listOf("customerName", "branchName")),
             NotificationEvent.PackageBalance to

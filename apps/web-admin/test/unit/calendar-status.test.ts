@@ -31,14 +31,14 @@ describe('randevu durum makinesi', () => {
       'cancelled',
     ]);
     expect(targets('confirmed', RECEPTION)).toEqual(['arrived', 'no_show', 'cancelled']);
-    expect(targets('arrived', RECEPTION)).toEqual(['in_progress', 'no_show', 'cancelled']);
-    expect(targets('in_progress', RECEPTION)).toEqual(['completed', 'cancelled']);
+    // "İşlemde" ara adımı yok (0058): gelen müşteri doğrudan tamamlanır.
+    expect(targets('arrived', RECEPTION)).toEqual(['completed', 'no_show', 'cancelled']);
   });
 
-  it('GERİYE geçiş yok — `confirmed`ten `scheduled`e dönülemez', () => {
+  it('personelin seçebileceği GERİYE geçiş yok', () => {
+    // `confirmed → scheduled` sunucuda var ama yalnız ertelemenin yan etkisi.
     expect(targets('confirmed', MANAGER)).not.toContain('scheduled');
     expect(targets('arrived', MANAGER)).not.toContain('confirmed');
-    expect(targets('in_progress', MANAGER)).not.toContain('arrived');
   });
 
   it('`cancelled` ve `no_show` TERMİNAL', () => {
@@ -55,7 +55,7 @@ describe('randevu durum makinesi', () => {
     // Hiç göstermemek uygulayıcıya "böyle bir şey yapılamaz" derdi; etkisiz
     // ve sebebi yazılı bir düğme "yapılabilir ama yetkiniz yok" der.
     const withoutReopen = statusActions('completed', RECEPTION);
-    expect(withoutReopen.map((a) => a.to)).toEqual(['in_progress', 'cancelled']);
+    expect(withoutReopen.map((a) => a.to)).toEqual(['arrived', 'cancelled']);
     for (const action of withoutReopen) {
       expect(action.allowed).toBe(false);
       expect(action.reasonKey).toBeDefined();
@@ -80,7 +80,7 @@ describe('randevu durum makinesi', () => {
     expect(occupiesSlot('cancelled')).toBe(false);
     expect(occupiesSlot('no_show')).toBe(false);
 
-    for (const status of ['scheduled', 'confirmed', 'arrived', 'in_progress', 'completed'] as const) {
+    for (const status of ['scheduled', 'confirmed', 'arrived', 'completed'] as const) {
       expect(occupiesSlot(status), status).toBe(true);
     }
   });

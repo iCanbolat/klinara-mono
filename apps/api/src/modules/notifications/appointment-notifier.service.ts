@@ -101,6 +101,33 @@ export class AppointmentNotifierService {
   }
 
   /**
+   * Yeni saat bildirimi — personel ya da müşteri randevuyu taşıdığında.
+   *
+   * `version` tekillik anahtarına girer: aynı randevu iki kez taşınırsa iki
+   * mesaj gider, aynı taşımanın tekrarı (kuyruk yeniden denemesi) gitmez.
+   */
+  async notifyRescheduled(
+    tx: Tx,
+    tenantId: string,
+    appointmentId: string,
+    version: number,
+    now: Date = new Date(),
+  ): Promise<EnqueueResult | null> {
+    const appointment = await repo.findAppointmentSummary(tx, appointmentId);
+    if (appointment === undefined || !ACTIVE.has(appointment.status)) return null;
+    if (appointment.startsAt.getTime() <= now.getTime()) return null;
+
+    return this.enqueueSafely(tx, tenantId, {
+      event: 'appointment_rescheduled',
+      customerId: appointment.customerId,
+      branchId: appointment.branchId,
+      appointmentId: appointment.id,
+      dedupeKey: `appointment_rescheduled:${appointment.id}:${version}`,
+      variables: appointmentVariables(appointment),
+    });
+  }
+
+  /**
    * `version` tekillik anahtarına girer: iptal → yeniden aç → iptal zincirinde
    * ikinci iptal de bildirilir, aynı iptalin tekrarı bildirilmez.
    */

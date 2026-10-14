@@ -4,6 +4,7 @@ import { AppError } from '../../common/errors/app-error';
 import { isPgError, PG_ERROR } from '../../common/errors/db-errors';
 import { setTenantContext } from '../../database/tenant-tx';
 import { TenantTxService } from '../../database/tenant-tx.service';
+import { BookingPageCacheService } from '../booking-page/booking-page-cache.service';
 import { BranchAccessService } from './branch-access.service';
 import { InvitationsService } from '../identity/invitations.service';
 import * as repo from './tenancy.repository';
@@ -64,6 +65,7 @@ export class TenancyService {
     private readonly tx: TenantTxService,
     private readonly invitations: InvitationsService,
     private readonly branchAccess: BranchAccessService,
+    private readonly bookingPage: BookingPageCacheService,
   ) {}
 
   /**
@@ -139,6 +141,7 @@ export class TenancyService {
     const tenantId = this.tx.tenantId;
     const row = await this.tx.run((tx) => repo.updateTenant(tx, tenantId, input));
     if (row === undefined) throw AppError.notFound('Kiracı bulunamadı');
+    await this.bookingPage.invalidate('tenant');
     return toTenantResponse(row);
   }
 
@@ -153,6 +156,7 @@ export class TenancyService {
     const tenantId = this.tx.tenantId;
     const row = await this.tx.run((tx) => repo.updateSettings(tx, tenantId, input));
     if (row === undefined) throw AppError.notFound('Kiracı ayarları bulunamadı');
+    await this.bookingPage.invalidate('tenant-settings');
     return toSettingsResponse(row);
   }
 
@@ -189,6 +193,7 @@ export class TenancyService {
     // Yeni şube, erişim cache'i TTL'i dolana kadar "bu kiracıya ait değil"
     // görünürdü — yani açılan şube bir dakika boyunca 403 verirdi.
     this.branchAccess.invalidateTenant(tenantId);
+    await this.bookingPage.invalidate('branch');
     return toBranchResponse(row);
   }
 
@@ -199,6 +204,7 @@ export class TenancyService {
     if (row === undefined) throw AppError.notFound('Şube bulunamadı');
     // Şube pasifleştirilmiş veya silinmiş olabilir.
     this.branchAccess.invalidateTenant(this.tx.tenantId);
+    await this.bookingPage.invalidate('branch');
     return toBranchResponse(row);
   }
 }

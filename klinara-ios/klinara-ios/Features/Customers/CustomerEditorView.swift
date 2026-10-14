@@ -98,15 +98,19 @@ struct CustomerEditorView: View {
 
             KlinaraDivider()
 
-            Picker("Cinsiyet", selection: $form.gender) {
-                Text("Belirtilmedi").tag(CustomerGender?.none)
-                ForEach(CustomerGender.allCases) { value in
-                    Text(value.turkishName).tag(CustomerGender?.some(value))
-                }
-            }
-            .pickerStyle(.menu)
-            .tint(KlinaraColor.sageDeep)
-            .klinaraText(.bodyM)
+            KlinaraPickerField(
+                label: "Cinsiyet",
+                // `nil` ile `.undisclosed` aynı şeyi söylüyor ("Belirtilmedi");
+                // ikisi de listelenince menüde iki "Belirtilmedi" çıkıyordu.
+                options: CustomerGender.allCases,
+                selection: Binding(
+                    get: { form.gender ?? .undisclosed },
+                    // Hiç seçilmemiş alan "Belirtilmedi"ye dokununca `nil`
+                    // kalır; yoksa form değişmiş sayılırdı.
+                    set: { form.gender = $0 == .undisclosed && form.gender == nil ? nil : $0 }
+                ),
+                title: \.turkishName
+            )
             .padding(KlinaraMetrics.md)
             .disabled(isReadOnly)
         }

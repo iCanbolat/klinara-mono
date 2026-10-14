@@ -158,6 +158,7 @@ data class BookingDraft(
             startsAt = clock.wireValue(picked.startsAt),
             services = serviceIds.map { AppointmentServiceInput(it, staff, packageItemIds[it]) },
             reason = reason.trim().takeIf { it.isNotEmpty() },
+            notifyCustomer = notifyCustomer.takeIf { !it },
         )
     }
 

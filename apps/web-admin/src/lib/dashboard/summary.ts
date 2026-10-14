@@ -118,7 +118,6 @@ export const UPCOMING_STATUSES: readonly AppointmentStatus[] = [
   'scheduled',
   'confirmed',
   'arrived',
-  'in_progress',
 ];
 
 export interface UpcomingRow {

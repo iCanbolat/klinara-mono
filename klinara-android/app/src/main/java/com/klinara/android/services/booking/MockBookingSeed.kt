@@ -182,7 +182,7 @@ object MockBookingSeed {
             appointment(
                 dayOffset = 0, start = at("14:30"), minutes = 75,
                 staffProfileId = MockIds.STAFF_MERVE, customerIndex = 5,
-                services = listOf(Catalog.SKIN_CARE, Catalog.MASK), status = AppointmentStatus.InProgress,
+                services = listOf(Catalog.SKIN_CARE, Catalog.MASK), status = AppointmentStatus.Arrived,
             ),
             appointment(
                 dayOffset = 0, start = at("16:00"), minutes = 45,

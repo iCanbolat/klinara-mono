@@ -89,14 +89,12 @@ struct BranchFormView: View {
                 footnote: "Saat dilimi randevu ve çalışma saatlerinin hangi saate göre tutulacağını belirler."
             ) {
                 VStack(alignment: .leading, spacing: KlinaraMetrics.md) {
-                    Picker("Saat dilimi", selection: $timezone) {
-                        ForEach(timeZones, id: \.self) { zone in
-                            Text(zone).tag(zone)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .tint(KlinaraColor.sageDeep)
-                    .klinaraText(.bodyM)
+                    KlinaraPickerField(
+                        label: "Saat dilimi",
+                        options: timeZones,
+                        selection: $timezone,
+                        title: { $0 }
+                    )
 
                     KlinaraTextField(
                         label: "Telefon",

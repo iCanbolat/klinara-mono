@@ -4,6 +4,7 @@ import { AppError } from '../../common/errors/app-error';
 import { isPgError, PG_ERROR } from '../../common/errors/db-errors';
 import { TenantTxService } from '../../database/tenant-tx.service';
 import { AvailabilityCacheService } from '../booking/availability-cache.service';
+import { BookingPageCacheService } from '../booking-page/booking-page-cache.service';
 import * as repo from './catalog.repository';
 import type {
   BranchServiceOverrideInputDto,
@@ -21,14 +22,17 @@ export class CatalogService {
   constructor(
     private readonly tx: TenantTxService,
     private readonly availabilityCache: AvailabilityCacheService,
+    private readonly bookingPage: BookingPageCacheService,
   ) {}
 
   /**
    * Katalog değişimi uygunluğu bayatlatır: süre ve buffer slot bloğunu
-   * belirler, aktiflik ise hizmetin randevuya açık olup olmadığını.
+   * belirler, aktiflik ise hizmetin randevuya açık olup olmadığını. Randevu
+   * sayfasının kataloğu da aynı veriden render edildiği için o da purge ediliyor.
    */
-  private invalidateAvailability(): void {
+  private async invalidateAvailability(): Promise<void> {
     this.availabilityCache.invalidateTenant(this.tx.tenantId);
+    await this.bookingPage.invalidate('catalog');
   }
 
   async listServiceCategories(): Promise<ServiceCategoryResponseDto[]> {
@@ -54,7 +58,7 @@ export class CatalogService {
         throw error;
       });
 
-    this.invalidateAvailability();
+    await this.invalidateAvailability();
     return CatalogService.toCategoryResponse(row);
   }
 
@@ -79,7 +83,7 @@ export class CatalogService {
       });
 
     if (row === undefined) throw AppError.notFound('Hizmet kategorisi bulunamadı');
-    this.invalidateAvailability();
+    await this.invalidateAvailability();
     return CatalogService.toCategoryResponse(row);
   }
 
@@ -99,7 +103,7 @@ export class CatalogService {
     });
 
     if (updated === undefined) throw AppError.notFound('Hizmet kategorisi bulunamadı');
-    this.invalidateAvailability();
+    await this.invalidateAvailability();
     return CatalogService.toCategoryResponse(updated);
   }
 
@@ -179,7 +183,7 @@ export class CatalogService {
         throw error;
       });
 
-    this.invalidateAvailability();
+    await this.invalidateAvailability();
     return CatalogService.toServiceResponse(payload.service, payload.overrides);
   }
 
@@ -228,7 +232,7 @@ export class CatalogService {
       });
 
     if (payload === undefined) throw AppError.notFound('Hizmet bulunamadı');
-    this.invalidateAvailability();
+    await this.invalidateAvailability();
     return CatalogService.toServiceResponse(payload.service, payload.overrides);
   }
 
@@ -241,7 +245,7 @@ export class CatalogService {
     });
 
     if (payload === undefined) throw AppError.notFound('Hizmet bulunamadı');
-    this.invalidateAvailability();
+    await this.invalidateAvailability();
     return CatalogService.toServiceResponse(payload.service, payload.overrides);
   }
 

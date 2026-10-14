@@ -129,7 +129,6 @@ object DashboardSummaries {
             AppointmentStatus.Scheduled,
             AppointmentStatus.Confirmed,
             AppointmentStatus.Arrived,
-            AppointmentStatus.InProgress,
         )
 
     /** Şube başına gelen listeleri tek, başlangıca göre sıralı listeye indirir. */

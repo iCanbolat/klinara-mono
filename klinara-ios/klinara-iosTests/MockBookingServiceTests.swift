@@ -189,11 +189,11 @@ struct MockBookingServiceTests {
             idempotencyKey: UUID().uuidString
         )
 
-        // scheduled → in_progress atlanamaz.
+        // scheduled → completed atlanamaz.
         do {
             _ = try await graph.booking.changeStatus(
                 id: created.id,
-                ChangeAppointmentStatusInput(status: .inProgress)
+                ChangeAppointmentStatusInput(status: .completed)
             )
             Issue.record("Geçersiz durum geçişi kabul edildi")
         } catch let error as APIError {
@@ -202,14 +202,14 @@ struct MockBookingServiceTests {
 
         // Zincir sırayla ilerlemeli ve her adımda sürüm artmalı.
         var current = created
-        for status in [AppointmentStatus.confirmed, .arrived, .inProgress, .completed] {
+        for status in [AppointmentStatus.confirmed, .arrived, .completed] {
             current = try await graph.booking.changeStatus(
                 id: current.id,
                 ChangeAppointmentStatusInput(status: status)
             )
             #expect(current.status == status)
         }
-        #expect(current.version == created.version + 4)
+        #expect(current.version == created.version + 3)
     }
 
     @Test("Aynı duruma geçiş sürüm artırmayan no-op")
@@ -233,7 +233,7 @@ struct MockBookingServiceTests {
             graph.createInput(at: graph.workingTuesday()),
             idempotencyKey: UUID().uuidString
         )
-        for status in [AppointmentStatus.confirmed, .arrived, .inProgress, .completed] {
+        for status in [AppointmentStatus.confirmed, .arrived, .completed] {
             current = try await graph.booking.changeStatus(
                 id: current.id,
                 ChangeAppointmentStatusInput(status: status)
@@ -243,7 +243,7 @@ struct MockBookingServiceTests {
         do {
             _ = try await graph.booking.changeStatus(
                 id: current.id,
-                ChangeAppointmentStatusInput(status: .inProgress)
+                ChangeAppointmentStatusInput(status: .arrived)
             )
             Issue.record("İzinsiz reopen kabul edildi")
         } catch let error as APIError {
@@ -340,6 +340,29 @@ struct MockBookingServiceTests {
             idempotencyKey: UUID().uuidString
         )
         #expect(replacement.status == .scheduled)
+    }
+
+    @Test("Onaylanmış randevu ertelenince onay düşer")
+    func rescheduleResetsConfirmation() async throws {
+        let graph = MockGraph()
+        let created = try await graph.booking.create(
+            graph.createInput(at: graph.workingTuesday(hour: 11)),
+            idempotencyKey: UUID().uuidString
+        )
+        let confirmed = try await graph.booking.changeStatus(
+            id: created.id,
+            ChangeAppointmentStatusInput(status: .confirmed)
+        )
+
+        let moved = try await graph.booking.reschedule(
+            id: confirmed.id,
+            version: confirmed.version,
+            RescheduleAppointmentInput(startsAt: graph.clock.wireValue(
+                graph.workingTuesday(hour: 15)
+            ))
+        )
+        // Müşterinin onayı eski saate aitti; yeni saat yeniden onay bekler.
+        #expect(moved.status == .scheduled)
     }
 
     @Test("İptal edilen randevu ertelenemez")

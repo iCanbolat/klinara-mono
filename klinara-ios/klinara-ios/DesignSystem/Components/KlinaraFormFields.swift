@@ -320,14 +320,53 @@ struct FlowLayout: Layout {
 /// Menüden tek seçim — `KlinaraTextField` ile aynı etiket ve alan görünümü.
 ///
 /// `Picker(.menu)` form içinde etiketini çizmiyor ve yalnız "Epilasyon ⌃" gibi
-/// çıplak bir metin bırakıyordu; kullanıcı bunun bir alan olduğunu anlamıyordu.
-struct KlinaraPickerField<Option: Identifiable>: View {
+/// çıplak bir metin bırakıyordu; kullanıcı bunun bir alan olduğunu, neyi
+/// seçtiğini anlamıyordu (müşteri formunda "Belirtilmedi ⌃" cinsiyet alanıydı).
+/// Ekranlarda çıplak `Picker(.menu)` KULLANILMAZ; bu alan kullanılır.
+///
+/// Seçenekler doğrudan değerlerdir: "Belirtilmedi", "Tüm şubeler" gibi `nil`
+/// seçenekleri `Optional` değer olarak listeye girer.
+struct KlinaraPickerField<Value: Hashable>: View {
 
     let label: String
-    let options: [Option]
-    @Binding var selection: Option.ID
-    let title: (Option) -> String
+    let options: [Value]
+    @Binding var selection: Value
+    let title: (Value) -> String
     var placeholder = "Seçin"
+
+    @Environment(\.isEnabled) private var isEnabled
+
+    init(
+        label: String,
+        options: [Value],
+        selection: Binding<Value>,
+        title: @escaping (Value) -> String,
+        placeholder: String = "Seçin"
+    ) {
+        self.label = label
+        self.options = options
+        self._selection = selection
+        self.title = title
+        self.placeholder = placeholder
+    }
+
+    /// Kimlikli kayıtlardan (kategori, şube…) seçim: seçim kaydın kimliğidir.
+    init<Option: Identifiable>(
+        label: String,
+        options: [Option],
+        selection: Binding<Value>,
+        title: @escaping (Option) -> String,
+        placeholder: String = "Seçin"
+    ) where Option.ID == Value {
+        let titles = Dictionary(options.map { ($0.id, title($0)) }, uniquingKeysWith: { first, _ in first })
+        self.init(
+            label: label,
+            options: options.map(\.id),
+            selection: selection,
+            title: { titles[$0] ?? "" },
+            placeholder: placeholder
+        )
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: KlinaraMetrics.sm) {
@@ -337,8 +376,8 @@ struct KlinaraPickerField<Option: Identifiable>: View {
 
             Menu {
                 Picker(label, selection: $selection) {
-                    ForEach(options) { option in
-                        Text(title(option)).tag(option.id)
+                    ForEach(options, id: \.self) { option in
+                        Text(title(option)).tag(option)
                     }
                 }
             } label: {
@@ -362,12 +401,13 @@ struct KlinaraPickerField<Option: Identifiable>: View {
                 .clipShape(.rect(cornerRadius: KlinaraMetrics.controlRadius))
                 .contentShape(.rect)
             }
+            .opacity(isEnabled ? 1 : 0.6)
             .accessibilityLabel(label)
             .accessibilityValue(selectedTitle ?? placeholder)
         }
     }
 
     private var selectedTitle: String? {
-        options.first { $0.id == selection }.map(title)
+        options.contains(selection) ? title(selection) : nil
     }
 }

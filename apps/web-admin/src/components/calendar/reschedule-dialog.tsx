@@ -8,6 +8,7 @@ import { api } from '@/lib/api/client';
 import { toMessage } from '@/lib/reports/errors';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { FieldCheckbox } from '@/components/ui/field';
 import {
   Dialog,
   DialogBody,
@@ -66,6 +67,7 @@ export function RescheduleDialog({
   const [error, setError] = useState<string | null>(null);
   const [conflict, setConflict] = useState<SlotConflict | null>(null);
   const [busy, setBusy] = useState(false);
+  const [notifyCustomer, setNotifyCustomer] = useState(true);
 
   useEffect(() => {
     if (!open) return;
@@ -74,6 +76,7 @@ export function RescheduleDialog({
       setStartsAt(null);
       setError(null);
       setConflict(null);
+      setNotifyCustomer(true);
     })();
   }, [open]);
 
@@ -88,7 +91,7 @@ export function RescheduleDialog({
     try {
       await api.post(
         `appointments/${appointment.id}/reschedule`,
-        { startsAt: target },
+        { startsAt: target, ...(notifyCustomer ? {} : { notifyCustomer: false }) },
         { ifMatch: `W/"${String(appointment.version)}"` },
       );
       toast.success(t('calendar.rescheduled'));
@@ -129,6 +132,18 @@ export function RescheduleDialog({
               setStartsAt(target);
               setConflict(null);
             }}
+          />
+
+          <FieldCheckbox
+            label={t('calendar.notify.label')}
+            hint={t(
+              appointment.status === 'confirmed'
+                ? 'calendar.notify.rescheduleConfirmedHint'
+                : 'calendar.notify.rescheduleHint',
+            )}
+            checked={notifyCustomer}
+            disabled={busy}
+            onCheckedChange={setNotifyCustomer}
           />
 
           {conflict !== null ? (

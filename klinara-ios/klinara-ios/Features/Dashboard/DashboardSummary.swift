@@ -130,7 +130,7 @@ nonisolated enum DashboardSummaries {
     static let upcomingHorizonDays = 92
 
     /// Slot kaplayan ve henüz bitmemiş durumlar.
-    static let upcomingStatuses: [AppointmentStatus] = [.scheduled, .confirmed, .arrived, .inProgress]
+    static let upcomingStatuses: [AppointmentStatus] = [.scheduled, .confirmed, .arrived]
 
     /// Şube başına gelen listeleri tek, başlangıca göre sıralı listeye indirir.
     static func mergeUpcoming(

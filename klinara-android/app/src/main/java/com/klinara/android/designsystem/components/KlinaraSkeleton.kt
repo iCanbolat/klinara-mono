@@ -362,20 +362,30 @@ fun KlinaraSkeleton(
                 }
 
             KlinaraSkeletonStyle.Kind.Agenda ->
-                repeat(style.count.coerceAtLeast(1)) { index ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(KlinaraMetrics.md)) {
-                        // Saat sütunu: ajandanın sol kenarı sabit genişlikte ve
-                        // veri gelince kaymamalı.
-                        KlinaraSkeletonBar(
-                            width = 44.dp,
-                            height = 13.dp,
-                            modifier = Modifier.padding(top = KlinaraMetrics.md),
-                        )
-                        SkeletonCard { KlinaraSkeletonRow(hasValue = true, seed = index) }
+                // `AgendaListScreen` ile aynı düzen: TEK kart, içinde ayraçlı
+                // satırlar; saat sütunu kartın içinde. Ayrı kartlar ve dışarıda
+                // duran saat sütunu, veri gelince bütün listeyi yeniden diziyordu.
+                SkeletonCard {
+                    repeat(style.count.coerceAtLeast(1)) { index ->
+                        if (index > 0) KlinaraDivider()
+                        AgendaRow(index)
                     }
                 }
         }
     }
+}
+
+/**
+ * Filtre hapı şeridinin yer tutucusu — ekranın İSKELETİNİN DIŞINDA kalan
+ * başlık şeritleri için (takvimde personel hapları).
+ *
+ * Takvim başlığındaki personel şeridi yalnız personel listesi gelince
+ * çiziliyordu: o ana kadar yoktu, gelince gövdeyi aşağı itiyordu.
+ */
+@Composable
+fun KlinaraSkeletonPills(modifier: Modifier = Modifier) {
+    val alpha = skeletonAlpha()
+    Box(modifier.fillMaxWidth().skeletonGroup(alpha)) { PillRow() }
 }
 
 /**
@@ -436,6 +446,41 @@ private fun PillRow() {
         widths.forEach { width ->
             KlinaraSkeletonBar(width = width, height = 34.dp, cornerRadius = 17.dp)
         }
+    }
+}
+
+private val AGENDA_NAME_WIDTHS = listOf(148.dp, 120.dp, 168.dp, 132.dp, 156.dp)
+private val AGENDA_SERVICE_WIDTHS = listOf(104.dp, 128.dp, 88.dp, 116.dp, 96.dp)
+
+/**
+ * `AgendaListScreen` satırı: başlangıç/bitiş saati, personel noktası, müşteri +
+ * hizmet, durum rozeti, ok. Çubuklar sabit genişlikli; satır dar ekranda taşarsa
+ * orta sütun (`weight`) daralır, kartın dışına çıkılmaz.
+ */
+@Composable
+private fun AgendaRow(seed: Int) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = KlinaraMetrics.xs),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(KlinaraMetrics.sm),
+    ) {
+        Column(
+            modifier = Modifier.width(48.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            KlinaraSkeletonBar(width = 40.dp, height = 14.dp)
+            KlinaraSkeletonBar(width = 32.dp, height = 10.dp)
+        }
+        KlinaraSkeletonCircle(size = 10.dp)
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(KlinaraMetrics.sm),
+        ) {
+            KlinaraSkeletonBar(width = AGENDA_NAME_WIDTHS[seed.mod(AGENDA_NAME_WIDTHS.size)], height = 14.dp)
+            KlinaraSkeletonBar(width = AGENDA_SERVICE_WIDTHS[seed.mod(AGENDA_SERVICE_WIDTHS.size)], height = 12.dp)
+        }
+        KlinaraSkeletonBar(width = 64.dp, height = 22.dp, cornerRadius = 11.dp)
+        KlinaraSkeletonBar(width = 16.dp, height = 16.dp, cornerRadius = 4.dp)
     }
 }
 

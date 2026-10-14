@@ -21,7 +21,6 @@ export const STATUS_TONE: Record<AppointmentStatus, AlertTone> = {
   scheduled: 'info',
   confirmed: 'ok',
   arrived: 'ok',
-  in_progress: 'ok',
   completed: 'ok',
   no_show: 'warn',
   cancelled: 'danger',
@@ -31,7 +30,6 @@ export const STATUS_LABEL: Record<AppointmentStatus, MessageKey> = {
   scheduled: 'calendar.status.scheduled',
   confirmed: 'calendar.status.confirmed',
   arrived: 'calendar.status.arrived',
-  in_progress: 'calendar.status.inProgress',
   completed: 'calendar.status.completed',
   no_show: 'calendar.status.noShow',
   cancelled: 'calendar.status.cancelled',
@@ -44,7 +42,7 @@ interface Transition {
 }
 
 /**
- * `0018_phase3_appointments.sql:171-187` ile birebir.
+ * `0018_phase3_appointments.sql` + `0058_simplify_appointment_status.sql` ile birebir.
  *
  * `cancelled` ve `no_show` KAYNAK olarak yok: ikisi de terminal. İptal edilen
  * bir randevu geri açılmaz — yenisi oluşturulur; `resource_bookings` satırı
@@ -57,13 +55,14 @@ const TRANSITIONS: Record<AppointmentStatus, readonly Transition[]> = {
     { to: 'no_show' },
     { to: 'cancelled' },
   ],
+  // `confirmed → scheduled` sunucuda var ama yalnız ertelemenin yan etkisi;
+  // personelin seçtiği bir geçiş değil.
   confirmed: [{ to: 'arrived' }, { to: 'no_show' }, { to: 'cancelled' }],
-  arrived: [{ to: 'in_progress' }, { to: 'no_show' }, { to: 'cancelled' }],
-  in_progress: [{ to: 'completed' }, { to: 'cancelled' }],
+  arrived: [{ to: 'completed' }, { to: 'no_show' }, { to: 'cancelled' }],
   completed: [
     // Tamamlanmış randevuya dokunmak ayrı bir yetki: seans hakkı tüketilmiş,
     // hizmet bedeli yazılmış olabilir ve geri almak TERS KAYIT üretir.
-    { to: 'in_progress', permission: PERMISSIONS.APPOINTMENT_REOPEN },
+    { to: 'arrived', permission: PERMISSIONS.APPOINTMENT_REOPEN },
     { to: 'cancelled', permission: PERMISSIONS.APPOINTMENT_REOPEN },
   ],
   no_show: [],

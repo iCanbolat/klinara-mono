@@ -71,7 +71,7 @@ export function ConsentStatusProvider({
 }
 
 /** İşaret yalnız henüz işlemi bitmemiş randevularda anlamlı. */
-const ACTIVE_STATUSES = new Set(['scheduled', 'confirmed', 'arrived', 'in_progress']);
+const ACTIVE_STATUSES = new Set(['scheduled', 'confirmed', 'arrived']);
 
 /** "Onam eksik" işareti — blokta ve ajanda satırında. */
 export function ConsentMissingMark({

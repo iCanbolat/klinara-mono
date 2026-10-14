@@ -159,6 +159,10 @@ struct FileGroupEditorView: View {
     @State private var serviceId: String?
     @State private var error: APIError?
 
+    private var services: [ClinicService] {
+        session.catalogStore.state.value?.services ?? []
+    }
+
     private var trimmedTitle: String {
         title.trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -197,15 +201,14 @@ struct FileGroupEditorView: View {
 
                 KlinaraDivider()
 
-                Picker("Hizmet", selection: $serviceId) {
-                    Text("Bağlı değil").tag(String?.none)
-                    ForEach(session.catalogStore.state.value?.services ?? []) { service in
-                        Text(service.name).tag(String?.some(service.id))
+                KlinaraPickerField(
+                    label: "Hizmet",
+                    options: [nil] + services.map { Optional($0.id) },
+                    selection: $serviceId,
+                    title: { id in
+                        id.flatMap { id in services.first { $0.id == id }?.name } ?? "Bağlı değil"
                     }
-                }
-                .pickerStyle(.menu)
-                .tint(KlinaraColor.sageDeep)
-                .klinaraText(.bodyM)
+                )
                 .padding(KlinaraMetrics.md)
             }
         }

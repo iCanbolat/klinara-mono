@@ -205,6 +205,7 @@ object ConversationFormat {
             "appointment_confirmation" -> "Randevu onayı"
             "appointment_reminder" -> "Randevu hatırlatması"
             "appointment_cancelled" -> "İptal bildirimi"
+            "appointment_rescheduled" -> "Saat değişikliği bildirimi"
             "no_show_followup" -> "Gelmedi takibi"
             "package_balance" -> "Paket bakiyesi"
             "package_expiring" -> "Paket süresi"

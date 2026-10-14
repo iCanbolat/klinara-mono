@@ -277,7 +277,7 @@ describe('karşılama sayfası', () => {
     const call = get.mock.calls.map((c) => String(c[0])).find((p) => p.startsWith('appointments?'));
     const params = new URLSearchParams(call?.split('?')[1]);
     expect(params.get('limit')).toBe('10');
-    expect(params.get('status')).toBe('scheduled,confirmed,arrived,in_progress');
+    expect(params.get('status')).toBe('scheduled,confirmed,arrived');
   });
 
   it('sıradaki randevudan takvime giderken şubeyi seçiyor', async () => {

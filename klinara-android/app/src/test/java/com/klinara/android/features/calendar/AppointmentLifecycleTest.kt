@@ -61,17 +61,33 @@ class AppointmentLifecycleTest {
             AppointmentStatus.Scheduled.allowedTransitions(canReopen = false),
         )
         assertEquals(
-            listOf(AppointmentStatus.Arrived, AppointmentStatus.NoShow),
+            listOf(AppointmentStatus.Scheduled, AppointmentStatus.Arrived, AppointmentStatus.NoShow),
             AppointmentStatus.Confirmed.allowedTransitions(canReopen = false),
         )
+        // "İşlemde" ara adımı yok (0058): gelen müşteri doğrudan tamamlanır.
         assertEquals(
-            listOf(AppointmentStatus.InProgress, AppointmentStatus.NoShow),
+            listOf(AppointmentStatus.Completed, AppointmentStatus.NoShow),
             AppointmentStatus.Arrived.allowedTransitions(canReopen = false),
         )
+        AppointmentStatus.entries.forEach { status ->
+            assertTrue(AppointmentStatus.InProgress !in status.allowedTransitions(canReopen = true))
+        }
+    }
+
+    @Test
+    @DisplayName("Onay personelin adımı değil — düğme olarak çizilmez, rozet olur")
+    fun confirmationIsABadgeNotAnAction() {
         assertEquals(
-            listOf(AppointmentStatus.Completed),
-            AppointmentStatus.InProgress.allowedTransitions(canReopen = false),
+            listOf(AppointmentStatus.Arrived, AppointmentStatus.NoShow),
+            AppointmentStatus.Scheduled.staffActions(canReopen = false),
         )
+        assertEquals(
+            listOf(AppointmentStatus.Arrived, AppointmentStatus.NoShow),
+            AppointmentStatus.Confirmed.staffActions(canReopen = false),
+        )
+        assertEquals("Müşteri onayladı", AppointmentStatus.Confirmed.confirmationLabel)
+        assertEquals("Müşteri onayı bekleniyor", AppointmentStatus.Scheduled.confirmationLabel)
+        assertEquals(null, AppointmentStatus.Arrived.confirmationLabel)
     }
 
     @Test
@@ -82,7 +98,7 @@ class AppointmentLifecycleTest {
             "İzinsiz kullanıcı 403 ile karşılaşmamalı; giriş noktası HİÇ görünmemeli (§7.4).",
         )
         assertEquals(
-            listOf(AppointmentStatus.InProgress),
+            listOf(AppointmentStatus.Arrived),
             AppointmentStatus.Completed.allowedTransitions(canReopen = true),
         )
     }

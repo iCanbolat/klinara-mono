@@ -39,10 +39,12 @@ import { ConsentOverrideDialog } from '@/components/consent/consent-override-dia
 import { toneClassOf } from './appointment-block';
 import { CancelDialog } from './cancel-dialog';
 import { RescheduleDialog } from './reschedule-dialog';
-import { StatusStepper, isFlowStatus } from './status-stepper';
+import { ConfirmationBadge, StatusStepper, isFlowStatus } from './status-stepper';
 
 /** Geçmiş satırındaki durum adı; sunucuya yeni bir durum eklenirse ham değer. */
 function statusText(value: string): string {
+  // `in_progress` akıştan 0058'de çıktı; eski geçmiş satırlarında duruyor.
+  if (value === 'in_progress') return t('calendar.status.legacyInProgress');
   return isAppointmentStatus(value) ? t(STATUS_LABEL[value]) : value;
 }
 
@@ -351,12 +353,15 @@ export function AppointmentSheet({
                 <section className="flex flex-col gap-3">
                   <h3 className="text-label">{t('calendar.detail.status')}</h3>
                   {isFlowStatus(status) ? (
-                    <StatusStepper
-                      status={status}
-                      actions={actions}
-                      busy={busy}
-                      onSelect={(to) => void changeStatus(to)}
-                    />
+                    <>
+                      <StatusStepper
+                        status={status}
+                        actions={actions}
+                        busy={busy}
+                        onSelect={(to) => void changeStatus(to)}
+                      />
+                      <ConfirmationBadge status={status} />
+                    </>
                   ) : (
                     <div
                       className={cn(

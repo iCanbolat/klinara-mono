@@ -350,7 +350,7 @@ describe('randevu yaşam döngüsü (Batch 3.3)', () => {
       const created = await create(at('10:00')).expect(201);
       const id = (created.body as AppointmentBody).id;
 
-      for (const status of ['confirmed', 'arrived', 'in_progress', 'completed']) {
+      for (const status of ['confirmed', 'arrived', 'completed']) {
         const res = await http(app)
           .post(`/api/v1/appointments/${id}/status`)
           .set(ownerAuth())
@@ -365,7 +365,7 @@ describe('randevu yaşam döngüsü (Batch 3.3)', () => {
         .set(ownerAuth())
         .set(branch());
       const entries = (history.body as { data: { action: string; toStatus: string | null }[] }).data;
-      expect(entries).toHaveLength(5); // created + 4 geçiş
+      expect(entries).toHaveLength(4); // created + 3 geçiş
       expect(entries.at(-1)?.action).toBe('created');
     });
 
@@ -386,7 +386,7 @@ describe('randevu yaşam döngüsü (Batch 3.3)', () => {
       const created = await create(at('10:00')).expect(201);
       const id = (created.body as AppointmentBody).id;
 
-      for (const status of ['confirmed', 'arrived', 'in_progress', 'completed']) {
+      for (const status of ['confirmed', 'arrived', 'completed']) {
         await http(app)
           .post(`/api/v1/appointments/${id}/status`)
           .set(ownerAuth())
@@ -415,14 +415,14 @@ describe('randevu yaşam döngüsü (Batch 3.3)', () => {
         .post(`/api/v1/appointments/${id}/status`)
         .set(auth(receptionTokens))
         .set(branch())
-        .send({ status: 'in_progress' });
+        .send({ status: 'arrived' });
       expect(denied.status).toBe(403);
 
       const allowed = await http(app)
         .post(`/api/v1/appointments/${id}/status`)
         .set(ownerAuth())
         .set(branch())
-        .send({ status: 'in_progress' });
+        .send({ status: 'arrived' });
       expect(allowed.status).toBe(200);
     });
   });

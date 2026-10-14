@@ -48,6 +48,9 @@ import com.klinara.android.designsystem.components.KlinaraFabBox
 import com.klinara.android.designsystem.components.KlinaraFilterPill
 import com.klinara.android.designsystem.components.KlinaraScreen
 import com.klinara.android.designsystem.components.KlinaraSegmentedPicker
+import com.klinara.android.designsystem.components.KlinaraSkeleton
+import com.klinara.android.designsystem.components.KlinaraSkeletonPills
+import com.klinara.android.designsystem.components.KlinaraSkeletonStyle
 import com.klinara.android.designsystem.components.klinaraClickable
 import com.klinara.android.features.auth.AppSession
 import com.klinara.android.services.ServiceContainer
@@ -118,12 +121,9 @@ fun CalendarHomeScreen(
         CalendarHeader(clock = clock, state = state, viewModel = viewModel, now = now)
 
         when (val calendar = state.calendar) {
-            Loadable.Loading ->
-                Text(
-                    "Takvim yükleniyor…",
-                    style = KlinaraType.bodyM,
-                    color = KlinaraTheme.colors.charcoalMuted,
-                )
+            // Düz "Takvim yükleniyor…" metni tek satırdı; veri gelince gövde bir
+            // anda doluyordu. Yer tutucu ajandanın ölçüsünü şimdiden çiziyor.
+            Loadable.Loading -> KlinaraSkeleton(KlinaraSkeletonStyle.agenda)
 
             is Loadable.Failed ->
                 ErrorBanner(
@@ -298,7 +298,12 @@ private fun StaffFilterRow(
     onToggle: (String?) -> Unit,
 ) {
     val staff = state.activeStaff
-    if (staff.isEmpty()) return
+    if (staff.isEmpty()) {
+        // Personel listesi gelene kadar şeridin YERİ tutulur: şerit sonradan
+        // belirdiğinde başlık uzuyor ve takvim gövdesi aşağı kayıyordu.
+        if (state.staff is Loadable.Loading) KlinaraSkeletonPills()
+        return
+    }
     val colors = KlinaraTheme.colors
 
     Row(

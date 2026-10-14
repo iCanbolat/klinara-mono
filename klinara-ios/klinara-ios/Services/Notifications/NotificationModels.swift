@@ -21,6 +21,7 @@ nonisolated enum NotificationEvent: String, Codable, Sendable, CaseIterable, Ide
     case appointmentConfirmation = "appointment_confirmation"
     case appointmentReminder = "appointment_reminder"
     case appointmentCancelled = "appointment_cancelled"
+    case appointmentRescheduled = "appointment_rescheduled"
     case noShowFollowup = "no_show_followup"
     case packageBalance = "package_balance"
     case packageExpiring = "package_expiring"
@@ -48,6 +49,7 @@ nonisolated enum NotificationEvent: String, Codable, Sendable, CaseIterable, Ide
         case .appointmentConfirmation: return "Randevu onayı"
         case .appointmentReminder: return "Randevu hatırlatması"
         case .appointmentCancelled: return "Randevu iptali"
+        case .appointmentRescheduled: return "Randevu saati değişikliği"
         case .noShowFollowup: return "Gelmedi takibi"
         case .packageBalance: return "Paket bakiyesi"
         case .packageExpiring: return "Paket süre dolumu"
@@ -62,6 +64,8 @@ nonisolated enum NotificationEvent: String, Codable, Sendable, CaseIterable, Ide
         case .appointmentConfirmation: return "Randevu oluşturulduğunda müşteriye gider."
         case .appointmentReminder: return "Randevudan önce, hatırlatma ayarındaki saatlerde gider."
         case .appointmentCancelled: return "Randevu iptal edildiğinde müşteriye gider."
+        case .appointmentRescheduled:
+            return "Randevu başka bir saate alındığında müşteriye yeni saati bildirir ve onay ister."
         case .noShowFollowup: return "Müşteri gelmediğinde, ayarlanan gecikmeden sonra gider."
         case .packageBalance: return "Paket hakkı azaldığında müşteriye gider."
         case .packageExpiring: return "Paketin süresi dolmadan önce müşteriye gider."
@@ -158,6 +162,10 @@ nonisolated enum NotificationEventCatalog {
         .appointmentCancelled: Definition(
             channels: [.whatsapp],
             variables: ["customerName", "branchName", "appointmentAt"]
+        ),
+        .appointmentRescheduled: Definition(
+            channels: [.whatsapp],
+            variables: ["customerName", "branchName", "branchAddress", "appointmentAt", "serviceName"]
         ),
         .noShowFollowup: Definition(
             channels: [.whatsapp],

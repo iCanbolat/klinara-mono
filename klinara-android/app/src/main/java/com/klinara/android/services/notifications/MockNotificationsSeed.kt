@@ -186,6 +186,13 @@ internal object MockNotificationsSeed {
                     "Yeni bir randevu için {{branchName}} şubemize bu mesajı yanıtlayarak ulaşabilirsiniz.",
             ),
             whatsapp(
+                NotificationEvent.AppointmentRescheduled,
+                "Merhaba {{customerName}}, {{serviceName}} randevunuzun saati değiştirildi. " +
+                    "Yeni randevu zamanınız {{appointmentAt}}. Sizi {{branchName}} şubemizde bekliyoruz.\n\n" +
+                    "Adres: {{branchAddress}}\n\n" +
+                    "Yeni saate katılımınızı aşağıdaki butonlarla bildirebilirsiniz.",
+            ),
+            whatsapp(
                 NotificationEvent.NoShowFollowup,
                 "Merhaba {{customerName}}, bugünkü randevunuza gelemediğinizi gördük. " +
                     "Yeni bir randevu için {{branchName}} şubemize bu mesajı yanıtlayarak ulaşabilirsiniz.",

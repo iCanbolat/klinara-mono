@@ -102,15 +102,12 @@ struct StaffCreateView: View {
                 KlinaraTagField(label: "Uzmanlıklar", tags: $specialties)
                 ColorSwatchPicker(label: "Takvim rengi", hex: $calendarColor)
 
-                Picker("Birincil şube", selection: $primaryBranchId) {
-                    Text("Belirtilmedi").tag(String?.none)
-                    ForEach(session.branches) { branch in
-                        Text(branch.name).tag(Optional(branch.id))
-                    }
-                }
-                .pickerStyle(.menu)
-                .tint(KlinaraColor.sageDeep)
-                .klinaraText(.bodyM)
+                KlinaraPickerField(
+                    label: "Birincil şube",
+                    options: [nil] + session.branches.map { Optional($0.id) },
+                    selection: $primaryBranchId,
+                    title: { id in id.flatMap { id in session.branches.first { $0.id == id }?.name } ?? "Belirtilmedi" }
+                )
             }
             .padding(KlinaraMetrics.md)
 

@@ -34,13 +34,35 @@ struct KlinaraSearchablePicker<Value: Identifiable>: View {
     /// terim sunucuda da aranır ve sonuç yerel eşleşmelere eklenir. Yoksa
     /// ilk sayfada olmayan kayıt hiçbir aramayla bulunamıyordu.
     var remoteSearch: ((String) async -> [Value])?
+    /// Liste bu kadar karakter yazılana kadar açılmaz (`0` → eşik yok).
+    ///
+    /// Müşteri seçiminde bir iki harf yüzlerce kaydı eşliyor ve her tuşta
+    /// sunucuya arama gidiyordu; üç harf hem sonucu daraltıyor hem isteği
+    /// anlamlı kılıyor.
+    var minSearchLength = 0
+    /// Verilirse sonuçlar bu SABİT yükseklikte, kendi içinde kayan bir alanda
+    /// çizilir. Uzun bir sonuç listesi formun geri kalanını (hizmet, saat)
+    /// ekranın çok altına itiyordu; sabit yükseklik yazarken alanın boyunun
+    /// da zıplamasını önlüyor.
+    var resultsHeight: CGFloat?
 
     @State private var term = ""
     @State private var remote: [Value] = []
+    /// Sunucu araması sürüyor. Yerel sayfada eşleşme yokken sonuç gelmeden
+    /// "Eşleşen müşteri yok" demek, birazdan gelecek kaydı yok gibi gösteriyordu.
+    @State private var isSearchingRemote = false
+
+    private var trimmedTerm: String {
+        term.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 
     private var isCollapsed: Bool {
-        term.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && options.count > searchablePickerCollapseThreshold
+        trimmedTerm.isEmpty && options.count > searchablePickerCollapseThreshold
+    }
+
+    /// Eşik verilmiş ve henüz ona ulaşılmamış — boş terim dahil.
+    private var isBelowMinLength: Bool {
+        minSearchLength > 0 && trimmedTerm.count < minSearchLength
     }
 
     private var visible: [Value] {
@@ -68,15 +90,22 @@ struct KlinaraSearchablePicker<Value: Identifiable>: View {
             .padding(.horizontal, KlinaraMetrics.md)
             .padding(.top, KlinaraMetrics.sm)
 
-            if isCollapsed {
+            if isBelowMinLength {
+                minLengthHint
+            } else if isCollapsed {
                 collapsedHint
+            } else if visible.isEmpty && isSearchingRemote {
+                hintRow("Aranıyor…")
             } else if visible.isEmpty {
                 emptyRow
-            } else {
-                ForEach(Array(visible.enumerated()), id: \.element.id) { index, option in
-                    if index > 0 { KlinaraDivider() }
-                    row(option)
+            } else if let resultsHeight {
+                ScrollView {
+                    LazyVStack(spacing: 0) { rows }
                 }
+                .frame(height: resultsHeight)
+                .scrollBounceBehavior(.basedOnSize)
+            } else {
+                rows
             }
 
             if let createLabel, let onCreate {
@@ -92,18 +121,41 @@ struct KlinaraSearchablePicker<Value: Identifiable>: View {
         }
         .task(id: term) {
             guard let remoteSearch else { return }
-            let trimmed = term.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard trimmed.count >= 2 else {
+            let trimmed = trimmedTerm
+            guard trimmed.count >= max(2, minSearchLength) else {
                 remote = []
+                isSearchingRemote = false
                 return
             }
+            isSearchingRemote = true
             // Her tuşa bir istek atılmasın; terim değişince görev iptal olur.
             try? await Task.sleep(for: .milliseconds(250))
             guard !Task.isCancelled else { return }
             let found = await remoteSearch(trimmed)
             guard !Task.isCancelled else { return }
             remote = found
+            isSearchingRemote = false
         }
+    }
+
+    @ViewBuilder
+    private var rows: some View {
+        ForEach(Array(visible.enumerated()), id: \.element.id) { index, option in
+            if index > 0 { KlinaraDivider() }
+            row(option)
+        }
+    }
+
+    private var minLengthHint: some View {
+        hintRow("Aramak için en az \(minSearchLength) karakter yazın.")
+    }
+
+    private func hintRow(_ text: String) -> some View {
+        Text(text)
+            .klinaraText(.bodyM)
+            .foregroundStyle(KlinaraColor.charcoalMuted)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(KlinaraMetrics.md)
     }
 
     private var collapsedHint: some View {
