@@ -1,7 +1,48 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ASSIGNABLE_ROLES } from '@klinara/shared';
-import { IsEmail, IsIn, IsOptional, IsString, IsUUID, Length, MaxLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  ArrayMaxSize,
+  ArrayUnique,
+  IsArray,
+  IsBoolean,
+  IsEmail,
+  IsIn,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Length,
+  MaxLength,
+  ValidateNested,
+} from 'class-validator';
 import { PASSWORD_MAX, PASSWORD_MIN } from './auth.dto';
+
+/**
+ * Uygulayıcı davetinde kabulle birlikte açılacak personel profili.
+ *
+ * Profil, takvimde randevu alabilen kişiyi tanımlar; davet kabul edilince
+ * üyelikle aynı transaction'da oluşur.
+ */
+export class InvitationStaffProfileDto {
+  @ApiPropertyOptional({ example: 'Dermatolog' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  title?: string;
+
+  @ApiPropertyOptional({ default: true })
+  @IsOptional()
+  @IsBoolean()
+  isVisibleOnline?: boolean;
+
+  @ApiPropertyOptional({ type: [String], description: 'Yetkin olduğu hizmetler' })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(200)
+  @ArrayUnique()
+  @IsUUID('all', { each: true })
+  serviceIds?: string[];
+}
 
 export class CreateInvitationDto {
   @ApiProperty({ example: 'yeni@klinik.com' })
@@ -23,6 +64,13 @@ export class CreateInvitationDto {
   @IsString()
   @MaxLength(200)
   fullName?: string;
+
+  /** Yalnız `practitioner` rolünde; kabulde personel profili olarak açılır. */
+  @ApiPropertyOptional({ type: InvitationStaffProfileDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => InvitationStaffProfileDto)
+  staffProfile?: InvitationStaffProfileDto;
 }
 
 export class InvitationResponseDto {
@@ -50,11 +98,15 @@ export class InvitationResponseDto {
   @ApiPropertyOptional({ format: 'date-time', nullable: true, type: String })
   revokedAt?: string | null;
 
+  /** Davet e-postası sağlayıcıya teslim edildi mi; yalnız oluşturma yanıtında. */
+  @ApiPropertyOptional()
+  mailDelivered?: boolean;
+
   /**
    * Davet token'ı — YALNIZ üretim dışında döner.
    *
-   * E-posta gönderimi Batch 8.1'e kadar loga yazdığı için geliştirme akışının
-   * tıkanmaması adına yanıtta da veriliyor. Üretimde bu alan hiç görünmez.
+   * Yerelde e-posta çoğu zaman loga yazıldığı için geliştirme akışı
+   * tıkanmasın diye yanıtta da verilir. Üretimde bu alan hiç görünmez.
    */
   @ApiPropertyOptional()
   token?: string;

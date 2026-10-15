@@ -102,7 +102,12 @@ const STAFF = {
   ],
 };
 
-const PRACTITIONER_B1 = { id: 'm1', branchId: 'b1', roleKey: 'practitioner', roleName: 'Uygulayıcı' };
+const PRACTITIONER_B1 = {
+  id: 'm1',
+  branchId: 'b1',
+  roleKey: 'practitioner',
+  roleName: 'Uygulayıcı',
+};
 let memberships: unknown[] = [PRACTITIONER_B1];
 
 function mockRoutes(): void {
@@ -137,6 +142,25 @@ describe('katalog', () => {
     // İki hizmet de 500 TL; fiyatın BİÇİMLENDİĞİ iddia ediliyor, tekil
     // olduğu değil.
     expect(screen.getAllByText('₺500,00').length).toBeGreaterThan(0);
+  });
+
+  it('yeni hizmette kod addan türetilir, çakışırsa sayı alır ve düzenlenemez', async () => {
+    const user = userEvent.setup();
+    render(<CatalogPage />);
+    await screen.findByText('Lazer');
+
+    await user.click(screen.getByRole('button', { name: 'Yeni hizmet' }));
+    const dialog = await screen.findByRole('dialog');
+    const slug = within(dialog).getByLabelText('Kısa ad (slug)');
+    expect(slug).toHaveAttribute('readonly');
+
+    await user.type(within(dialog).getByLabelText('Ad'), 'Diş Beyazlatma');
+    expect(slug).toHaveValue('dis-beyazlatma');
+
+    // `lazer` kodu zaten var: aynı ad sayı ekleyerek ayrışır.
+    await user.clear(within(dialog).getByLabelText('Ad'));
+    await user.type(within(dialog).getByLabelText('Ad'), 'Lazer');
+    expect(slug).toHaveValue('lazer-2');
   });
 
   it('SALT OKUNUR rolde ekran görünür, düğmeler YOK', async () => {
@@ -236,7 +260,7 @@ describe('paketler sekmesi', () => {
     permissions = [
       PERMISSIONS.SERVICE_READ,
       PERMISSIONS.PACKAGE_READ,
-      PERMISSIONS.PACKAGE_WRITE,
+      PERMISSIONS.PACKAGE_DEFINITION_WRITE,
     ];
   });
 
@@ -445,7 +469,10 @@ describe('personel — roller ve şubeler', () => {
 
   it('ikinci şubede rol eklemek TAM LİSTEYİ gönderiyor', async () => {
     put.mockResolvedValue({
-      data: [PRACTITIONER_B1, { id: 'm2', branchId: 'b2', roleKey: 'receptionist', roleName: 'Resepsiyon' }],
+      data: [
+        PRACTITIONER_B1,
+        { id: 'm2', branchId: 'b2', roleKey: 'receptionist', roleName: 'Resepsiyon' },
+      ],
     });
     const user = userEvent.setup();
     const sheet = await openEditor(user);
@@ -490,7 +517,9 @@ describe('personel — roller ve şubeler', () => {
     const user = userEvent.setup();
     const sheet = await openEditor(user);
 
-    expect(await within(sheet).findByText(/erişiminiz olmayan bir şubede de rolü var/)).toBeInTheDocument();
+    expect(
+      await within(sheet).findByText(/erişiminiz olmayan bir şubede de rolü var/),
+    ).toBeInTheDocument();
     expect(within(sheet).queryByRole('button', { name: 'Rolleri kaydet' })).not.toBeInTheDocument();
     expect(within(sheet).queryByRole('button', { name: 'Rol ekle' })).not.toBeInTheDocument();
   });
@@ -505,7 +534,9 @@ describe('personel — roller ve şubeler', () => {
     const user = userEvent.setup();
     const sheet = await openEditor(user);
 
-    expect(await within(sheet).findAllByText('Sizden yetkili bir rol — değiştirilemez.')).not.toHaveLength(0);
+    expect(
+      await within(sheet).findAllByText('Sizden yetkili bir rol — değiştirilemez.'),
+    ).not.toHaveLength(0);
     await user.click(within(sheet).getByRole('button', { name: 'Rolü kaldır: Resepsiyon' }));
     await user.click(within(sheet).getByRole('button', { name: 'Rolleri kaydet' }));
 
@@ -520,7 +551,9 @@ describe('personel — roller ve şubeler', () => {
     me = { ...OWNER, user: { id: 'u1' } };
     const user = userEvent.setup();
     const sheet = await openEditor(user);
-    expect(await within(sheet).findByText(/Kendi rollerinizi değiştiremezsiniz/)).toBeInTheDocument();
+    expect(
+      await within(sheet).findByText(/Kendi rollerinizi değiştiremezsiniz/),
+    ).toBeInTheDocument();
   });
 
   it('tüm rolleri kaldırmak ayrıca onay istiyor', async () => {
@@ -534,6 +567,95 @@ describe('personel — roller ve şubeler', () => {
 
     const confirm = await screen.findByRole('alertdialog');
     await user.click(within(confirm).getByRole('button', { name: 'Rolleri kaldır' }));
-    await waitFor(() => expect(put).toHaveBeenCalledWith('users/u1/memberships', { memberships: [] }));
+    await waitFor(() =>
+      expect(put).toHaveBeenCalledWith('users/u1/memberships', { memberships: [] }),
+    );
+  });
+});
+
+describe('uygulayıcı daveti ve otomatik profil', () => {
+  let plan: unknown;
+
+  beforeEach(() => {
+    get.mockReset();
+    post.mockReset();
+    mockRoutes();
+    plan = {
+      planKey: 'klinik',
+      planName: 'Klinik',
+      limits: { maxBranches: 1, maxPractitioners: 8 },
+      usage: { branches: 1, practitioners: 1 },
+    };
+    const base = get.getMockImplementation();
+    get.mockImplementation((path: string, options?: unknown) => {
+      if (path === 'tenant/plan') return Promise.resolve(plan);
+      const fallback: unknown = base?.(path, options);
+      return fallback;
+    });
+    permissions = [
+      PERMISSIONS.STAFF_READ,
+      PERMISSIONS.STAFF_WRITE,
+      PERMISSIONS.USER_READ,
+      PERMISSIONS.USER_INVITE,
+      PERMISSIONS.TENANT_READ,
+    ];
+    me = { tenantWide: true, branchIds: [], user: { id: 'u9' }, roles: ['owner'] };
+    memberships = [PRACTITIONER_B1];
+  });
+
+  it('profil ekleme düğmesi yok; yalnız personel davet et var', async () => {
+    render(<StaffPage />);
+    await screen.findByText('Zeynep Kaya');
+    expect(screen.queryByRole('button', { name: 'Personel profili ekle' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Personel davet et' })).toBeInTheDocument();
+  });
+
+  it('uygulayıcı davetinde unvan ve hizmetler staffProfile olarak gönderilir', async () => {
+    post.mockResolvedValue({ id: 'i1', email: 'yeni@k.test', roleKey: 'practitioner' });
+    const user = userEvent.setup();
+    render(<StaffPage />);
+
+    await user.click(await screen.findByRole('button', { name: 'Personel davet et' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText(/E-posta/), 'yeni@k.test');
+    await user.type(within(dialog).getByLabelText('Unvan'), ' Dermatolog ');
+    await user.click(await within(dialog).findByLabelText('Lazer'));
+    await user.click(within(dialog).getByRole('button', { name: 'Personel davet et' }));
+
+    await waitFor(() =>
+      expect(post).toHaveBeenCalledWith('invitations', {
+        email: 'yeni@k.test',
+        roleKey: 'practitioner',
+        branchId: 'b1',
+        staffProfile: { title: 'Dermatolog', isVisibleOnline: true, serviceIds: ['s1'] },
+      }),
+    );
+  });
+
+  it('uygulayıcı dışındaki rolde profil alanları ve staffProfile yok', async () => {
+    post.mockResolvedValue({ id: 'i2', email: 'yonetici@k.test', roleKey: 'manager' });
+    const user = userEvent.setup();
+    render(<StaffPage />);
+
+    await user.click(await screen.findByRole('button', { name: 'Personel davet et' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.selectOptions(within(dialog).getByLabelText('Rol'), 'manager');
+    expect(within(dialog).queryByLabelText('Unvan')).not.toBeInTheDocument();
+    await user.type(within(dialog).getByLabelText(/E-posta/), 'yonetici@k.test');
+    await user.click(within(dialog).getByRole('button', { name: 'Personel davet et' }));
+
+    await waitFor(() => expect(post).toHaveBeenCalled());
+    expect(post.mock.calls[0]?.[1]).not.toHaveProperty('staffProfile');
+  });
+
+  it('plan hekim sınırı doluysa uyarı gösterilir', async () => {
+    plan = {
+      planKey: 'baslangic',
+      planName: 'Başlangıç',
+      limits: { maxBranches: 1, maxPractitioners: 2 },
+      usage: { branches: 1, practitioners: 2 },
+    };
+    render(<StaffPage />);
+    expect(await screen.findByText('Plan hekim sınırı dolu (2/2).')).toBeInTheDocument();
   });
 });

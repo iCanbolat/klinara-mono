@@ -9,6 +9,13 @@ import { setTenantContext, type Tx } from '../../database/tenant-tx';
 import { TenantTxService } from '../../database/tenant-tx.service';
 import type { EnvironmentVariables } from '../../config/env.validation';
 import { MAIL_SENDER, type MailSender } from '../../lib/mail/mail.types';
+import { invitationMail } from '../../lib/mail/mail-templates';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
+import type { InvitationStaffProfile } from '../../database/schema';
+import { AvailabilityCacheService } from '../booking/availability-cache.service';
+import { BookingPageCacheService } from '../booking-page/booking-page-cache.service';
+import * as staffRepo from '../staff/staff.repository';
+import { assertCanAddPractitioner } from '../tenancy/plan-limits';
 import { assertAssignableRole, assertNoEscalation, assertRoleScope } from './role-rules';
 import * as identityRepo from './identity.repository';
 import * as invitationsRepo from './invitations.repository';
@@ -23,26 +30,6 @@ import type {
 } from './dto/invitation.dto';
 import type { LoginResponseDto } from './dto/auth-response.dto';
 
-/**
- * Davet e-postasının gövdesi: düz metin her zaman, HTML Resend gibi HTML
- * gönderen sağlayıcılar için. Bağlantı `link` yalnız bizim ürettiğimiz bir URL
- * (`APP_BASE_URL` + token), yine de HTML'e kaçışlı yazılır.
- */
-export function invitationMail(link: string, ttlHours: number): { body: string; html: string } {
-  const safe = link.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-  return {
-    body: `Klinara ekibine davet edildiniz.\n\nHesabınızı oluşturmak için: ${link}\nBağlantı ${ttlHours} saat geçerlidir.`,
-    html:
-      `<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:480px;color:#2b2b2b">` +
-      `<h2 style="margin:0 0 12px">Klinara ekibine davet edildiniz</h2>` +
-      `<p style="margin:0 0 20px">Hesabınızı oluşturmak için aşağıdaki düğmeye dokunun.</p>` +
-      `<p style="margin:0 0 20px"><a href="${safe}" style="background:#4a6b5d;color:#fff;` +
-      `text-decoration:none;padding:12px 20px;border-radius:8px;display:inline-block">Hesabımı oluştur</a></p>` +
-      `<p style="margin:0;color:#777;font-size:13px">Bağlantı ${ttlHours} saat geçerlidir. ` +
-      `Bu daveti beklemiyorsanız e-postayı yok sayabilirsiniz.</p></div>`,
-  };
-}
-
 @Injectable()
 export class InvitationsService {
   private readonly ttlHours: number;
@@ -54,14 +41,17 @@ export class InvitationsService {
     private readonly passwords: PasswordService,
     private readonly auth: AuthService,
     private readonly principals: PrincipalService,
+    private readonly availabilityCache: AvailabilityCacheService,
+    private readonly bookingPage: BookingPageCacheService,
     @Inject(MAIL_SENDER) private readonly mail: MailSender,
+    @InjectPinoLogger(InvitationsService.name) private readonly logger: PinoLogger,
     config: ConfigService<EnvironmentVariables, true>,
   ) {
     this.ttlHours = config.get('INVITATION_TTL_HOURS', { infer: true });
     this.appBaseUrl = config.get('APP_BASE_URL', { infer: true });
-    // Token'ı yanıtta göstermek YALNIZ üretim dışında yapılır: e-posta
-    // gönderimi Batch 8.1'e kadar loga yazıyor, geliştirme akışının tıkanmaması
-    // için bağlantı yanıtta da dönüyor.
+    // Token'ı yanıtta göstermek YALNIZ üretim dışında yapılır: yerelde e-posta
+    // çoğu zaman loga yazılır, geliştirme akışı tıkanmasın diye bağlantı
+    // yanıtta da döner.
     this.exposeToken = config.get('NODE_ENV', { infer: true }) !== 'production';
   }
 
@@ -80,11 +70,13 @@ export class InvitationsService {
     assertNoEscalation(roleKey, principal);
     assertRoleScope(roleKey, input.branchId);
 
+    const staffProfile = InvitationsService.normalizeStaffProfile(roleKey, input);
+
     const email = input.email.trim().toLowerCase();
     const token = generateOpaqueToken();
     const expiresAt = new Date(Date.now() + this.ttlHours * 3_600_000);
 
-    const invitation = await this.tx
+    const { invitation, tenantName, inviterName } = await this.tx
       .run(async (tx) => {
         const pending = await invitationsRepo.findPendingInvitation(tx, principal.tenantId, email);
         if (pending !== undefined) {
@@ -92,16 +84,36 @@ export class InvitationsService {
             detail: 'Önce mevcut daveti iptal edin ya da süresinin dolmasını bekleyin.',
           });
         }
-        return invitationsRepo.insertInvitation(tx, {
+        if (staffProfile !== undefined) {
+          // Kabulde profil açılacak: hekim kotası dolmuşsa daveti baştan reddet,
+          // kişi hesabını açtıktan sonra "profilin açılamadı" sürprizi yaşamasın.
+          await assertCanAddPractitioner(tx, principal.tenantId);
+          const active = await staffRepo.filterActiveServiceIds(tx, staffProfile.serviceIds);
+          if (active.length !== staffProfile.serviceIds.length) {
+            throw new AppError(400, ERROR_CODES.VALIDATION_FAILED, 'Hizmet bulunamadı', {
+              detail: 'Seçilen hizmetlerden biri pasif ya da bu kliniğe ait değil.',
+              extra: {
+                errors: [{ path: 'staffProfile.serviceIds', message: 'Aktif bir hizmet olmalı' }],
+              },
+            });
+          }
+        }
+        const row = await invitationsRepo.insertInvitation(tx, {
           tenantId: principal.tenantId,
           branchId: input.branchId ?? null,
           roleKey,
           email,
           fullName: input.fullName,
+          staffProfile,
           tokenHash: sha256(token),
           invitedByUserId: principal.userId,
           expiresAt,
         });
+        const [name, inviter] = await Promise.all([
+          identityRepo.findTenantName(tx, principal.tenantId),
+          identityRepo.findUserById(tx, principal.userId),
+        ]);
+        return { invitation: row, tenantName: name, inviterName: inviter?.fullName };
       })
       .catch((error: unknown) => {
         if (isPgError(error, PG_ERROR.FOREIGN_KEY_VIOLATION)) {
@@ -120,10 +132,10 @@ export class InvitationsService {
       });
 
     const link = `${this.appBaseUrl}/davet/${token}`;
-    await this.mail.send({
-      to: email,
-      subject: 'Klinara ekibine davet edildiniz',
-      ...invitationMail(link, this.ttlHours),
+    const mailDelivered = await this.sendInvitationMail(email, link, {
+      tenantName,
+      roleName: ROLE_BY_KEY[roleKey].name,
+      inviterName,
     });
 
     return {
@@ -133,6 +145,7 @@ export class InvitationsService {
       branchId: invitation.branchId,
       expiresAt: invitation.expiresAt.toISOString(),
       createdAt: invitation.createdAt.toISOString(),
+      mailDelivered,
       ...(this.exposeToken ? { token, link } : {}),
     };
   }
@@ -162,12 +175,77 @@ export class InvitationsService {
     return { invitation, token, link: `${this.appBaseUrl}/davet/${token}` };
   }
 
-  /** Davet bağlantısının kullanıcıya gönderilmesi (Faz 1'de loga yazılır). */
-  async sendInvitationMail(email: string, link: string, subject: string): Promise<void> {
-    await this.mail.send({ to: email, subject, ...invitationMail(link, this.ttlHours) });
+  /**
+   * Sahip davetini yeniden gönderir (platform ekranı).
+   *
+   * Bekleyen sahip davetleri iptal edilir ve yenisi açılır: eski bağlantı
+   * e-postası kaybolmuş ya da hiç gitmemiş olabilir, ikisinin birden geçerli
+   * olması gerekmiyor. E-posta verilmezse son davetin adresi kullanılır.
+   */
+  async reissueOwnerInvitation(
+    tenantId: string,
+    email?: string,
+  ): Promise<{
+    email: string;
+    expiresAt: string;
+    mailDelivered: boolean;
+    token?: string;
+    link?: string;
+  }> {
+    const result = await this.tx.runForTenant(tenantId, async (tx) => {
+      const latest = await invitationsRepo.findLatestOwnerInvitation(tx, tenantId);
+      const target = email?.trim().toLowerCase() ?? latest?.email;
+      if (target === undefined) throw AppError.notFound('Sahip daveti bulunamadı; e-posta verin');
+      await invitationsRepo.revokePendingOwnerInvitations(tx, tenantId);
+      const created = await this.createOwnerInvitation(tx, {
+        tenantId,
+        email: target,
+        fullName: latest?.email === target ? (latest.fullName ?? undefined) : undefined,
+      });
+      const tenantName = await identityRepo.findTenantName(tx, tenantId);
+      return { ...created, tenantName };
+    });
+
+    const mailDelivered = await this.sendInvitationMail(result.invitation.email, result.link, {
+      tenantName: result.tenantName,
+      roleName: ROLE_BY_KEY.owner.name,
+    });
+    return {
+      email: result.invitation.email,
+      expiresAt: result.invitation.expiresAt.toISOString(),
+      mailDelivered,
+      ...(this.exposeToken ? { token: result.token, link: result.link } : {}),
+    };
   }
 
-  /** Üretim dışında davet token'ı yanıtta da döner (e-posta Batch 8.1'de). */
+  /**
+   * Davet e-postasını gönderir; sonucu döndürür, HATA FIRLATMAZ.
+   *
+   * Davet kaydı gönderimden önce commit edilmiştir. Hata yukarı çıksaydı
+   * çağıran 500 alır, aynı e-postaya tekrar davet ise "bekleyen davet var"
+   * çatışmasına düşerdi. Bunun yerine `mailDelivered: false` döner; panel
+   * daveti iptal edip yeniden göndermeyi (sahip için platform ekranı) önerir.
+   */
+  async sendInvitationMail(
+    email: string,
+    link: string,
+    context: {
+      tenantName?: string | undefined;
+      roleName?: string | undefined;
+      inviterName?: string | undefined;
+    },
+  ): Promise<boolean> {
+    const { subject, body, html } = invitationMail({ link, ttlHours: this.ttlHours, ...context });
+    try {
+      await this.mail.send({ to: email, subject, body, html });
+      return true;
+    } catch (error) {
+      this.logger.error({ err: error }, 'Davet e-postası gönderilemedi');
+      return false;
+    }
+  }
+
+  /** Üretim dışında davet token'ı yanıtta da döner (yerel geliştirme kolaylığı). */
   get tokenVisible(): boolean {
     return this.exposeToken;
   }
@@ -285,10 +363,23 @@ export class InvitationsService {
         roleKey: invitation.roleKey,
       });
 
-      return { user, tenantId: invitation.tenantId, alreadyHadPassword: hasPassword };
+      const profileOpened =
+        invitation.staffProfile !== null &&
+        (await InvitationsService.openStaffProfile(tx, invitation, invitation.staffProfile, user.id));
+
+      return {
+        user,
+        tenantId: invitation.tenantId,
+        alreadyHadPassword: hasPassword,
+        profileOpened,
+      };
     });
 
     this.principals.invalidateUser(outcome.user.id);
+    if (outcome.profileOpened) {
+      this.availabilityCache.invalidateTenant(outcome.tenantId);
+      await this.bookingPage.invalidate('staff');
+    }
 
     if (outcome.alreadyHadPassword) {
       // Mevcut hesaba yeni klinik eklendi; oturum açmak için normal giriş.
@@ -302,6 +393,77 @@ export class InvitationsService {
       meta,
     });
     return { status: 'authenticated', tokens, tenant: { id: outcome.tenantId } };
+  }
+
+  /**
+   * Taslağı doğrular ve normalleştirir; yalnız `practitioner` rolü profil taşır.
+   * Boş taslak (hiç alan yok) da profil sayılır: kişi takvimde görünsün diye
+   * unvan/hizmet sonradan eklenebilir.
+   */
+  private static normalizeStaffProfile(
+    roleKey: string,
+    input: CreateInvitationDto,
+  ): InvitationStaffProfile | undefined {
+    const draft = input.staffProfile;
+    if (draft === undefined) return undefined;
+    if (roleKey !== ROLES.PRACTITIONER) {
+      throw new AppError(400, ERROR_CODES.VALIDATION_FAILED, 'Profil yalnız uygulayıcıya açılır', {
+        extra: {
+          errors: [{ path: 'staffProfile', message: 'Yalnız uygulayıcı rolünde kullanılır' }],
+        },
+      });
+    }
+    const title = draft.title?.trim();
+    return {
+      ...(title === undefined || title === '' ? {} : { title }),
+      isVisibleOnline: draft.isVisibleOnline ?? true,
+      serviceIds: draft.serviceIds ?? [],
+    };
+  }
+
+  /**
+   * Kabul anında personel profilini açar (üyelikle AYNI transaction).
+   *
+   * Davet ile kabul arasında durum değişmiş olabilir; bu yüzden kabul ASLA
+   * profil yüzünden başarısız olmaz (kullanıcı hesabını açmış, bağlantısı
+   * tükenmiş olurdu):
+   *   - profil zaten varsa dokunulmaz,
+   *   - pasife alınmış hizmetler yetkinlikten düşer,
+   *   - hekim kotası dolduysa profil PASİF açılır; yönetici kotayı açınca etkinleştirir.
+   */
+  private static async openStaffProfile(
+    tx: Tx,
+    invitation: invitationsRepo.InvitationRow,
+    draft: InvitationStaffProfile,
+    userId: string,
+  ): Promise<boolean> {
+    if ((await staffRepo.findStaffProfileIdByUser(tx, userId)) !== undefined) return false;
+
+    let isActive = true;
+    try {
+      await assertCanAddPractitioner(tx, invitation.tenantId);
+    } catch (error) {
+      if (!(error instanceof AppError) || error.statusCode !== 409) throw error;
+      isActive = false;
+    }
+
+    const profile = await staffRepo.insertStaffProfile(tx, {
+      tenantId: invitation.tenantId,
+      userId,
+      primaryBranchId: invitation.branchId,
+      title: draft.title,
+      specialties: [],
+      isVisibleOnline: draft.isVisibleOnline,
+      isActive,
+    });
+    const serviceIds = await staffRepo.filterActiveServiceIds(tx, draft.serviceIds);
+    await staffRepo.replaceStaffServices(
+      tx,
+      invitation.tenantId,
+      profile.id,
+      serviceIds.map((serviceId) => ({ serviceId })),
+    );
+    return true;
   }
 
   private static assertUsable(invitation: invitationsRepo.InvitationRow): void {

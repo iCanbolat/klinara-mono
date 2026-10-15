@@ -60,7 +60,8 @@ export class PrincipalService {
     const row = await this.tx.run(async (tx) => {
       const session = await repo.findActiveSession(tx, input.sessionId, input.userId);
       if (session === undefined) return undefined;
-      return repo.resolvePrincipal(tx, input.userId, input.tenantId);
+      const resolved = await repo.resolvePrincipal(tx, input.userId, input.tenantId);
+      return { ...resolved, tenantStatus: await repo.findTenantStatus(tx, input.tenantId) };
     });
 
     if (row === undefined || row.user === undefined) {
@@ -71,6 +72,13 @@ export class PrincipalService {
     }
     if (!row.user.isActive) {
       throw new AppError(403, ERROR_CODES.ACCOUNT_DISABLED, 'Hesap devre dışı');
+    }
+    if (row.tenantStatus === 'suspended') {
+      // Platform kiracıyı askıya aldı: veri korunur, panel ve uygulamalar
+      // açılmaz. Askı kaldırılınca oturumlar yeniden çalışır.
+      throw new AppError(403, ERROR_CODES.TENANT_SUSPENDED, 'Klinik hesabı askıya alındı', {
+        detail: 'Hesabınız geçici olarak durduruldu. Bilgi için Klinara destek ile iletişime geçin.',
+      });
     }
     if (row.memberships.length === 0) {
       throw AppError.forbidden('Bu klinikte yetkiniz yok');

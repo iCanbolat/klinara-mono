@@ -50,6 +50,12 @@ const MESSAGE_BY_CODE: Partial<Record<string, MessageKey>> = {
   [ERROR_CODES.WHATSAPP_TEMPLATE_NOT_APPROVED]: 'error.whatsappTemplateNotApproved',
   [ERROR_CODES.WHATSAPP_INVALID_RECIPIENT]: 'error.whatsappInvalidRecipient',
   [ERROR_CODES.WHATSAPP_RATE_LIMITED]: 'error.whatsappRateLimited',
+
+  // Plan limitleri ve askı: sunucunun `detail`i limiti söylüyor, kullanıcıya
+  // gereken ise ne yapacağı (pasife al / yükselt / destekle görüş).
+  [ERROR_CODES.PLAN_BRANCH_LIMIT_REACHED]: 'error.planBranchLimit',
+  [ERROR_CODES.PLAN_PRACTITIONER_LIMIT_REACHED]: 'error.planPractitionerLimit',
+  [ERROR_CODES.TENANT_SUSPENDED]: 'error.tenantSuspended',
 };
 
 export function isProblem(value: unknown): value is ProblemDetails {

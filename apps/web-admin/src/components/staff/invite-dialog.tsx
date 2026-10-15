@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
-import type { CreateInvitationInput, Invitation } from '@klinara/shared';
+import type { CreateInvitationInput, Invitation, Service } from '@klinara/shared';
 import { t } from '@/i18n/tr';
 import { api } from '@/lib/api/client';
 import { errorFor, toFormErrors, type FormErrors } from '@/lib/forms/field-errors';
@@ -20,12 +20,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldSelect } from '@/components/ui/field';
+import { Field, FieldCheckbox, FieldSelect, FieldSwitch } from '@/components/ui/field';
 
 const NO_ERRORS: FormErrors = { message: null, fields: {}, requestId: null };
 
 /**
  * Personel daveti: e-posta + rol (+ şube kapsamlı rolde şube).
+ *
+ * Uygulayıcı davetinde kabulle birlikte açılacak personel profili de burada
+ * girilir (unvan, online görünürlük, hizmet yetkinlikleri); böylece kişi
+ * hesabını açar açmaz takvimde randevu alabilir.
  *
  * Rol listesi yalnız ATAYABİLDİĞİM roller (rütbe kuralı); şube listesi yalnız
  * erişebildiğim AKTİF şubeler. Sunucu ikisini de ayrıca zorluyor.
@@ -55,6 +59,10 @@ export function InviteDialog({
   const [fullName, setFullName] = useState('');
   const [roleKey, setRoleKey] = useState('');
   const [branchId, setBranchId] = useState('');
+  const [title, setTitle] = useState('');
+  const [visibleOnline, setVisibleOnline] = useState(true);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [services, setServices] = useState<Service[]>([]);
   const [errors, setErrors] = useState<FormErrors>(NO_ERRORS);
   const [busy, setBusy] = useState(false);
 
@@ -70,6 +78,9 @@ export function InviteDialog({
           ? (activeBranchId ?? '')
           : (assignable[0]?.id ?? ''),
       );
+      setTitle('');
+      setVisibleOnline(true);
+      setSelected(new Set());
       setErrors(NO_ERRORS);
       setBusy(false);
     })();
@@ -77,7 +88,20 @@ export function InviteDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  // Hizmet listesi diyalog açılınca bir kez çekilir; alınamazsa davet yine de
+  // gönderilebilir, profil hizmetleri sonradan da atanabilir.
+  useEffect(() => {
+    if (!open) return;
+    const controller = new AbortController();
+    void api
+      .get<{ data: Service[] }>('services', { signal: controller.signal })
+      .then((result) => setServices(result.data.filter((service) => service.isActive)))
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [open]);
+
   const tenantScoped = isTenantScoped(roleKey);
+  const withProfile = roleKey === 'practitioner';
 
   async function submit(): Promise<void> {
     setBusy(true);
@@ -88,6 +112,15 @@ export function InviteDialog({
         roleKey,
         ...(fullName.trim() === '' ? {} : { fullName: fullName.trim() }),
         ...(tenantScoped || branchId === '' ? {} : { branchId }),
+        ...(withProfile
+          ? {
+              staffProfile: {
+                ...(title.trim() === '' ? {} : { title: title.trim() }),
+                isVisibleOnline: visibleOnline,
+                serviceIds: [...selected],
+              },
+            }
+          : {}),
       };
       const invitation = await api.post<Invitation>('invitations', body);
       toast.success(t('invites.sent'));
@@ -173,6 +206,57 @@ export function InviteDialog({
                 </FieldSelect>
               )}
             </div>
+
+            {withProfile ? (
+              <div className="flex flex-col gap-4 border-t border-border pt-4">
+                <p className="text-xs text-muted-foreground">{t('invites.profileHint')}</p>
+                <Field
+                  label={t('staff.jobTitle')}
+                  value={title}
+                  maxLength={100}
+                  placeholder="ör. Dermatolog"
+                  disabled={busy}
+                  error={errorFor(errors, 'staffProfile.title')}
+                  onChange={(event) => setTitle(event.target.value)}
+                />
+                <FieldSwitch
+                  label={t('staff.visibleOnline')}
+                  checked={visibleOnline}
+                  disabled={busy}
+                  onCheckedChange={setVisibleOnline}
+                />
+                <div className="flex flex-col gap-2">
+                  <span className="text-sm font-medium">{t('staff.competency')}</span>
+                  {services.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">{t('staff.noServices')}</p>
+                  ) : (
+                    <div className="grid gap-1 sm:grid-cols-2">
+                      {services.map((service) => (
+                        <FieldCheckbox
+                          key={service.id}
+                          label={service.name}
+                          checked={selected.has(service.id)}
+                          disabled={busy}
+                          onCheckedChange={(checked) =>
+                            setSelected((current) => {
+                              const next = new Set(current);
+                              if (checked) next.add(service.id);
+                              else next.delete(service.id);
+                              return next;
+                            })
+                          }
+                        />
+                      ))}
+                    </div>
+                  )}
+                  {errorFor(errors, 'staffProfile.serviceIds') !== undefined ? (
+                    <p className="text-xs text-destructive">
+                      {errorFor(errors, 'staffProfile.serviceIds')}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
           </DialogBody>
 
           <DialogFooter>

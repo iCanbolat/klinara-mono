@@ -103,7 +103,7 @@ describe('mobil push', () => {
 
     const devices = await app
       .get(TenantTxService)
-      .runForTenant(clinic.tenant.id, (tx) => pushRepo.recipients(tx, null));
+      .runForTenant(clinic.tenant.id, (tx) => pushRepo.recipients(tx, { branchId: null, kind: 'appointment_created', appointmentId: null }));
     expect(devices).toHaveLength(1);
 
     await notifyAndPush();
@@ -143,13 +143,40 @@ describe('mobil push', () => {
 
     const tx = app.get(TenantTxService);
     const own = await tx.runForTenant(clinic.tenant.id, (t) =>
-      pushRepo.recipients(t, clinic.branch.id),
+      pushRepo.recipients(t, { branchId: clinic.branch.id, kind: 'appointment_created', appointmentId: null }),
     );
     expect(own.map((row) => row.token).sort()).toEqual(['owner-token', 'practitioner-token']);
 
     // Uygulayıcı yalnız kendi şubesinde; klinik geneli sahip her şubeyi görür.
-    const other = await tx.runForTenant(clinic.tenant.id, (t) => pushRepo.recipients(t, randomUUID()));
+    const other = await tx.runForTenant(clinic.tenant.id, (t) =>
+      pushRepo.recipients(t, { branchId: randomUUID(), kind: 'appointment_created', appointmentId: null }),
+    );
     expect(other.map((row) => row.token)).toEqual(['owner-token']);
+  });
+
+  it('gelen WhatsApp mesajı mesajlaşma izni olmayan uygulayıcıya gitmez', async () => {
+    await register(clinic.owner.tokens, 'owner-token').expect(204);
+    await register(clinic.practitioner.tokens, 'practitioner-token', 'android').expect(204);
+    const devices = await app
+      .get(TenantTxService)
+      .runForTenant(clinic.tenant.id, (t) =>
+        pushRepo.recipients(t, { branchId: null, kind: 'inbound_message', appointmentId: null }),
+      );
+    expect(devices.map((row) => row.token)).toEqual(['owner-token']);
+  });
+
+  it('uygulayıcı başkasının randevusunun bildirimini almaz', async () => {
+    await register(clinic.practitioner.tokens, 'practitioner-token', 'android').expect(204);
+    const devices = await app
+      .get(TenantTxService)
+      .runForTenant(clinic.tenant.id, (t) =>
+        pushRepo.recipients(t, {
+          branchId: clinic.branch.id,
+          kind: 'appointment_created',
+          appointmentId: randomUUID(),
+        }),
+      );
+    expect(devices).toHaveLength(0);
   });
 
   it('başka kliniğin cihazı alıcı listesine girmez', async () => {
@@ -157,7 +184,7 @@ describe('mobil push', () => {
     const other = await setupClinic(app, { slug: 'diger-klinik' });
     const devices = await app
       .get(TenantTxService)
-      .runForTenant(other.tenant.id, (tx) => pushRepo.recipients(tx, null));
+      .runForTenant(other.tenant.id, (tx) => pushRepo.recipients(tx, { branchId: null, kind: 'appointment_created', appointmentId: null }));
     expect(devices).toHaveLength(0);
   });
 });

@@ -8,6 +8,7 @@ import { BookingPageCacheService } from '../booking-page/booking-page-cache.serv
 import type { Principal } from '../identity/principal';
 import { BranchAccessService } from '../tenancy/branch-access.service';
 import * as repo from './staff.repository';
+import { assertCanAddPractitioner } from '../tenancy/plan-limits';
 import type {
   CreateStaffProfileDto,
   ReplaceStaffServicesDto,
@@ -103,6 +104,7 @@ export class StaffService {
 
     const payload = await this.tx
       .run(async (tx) => {
+        if (input.isActive ?? true) await assertCanAddPractitioner(tx, this.tx.tenantId);
         const profile = await repo.insertStaffProfile(tx, {
           tenantId: this.tx.tenantId,
           userId: input.userId,
@@ -170,6 +172,13 @@ export class StaffService {
     }
     const payload = await this.tx
       .run(async (tx) => {
+        // Pasif profili yeniden aktif etmek bir hekim koltuğu daha kullanır.
+        if (input.isActive === true) {
+          const current = await repo.findStaffProfileById(tx, id);
+          if (current !== undefined && !current.isActive) {
+            await assertCanAddPractitioner(tx, this.tx.tenantId);
+          }
+        }
         const updated = await repo.updateStaffProfile(tx, id, {
           primaryBranchId: input.primaryBranchId,
           title: input.title,

@@ -26,16 +26,10 @@ struct AppShellView: View {
         case dashboard, calendar, customers, management, profile
     }
 
-    /// Yönetim sekmesi Faz 2'nin tamamını barındırır; izinlerden herhangi biri
-    /// yeter (yalnız çalışma saatlerini düzenleyen bir yönetici de girebilmeli).
+    /// Yönetim sekmesi, içindeki kartlardan en az biri görünüyorsa çizilir —
+    /// kart kuralları tek yerde (``ManagementAccess``), web menüsüyle aynı.
     private var showsManagement: Bool {
-        session.canAny(
-            Permissions.serviceRead,
-            Permissions.staffRead,
-            Permissions.scheduleRead,
-            Permissions.notificationRead,
-            Permissions.notificationManage
-        )
+        ManagementAccess(session: session).any
     }
 
     /// Randevu izni olmayan bir rolde sekme yine de duruyor —
@@ -159,7 +153,11 @@ enum Permissions {
     static let userWrite = "user:write"
     static let userInvite = "user:invite"
     static let packageRead = "package:read"
+    /// Paket SATIŞI ve seans düzenleme — resepsiyonda da var.
     static let packageWrite = "package:write"
+    /// Paket TANIMI (katalog) yazma — yalnız sahip ve şube yöneticisi.
+    /// `package:write` üzerine binmez: resepsiyon satar ama tanımı değiştiremez.
+    static let packageDefinitionWrite = "package_definition:write"
     /// İade ve devir `package:write` üzerine **binmez**. Gerekçe `customer:merge`
     /// ile aynı: geri alınması pahalı, paraya dokunan işlemlerin resepsiyonun
     /// günlük yazma iznine binmesi yetkisiz iade demektir.
@@ -184,4 +182,8 @@ enum Permissions {
     /// `send`i **kapsamaz**: şablonu yöneten bir kullanıcı mesaj göndermek
     /// zorunda değil.
     static let notificationManage = "notification:manage"
+    static let consentRead = "consent:read"
+    /// Onam METİNLERİNİ düzenleme; imza toplamak (`consent:collect`) buna binmez.
+    static let consentManage = "consent:manage"
+    static let consentCollect = "consent:collect"
 }

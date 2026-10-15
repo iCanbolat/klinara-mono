@@ -61,9 +61,19 @@ fun PackageDefinitionEditorScreen(
             factory = PackageDefinitionEditorViewModel.factory(container, definitionId, session.activeBranchId),
         )
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val canWrite = session.can(Permissions.PACKAGE_WRITE)
+    // Tanım yazmak `package_definition:write` (sahip, şube yöneticisi); şube yöneticisi tüm
+    // şubeleri kapsayan (sahibin) tanımı değiştiremez.
+    val canWrite =
+        session.can(Permissions.PACKAGE_DEFINITION_WRITE) &&
+            (session.tenantWide || !state.form.isEditing || state.form.branchId != null)
 
     LaunchedEffect(definitionId) { viewModel.load() }
+    // Şube yöneticisi "tüm şubeler" tanımı açamaz: yeni tanım seçili şubeyle başlar.
+    LaunchedEffect(state.form.isEditing, session.tenantWide) {
+        if (!state.form.isEditing && !session.tenantWide && state.form.branchId == null) {
+            session.activeBranchId?.let { id -> viewModel.update { it.copy(branchId = id) } }
+        }
+    }
     LaunchedEffect(state.saved) { state.saved?.let(onSaved) }
 
     Box {
@@ -267,13 +277,15 @@ private fun ScopeCard(
         footnote =
             if (form.isEditing) {
                 "Şube kapsamı satıştan sonra değiştirilemez; satılmış paketlerin izini taşır."
+            } else if (!session.tenantWide) {
+                "Paket yalnız seçili şubede satılabilir."
             } else {
                 "Tüm şubeler seçilirse paket her şubede satılabilir."
             },
     ) {
         val branchName =
             form.branchId?.let { id -> session.branches.firstOrNull { it.id == id }?.name ?: "Şubeye özel" }
-        if (form.isEditing || !canWrite || activeBranch == null) {
+        if (form.isEditing || !canWrite || activeBranch == null || !session.tenantWide) {
             KlinaraRow(label = "Şube", value = branchName ?: "Tüm şubeler")
         } else {
             KlinaraSegmentedPicker(

@@ -13,7 +13,7 @@ import {
 } from '@klinara/shared';
 import { useBranch } from '@/components/session/branch-provider';
 import { useSession } from '@/components/session/session-provider';
-import { api } from '@/lib/api/client';
+import { api, ApiProblemError } from '@/lib/api/client';
 import { todayKey } from '@/lib/calendar/date';
 import {
   accessibleBranches,
@@ -29,6 +29,7 @@ import {
   type UpcomingRow,
 } from '@/lib/dashboard/summary';
 import { toMessage } from '@/lib/reports/errors';
+
 import { presetRange, rangeQuery } from '@/lib/reports/period';
 
 /**
@@ -52,6 +53,8 @@ export interface DashboardState {
   summaries: BranchSummary[];
   /** Tüm şubelerde tarihi en yakın randevular — bugünle sınırlı değil. */
   upcoming: UpcomingRow[];
+  /** Bugünün TÜM randevuları (tamamlananlar dahil), saate göre — "Bugünüm" akışı. */
+  today: UpcomingRow[];
   /** Verinin çekildiği an; "bugün/yarın" etiketleri buna göre. */
   fetchedAt: number | null;
   totals: DashboardTotals;
@@ -196,6 +199,9 @@ export function useDashboard(): DashboardState {
       let reportsError: string | null = null;
       const unwrap = <T>(settled: PromiseSettledResult<T | null>): T | null => {
         if (settled.status === 'fulfilled') return settled.value;
+        // 403 = bu rol/kişi için o rapor yok (ör. personel profili açılmamış
+        // uygulayıcı). Kart boş kalır; "alınamadı" uyarısı yanıltıcı olurdu.
+        if (settled.reason instanceof ApiProblemError && settled.reason.status === 403) return null;
         reportsError ??= toMessage(settled.reason);
         return null;
       };
@@ -229,12 +235,30 @@ export function useDashboard(): DashboardState {
     [branches, result],
   );
 
+  const today = useMemo<UpcomingRow[]>(
+    () =>
+      result === null
+        ? []
+        : branches
+            .flatMap((branch) =>
+              (result.day.get(branch.id)?.entries ?? []).map((entry) => ({
+                entry,
+                branchId: branch.id,
+                branchName: branch.name,
+                timezone: result.day.get(branch.id)?.timezone ?? branch.timezone,
+              })),
+            )
+            .sort((a, b) => Date.parse(a.entry.startsAt) - Date.parse(b.entry.startsAt)),
+    [branches, result],
+  );
+
   const sources = result?.sources ?? EMPTY_SOURCES;
 
   return {
     loading: result === null,
     summaries,
     upcoming,
+    today,
     fetchedAt: result?.fetchedAt ?? null,
     totals: dashboardTotals(summaries, sources),
     sources,

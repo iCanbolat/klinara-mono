@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useMemo, type ReactNode } from 'react';
 import { Building2, CalendarCheck, RefreshCw, TrendingUp, UserX, Wallet } from 'lucide-react';
-import { PERMISSIONS, isAppointmentStatus } from '@klinara/shared';
+import { isAppointmentStatus } from '@klinara/shared';
 import { t } from '@/i18n/tr';
 import { cn } from '@/lib/cn';
 import { formatTime } from '@/lib/calendar/date';
@@ -23,10 +23,13 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { SetupCard } from './setup-card';
 import { PageHeader } from '@/components/ui/page-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StatCard } from '@/components/ui/stat-card';
 import { BranchChart } from './branch-chart';
+import { isOwnScope } from '@/lib/permissions';
+import { TodayPage } from './today-page';
 import { useDashboard } from './use-dashboard';
 
 /**
@@ -48,30 +51,36 @@ const TODAY_LABEL = new Intl.DateTimeFormat('tr-TR', {
   weekday: 'long',
 });
 
+/**
+ * Rol ayrımı: yalnız KENDİ randevularını gören uygulayıcı yönetici panosunu
+ * değil "Bugünüm"ü görür (bkz. `today-page.tsx`).
+ */
 export function DashboardPage(): ReactNode {
-  const { me, loading: sessionLoading, permissions } = useSession();
+  const { loading, permissions } = useSession();
+  if (loading) return <DashboardSkeleton />;
+  return isOwnScope(permissions) ? <TodayPage /> : <ManagerDashboard />;
+}
+
+function DashboardSkeleton(): ReactNode {
+  return (
+    <div className="flex flex-col gap-8" aria-busy="true">
+      <div className="flex flex-col gap-2">
+        <Skeleton className="h-9 w-72" />
+        <Skeleton className="h-4 w-96 max-w-full" />
+      </div>
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {[0, 1, 2, 3].map((key) => (
+          <Skeleton key={key} className="h-28 rounded-xl" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ManagerDashboard(): ReactNode {
+  const { me } = useSession();
   const state = useDashboard();
   const { sources, totals, can } = state;
-
-  const ownOnly =
-    !permissions.includes(PERMISSIONS.APPOINTMENT_READ_ALL) &&
-    permissions.includes(PERMISSIONS.APPOINTMENT_READ_OWN);
-
-  if (sessionLoading) {
-    return (
-      <div className="flex flex-col gap-8" aria-busy="true">
-        <div className="flex flex-col gap-2">
-          <Skeleton className="h-9 w-72" />
-          <Skeleton className="h-4 w-96 max-w-full" />
-        </div>
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          {[0, 1, 2, 3].map((key) => (
-            <Skeleton key={key} className="h-28 rounded-xl" />
-          ))}
-        </div>
-      </div>
-    );
-  }
 
   const kpis: ReactNode[] = [];
   if (can.calendar) {
@@ -154,7 +163,7 @@ export function DashboardPage(): ReactNode {
         }
       />
 
-      {ownOnly ? <Alert tone="info">{t('calendar.scopeOwn')}</Alert> : null}
+      <SetupCard />
 
       {kpis.length === 0 ? null : (
         <section
@@ -192,7 +201,7 @@ export function DashboardPage(): ReactNode {
         </div>
       ) : null}
 
-      <BranchesSection state={state} />
+      {can.occupancy ? <BranchesSection state={state} /> : null}
     </div>
   );
 }

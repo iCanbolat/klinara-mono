@@ -256,7 +256,12 @@ struct BookingFlowView: View {
 
     @ViewBuilder
     private var staffSection: some View {
-        let eligible = draft.eligibleStaff(session.staffStore.profiles)
+        // Uygulayıcı yalnız KENDİ adına randevu açar; diğer rollerde şubenin personeli.
+        let eligible = draft.eligibleStaff(session.staffStore.profiles).filter { profile in
+            session.isOwnScope
+                ? profile.userId == session.user.id
+                : profile.worksIn(branchId: draft.branchId)
+        }
         KlinaraFormSection(
             title: "Personel",
             footnote: eligible.isEmpty

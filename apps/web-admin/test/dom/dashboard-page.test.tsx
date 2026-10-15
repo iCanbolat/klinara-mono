@@ -237,11 +237,13 @@ describe('karşılama sayfası', () => {
     expect(screen.queryByText('Hızlı erişim')).not.toBeInTheDocument();
   });
 
-  it('personel raporu yalnız dönemle isteniyor, uygulayıcıya da açık', async () => {
+  it('uygulayıcı yönetici panosu yerine "Bugünüm"ü görüyor; kendi performansı yalnız dönemle', async () => {
     permissions = [PERMISSIONS.APPOINTMENT_READ_OWN, PERMISSIONS.REPORT_PERFORMANCE_READ_OWN];
     render(<DashboardPage />);
 
-    await screen.findByRole('heading', { name: 'Personel cirosu' });
+    await screen.findByRole('heading', { name: 'Bugünün akışı' });
+    expect(screen.queryByRole('heading', { name: 'Personel cirosu' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Şubeler' })).not.toBeInTheDocument();
     const call = get.mock.calls
       .map((c) => String(c[0]))
       .find((p) => p.startsWith('reports/staff-performance'));

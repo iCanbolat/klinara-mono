@@ -66,8 +66,10 @@ export function PackageFormDialog({
   onClose: () => void;
   onSaved: () => void;
 }): ReactNode {
-  const { branches } = useBranch();
+  const { branches, branchId: selectedBranchId, canSelectAll } = useBranch();
   const isEditing = definition !== null;
+  // Şube yöneticisi "tüm şubeler" tanımı açamaz: varsayılan seçili şubesi.
+  const defaultBranchId = canSelectAll ? null : (selectedBranchId ?? branches[0]?.id ?? null);
 
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
@@ -103,7 +105,7 @@ export function PackageFormDialog({
           })),
       );
       setPriceMinor(definition?.totalPriceMinor ?? null);
-      setBranchId(definition?.branchId ?? null);
+      setBranchId(definition?.branchId ?? defaultBranchId);
       setValidityDays(definition?.validityDays == null ? null : String(definition.validityDays));
       setTransferable(definition?.isTransferable ?? true);
       setOnlineSellable(definition?.isOnlineSellable ?? false);
@@ -112,7 +114,7 @@ export function PackageFormDialog({
       setErrors(NO_ERRORS);
       setBusy(false);
     })();
-  }, [open, definition]);
+  }, [open, definition, defaultBranchId]);
 
   const listMinor = listTotalMinor(items);
   const discount = discountMinor(listMinor, priceMinor);
@@ -399,7 +401,7 @@ export function PackageFormDialog({
                     setBranchId(event.target.value === '' ? null : event.target.value)
                   }
                 >
-                  <option value="">{t('packages.allBranches')}</option>
+                  {canSelectAll ? <option value="">{t('packages.allBranches')}</option> : null}
                   {branches.map((branch: Branch) => (
                     <option key={branch.id} value={branch.id}>
                       {branchName(branch.id)}

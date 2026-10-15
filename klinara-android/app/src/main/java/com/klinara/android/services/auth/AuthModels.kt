@@ -152,7 +152,10 @@ data class MeResponse(
     val branchIds: List<String> = emptyList(),
     /** true ise kullanıcı kiracının TÜM şubelerini görür. */
     val tenantWide: Boolean = false,
-)
+) {
+    /** Sunucudaki `canAccessBranch` ile aynı kural. */
+    fun canAccessBranch(id: String): Boolean = tenantWide || id in branchIds
+}
 
 @Serializable
 data class BranchSummary(

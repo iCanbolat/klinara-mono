@@ -30,7 +30,13 @@ export class PackageDefinitionsService {
     private readonly branchAccess: BranchAccessService,
   ) {}
 
-  async list(query: ListPackageDefinitionsQueryDto): Promise<Page<PackageDefinitionResponseDto>> {
+  async list(
+    principal: Principal,
+    query: ListPackageDefinitionsQueryDto,
+  ): Promise<Page<PackageDefinitionResponseDto>> {
+    if (query.branchId !== undefined) {
+      await this.branchAccess.assertInput(principal, query.branchId);
+    }
     const limit = Math.min(query.limit ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
     const cursor = decodeCursor(query.cursor);
 
@@ -74,6 +80,8 @@ export class PackageDefinitionsService {
     PackageDefinitionsService.assertDistinctServices(input.items);
     if (input.branchId !== undefined) {
       await this.branchAccess.assertInput(principal, input.branchId);
+    } else {
+      PackageDefinitionsService.assertScope(principal, null);
     }
 
     return this.tx
@@ -105,6 +113,7 @@ export class PackageDefinitionsService {
   }
 
   async update(
+    principal: Principal,
     id: string,
     expectedVersion: number,
     input: UpdatePackageDefinitionDto,
@@ -115,6 +124,7 @@ export class PackageDefinitionsService {
 
     const payload = await this.tx
       .run(async (tx) => {
+        await PackageDefinitionsService.assertScopeOf(tx, principal, id);
         const row = await repo.updateWithVersion(tx, id, expectedVersion, {
           name: input.name?.trim(),
           description: input.description,
@@ -155,9 +165,10 @@ export class PackageDefinitionsService {
    * üzerinden yaşamaya devam eder ama tanım kimlik olarak ayakta kalmalıdır,
    * aksi hâlde "bu paket hangi tanımdan satıldı" izi kopardı.
    */
-  async remove(id: string, expectedVersion: number): Promise<void> {
+  async remove(principal: Principal, id: string, expectedVersion: number): Promise<void> {
     const payload = await this.tx
       .run(async (tx) => {
+        await PackageDefinitionsService.assertScopeOf(tx, principal, id);
         // Satılmışsa arşivlenmez, yalnız pasife alınır. Aynı kural DB'de de
         // var (package_definitions_guard_delete, K0007); burada sormamızın
         // sebebi tek bir uçtan iki davranışı da sunabilmek.
@@ -185,6 +196,31 @@ export class PackageDefinitionsService {
     if (row === undefined) return undefined;
     const items = await repo.listItemsForDefinitions(tx, [id]);
     return PackageDefinitionsService.toResponse(row, items.get(id) ?? []);
+  }
+
+  /**
+   * Şube kapsamlı kullanıcı (şube yöneticisi) yalnız KENDİ şubesinin
+   * tanımlarını yazar; tüm şubeleri kapsayan tanım işletme sahibinindir.
+   */
+  private static assertScope(principal: Principal, branchId: string | null): void {
+    if (branchId === null) {
+      if (!principal.tenantWide) {
+        throw new AppError(
+          403,
+          ERROR_CODES.BRANCH_FORBIDDEN,
+          'Tüm şubeleri kapsayan paket tanımını yalnız işletme sahibi değiştirebilir',
+        );
+      }
+      return;
+    }
+    BranchAccessService.assertMembership(principal, branchId);
+  }
+
+  private static async assertScopeOf(tx: Tx, principal: Principal, id: string): Promise<void> {
+    const current = await repo.findDefinitionById(tx, id);
+    // Yoksa akış 404'e düşsün.
+    if (current === undefined) return;
+    PackageDefinitionsService.assertScope(principal, current.branchId);
   }
 
   private static assertDistinctServices(items: PackageDefinitionItemInputDto[]): void {

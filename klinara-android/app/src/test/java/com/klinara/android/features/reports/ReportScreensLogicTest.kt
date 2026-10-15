@@ -33,7 +33,8 @@ class ReportScreensLogicTest {
                 ?.map { it.label }
 
         assertEquals(listOf("Klinik raporları", "Paket raporları"), rows("manager"))
-        assertEquals(listOf("Klinik raporları", "Paket raporları"), rows("practitioner"))
+        // Uygulayıcı yalnız kendi performansını görür; paket raporu operasyonun işi.
+        assertEquals(listOf("Performansım"), rows("practitioner"))
         val packages = managementSections(ShellSessions.forRole("manager")).first { it.title == "Paketler" }
         assertEquals(listOf("Paket tanımları"), packages.rows.map { it.label })
     }

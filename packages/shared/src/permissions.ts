@@ -51,6 +51,13 @@ export const PERMISSIONS = {
   // --- Paket ---
   PACKAGE_READ: 'package:read',
   PACKAGE_WRITE: 'package:write',
+  /**
+   * Paket TANIMI (katalog) oluşturma/düzenleme/arşivleme.
+   *
+   * `package:write` (satış ve seans) üzerine BİNMEZ: resepsiyon paketi satar
+   * ama kiracının fiyat ve seans kurallarını belirleyen tanımı değiştiremez.
+   */
+  PACKAGE_DEFINITION_WRITE: 'package_definition:write',
   // İade ve devir `package:write` üzerine BİNMEZ. Gerekçe `customer:merge`
   // ile aynı: geri alınması pahalı, paraya dokunan işlemlerin resepsiyonun
   // günlük yazma iznine binmesi yetkisiz iade demektir.
@@ -189,6 +196,7 @@ export const ROLE_DEFINITIONS: RoleDefinition[] = [
       P.CUSTOMER_MEDICAL_READ,
       P.CUSTOMER_MERGE,
       P.PACKAGE_WRITE,
+      P.PACKAGE_DEFINITION_WRITE,
       P.PACKAGE_REFUND,
       P.PACKAGE_TRANSFER,
       P.REPORT_REVENUE_READ,
@@ -196,8 +204,8 @@ export const ROLE_DEFINITIONS: RoleDefinition[] = [
       P.CONSENT_COLLECT,
       P.NOTIFICATION_SEND,
       P.NOTIFICATION_MANAGE,
-      P.BOOKING_PAGE_READ,
-      P.BOOKING_PAGE_MANAGE,
+      // Randevu sayfası ve içerik YALNIZ işletme sahibinde: kiracının dışarıya
+      // görünen yüzü şube düzeyinde değiştirilmez.
       P.AUDIT_READ,
     ],
   },
@@ -214,7 +222,6 @@ export const ROLE_DEFINITIONS: RoleDefinition[] = [
       P.CONSENT_MANAGE,
       P.CONSENT_COLLECT,
       P.NOTIFICATION_SEND,
-      P.BOOKING_PAGE_READ,
     ],
   },
   {

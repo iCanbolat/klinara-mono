@@ -129,6 +129,11 @@ nonisolated struct MeResponse: Decodable, Sendable {
     let branchIds: [String]
     /// `true` ise kullanıcı kiracının **tüm** şubelerine erişir.
     let tenantWide: Bool
+
+    /// Sunucudaki `canAccessBranch` ile aynı kural.
+    func canAccessBranch(_ id: String) -> Bool {
+        tenantWide || branchIds.contains(id)
+    }
 }
 
 /// `BranchResponseDto`.

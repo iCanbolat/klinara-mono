@@ -228,7 +228,7 @@ class AuthFlowViewModel(
 
     private suspend fun routeToBranchOrFinish(me: MeResponse) {
         val all = container.auth.branches()
-        val visible = if (me.tenantWide) all else all.filter { me.branchIds.contains(it.id) }
+        val visible = all.filter { me.canAccessBranch(it.id) }
         visibleBranches = visible
 
         val saved = container.tokens.branchId()

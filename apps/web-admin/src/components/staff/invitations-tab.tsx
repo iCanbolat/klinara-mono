@@ -183,6 +183,9 @@ export function InvitationsTab(): ReactNode {
         onSent={(invitation) => {
           setInviting(false);
           setInvitations((current) => [invitation, ...(current ?? [])]);
+          if (invitation.mailDelivered === false) {
+            toast.error(t('invites.mailFailed'), { duration: 12_000 });
+          }
           if (invitation.link !== undefined) {
             // Üretim dışında e-posta loga gidiyor; bağlantıyı elde etmenin tek yolu bu.
             toast.info(t('invites.devLink'), { description: invitation.link, duration: 20_000 });

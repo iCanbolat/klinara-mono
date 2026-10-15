@@ -50,8 +50,13 @@ export function PackagesTab({
   categories: readonly ServiceCategorySummary[];
 }): ReactNode {
   const { permissions } = useSession();
-  const { branches } = useBranch();
-  const canWrite = permissions.includes(PERMISSIONS.PACKAGE_WRITE);
+  const { branches, canSelectAll } = useBranch();
+  // Tanım yazmak `package_definition:write` (sahip, şube yöneticisi); satış
+  // izni (`package:write`) resepsiyonda da var ama tanıma binmez.
+  const canWrite = permissions.includes(PERMISSIONS.PACKAGE_DEFINITION_WRITE);
+  // Şube yöneticisi tüm şubeleri kapsayan (sahibin) tanımı değiştiremez.
+  const canEdit = (definition: PackageDefinition): boolean =>
+    canWrite && (canSelectAll || definition.branchId !== null);
 
   const [definitions, setDefinitions] = useState<PackageDefinition[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -132,7 +137,7 @@ export function PackagesTab({
       : t('packages.days', { count: definition.validityDays });
 
   const renderActions = (definition: PackageDefinition): ReactNode =>
-    canWrite ? (
+    canEdit(definition) ? (
       <>
         <Button
           type="button"

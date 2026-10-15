@@ -1,5 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { ERROR_CODES } from '@klinara/shared';
+import {
+  DEFAULT_PLAN_KEY,
+  ERROR_CODES,
+  ROLE_BY_KEY,
+  type TenantPlanInfo,
+  type TenantSetupStatus,
+} from '@klinara/shared';
 import { AppError } from '../../common/errors/app-error';
 import { isPgError, PG_ERROR } from '../../common/errors/db-errors';
 import { setTenantContext } from '../../database/tenant-tx';
@@ -8,6 +14,9 @@ import { BookingPageCacheService } from '../booking-page/booking-page-cache.serv
 import { BranchAccessService } from './branch-access.service';
 import { InvitationsService } from '../identity/invitations.service';
 import * as repo from './tenancy.repository';
+import { canAccessBranch, type Principal } from '../identity/principal';
+import { assertCanAddBranch, getTenantPlanInfo } from './plan-limits';
+import { getSetupStatus } from './setup-status';
 import type {
   BranchResponseDto,
   CreateBranchDto,
@@ -20,7 +29,7 @@ import type {
   UpdateTenantSettingsDto,
 } from './dto/tenant.dto';
 
-function toTenantResponse(row: repo.TenantRow): TenantResponseDto {
+export function toTenantResponse(row: repo.TenantRow): TenantResponseDto {
   return {
     id: row.id,
     slug: row.slug,
@@ -44,7 +53,7 @@ function toSettingsResponse(row: repo.TenantSettingsRow): TenantSettingsResponse
   };
 }
 
-function toBranchResponse(row: repo.BranchRow): BranchResponseDto {
+export function toBranchResponse(row: repo.BranchRow): BranchResponseDto {
   return {
     id: row.id,
     tenantId: row.tenantId,
@@ -87,6 +96,9 @@ export class TenancyService {
           name: input.name,
           timezone: input.timezone,
           currency: input.currency,
+          planKey: input.planKey ?? DEFAULT_PLAN_KEY,
+          maxBranchesOverride: input.maxBranchesOverride ?? null,
+          maxPractitionersOverride: input.maxPractitionersOverride ?? null,
         });
         await setTenantContext(tx, tenant.id);
         await repo.insertDefaultSettings(tx, tenant.id);
@@ -113,11 +125,10 @@ export class TenancyService {
       });
 
     const { invitation, token, link } = result.invitation;
-    await this.invitations.sendInvitationMail(
-      invitation.email,
-      link,
-      `${result.tenant.name} için Klinara hesabınız hazır`,
-    );
+    const mailDelivered = await this.invitations.sendInvitationMail(invitation.email, link, {
+      tenantName: result.tenant.name,
+      roleName: ROLE_BY_KEY.owner.name,
+    });
 
     return {
       tenant: toTenantResponse(result.tenant),
@@ -125,6 +136,7 @@ export class TenancyService {
       ownerInvitation: {
         email: invitation.email,
         expiresAt: invitation.expiresAt.toISOString(),
+        mailDelivered,
         ...(this.invitations.tokenVisible ? { token, link } : {}),
       },
     };
@@ -160,9 +172,21 @@ export class TenancyService {
     return toSettingsResponse(row);
   }
 
-  async listBranches(): Promise<BranchResponseDto[]> {
+  /** Plan, geçerli limitler ve kullanım — panelde "Plan ve kullanım" kartı. */
+  async getPlan(): Promise<TenantPlanInfo> {
+    const tenantId = this.tx.tenantId;
+    return this.tx.run((tx) => getTenantPlanInfo(tx, tenantId));
+  }
+
+  async getSetupStatus(): Promise<TenantSetupStatus> {
+    const tenantId = this.tx.tenantId;
+    return this.tx.run((tx) => getSetupStatus(tx, tenantId));
+  }
+
+  /** Seçicilerde kullanıcının üye olmadığı şube görünmesin (aksi hâlde 403). */
+  async listBranches(principal: Principal): Promise<BranchResponseDto[]> {
     const rows = await this.tx.run((tx) => repo.listBranches(tx));
-    return rows.map(toBranchResponse);
+    return rows.filter((row) => canAccessBranch(principal, row.id)).map(toBranchResponse);
   }
 
   async createBranch(input: CreateBranchDto): Promise<BranchResponseDto> {
@@ -171,6 +195,7 @@ export class TenancyService {
       .run(async (tx) => {
         const tenant = await repo.findTenantById(tx, tenantId);
         if (tenant === undefined) throw AppError.notFound('Kiracı bulunamadı');
+        await assertCanAddBranch(tx, tenantId);
         return repo.insertBranch(tx, {
           tenantId,
           slug: input.slug,
@@ -198,7 +223,15 @@ export class TenancyService {
   }
 
   async updateBranch(id: string, input: UpdateBranchDto): Promise<BranchResponseDto> {
-    const row = await this.tx.run((tx) => repo.updateBranch(tx, id, input));
+    const tenantId = this.tx.tenantId;
+    const row = await this.tx.run(async (tx) => {
+      // Pasif şubeyi yeniden açmak, yeni şube açmakla aynı kapasiteyi kullanır.
+      if (input.isActive === true) {
+        const current = await repo.findBranchById(tx, id);
+        if (current !== undefined && !current.isActive) await assertCanAddBranch(tx, tenantId);
+      }
+      return repo.updateBranch(tx, id, input);
+    });
     // RLS sayesinde başka kiracının şubesi de burada "bulunamadı" olur —
     // varlığını bile sızdırmaz.
     if (row === undefined) throw AppError.notFound('Şube bulunamadı');

@@ -44,28 +44,10 @@ enum class ShellTab(
             // izin yoksa sekme durur ama içerik "erişiminiz yok" der.
             Dashboard, Calendar, Profile -> true
             Customers -> session.can(Permissions.CUSTOMER_READ)
-            Management -> session.canAny(MANAGEMENT_PERMISSIONS)
+            Management -> ManagementAccess.of(session).any
         }
 
     companion object {
-        /**
-         * Yönetim sekmesini açan izinler.
-         *
-         * **`package:read` A5.1'de eklendi**, aynı sınıftan bir hatayı önlemek için:
-         * paket tanımları ve raporları Yönetim'de yaşıyor. Bugün her paket izni olan rol
-         * sekmeyi zaten başka bir izinle görüyor, ama koşul "şans eseri doğru" olmamalı —
-         * paket ekranına götüren izin sekmeyi de açmalı.
-         */
-        val MANAGEMENT_PERMISSIONS =
-            setOf(
-                Permissions.SERVICE_READ,
-                Permissions.STAFF_READ,
-                Permissions.SCHEDULE_READ,
-                Permissions.NOTIFICATION_READ,
-                Permissions.NOTIFICATION_MANAGE,
-                Permissions.PACKAGE_READ,
-            )
-
         fun visibleFor(session: AppSession): List<ShellTab> = entries.filter { it.isVisible(session) }
 
         /**
@@ -331,6 +313,10 @@ object ShellRoutes {
     /** Şube çalışma saatleri (A7.3) — SEÇİLİ şubenin. */
     @Serializable
     data object BranchHours
+
+    /** Uygulayıcının KENDİ programı — profil kimliği ekranda çözülür. */
+    @Serializable
+    data object MySchedule
 
     /** Personelin seçili şubedeki haftalık programı. */
     @Serializable

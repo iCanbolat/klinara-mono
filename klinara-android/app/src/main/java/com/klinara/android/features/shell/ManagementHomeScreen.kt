@@ -25,6 +25,8 @@ enum class ManagementDestination {
     Branches,
     Invitations,
     BranchHours,
+    /** Uygulayıcının kendi haftalık programı. */
+    MySchedule,
     ScheduleExceptions,
     CustomerTags,
     PackageDefinitions,
@@ -60,9 +62,53 @@ data class ManagementSection(
  * **Sahte satır yok** — açılmayan bir satır, var olmayan bir özellik vaat eder. Henüz
  * gelmemiş fazlar tek bir "Yakında" kartında metin olarak anılır.
  */
+/**
+ * Kartların hangi rolde görüneceği — web menüsü (`lib/permissions.ts` `NAV_ITEMS`) ve iOS
+ * `ManagementAccess` paritesi.
+ *
+ * Kapılar "veriyi okuyabiliyor mu" değil "bu ekran onun işi mi" sorusuna bakar:
+ * `staff:read`, `service:read`, `notification:read` HER rolde var (randevu formu ve zil
+ * için), ama uygulayıcının ekip, katalog ya da şablon yönetimiyle işi yok.
+ */
+data class ManagementAccess(
+    val catalog: Boolean,
+    val team: Boolean,
+    val schedule: Boolean,
+    val customerTags: Boolean,
+    val packages: Boolean,
+    val communication: Boolean,
+    val reports: Boolean,
+    val packageReports: Boolean,
+    val ownOnly: Boolean,
+) {
+    val any: Boolean
+        get() = catalog || team || schedule || customerTags || packages || communication || reports
+
+    companion object {
+        fun of(session: AppSession): ManagementAccess {
+            val readAll = session.can(Permissions.APPOINTMENT_READ_ALL)
+            val packages = session.can(Permissions.PACKAGE_READ) && readAll
+            return ManagementAccess(
+                catalog = session.can(Permissions.SERVICE_READ) && readAll,
+                team =
+                    session.can(Permissions.STAFF_READ) &&
+                        session.canAny(Permissions.USER_READ, Permissions.STAFF_WRITE),
+                schedule = session.can(Permissions.SCHEDULE_READ),
+                customerTags = session.can(Permissions.CUSTOMER_WRITE),
+                packages = packages,
+                communication = session.canAny(Permissions.NOTIFICATION_SEND, Permissions.NOTIFICATION_MANAGE),
+                reports = ReportAccess.visible(session::can).isNotEmpty(),
+                packageReports = packages || session.can(Permissions.REPORT_REVENUE_READ),
+                ownOnly = session.isOwnScope,
+            )
+        }
+    }
+}
+
 fun managementSections(session: AppSession): List<ManagementSection> =
     buildList {
-        if (session.can(Permissions.SERVICE_READ)) {
+        val access = ManagementAccess.of(session)
+        if (access.catalog) {
             add(
                 section(
                     "Katalog",
@@ -71,8 +117,17 @@ fun managementSections(session: AppSession): List<ManagementSection> =
                 ),
             )
         }
-        teamSection(session)?.let(::add)
-        if (session.can(Permissions.SCHEDULE_READ)) {
+        if (access.team) teamSection(session)?.let(::add)
+        if (access.schedule && access.ownOnly) {
+            // Uygulayıcı: ekibin planı ve izinler değil, yalnız kendi programı.
+            add(
+                section(
+                    "Çalışma saatleri",
+                    row(ManagementDestination.MySchedule, "Çalışma programım", "Haftalık çalışma saatleriniz"),
+                    row(ManagementDestination.BranchHours, "Şube çalışma saatleri", "Açılış, kapanış ve mola"),
+                ),
+            )
+        } else if (access.schedule) {
             add(
                 section(
                     "Takvim kurulumu",
@@ -89,7 +144,7 @@ fun managementSections(session: AppSession): List<ManagementSection> =
                 ),
             )
         }
-        if (session.can(Permissions.CUSTOMER_READ)) {
+        if (access.customerTags) {
             add(
                 section(
                     "Müşteriler",
@@ -97,7 +152,7 @@ fun managementSections(session: AppSession): List<ManagementSection> =
                 ),
             )
         }
-        if (session.can(Permissions.PACKAGE_READ)) {
+        if (access.packages) {
             add(
                 section(
                     "Paketler",
@@ -109,8 +164,8 @@ fun managementSections(session: AppSession): List<ManagementSection> =
                 ),
             )
         }
-        communicationSection(session)?.let(::add)
-        reportsSection(session)?.let(::add)
+        if (access.communication) communicationSection(session)?.let(::add)
+        reportsSection(session, access)?.let(::add)
     }
 
 /**
@@ -154,19 +209,26 @@ private fun teamSection(session: AppSession): ManagementSection? {
  * Klinik raporları satırı, beş rapordan EN AZ BİRİ açılabiliyorsa görünür ([ReportAccess]);
  * hangilerinin açıldığı giriş ekranında ayrıca süzülür.
  */
-private fun reportsSection(session: AppSession): ManagementSection? {
+private fun reportsSection(
+    session: AppSession,
+    access: ManagementAccess,
+): ManagementSection? {
     val rows =
         buildList {
-            if (ReportAccess.visible(session::can).isNotEmpty()) {
+            if (access.reports) {
                 add(
-                    row(
-                        ManagementDestination.Reports,
-                        "Klinik raporları",
-                        "Doluluk, ciro, personel performansı, gelmeme ve kazanım",
-                    ),
+                    if (access.ownOnly) {
+                        row(ManagementDestination.Reports, "Performansım", "Kendi işlem sayınız, ciro ve doluluğunuz")
+                    } else {
+                        row(
+                            ManagementDestination.Reports,
+                            "Klinik raporları",
+                            "Doluluk, ciro, personel performansı, gelmeme ve kazanım",
+                        )
+                    },
                 )
             }
-            if (session.can(Permissions.PACKAGE_READ)) {
+            if (access.packageReports) {
                 add(
                     row(
                         ManagementDestination.PackageReports,
@@ -198,14 +260,16 @@ private fun communicationSection(session: AppSession): ManagementSection? {
             if (session.can(Permissions.NOTIFICATION_SEND)) {
                 add(row(ManagementDestination.Conversations, "Sohbetler", "Müşterilerle WhatsApp yazışmaları"))
             }
-            if (session.can(Permissions.NOTIFICATION_READ)) {
-                add(
-                    row(
-                        ManagementDestination.MessageLog,
-                        "Mesaj günlüğü",
-                        "Gönderilen, ulaşan ve gönderilmeyen mesajlar",
-                    ),
-                )
+            add(
+                row(
+                    ManagementDestination.MessageLog,
+                    "Mesaj günlüğü",
+                    "Gönderilen, ulaşan ve gönderilmeyen mesajlar",
+                ),
+            )
+            // Hatırlatma ve şablonlar kiracının TÜM müşterilerine giden mesajları
+            // değiştirir: yönetenlerin (sahip, şube yöneticisi) işi.
+            if (session.can(Permissions.NOTIFICATION_MANAGE)) {
                 add(
                     row(
                         ManagementDestination.ReminderSettings,
@@ -266,6 +330,7 @@ val ManagementDestination.icon: Int
             ManagementDestination.Branches -> KlinaraIcons.branch
             ManagementDestination.Invitations -> KlinaraIcons.invite
             ManagementDestination.BranchHours -> KlinaraIcons.clock
+            ManagementDestination.MySchedule -> KlinaraIcons.preferences
             ManagementDestination.ScheduleExceptions -> KlinaraIcons.calendarException
             ManagementDestination.CustomerTags -> KlinaraIcons.tag
             ManagementDestination.PackageDefinitions -> KlinaraIcons.packageBox
@@ -293,7 +358,12 @@ fun ManagementHomeScreen(
 ) {
     KlinaraScreen(title = "Yönetim", modifier = modifier, trailing = trailing) {
         Text(
-            text = "${session.activeBranch?.name ?: "Klinik"} · Hizmetler, ekip ve çalışma saatleri buradan yönetilir.",
+            text =
+                if (session.isOwnScope) {
+                    "${session.activeBranch?.name ?: "Klinik"} · Çalışma programınız ve performansınız."
+                } else {
+                    "${session.activeBranch?.name ?: "Klinik"} · Hizmetler, ekip ve çalışma saatleri buradan yönetilir."
+                },
             style = KlinaraType.bodyM,
             color = KlinaraTheme.colors.charcoalMuted,
         )

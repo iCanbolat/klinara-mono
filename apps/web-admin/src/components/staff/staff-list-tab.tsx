@@ -34,6 +34,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Field, FieldSelect } from '@/components/ui/field';
+import { useTenantPlan } from '@/components/plan/use-tenant-plan';
 import { InviteDialog } from './invite-dialog';
 import { CompetencyMatrix } from './competency-matrix';
 import { StaffCard } from './staff-card';
@@ -79,6 +80,10 @@ export function StaffListTab(): ReactNode {
   const [competencyFor, setCompetencyFor] = useState<StaffProfile | null>(null);
   const [editing, setEditing] = useState<StaffProfile | null>(null);
   const [inviting, setInviting] = useState(false);
+  // Profil pasife alınınca (nonce) kullanım tazelenir.
+  const plan = useTenantPlan(nonce);
+  const practitionerLimitReached =
+    plan !== null && plan.usage.practitioners >= plan.limits.maxPractitioners;
 
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<StatusFilter>('all');
@@ -245,9 +250,19 @@ export function StaffListTab(): ReactNode {
         {...(canInvite
           ? {
               actions: (
-                <Button type="button" onClick={() => setInviting(true)}>
-                  {t('invites.new')}
-                </Button>
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  {practitionerLimitReached && plan !== null ? (
+                    <span className="text-sm text-muted-foreground">
+                      {t('staff.planFull', {
+                        used: plan.usage.practitioners,
+                        limit: plan.limits.maxPractitioners,
+                      })}
+                    </span>
+                  ) : null}
+                  <Button type="button" onClick={() => setInviting(true)}>
+                    {t('invites.new')}
+                  </Button>
+                </div>
               ),
             }
           : {})}

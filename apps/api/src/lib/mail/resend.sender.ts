@@ -1,10 +1,14 @@
 import { PinoLogger } from 'nestjs-pino';
-import type { MailMessage, MailSender } from './mail.types';
+import type { MailMessage, MailSendResult, MailSender } from './mail.types';
 
 export interface ResendConfig {
   apiKey: string;
   /** Resend'de doğrulanmış alan adından bir adres: `Klinara <davet@klinara.app>`. */
   from: string;
+  /** Yanıtların gideceği adres; `bildirim@` adresi gelen kutusu değildir. */
+  replyTo?: string | undefined;
+  /** İstek zaman aşımı; yavaş bir sağlayıcı isteği askıda tutmasın. */
+  timeoutMs?: number;
 }
 
 const RESEND_ENDPOINT = 'https://api.resend.com/emails';
@@ -22,9 +26,11 @@ export class ResendMailSender implements MailSender {
     private readonly logger: PinoLogger,
   ) {}
 
-  async send(message: MailMessage): Promise<void> {
+  async send(message: MailMessage): Promise<MailSendResult> {
+    const replyTo = this.config.replyTo;
     const response = await fetch(RESEND_ENDPOINT, {
       method: 'POST',
+      signal: AbortSignal.timeout(this.config.timeoutMs ?? 10_000),
       headers: {
         Authorization: `Bearer ${this.config.apiKey}`,
         'Content-Type': 'application/json',
@@ -35,6 +41,7 @@ export class ResendMailSender implements MailSender {
         subject: message.subject,
         text: message.body,
         ...(message.html === undefined ? {} : { html: message.html }),
+        ...(replyTo === undefined || replyTo === '' ? {} : { reply_to: replyTo }),
       }),
     });
 
@@ -48,5 +55,6 @@ export class ResendMailSender implements MailSender {
 
     const { id } = (await response.json().catch(() => ({}))) as { id?: string };
     this.logger.debug({ messageId: id }, 'E-posta gönderildi');
+    return { provider: 'resend', messageId: id ?? null };
   }
 }

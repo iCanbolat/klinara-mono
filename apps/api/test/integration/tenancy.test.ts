@@ -4,7 +4,14 @@ import { sql } from 'drizzle-orm';
 import pg from 'pg';
 import { createTestApp } from '../helpers/app';
 import { startTestDatabase, type TestDatabase } from '../helpers/database';
-import { auth, bootstrapTenant, http, PLATFORM_TOKEN, supportReason } from '../helpers/identity';
+import {
+  auth,
+  bootstrapTenant,
+  http,
+  inviteMember,
+  PLATFORM_TOKEN,
+  supportReason,
+} from '../helpers/identity';
 import { DRIZZLE, PG_POOL, type Database } from '../../src/database/database.constants';
 import { withTenantTx } from '../../src/database/tenant-tx';
 
@@ -164,6 +171,27 @@ describe('kiracılık ve RLS', () => {
       expect((listB.body as { data: BranchBody[] }).data.map((x) => x.slug)).not.toContain(
         'kadikoy',
       );
+    });
+
+    it('şube kapsamlı kullanıcı yalnız üyesi olduğu şubeleri listeler', async () => {
+      const a = await bootstrapTenant(app, { slug: 'klinik-a', name: 'Klinik A' });
+      await http(app)
+        .post('/api/v1/branches')
+        .set(auth(a.owner.tokens))
+        .send({ slug: 'kadikoy', name: 'Kadıköy' })
+        .expect(201);
+      const ownList = await http(app).get('/api/v1/branches').set(auth(a.owner.tokens));
+      const all = (ownList.body as { data: BranchBody[] }).data;
+      const home = all.find((x) => x.slug !== 'kadikoy');
+      if (home === undefined) throw new Error('İlk şube yok');
+
+      const desk = await inviteMember(app, a.owner.tokens, {
+        email: 'resepsiyon@klinik-a.test',
+        roleKey: 'receptionist',
+        branchId: home.id,
+      });
+      const list = await http(app).get('/api/v1/branches').set(auth(desk.tokens)).expect(200);
+      expect((list.body as { data: BranchBody[] }).data.map((x) => x.slug)).toEqual([home.slug]);
     });
 
     it('bir kiracı diğerinin şubesini GÜNCELLEYEMEZ (varlığını bile sızdırmaz)', async () => {

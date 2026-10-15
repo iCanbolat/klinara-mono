@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { COOKIE_NAMES, isExpired, type AccessPayload } from '@/lib/session/cookies';
 import { unseal } from '@/lib/session/seal';
+import { PLATFORM_COOKIE, type PlatformSessionPayload } from '@/lib/platform-session';
 
 /**
  * Rota koruması — ilk katman, AĞ ÇAĞRISI YOK.
@@ -24,6 +25,19 @@ const PUBLIC_PREFIXES = ['/giris', '/parola', '/davet'];
 
 export async function middleware(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
+
+  // Platform yöneticisi ekranları klinik oturumuna değil, platform cookie'sine
+  // bakar (`lib/platform-session.ts`). İki oturum birbirinden bağımsız.
+  if (pathname === '/platform' || pathname.startsWith('/platform/')) {
+    if (pathname === '/platform/giris') return NextResponse.next();
+    const sealedPlatform = request.cookies.get(PLATFORM_COOKIE)?.value;
+    const platform =
+      sealedPlatform === undefined ? null : await unseal<PlatformSessionPayload>(sealedPlatform, 'pt');
+    if (platform === null || platform.exp * 1000 <= Date.now()) {
+      return NextResponse.redirect(new URL('/platform/giris', request.url));
+    }
+    return NextResponse.next();
+  }
 
   const sealed = request.cookies.get(COOKIE_NAMES.access)?.value;
   const payload = sealed === undefined ? null : await unseal<AccessPayload>(sealed, 'at');

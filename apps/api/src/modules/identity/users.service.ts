@@ -61,8 +61,21 @@ export class UsersService {
 
   /** Kiracının personeli. RLS zaten başka kiracının kullanıcısını göstermez. */
   async list(): Promise<UserResponseDto[]> {
-    const rows = await this.tx.run((tx) => identityRepo.listTenantUsers(tx));
-    return rows.map((row) => UsersService.toResponse(row));
+    const { rows, memberships } = await this.tx.run(async (tx) => {
+      const users = await identityRepo.listTenantUsers(tx);
+      const found = await identityRepo.listMembershipsForUsersInTenant(
+        tx,
+        users.map((user) => user.id),
+        this.tx.tenantId,
+      );
+      return { rows: users, memberships: found };
+    });
+    return rows.map((row) =>
+      UsersService.toResponse(
+        row,
+        memberships.filter((membership) => membership.userId === row.id),
+      ),
+    );
   }
 
   async get(id: string, tenantId: string): Promise<UserResponseDto> {

@@ -127,11 +127,34 @@ describe('izne göre navigasyon', () => {
       expect(canOpenPath(practitioner, '/takvim')).toBe(true);
     });
 
-    it('RESEPSİYON dört ekranı da görüyor', () => {
+    it('RESEPSİYON operasyon ekranlarını görüyor; ekip, şablon ve randevu sayfasını görmüyor', () => {
       const paths = visibleNav(roleOf('receptionist')).map((item) => item.path);
-      for (const path of ['/takvim', '/musteriler', '/katalog', '/personel', '/calisma-saatleri']) {
+      for (const path of ['/takvim', '/musteriler', '/mesajlar', '/katalog', '/calisma-saatleri']) {
         expect(paths, path).toContain(path);
       }
+      for (const path of ['/personel', '/sablonlar', '/sayfa', '/icerik']) {
+        expect(paths, path).not.toContain(path);
+      }
+    });
+
+    it('UYGULAYICI yalnız kendi işini görüyor', () => {
+      const paths = visibleNav(roleOf('practitioner')).map((item) => item.path);
+      expect(paths).toEqual([
+        '/dashboard',
+        '/takvim',
+        '/musteriler',
+        '/calisma-saatleri',
+        '/raporlar',
+        '/hesap',
+      ]);
+    });
+
+    it('ŞUBE YÖNETİCİSİ randevu sayfasını ve içeriği görmüyor', () => {
+      const paths = visibleNav(roleOf('manager')).map((item) => item.path);
+      expect(paths).toContain('/personel');
+      expect(paths).toContain('/sablonlar');
+      expect(paths).not.toContain('/sayfa');
+      expect(paths).not.toContain('/icerik');
     });
   });
 

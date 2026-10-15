@@ -30,6 +30,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -57,6 +58,7 @@ import com.klinara.android.features.auth.AppSession
 import com.klinara.android.features.reports.ReportFormat
 import com.klinara.android.services.ServiceContainer
 import com.klinara.android.services.formatting.BranchClock
+import com.klinara.android.services.booking.AppointmentStatus
 import com.klinara.android.services.formatting.Money
 import com.klinara.android.services.formatting.TrLocale
 import com.klinara.android.services.reports.ReportScope
@@ -110,6 +112,25 @@ fun DashboardHost(
             val clock = BranchClock(session.activeBranch?.timezone)
             TODAY_LABEL.format(clock.localDate(Instant.now()))
         }
+
+    if (session.isOwnScope) {
+        // Uygulayıcı yönetici panosunu (şubeler, doluluk, personel cirosu) değil kendi
+        // gününü görür — web `today-page.tsx`, iOS `todayContent` paritesi.
+        TodayScreen(
+            state = state,
+            access = access,
+            greeting = "Bugünüm, ${session.profile.user.fullName.substringBefore(' ')}",
+            subtitle = subtitle,
+            actions =
+                DashboardActions(viewModel::reload, onOpenCalendar, onOpenStaffReport) { id ->
+                    openedAppointment = true
+                    onOpenAppointment(id)
+                },
+            modifier = modifier,
+            trailing = trailing,
+        )
+        return
+    }
 
     DashboardScreen(
         state = state,
@@ -179,7 +200,107 @@ fun DashboardScreen(
 
         if (access.calendar) UpcomingCard(data, actions.onOpenCalendar, actions.onOpenAppointment)
         if (access.staff) StaffRevenueCard(data, actions.onOpenStaffReport)
-        BranchChartCard(data)
+        if (access.occupancy) BranchChartCard(data)
+    }
+}
+
+/** "Bugünüm" — uygulayıcının açılış ekranı: kendi günü, sıradaki hastası, bu ayki işi. */
+@Composable
+fun TodayScreen(
+    state: DashboardUiState,
+    access: DashboardAccess,
+    greeting: String,
+    subtitle: String,
+    actions: DashboardActions,
+    modifier: Modifier = Modifier,
+    trailing: @Composable (RowScope.() -> Unit)? = null,
+) {
+    KlinaraScreen(
+        title = "Dashboard",
+        modifier = modifier,
+        trailing = trailing,
+        onRefresh = actions.onReload,
+        isRefreshing = state.isLoading,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(KlinaraMetrics.xs)) {
+            Text(greeting, style = KlinaraType.displayM, color = KlinaraTheme.colors.charcoal)
+            Text(subtitle, style = KlinaraType.bodyM, color = KlinaraTheme.colors.charcoalMuted)
+        }
+        val data = state.data
+        KlinaraStatStrip(stats = todayStats(data, access), isLoading = data == null)
+        if (data == null) return@KlinaraScreen
+
+        data.calendarError?.let { ErrorBanner(message = it, onRetry = actions.onReload) }
+
+        KlinaraCard(title = "Sıradaki hasta") {
+            val next = data.upcoming.firstOrNull()
+            if (next == null) {
+                EmptyLine("Yaklaşan randevunuz yok.")
+            } else {
+                UpcomingRow(next, false, data.fetchedAt, onClick = { actions.onOpenAppointment(next.entry.id) })
+            }
+        }
+
+        val multiBranch = data.today.map { it.branchName }.toSet().size > 1
+        KlinaraCard(title = "Bugünün akışı") {
+            if (data.today.isEmpty()) EmptyLine("Bugün için randevunuz yok.")
+            data.today.forEachIndexed { index, item ->
+                if (index > 0) KlinaraDivider()
+                Box(modifier = Modifier.alpha(if (item.entry.endsAt < data.fetchedAt) 0.6f else 1f)) {
+                    UpcomingRow(item, multiBranch, data.fetchedAt, onClick = { actions.onOpenAppointment(item.entry.id) })
+                }
+            }
+            if (data.today.isNotEmpty()) {
+                KlinaraDivider()
+                KlinaraNavigationRow(label = "Takvimde aç", onClick = actions.onOpenCalendar)
+            }
+        }
+    }
+}
+
+internal fun todayStats(
+    data: DashboardData?,
+    access: DashboardAccess,
+): List<KlinaraStat> {
+    val today = data?.today.orEmpty()
+    val active = today.count { it.entry.status != AppointmentStatus.Cancelled && it.entry.status != AppointmentStatus.NoShow }
+    val completed = today.count { it.entry.status == AppointmentStatus.Completed }
+    val next = data?.upcoming?.firstOrNull()
+    val own = data?.staffPerformance?.data?.firstOrNull()
+    val currency = data?.staffPerformance?.currency ?: "TRY"
+    return buildList {
+        add(
+            KlinaraStat(
+                label = "Bugünkü randevularım",
+                value = data?.let { active.toString() },
+                icon = Icons.Filled.DateRange,
+                hint = data?.let { "$completed tamamlandı" },
+            ),
+        )
+        add(
+            KlinaraStat(
+                label = "Sıradaki",
+                value = data?.let { next?.let { BranchClock(it.timezone).formatTime(it.entry.startsAt) } ?: "—" },
+                icon = Icons.Filled.Home,
+                hint = next?.entry?.customerName,
+            ),
+        )
+        if (access.staff) {
+            add(
+                KlinaraStat(
+                    label = "Bu ay işlem",
+                    value = data?.let { own?.completedServices?.toString() ?: "—" },
+                    icon = Icons.Filled.CheckCircle,
+                ),
+            )
+            add(
+                KlinaraStat(
+                    label = "Bu ay cirom",
+                    value = data?.let { own?.let { Money.format(it.revenueMinor, currency) } ?: "—" },
+                    icon = Icons.Filled.ShoppingCart,
+                ),
+            )
+        }
     }
 }
 

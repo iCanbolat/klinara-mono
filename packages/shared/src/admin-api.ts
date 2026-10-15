@@ -448,6 +448,8 @@ export interface Invitation {
   createdAt: string;
   acceptedAt?: string | null;
   revokedAt?: string | null;
+  /** Yalnız `POST invitations` yanıtında: e-posta sağlayıcıya teslim edildi mi. */
+  mailDelivered?: boolean;
   /** Yalnız üretim dışında döner (e-posta gönderimi loga yazarken). */
   token?: string;
   link?: string;
@@ -460,6 +462,15 @@ export interface CreateInvitationInput {
   /** Şube kapsamlı roller için ZORUNLU. */
   branchId?: string;
   fullName?: string;
+  /**
+   * Yalnız `practitioner` rolünde: kabulde üyelikle birlikte personel profili
+   * açılır (takvimde randevu alabilmesi için).
+   */
+  staffProfile?: {
+    title?: string;
+    isVisibleOnline?: boolean;
+    serviceIds?: string[];
+  };
 }
 
 /**

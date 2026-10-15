@@ -2,7 +2,7 @@ import { Global, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PinoLogger } from 'nestjs-pino';
 import type { EnvironmentVariables } from '../../config/env.validation';
-import { MAIL_SENDER, type MailMessage, type MailSender } from './mail.types';
+import { MAIL_SENDER, type MailMessage, type MailSendResult, type MailSender } from './mail.types';
 import { ResendMailSender } from './resend.sender';
 import { SmtpMailSender } from './smtp.sender';
 
@@ -17,10 +17,11 @@ export class LogMailSender implements MailSender {
 
   constructor(private readonly logger: PinoLogger) {}
 
-  async send(message: MailMessage): Promise<void> {
+  async send(message: MailMessage): Promise<MailSendResult> {
     this.sent.push(message);
     if (this.sent.length > 50) this.sent.shift();
     this.logger.warn({ subject: message.subject }, 'E-posta loga yazıldı');
+    return { provider: 'log', messageId: null };
   }
 }
 
@@ -38,7 +39,11 @@ function createMailSender(
   const resendKey = config.get('RESEND_API_KEY', { infer: true });
   if (resendKey !== undefined && resendKey !== '') {
     return new ResendMailSender(
-      { apiKey: resendKey, from: config.get('MAIL_FROM', { infer: true }) },
+      {
+        apiKey: resendKey,
+        from: config.get('MAIL_FROM', { infer: true }),
+        replyTo: config.get('MAIL_REPLY_TO', { infer: true }),
+      },
       logger,
     );
   }
@@ -54,6 +59,7 @@ function createMailSender(
       password: config.get('SMTP_PASSWORD', { infer: true }),
       secure: config.get('SMTP_SECURE', { infer: true }),
       from: config.get('MAIL_FROM', { infer: true }),
+      replyTo: config.get('MAIL_REPLY_TO', { infer: true }),
     },
     logger,
   );

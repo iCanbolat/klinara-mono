@@ -3,6 +3,7 @@ package com.klinara.android.features.auth
 import com.klinara.android.services.auth.BranchSummary
 import com.klinara.android.services.auth.MeResponse
 import com.klinara.android.services.auth.TenantOption
+import com.klinara.android.services.contracts.Permissions
 import java.time.Instant
 
 /**
@@ -88,6 +89,19 @@ data class AppSession(
 
     /** Şube değiştirme menüsü yalnız seçenek varken anlamlı. */
     val canSwitchBranch: Boolean get() = switchableBranches.size > 1
+
+    /** Kiracı geneli rol (işletme sahibi) — tüm şubeleri kapsar. */
+    val tenantWide: Boolean get() = profile.tenantWide
+
+    /**
+     * Uygulayıcı kapsamı: tüm takvimi değil yalnız KENDİ randevularını görür. Sunucu bu
+     * ayrımı izinden yapıyor; arayüz de aynı izinden çıkarıyor.
+     */
+    val isOwnScope: Boolean
+        get() = !can(Permissions.APPOINTMENT_READ_ALL) && can(Permissions.APPOINTMENT_READ_OWN)
+
+    /** Sunucudaki `canAccessBranch` ile aynı kural. */
+    fun canAccessBranch(id: String): Boolean = profile.canAccessBranch(id)
 }
 
 /** Kullanıcı tanımlayıcı olarak telefonu mu e-postayı mı veriyor. */

@@ -345,6 +345,7 @@ function ServicesTab({
         open={creating || editing !== null}
         service={editing}
         categories={categories}
+        existingSlugs={(services ?? []).map((service) => service.slug)}
         onClose={() => {
           setCreating(false);
           setEditing(null);

@@ -116,7 +116,7 @@ export function ConversationThread({
         <Button
           variant="ghost"
           size="icon-sm"
-          className="md:hidden"
+          className="lg:hidden"
           aria-label={t('messages.back')}
           onClick={onBack}
         >

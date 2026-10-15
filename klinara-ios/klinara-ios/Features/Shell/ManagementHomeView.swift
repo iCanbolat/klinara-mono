@@ -1,5 +1,48 @@
 import SwiftUI
 
+/// Yönetim kartlarının hangi rolde görüneceği — web menüsünün
+/// (`apps/web-admin/src/lib/permissions.ts` `NAV_ITEMS`) ve Android
+/// `ManagementAccess` paritesi.
+///
+/// Kapılar "veriyi okuyabiliyor mu" değil "bu ekran onun işi mi" sorusuna
+/// bakar: `staff:read`, `service:read`, `notification:read` HER rolde var
+/// (randevu formu ve zil için), ama uygulayıcının ekip, katalog ya da şablon
+/// yönetimiyle işi yok.
+@MainActor
+struct ManagementAccess {
+    let catalog: Bool
+    let team: Bool
+    let schedule: Bool
+    let customerTags: Bool
+    let packages: Bool
+    let communication: Bool
+    let reports: Bool
+    let packageReports: Bool
+    /// Uygulayıcı: takvim kurulumunda yalnız kendi programı.
+    let ownOnly: Bool
+
+    init(session: AppSession) {
+        let readAll = session.can(Permissions.appointmentReadAll)
+        catalog = session.can(Permissions.serviceRead) && readAll
+        team = session.can(Permissions.staffRead)
+            && session.canAny(Permissions.userRead, Permissions.staffWrite)
+        schedule = session.can(Permissions.scheduleRead)
+        customerTags = session.can(Permissions.customerWrite)
+        packages = session.can(Permissions.packageRead) && readAll
+        communication = session.canAny(Permissions.notificationSend, Permissions.notificationManage)
+        reports = readAll || session.canAny(
+            Permissions.reportRevenueRead,
+            Permissions.reportPerformanceReadOwn
+        )
+        packageReports = packages || session.can(Permissions.reportRevenueRead)
+        ownOnly = session.isOwnScope
+    }
+
+    var any: Bool {
+        catalog || team || schedule || customerTags || packages || communication || reports
+    }
+}
+
 /// Yönetim sekmesinin girişi — Faz 2'nin tüm ekranlarına açılan hub.
 ///
 /// Düz bir liste yerine üç grup: **katalog** (ne satıyoruz), **ekip** (kim
@@ -12,40 +55,33 @@ struct ManagementHomeView: View {
     /// Sohbetler satırındaki rozet; hub'a her dönüşte tazelenir.
     @State private var unreadConversations: Int?
 
+    private var access: ManagementAccess { ManagementAccess(session: session) }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: KlinaraMetrics.lg) {
                     header
 
-                    if session.can(Permissions.serviceRead) {
+                    if access.catalog {
                         catalogCard
                     }
-                    if session.can(Permissions.staffRead) {
+                    if access.team {
                         teamCard
                     }
-                    if session.can(Permissions.scheduleRead) {
+                    if access.schedule {
                         scheduleCard
                     }
-                    if session.can(Permissions.customerRead) {
+                    if access.customerTags {
                         customerCard
                     }
-                    if session.can(Permissions.packageRead) {
+                    if access.packages {
                         packageCard
                     }
-                    if session.canAny(
-                        Permissions.notificationRead,
-                        Permissions.notificationManage,
-                        Permissions.notificationSend
-                    ) {
+                    if access.communication {
                         communicationCard
                     }
-                    if session.canAny(
-                        Permissions.packageRead,
-                        Permissions.reportRevenueRead,
-                        Permissions.appointmentReadAll,
-                        Permissions.reportPerformanceReadOwn
-                    ) {
+                    if access.reports || access.packageReports {
                         reportsCard
                     }
                 }
@@ -56,6 +92,8 @@ struct ManagementHomeView: View {
             .navigationTitle("Yönetim")
             .navigationBarTitleDisplayMode(.inline)
             .task { await loadUnreadConversations() }
+            // Uygulayıcının "Çalışma programım" satırı kendi profiline gider.
+            .task { if access.ownOnly { await session.staffStore.load() } }
             .toolbar {
                 RootToolbarTitle(title: "Yönetim")
                 ToolbarItem(placement: .topBarTrailing) {
@@ -78,7 +116,9 @@ struct ManagementHomeView: View {
                 .klinaraText(.displayM)
                 .foregroundStyle(KlinaraColor.charcoal)
 
-            Text("Hizmetler, ekip ve çalışma saatleri buradan yönetilir.")
+            Text(access.ownOnly
+                ? "Çalışma programınız ve performansınız."
+                : "Hizmetler, ekip ve çalışma saatleri buradan yönetilir.")
                 .klinaraText(.bodyM)
                 .foregroundStyle(KlinaraColor.charcoalMuted)
                 .fixedSize(horizontal: false, vertical: true)
@@ -191,18 +231,18 @@ struct ManagementHomeView: View {
                 ) {
                     ConversationListView(session: session)
                 }
-                if session.canAny(Permissions.notificationRead, Permissions.notificationManage) {
-                    KlinaraDivider()
-                }
+                KlinaraDivider()
             }
-            if session.can(Permissions.notificationRead) {
-                KlinaraNavigationRow(
-                    label: "Mesaj günlüğü",
-                    detail: "Gönderilen, ulaşan ve gönderilmeyen mesajlar",
-                    icon: "bubble.left.and.text.bubble.right"
-                ) {
-                    MessageLogView(session: session)
-                }
+            KlinaraNavigationRow(
+                label: "Mesaj günlüğü",
+                detail: "Gönderilen, ulaşan ve gönderilmeyen mesajlar",
+                icon: "bubble.left.and.text.bubble.right"
+            ) {
+                MessageLogView(session: session)
+            }
+            // Hatırlatma ve şablonlar kiracının TÜM müşterilerine giden
+            // mesajları değiştirir: yönetenlerin (sahip, şube yöneticisi) işi.
+            if session.can(Permissions.notificationManage) {
                 KlinaraDivider()
                 KlinaraNavigationRow(
                     label: "Hatırlatma ayarları",
@@ -221,9 +261,7 @@ struct ManagementHomeView: View {
                 }
             }
             if session.can(Permissions.notificationManage) {
-                if session.can(Permissions.notificationRead) {
-                    KlinaraDivider()
-                }
+                KlinaraDivider()
                 KlinaraNavigationRow(
                     label: "WhatsApp entegrasyonu",
                     detail: "WABA kimlik bilgileri, şablonlar ve test gönderimi",
@@ -237,21 +275,19 @@ struct ManagementHomeView: View {
 
     private var reportsCard: some View {
         KlinaraCard(title: "Raporlar") {
-            if session.canAny(
-                Permissions.appointmentReadAll,
-                Permissions.reportRevenueRead,
-                Permissions.reportPerformanceReadOwn
-            ) {
+            if access.reports {
                 KlinaraNavigationRow(
-                    label: "Klinik raporları",
-                    detail: "Doluluk, ciro, personel performansı, gelmeme ve kazanım",
+                    label: access.ownOnly ? "Performansım" : "Klinik raporları",
+                    detail: access.ownOnly
+                        ? "Kendi işlem sayınız, ciro ve doluluğunuz"
+                        : "Doluluk, ciro, personel performansı, gelmeme ve kazanım",
                     icon: "chart.line.uptrend.xyaxis"
                 ) {
                     ReportsHomeView(session: session)
                 }
-                KlinaraDivider()
+                if access.packageReports { KlinaraDivider() }
             }
-            if session.canAny(Permissions.packageRead, Permissions.reportRevenueRead) {
+            if access.packageReports {
                 KlinaraNavigationRow(
                     label: "Paket raporları",
                     detail: "Taşınan yükümlülük, süre dolumu ve dönem kullanımı",
@@ -265,11 +301,21 @@ struct ManagementHomeView: View {
 
     private var scheduleCard: some View {
         KlinaraCard(
-            title: "Takvim kurulumu",
+            title: access.ownOnly ? "Çalışma saatleri" : "Takvim kurulumu",
             footnote: session.selectedBranch.map {
                 "Saatler \($0.name) şubesinin saat diliminde (\($0.timezone)) gösterilir."
             }
         ) {
+            if access.ownOnly, let own = session.ownStaffProfile {
+                KlinaraNavigationRow(
+                    label: "Çalışma programım",
+                    detail: "Haftalık çalışma saatleriniz",
+                    icon: "person.badge.clock"
+                ) {
+                    StaffScheduleView(session: session, staffProfileId: own.id)
+                }
+                KlinaraDivider()
+            }
             KlinaraNavigationRow(
                 label: "Şube çalışma saatleri",
                 detail: "Açılış, kapanış ve mola",
@@ -277,13 +323,15 @@ struct ManagementHomeView: View {
             ) {
                 BranchHoursView(session: session)
             }
-            KlinaraDivider()
-            KlinaraNavigationRow(
-                label: "İzin ve istisnalar",
-                detail: "Tatil, yarım gün, tekrarlı izinler",
-                icon: "calendar.badge.exclamationmark"
-            ) {
-                ScheduleExceptionListView(session: session)
+            if !access.ownOnly {
+                KlinaraDivider()
+                KlinaraNavigationRow(
+                    label: "İzin ve istisnalar",
+                    detail: "Tatil, yarım gün, tekrarlı izinler",
+                    icon: "calendar.badge.exclamationmark"
+                ) {
+                    ScheduleExceptionListView(session: session)
+                }
             }
         }
     }

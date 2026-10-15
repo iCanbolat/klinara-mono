@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
+import { PLAN_KEYS, SETUP_STEP_KEYS, type PlanKey, type SetupStepKey } from '@klinara/shared';
 import {
   IsArray,
   IsBoolean,
@@ -97,6 +98,27 @@ export class CreateTenantDto {
   @ValidateNested()
   @Type(() => CreateTenantOwnerDto)
   owner: CreateTenantOwnerDto;
+
+  /** Abonelik planı; ödeme altyapısı olmadığından platform yöneticisi atar. */
+  @ApiPropertyOptional({ enum: PLAN_KEYS, default: 'klinik' })
+  @IsOptional()
+  @IsIn(PLAN_KEYS)
+  planKey?: PlanKey;
+
+  /** Kiracıya özel limit (ör. Özel plan); verilmezse planın limiti geçerli. */
+  @ApiPropertyOptional({ type: Number })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(500)
+  maxBranchesOverride?: number;
+
+  @ApiPropertyOptional({ type: Number })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(5000)
+  maxPractitionersOverride?: number;
 }
 
 export class UpdateTenantDto {
@@ -112,10 +134,9 @@ export class UpdateTenantDto {
   @IsTimeZone({ message: 'Geçerli bir IANA saat dilimi olmalı (ör. Europe/Istanbul)' })
   timezone?: string;
 
-  @ApiPropertyOptional({ enum: TENANT_STATUSES })
-  @IsOptional()
-  @IsIn(TENANT_STATUSES)
-  status?: TenantStatus;
+  // `status` burada YOK: askıya alma ve deneme/aktif geçişi platform
+  // yöneticisinin kararı (`PATCH /platform/tenants/:id`). Kiracı kendi
+  // durumunu değiştirebilseydi askıyı kendisi kaldırabilirdi.
 }
 
 export class TenantResponseDto {
@@ -260,11 +281,15 @@ export class TenantOwnerInvitationDto {
   @ApiProperty({ format: 'date-time' })
   expiresAt: string;
 
+  /** Davet e-postası sağlayıcıya teslim edildi mi; yalnız oluşturma yanıtında. */
+  @ApiPropertyOptional()
+  mailDelivered?: boolean;
+
   /**
    * Davet token'ı — YALNIZ üretim dışında döner.
    *
-   * E-posta gönderimi Batch 8.1'e kadar loga yazdığı için, geliştirme akışı
-   * tıkanmasın diye yanıtta da veriliyor.
+   * Yerelde e-posta çoğu zaman loga yazıldığı için geliştirme akışı
+   * tıkanmasın diye yanıtta da verilir. Üretimde bu alan hiç görünmez.
    */
   @ApiPropertyOptional()
   token?: string;
@@ -365,4 +390,164 @@ export class UpdateBranchDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Plan ve kurulum durumu
+// ---------------------------------------------------------------------------
+
+export class PlanLimitsDto {
+  @ApiProperty()
+  maxBranches: number;
+
+  @ApiProperty()
+  maxPractitioners: number;
+}
+
+export class PlanUsageDto {
+  @ApiProperty()
+  branches: number;
+
+  @ApiProperty({ description: 'Aktif personel profili sayısı' })
+  practitioners: number;
+}
+
+export class TenantPlanResponseDto {
+  @ApiProperty({ enum: PLAN_KEYS })
+  planKey: PlanKey;
+
+  @ApiProperty()
+  planName: string;
+
+  @ApiProperty({ type: PlanLimitsDto })
+  limits: PlanLimitsDto;
+
+  @ApiProperty({ type: PlanUsageDto })
+  usage: PlanUsageDto;
+}
+
+export class SetupStepDto {
+  @ApiProperty({ enum: SETUP_STEP_KEYS })
+  key: SetupStepKey;
+
+  @ApiProperty()
+  done: boolean;
+}
+
+export class TenantSetupStatusDto {
+  @ApiProperty({ type: [SetupStepDto] })
+  steps: SetupStepDto[];
+
+  @ApiProperty()
+  complete: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Platform yöneticisi
+// ---------------------------------------------------------------------------
+
+export class UpdatePlatformTenantDto {
+  @ApiPropertyOptional({ enum: PLAN_KEYS })
+  @IsOptional()
+  @IsIn(PLAN_KEYS)
+  planKey?: PlanKey;
+
+  @ApiPropertyOptional({ enum: TENANT_STATUSES })
+  @IsOptional()
+  @IsIn(TENANT_STATUSES)
+  status?: TenantStatus;
+
+  /** `null` override'ı kaldırır, planın limiti geçerli olur. */
+  @ApiPropertyOptional({ nullable: true, type: Number })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(500)
+  maxBranchesOverride?: number | null;
+
+  @ApiPropertyOptional({ nullable: true, type: Number })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(5000)
+  maxPractitionersOverride?: number | null;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  planNote?: string | null;
+}
+
+export class PlatformOwnerInvitationStatusDto {
+  @ApiProperty()
+  email: string;
+
+  @ApiProperty({ enum: ['pending', 'accepted', 'expired', 'revoked'] })
+  state: 'pending' | 'accepted' | 'expired' | 'revoked';
+
+  @ApiProperty({ format: 'date-time' })
+  createdAt: string;
+
+  @ApiProperty({ format: 'date-time' })
+  expiresAt: string;
+}
+
+export class PlatformTenantDto {
+  @ApiProperty({ format: 'uuid' })
+  id: string;
+
+  @ApiProperty()
+  slug: string;
+
+  @ApiProperty()
+  name: string;
+
+  @ApiProperty({ enum: TENANT_STATUSES })
+  status: TenantStatus;
+
+  @ApiProperty({ enum: PLAN_KEYS })
+  planKey: PlanKey;
+
+  @ApiProperty({ nullable: true, type: Number })
+  maxBranchesOverride: number | null;
+
+  @ApiProperty({ nullable: true, type: Number })
+  maxPractitionersOverride: number | null;
+
+  @ApiProperty({ nullable: true, type: String })
+  planNote: string | null;
+
+  @ApiProperty({ type: PlanLimitsDto })
+  limits: PlanLimitsDto;
+
+  @ApiProperty({ type: PlanUsageDto })
+  usage: PlanUsageDto;
+
+  @ApiProperty({ type: PlatformOwnerInvitationStatusDto, nullable: true })
+  ownerInvitation: PlatformOwnerInvitationStatusDto | null;
+
+  @ApiProperty({ format: 'date-time' })
+  createdAt: string;
+}
+
+export class PlatformTenantListDto {
+  @ApiProperty({ type: [PlatformTenantDto] })
+  data: PlatformTenantDto[];
+}
+
+export class PlatformTenantDetailDto extends PlatformTenantDto {
+  @ApiProperty({ type: [BranchResponseDto] })
+  branches: BranchResponseDto[];
+
+  @ApiProperty({ type: TenantSetupStatusDto })
+  setup: TenantSetupStatusDto;
+}
+
+export class PlatformOwnerInvitationResendDto {
+  @ApiPropertyOptional({ format: 'email' })
+  @IsOptional()
+  @IsEmail()
+  @MaxLength(254)
+  email?: string;
 }

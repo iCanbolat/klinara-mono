@@ -90,8 +90,8 @@ export function MessagesPage(): ReactNode {
       <div className="flex h-[calc(100dvh-15rem)] min-h-[520px] overflow-hidden rounded-xl border border-border bg-card">
         <aside
           className={cn(
-            'w-full shrink-0 border-border md:w-72 md:border-r',
-            selectedId !== null && 'hidden md:block',
+            'w-full shrink-0 border-border lg:w-72 lg:border-r',
+            selectedId !== null && 'hidden lg:block',
           )}
         >
           <ConversationList
@@ -114,7 +114,7 @@ export function MessagesPage(): ReactNode {
           katkıyı sıfırlıyor; `flex-1` alanı yine dolduruyor.
         */}
         <section
-          className={cn('w-0 min-w-0 flex-1', selectedId === null && 'hidden md:block')}
+          className={cn('w-0 min-w-0 flex-1', selectedId === null && 'hidden lg:block')}
           aria-label={t('messages.title')}
         >
           {selectedId === null ? (

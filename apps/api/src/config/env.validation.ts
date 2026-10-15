@@ -501,7 +501,7 @@ export class EnvironmentVariables {
   @Expose()
   @IsString()
   @IsNotEmpty()
-  APP_BASE_URL: string = 'http://localhost:5173';
+  APP_BASE_URL: string = 'http://localhost:3002';
 
   // --- E-posta gönderimi (Resend / SMTP) — Batch 8.1 ---
   /**
@@ -554,6 +554,15 @@ export class EnvironmentVariables {
   @IsString()
   @IsNotEmpty()
   MAIL_FROM: string = 'Klinara <bildirim@klinara.local>';
+
+  /**
+   * Yanıt adresi (isteğe bağlı). `MAIL_FROM` bir gelen kutusu değilse davet
+   * alan kişinin "yanıtla"sı buraya gider; ör. `destek@klinara.app`.
+   */
+  @Expose()
+  @IsOptional()
+  @IsString()
+  MAIL_REPLY_TO?: string;
 
   // --- WhatsApp Cloud API — Batch 8.2 ---
   /**
@@ -850,6 +859,14 @@ function crossFieldIssues(env: EnvironmentVariables): string[] {
     issues.push(
       'APP_BASE_URL: üretimde https:// olmalı — davet ve sıfırlama bağlantıları buradan üretilir',
     );
+  }
+  // Davet ve parola sıfırlama e-postası gitmezse üretimde kimse hesaba giremez;
+  // loga yazan göndericiye sessizce düşmek yerine açılışta durulur.
+  if ((env.RESEND_API_KEY ?? '') === '' && (env.SMTP_HOST ?? '') === '') {
+    issues.push('RESEND_API_KEY ya da SMTP_HOST: üretimde e-posta göndericisi zorunlu');
+  }
+  if (/\.local>?\s*$/i.test(env.MAIL_FROM)) {
+    issues.push('MAIL_FROM: üretimde doğrulanmış bir alan adından olmalı (ör. Klinara <bildirim@klinara.app>)');
   }
   if (env.PLATFORM_ADMIN_TOKEN !== undefined && env.PLATFORM_ADMIN_TOKEN.length < 32) {
     issues.push('PLATFORM_ADMIN_TOKEN: üretimde en az 32 karakter olmalı');

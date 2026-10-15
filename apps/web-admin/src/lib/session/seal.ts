@@ -23,7 +23,7 @@
 import { serverEnv } from '@/config/env';
 
 /** Mühür amaçları — AAD'ye girer, bu yüzden yuvalar arası replay imkânsız. */
-export type SealPurpose = 'at' | 'rt' | 'ch';
+export type SealPurpose = 'at' | 'rt' | 'ch' | 'pt';
 
 const IV_BYTES = 12;
 const ALGORITHM = 'AES-GCM';

@@ -217,14 +217,14 @@ class StaffFeatureTest {
     // --- İzin matrisi ---
 
     @Test
-    @DisplayName("Şube ve Personel kartı `staff:read` ile; oluşturma `staff:write` + `user:read` — owner, manager")
+    @DisplayName("Şube ve Personel kartı ekip yönetenlerde; oluşturma `staff:write` + `user:read` — owner, manager")
     fun permissions() {
         val roles = listOf("owner", "manager", "receptionist", "practitioner")
         val sees =
             roles.filter { role ->
                 managementSections(ShellSessions.forRole(role)).any { it.title == "Şube ve Personel" }
             }
-        assertEquals(listOf("owner", "manager", "receptionist", "practitioner"), sees)
+        assertEquals(listOf("owner", "manager"), sees)
 
         val creates = roles.filter { canCreateStaff(ShellSessions.forRole(it)) }
         assertEquals(listOf("owner", "manager"), creates)

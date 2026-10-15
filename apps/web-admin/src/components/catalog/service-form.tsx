@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import {
   PERMISSIONS,
@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/dialog';
 import { Field, FieldCheckbox, FieldSelect } from '@/components/ui/field';
 import { MoneyInput } from '@/components/ui/money-input';
+import { serviceSlug } from '@/lib/catalog/service-slug';
 import { errorFor, fieldPath, toFormErrors, type FormErrors } from '@/lib/forms/field-errors';
 
 const NO_ERRORS: FormErrors = { message: null, fields: {}, requestId: null };
@@ -52,6 +53,7 @@ export function ServiceFormDialog({
   open,
   service,
   categories,
+  existingSlugs,
   onClose,
   onSaved,
 }: {
@@ -59,6 +61,8 @@ export function ServiceFormDialog({
   /** `null` = oluşturma. */
   service: Service | null;
   categories: readonly ServiceCategorySummary[];
+  /** Kiracıdaki mevcut hizmet kodları — yeni kod bunlarla çakışmaz. */
+  existingSlugs: readonly string[];
   onClose: () => void;
   onSaved: () => void;
 }): ReactNode {
@@ -70,7 +74,6 @@ export function ServiceFormDialog({
   const [consentIds, setConsentIds] = useState<string[]>([]);
   const [initialConsentIds, setInitialConsentIds] = useState<string[]>([]);
   const [name, setName] = useState('');
-  const [slug, setSlug] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [duration, setDuration] = useState('30');
   const [bufferBefore, setBufferBefore] = useState('0');
@@ -87,7 +90,6 @@ export function ServiceFormDialog({
     void (async () => {
       await Promise.resolve();
       setName(service?.name ?? '');
-      setSlug(service?.slug ?? '');
       setCategoryId(service?.categoryId ?? categories[0]?.id ?? '');
       setDuration(String(service?.durationMinutes ?? 30));
       setBufferBefore(String(service?.bufferBeforeMinutes ?? 0));
@@ -135,6 +137,13 @@ export function ServiceFormDialog({
     })();
     return () => controller.abort();
   }, [open, service, canReadConsent]);
+
+  // Kod addan türetilir ve düzenlenemez; mevcut hizmette adı değişse de kodu
+  // sabit kalır (randevu sayfası bağlantıları ve entegrasyonlar ona dayanıyor).
+  const slug = useMemo(
+    () => service?.slug ?? serviceSlug(name, new Set(existingSlugs)),
+    [service, name, existingSlugs],
+  );
 
   async function submit(): Promise<void> {
     setBusy(true);
@@ -205,9 +214,11 @@ export function ServiceFormDialog({
             <Field
               label={t('catalog.slug')}
               value={slug}
-              disabled={busy}
+              hint={t('catalog.slugHint')}
+              readOnly
+              tabIndex={-1}
+              className="bg-muted text-muted-foreground"
               error={errorFor(errors, 'slug')}
-              onChange={(event) => setSlug(event.target.value)}
             />
             <FieldSelect
               label={t('catalog.category')}
@@ -376,7 +387,7 @@ export function ServiceFormDialog({
           <Button
             type="button"
             loading={busy}
-            disabled={busy || name.trim() === '' || slug.trim() === ''}
+            disabled={busy || name.trim() === ''}
             onClick={() => void submit()}
           >
             {t('customers.save')}

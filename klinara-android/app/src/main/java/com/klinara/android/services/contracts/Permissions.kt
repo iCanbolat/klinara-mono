@@ -44,6 +44,7 @@ object Permissions {
     const val CUSTOMER_MEDICAL_WRITE = "customer.medical:write"
     const val PACKAGE_READ = "package:read"
     const val PACKAGE_WRITE = "package:write"
+    const val PACKAGE_DEFINITION_WRITE = "package_definition:write"
     const val PACKAGE_REFUND = "package:refund"
     const val PACKAGE_TRANSFER = "package:transfer"
     const val REPORT_REVENUE_READ = "report.revenue:read"
@@ -149,6 +150,7 @@ object RolePermissions {
                     "customer.medical:write",
                     "package:read",
                     "package:write",
+                    "package_definition:write",
                     "package:refund",
                     "package:transfer",
                     "report.revenue:read",
@@ -186,6 +188,7 @@ object RolePermissions {
                     "customer.medical:read",
                     "customer:merge",
                     "package:write",
+                    "package_definition:write",
                     "package:refund",
                     "package:transfer",
                     "report.revenue:read",
@@ -193,8 +196,6 @@ object RolePermissions {
                     "consent:collect",
                     "notification:send",
                     "notification:manage",
-                    "booking_page:read",
-                    "booking_page:manage",
                     "audit:read",
                 ),
             "receptionist" to
@@ -214,7 +215,6 @@ object RolePermissions {
                     "consent:manage",
                     "consent:collect",
                     "notification:send",
-                    "booking_page:read",
                 ),
             "practitioner" to
                 listOf(

@@ -56,6 +56,11 @@ export async function bootstrapTenant(
     ownerEmail?: string;
     password?: string;
     branchSlug?: string;
+    /**
+     * Plan limitleri. Verilmezse geniş override'lar kullanılır: plan
+     * limitlerini test etmeyen testler kaç şube/hekim açtığına takılmasın.
+     */
+    plan?: { planKey?: string; maxBranchesOverride?: number; maxPractitionersOverride?: number };
   },
 ): Promise<TenantFixture> {
   const ownerEmail = options.ownerEmail ?? `sahip@${options.slug}.test`;
@@ -70,6 +75,7 @@ export async function bootstrapTenant(
       name: options.name ?? options.slug,
       branch: { slug: options.branchSlug ?? 'merkez', name: 'Merkez Şube' },
       owner: { email: ownerEmail, fullName: 'Klinik Sahibi' },
+      ...(options.plan ?? { maxBranchesOverride: 500, maxPractitionersOverride: 5000 }),
     });
 
   if (created.status !== 201) {

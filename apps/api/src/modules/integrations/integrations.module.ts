@@ -6,6 +6,7 @@ import { ConversationsService } from './conversations.service';
 import { InboxController } from './inbox.controller';
 import { MessageActionsService } from './message-actions.service';
 import { InboxService } from './inbox.service';
+import { PlatformWhatsAppController } from './platform-whatsapp.controller';
 import { WhatsAppController } from './whatsapp.controller';
 import { WhatsAppSenderService } from './whatsapp-sender.service';
 import { WhatsAppService } from './whatsapp.service';
@@ -28,6 +29,7 @@ import { WhatsAppWebhookService } from './whatsapp-webhook.service';
   imports: [forwardRef(() => NotificationsModule)],
   controllers: [
     WhatsAppController,
+    PlatformWhatsAppController,
     WhatsAppWebhookController,
     InboxController,
     ConversationsController,

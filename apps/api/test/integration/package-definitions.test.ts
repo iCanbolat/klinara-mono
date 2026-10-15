@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { createTestApp } from '../helpers/app';
 import { startTestDatabase, type TestDatabase } from '../helpers/database';
-import { auth, http, PLATFORM_TOKEN } from '../helpers/identity';
+import { auth, http, inviteMember, PLATFORM_TOKEN } from '../helpers/identity';
 import { setupClinic, type ClinicFixture } from '../helpers/clinic';
 
 interface DefinitionItem {
@@ -97,6 +97,59 @@ describe('paket tanımları (Batch 5.1)', () => {
     expect(detail.status).toBe(200);
     expect(detail.headers.etag).toBe('W/"1"');
     expect((detail.body as DefinitionBody).items.map((item) => item.quantity)).toEqual([10, 2]);
+  });
+
+  describe('rol kapsamı', () => {
+    const member = (roleKey: 'manager' | 'receptionist') =>
+      inviteMember(app, clinic.owner.tokens, {
+        email: `${roleKey}@klinik.test`,
+        roleKey,
+        branchId: clinic.branch.id,
+      });
+    const body = (overrides: Record<string, unknown> = {}) => ({
+      slug: 'bakim-5',
+      name: '5 Bakım',
+      totalPriceMinor: 200_000,
+      items: [{ serviceId: clinic.quickService.id, quantity: 5 }],
+      ...overrides,
+    });
+
+    it('resepsiyon paket tanımı oluşturamaz (satış izni tanıma binmez)', async () => {
+      const desk = await member('receptionist');
+      await http(app)
+        .post('/api/v1/package-definitions')
+        .set(auth(desk.tokens))
+        .send(body({ branchId: clinic.branch.id }))
+        .expect(403);
+      // Okuma açık kalır.
+      await http(app).get('/api/v1/package-definitions').set(auth(desk.tokens)).expect(200);
+    });
+
+    it('şube yöneticisi kendi şubesine tanım açar; tüm şubeleri kapsayanı açamaz', async () => {
+      const manager = await member('manager');
+      await http(app)
+        .post('/api/v1/package-definitions')
+        .set(auth(manager.tokens))
+        .send(body({ branchId: clinic.branch.id }))
+        .expect(201);
+      await http(app)
+        .post('/api/v1/package-definitions')
+        .set(auth(manager.tokens))
+        .send(body({ slug: 'bakim-5-genel' }))
+        .expect(403);
+    });
+
+    it('şube yöneticisi işletme sahibinin genel tanımını değiştiremez', async () => {
+      const created = await createDefinition();
+      const id = (created.body as DefinitionBody).id;
+      const manager = await member('manager');
+      await http(app)
+        .patch(`/api/v1/package-definitions/${id}`)
+        .set(auth(manager.tokens))
+        .set('If-Match', 'W/"1"')
+        .send({ name: 'Değişti' })
+        .expect(403);
+    });
   });
 
   it('aynı slug ikinci kez kullanılamaz', async () => {

@@ -8,6 +8,7 @@ import { api } from '@/lib/api/client';
 import { toMessage } from '@/lib/reports/errors';
 import { staffBranchIds } from '@/lib/staff/memberships';
 import { useBranch } from '@/components/session/branch-provider';
+import { useTenantPlan } from '@/components/plan/use-tenant-plan';
 import { useSession } from '@/components/session/session-provider';
 import { DataPage } from '@/components/data-page/data-page';
 import { DataTable, type DataColumn } from '@/components/data-page/data-table';
@@ -40,6 +41,9 @@ export function BranchesTab(): ReactNode {
 
   const [editing, setEditing] = useState<BranchDetail | null>(null);
   const [creating, setCreating] = useState(false);
+  // Kayıttan sonra (nonce) kullanım da tazelenir.
+  const plan = useTenantPlan(nonce);
+  const branchLimitReached = plan !== null && plan.usage.branches >= plan.limits.maxBranches;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -148,9 +152,19 @@ export function BranchesTab(): ReactNode {
         {...(canWrite
           ? {
               actions: (
-                <Button type="button" onClick={() => setCreating(true)}>
-                  {t('branches.new')}
-                </Button>
+                <div className="flex items-center gap-3">
+                  {branchLimitReached && plan !== null ? (
+                    <span className="text-sm text-muted-foreground">
+                      {t('plan.branchLimitReached', {
+                        used: plan.usage.branches,
+                        limit: plan.limits.maxBranches,
+                      })}
+                    </span>
+                  ) : null}
+                  <Button type="button" disabled={branchLimitReached} onClick={() => setCreating(true)}>
+                    {t('branches.new')}
+                  </Button>
+                </div>
               ),
             }
           : {})}

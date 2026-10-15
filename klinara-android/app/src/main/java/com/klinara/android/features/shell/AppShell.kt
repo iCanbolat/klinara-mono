@@ -24,6 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -46,6 +47,7 @@ import com.klinara.android.designsystem.KlinaraTheme
 import com.klinara.android.designsystem.KlinaraType
 import com.klinara.android.designsystem.components.EmptyStateView
 import com.klinara.android.designsystem.components.KlinaraScreen
+import com.klinara.android.services.networking.ApiError
 import com.klinara.android.designsystem.components.KlinaraCard
 import com.klinara.android.designsystem.components.KlinaraNavigationRow
 import com.klinara.android.features.auth.AppSession
@@ -801,6 +803,34 @@ private fun ManagementTab(
             )
         }
 
+        composable<ShellRoutes.MySchedule> {
+            // Kendi personel profili: listede `userId` eşleşmesi. Profil yoksa (rol
+            // verilmiş ama profil açılmamış) açıklama gösterilir.
+            val ownId by produceState<String?>(initialValue = null, session.profile.user.id) {
+                value =
+                    try {
+                        container.staff.list().firstOrNull { it.userId == session.profile.user.id }?.id ?: ""
+                    } catch (_: ApiError) {
+                        ""
+                    }
+            }
+            when (val id = ownId) {
+                null -> KlinaraScreen(title = "Çalışma programım", onBack = { navController.popBackStack() }) {}
+                "" ->
+                    KlinaraScreen(title = "Çalışma programım", onBack = { navController.popBackStack() }) {
+                        Text("Personel profiliniz bulunamadı. Klinik yöneticinizle iletişime geçin.")
+                    }
+                else ->
+                    StaffScheduleScreen(
+                        session = session,
+                        container = container,
+                        staffProfileId = id,
+                        onBack = { navController.popBackStack() },
+                        trailing = trailing,
+                    )
+            }
+        }
+
         composable<ShellRoutes.StaffSchedule> { entry ->
             val route = entry.toRoute<ShellRoutes.StaffSchedule>()
             StaffScheduleScreen(
@@ -1012,6 +1042,7 @@ private fun ManagementDestination.route(): Any =
         ManagementDestination.Branches -> ShellRoutes.BranchList
         ManagementDestination.Invitations -> ShellRoutes.InvitationList
         ManagementDestination.BranchHours -> ShellRoutes.BranchHours
+        ManagementDestination.MySchedule -> ShellRoutes.MySchedule
         ManagementDestination.ScheduleExceptions -> ShellRoutes.ScheduleExceptionList()
         ManagementDestination.CustomerTags -> ShellRoutes.CustomerTagList
         ManagementDestination.PackageDefinitions -> ShellRoutes.PackageDefinitionList

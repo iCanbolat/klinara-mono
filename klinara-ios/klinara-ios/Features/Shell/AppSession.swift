@@ -120,6 +120,25 @@ final class AppSession {
 
     func canAny(_ candidates: String...) -> Bool { candidates.contains(where: can) }
 
+    /// Uygulayıcı kapsamı: tüm takvimi değil yalnız KENDİ randevularını görür.
+    /// Sunucu bu ayrımı izinden yapıyor; arayüz de aynı izinden çıkarıyor.
+    var isOwnScope: Bool {
+        !can(Permissions.appointmentReadAll) && can(Permissions.appointmentReadOwn)
+    }
+
+    /// Kullanıcının kendi personel profili — ``StaffStore`` yüklüyse.
+    var ownStaffProfile: StaffProfile? {
+        staffStore.profiles.first { $0.userId == user.id }
+    }
+
+    /// Kiracı geneli rol (işletme sahibi) — tüm şubeleri kapsar.
+    var tenantWide: Bool { profile.tenantWide }
+
+    /// Kullanıcının erişebildiği şube mi — sunucudaki `canAccessBranch` ile aynı.
+    func canAccessBranch(_ id: String) -> Bool {
+        profile.canAccessBranch(id)
+    }
+
     var user: UserProfile { profile.user }
 
     var roleNames: String {
@@ -158,7 +177,8 @@ final class AppSession {
     /// şube menüsü onu artık göstermiyor.
     func reloadBranches() async {
         guard let fresh = try? await services.branches.branches() else { return }
-        branches = fresh.map(\.summary)
+        // Login'deki kural: üye olunmayan şube menüde görünmez (aksi hâlde 403).
+        branches = fresh.map(\.summary).filter { canAccessBranch($0.id) }
         let current = branches.first { $0.id == selectedBranchId }
         if current == nil || current?.isActive == false,
            let fallback = branches.first(where: \.isActive) {

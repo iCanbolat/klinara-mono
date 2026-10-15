@@ -33,9 +33,18 @@ export async function removeForSession(tx: Tx, sessionId: string): Promise<void>
   await tx.execute(sql`delete from push_devices where session_id = ${sessionId}::uuid`);
 }
 
-export async function recipients(tx: Tx, branchId: string | null): Promise<PushRecipientRow[]> {
+/** Alıcı kuralı zil akışıyla aynı — bkz. `staff-notifications.repository` `visibleTo`. */
+export async function recipients(
+  tx: Tx,
+  notification: { branchId: string | null; kind: string; appointmentId: string | null },
+): Promise<PushRecipientRow[]> {
   const result = await tx.execute<PushRecipientRow>(sql`
-    select id, platform, environment, token from push_recipients(${branchId}::uuid)
+    select id, platform, environment, token
+      from push_recipients(
+        ${notification.branchId}::uuid,
+        ${notification.kind}::staff_notification_kind,
+        ${notification.appointmentId}::uuid
+      )
   `);
   return result.rows;
 }

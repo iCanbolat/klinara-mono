@@ -1,6 +1,6 @@
 import { createTransport, type Transporter } from 'nodemailer';
 import { PinoLogger } from 'nestjs-pino';
-import type { MailMessage, MailSender } from './mail.types';
+import type { MailMessage, MailSendResult, MailSender } from './mail.types';
 
 export interface SmtpConfig {
   host: string;
@@ -9,6 +9,7 @@ export interface SmtpConfig {
   password?: string | undefined;
   secure: boolean;
   from: string;
+  replyTo?: string | undefined;
 }
 
 /**
@@ -41,7 +42,7 @@ export class SmtpMailSender implements MailSender {
     });
   }
 
-  async send(message: MailMessage): Promise<void> {
+  async send(message: MailMessage): Promise<MailSendResult> {
     // `sendMail` taşıyıcıya göre değişen bir yük döndürür ve tipi `any`dir;
     // ihtiyacımız olan tek alanı daraltarak alıyoruz.
     const info = (await this.transporter.sendMail({
@@ -49,8 +50,13 @@ export class SmtpMailSender implements MailSender {
       to: message.to,
       subject: message.subject,
       text: message.body,
+      ...(message.html === undefined ? {} : { html: message.html }),
+      ...(this.config.replyTo === undefined || this.config.replyTo === ''
+        ? {}
+        : { replyTo: this.config.replyTo }),
     })) as { messageId?: string };
     // Alıcı adresi loglanmaz: gövde zaten hiç loglanmıyor, adres de kişisel veri.
     this.logger.debug({ messageId: info.messageId }, 'E-posta gönderildi');
+    return { provider: 'smtp', messageId: info.messageId ?? null };
   }
 }

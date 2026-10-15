@@ -111,6 +111,9 @@ const RULES: readonly Rule[] = [
   // UCU YOK — pasife alma `PATCH { isActive: false }`.
   { methods: ['POST'], pattern: /^branches$/ },
   { methods: ['PATCH'], pattern: new RegExp(`^branches/${UUID}$`) },
+  // Plan ve kurulum durumu: salt okunur, `tenant:read`. Planı DEĞİŞTİREN uç
+  // yok — o `platform/*` altında ve bu proxy'den hiç geçmiyor.
+  { methods: ['GET'], pattern: /^tenant\/(plan|setup-status)$/ },
   { methods: ['GET'], pattern: /^auth\/sessions$/ },
   { methods: ['DELETE'], pattern: new RegExp(`^auth/sessions/${UUID}$`) },
   { methods: ['POST'], pattern: /^auth\/logout-all$/ },

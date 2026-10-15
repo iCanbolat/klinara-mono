@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { IdentityModule } from '../identity/identity.module';
 import { PlatformTenantsController } from './platform-tenants.controller';
+import { PlatformTenantsService } from './platform-tenants.service';
 import { TenancyController } from './tenancy.controller';
 import { TenancyService } from './tenancy.service';
 
@@ -9,6 +10,6 @@ import { TenancyService } from './tenancy.service';
   // modülünün sorumluluğudur (kiracı modülü onun repository'sine dokunmaz).
   imports: [IdentityModule],
   controllers: [PlatformTenantsController, TenancyController],
-  providers: [TenancyService],
+  providers: [TenancyService, PlatformTenantsService],
 })
 export class TenancyModule {}

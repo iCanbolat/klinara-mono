@@ -1,5 +1,5 @@
 import { and, desc, eq, isNull } from 'drizzle-orm';
-import { invitations, passwordResetTokens } from '../../database/schema';
+import { invitations, passwordResetTokens, type InvitationStaffProfile } from '../../database/schema';
 import type { Tx } from '../../database/tenant-tx';
 
 /** Davet ve parola sıfırlama token'ları — ikisi de tek kullanımlık ve süreli. */
@@ -15,6 +15,7 @@ export async function insertInvitation(
     roleKey: string;
     email: string;
     fullName?: string | undefined;
+    staffProfile?: InvitationStaffProfile | undefined;
     tokenHash: string;
     invitedByUserId?: string | undefined;
     expiresAt: Date;
@@ -55,6 +56,37 @@ export async function findPendingInvitation(
     )
     .limit(1);
   return row;
+}
+
+/** Kiracının en son işletme sahibi daveti — platform ekranında durum için. */
+export async function findLatestOwnerInvitation(
+  tx: Tx,
+  tenantId: string,
+): Promise<InvitationRow | undefined> {
+  const [row] = await tx
+    .select()
+    .from(invitations)
+    .where(and(eq(invitations.tenantId, tenantId), eq(invitations.roleKey, 'owner')))
+    .orderBy(desc(invitations.createdAt))
+    .limit(1);
+  return row;
+}
+
+/** Bekleyen sahip davetlerini iptal eder; yeniden gönderimden önce çağrılır. */
+export async function revokePendingOwnerInvitations(tx: Tx, tenantId: string): Promise<number> {
+  const rows = await tx
+    .update(invitations)
+    .set({ revokedAt: new Date() })
+    .where(
+      and(
+        eq(invitations.tenantId, tenantId),
+        eq(invitations.roleKey, 'owner'),
+        isNull(invitations.acceptedAt),
+        isNull(invitations.revokedAt),
+      ),
+    )
+    .returning({ id: invitations.id });
+  return rows.length;
 }
 
 export async function listInvitations(tx: Tx): Promise<InvitationRow[]> {

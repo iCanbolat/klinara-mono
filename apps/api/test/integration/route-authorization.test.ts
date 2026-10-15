@@ -98,7 +98,17 @@ const SELF_SERVICE_ROUTES = [
 ];
 
 /** Platform token'ı ile korunan kiracı-üstü uçlar. */
-const PLATFORM_ROUTES = ['POST /platform/tenants/'];
+const PLATFORM_ROUTES = [
+  'GET /platform/tenants/',
+  'POST /platform/tenants/',
+  'GET /platform/tenants/:id',
+  'PATCH /platform/tenants/:id',
+  'POST /platform/tenants/:id/owner-invitation',
+  'GET /platform/tenants/:id/whatsapp/',
+  'PUT /platform/tenants/:id/whatsapp/',
+  'POST /platform/tenants/:id/whatsapp/verify',
+  'POST /platform/tenants/:id/whatsapp/templates/provision',
+];
 
 /** Kenar proxy'sinin (Caddy) iç uçları — kendi token'ı. */
 const EDGE_ROUTES = ['GET /internal/booking-domains/authorize'];

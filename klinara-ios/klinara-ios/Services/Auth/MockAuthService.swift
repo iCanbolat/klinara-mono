@@ -341,7 +341,8 @@ private enum Fixtures {
             return """
             ["branch:read", "appointment:read.own", "appointment:write", "customer:read",
              "customer.medical:read", "customer.medical:write", "service:read", "staff:read",
-             "schedule:read", "package:read", "consent:read", "notification:read"]
+             "schedule:read", "package:read", "consent:read", "consent:collect",
+             "notification:read", "report.performance:read.own"]
             """
         default:  // manager
             return """
@@ -351,9 +352,10 @@ private enum Fixtures {
              "notification:read",
              "appointment:reopen", "service:write", "staff:write", "schedule:write",
              "customer.medical:read", "customer:merge",
-             "package:write", "package:refund", "package:transfer",
+             "package:write", "package_definition:write", "package:refund", "package:transfer",
              "report.revenue:read",
-             "consent:manage", "notification:send", "notification:manage", "audit:read"]
+             "consent:manage", "consent:collect", "notification:send", "notification:manage",
+             "audit:read"]
             """
         }
     }

@@ -9,7 +9,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import type { Branch } from '@klinara/shared';
+import type { Branch, Me } from '@klinara/shared';
 import { api, SessionExpiredError } from '@/lib/api/client';
 import { useSession } from './session-provider';
 
@@ -82,7 +82,11 @@ export function BranchProvider({ children }: { children: ReactNode }): ReactNode
         // `GET branches` yanıtı ZARFLI: `{ data: [...] }`. Düz dizi bekleyip
         // gelen nesneyi state'e koymak, süzgeçteki `branches.map`i çalışma
         // anında patlatıyordu — sözleşme API tarafında, uyacak taraf burası.
-        const { data: list } = await api.get<{ data: Branch[] }>('branches');
+        const { data: all } = await api.get<{ data: Branch[] }>('branches');
+        // Sunucu zaten üyeliğe göre süzüyor; burada tekrar süzmek eski bir
+        // yanıtın ya da önbelleğin üye olunmayan şubeyi seçtirmesini önler
+        // (aksi hâlde "Bu şubeye erişim yetkiniz yok").
+        const list = memberBranches(all, me);
         setBranches(list);
 
         const stored = readStored();
@@ -118,6 +122,17 @@ export function BranchProvider({ children }: { children: ReactNode }): ReactNode
   );
 
   return <BranchContext.Provider value={value}>{children}</BranchContext.Provider>;
+}
+
+/** Kullanıcının üye olduğu şubeler (kiracı geneli rolde tümü). Pasifler dahil. */
+export function memberBranches(
+  branches: readonly Branch[],
+  me: Pick<Me, 'tenantWide' | 'branchIds'> | null,
+): Branch[] {
+  if (me === null) return [];
+  if (me.tenantWide) return [...branches];
+  const allowed = new Set(me.branchIds);
+  return branches.filter((branch) => allowed.has(branch.id));
 }
 
 function readStored(): string | null {

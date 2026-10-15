@@ -1,4 +1,4 @@
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 import { branches, tenants, tenantSettings } from '../../database/schema';
 import type { Tx } from '../../database/tenant-tx';
 import { definedValues, hasUpdates, type Updatable } from '../../database/updates';
@@ -24,7 +24,15 @@ export type TenantSettingsRow = typeof tenantSettings.$inferSelect;
 
 export async function insertTenant(
   tx: Tx,
-  values: { slug: string; name: string; timezone: string; currency: string },
+  values: {
+    slug: string;
+    name: string;
+    timezone: string;
+    currency: string;
+    planKey?: string;
+    maxBranchesOverride?: number | null;
+    maxPractitionersOverride?: number | null;
+  },
 ): Promise<TenantRow> {
   const [row] = await tx.insert(tenants).values(values).returning();
   if (row === undefined) throw new Error('Kiracı oluşturulamadı');
@@ -56,13 +64,43 @@ export async function findTenantBySlug(tx: Tx, slug: string): Promise<TenantRow 
 export async function updateTenant(
   tx: Tx,
   id: string,
-  values: Updatable<Pick<TenantRow, 'name' | 'timezone' | 'status'>>,
+  values: Updatable<Pick<TenantRow, 'name' | 'timezone'>>,
 ): Promise<TenantRow | undefined> {
   // Boş PATCH gövdesi geçerli bir istektir; `set({})` ise SQL kurucusunu
   // patlatır. Değişecek alan yoksa mevcut satırı döndürmek yeterli.
   const patch = definedValues(values);
   if (!hasUpdates(patch)) return findTenantById(tx, id);
   const [row] = await tx.update(tenants).set(patch).where(eq(tenants.id, id)).returning();
+  return row;
+}
+
+/** Platform yöneticisinin kiracı listesi (yalnız `runAsPlatform` altında tüm kiracıları görür). */
+export async function listAllTenants(tx: Tx): Promise<TenantRow[]> {
+  return tx
+    .select()
+    .from(tenants)
+    .where(isNull(tenants.deletedAt))
+    .orderBy(desc(tenants.createdAt));
+}
+
+/** Plan ve durum — YALNIZ platform yöneticisi (`tenants_plan_guard` trigger'ı da zorlar). */
+export async function updateTenantPlan(
+  tx: Tx,
+  id: string,
+  values: Updatable<
+    Pick<
+      TenantRow,
+      'planKey' | 'status' | 'maxBranchesOverride' | 'maxPractitionersOverride' | 'planNote'
+    >
+  >,
+): Promise<TenantRow | undefined> {
+  const patch = definedValues(values);
+  if (!hasUpdates(patch)) return findTenantById(tx, id);
+  const [row] = await tx
+    .update(tenants)
+    .set(patch)
+    .where(and(eq(tenants.id, id), isNull(tenants.deletedAt)))
+    .returning();
   return row;
 }
 
@@ -139,7 +177,9 @@ export async function findBranchById(tx: Tx, id: string): Promise<BranchRow | un
 export async function updateBranch(
   tx: Tx,
   id: string,
-  values: Updatable<Pick<BranchRow, 'name' | 'timezone' | 'phone' | 'address' | 'mapsUrl' | 'isActive'>>,
+  values: Updatable<
+    Pick<BranchRow, 'name' | 'timezone' | 'phone' | 'address' | 'mapsUrl' | 'isActive'>
+  >,
 ): Promise<BranchRow | undefined> {
   const patch = definedValues(values);
   if (!hasUpdates(patch)) return findBranchById(tx, id);

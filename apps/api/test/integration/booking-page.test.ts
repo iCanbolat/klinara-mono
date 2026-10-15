@@ -113,7 +113,7 @@ describe('randevu sayfası: site, alan adı ve public çözümleme (Batch 9.1)',
       );
     });
 
-    it('resepsiyon sayfayı OKUR ama yönetemez', async () => {
+    it('randevu sayfası yalnız işletme sahibinde: resepsiyon ve şube yöneticisi erişemez', async () => {
       const { inviteMember } = await import('../helpers/identity');
       const desk = await inviteMember(app, clinic.owner.tokens, {
         email: 'resepsiyon@klinik-x.test',
@@ -121,11 +121,19 @@ describe('randevu sayfası: site, alan adı ve public çözümleme (Batch 9.1)',
         branchId: clinic.branch.id,
       });
 
-      await http(app).get('/api/v1/booking-page').set(auth(desk.tokens)).expect(200);
-      await http(app)
-        .post('/api/v1/booking-page/publish')
-        .set(auth(desk.tokens))
-        .expect(403);
+      const manager = await inviteMember(app, clinic.owner.tokens, {
+        email: 'yonetici@klinik-x.test',
+        roleKey: 'manager',
+        branchId: clinic.branch.id,
+      });
+
+      for (const member of [desk, manager]) {
+        await http(app).get('/api/v1/booking-page').set(auth(member.tokens)).expect(403);
+        await http(app)
+          .post('/api/v1/booking-page/publish')
+          .set(auth(member.tokens))
+          .expect(403);
+      }
     });
   });
 

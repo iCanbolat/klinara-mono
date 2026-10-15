@@ -115,6 +115,14 @@ export const ERROR_CODES = {
 
   // --- Kiracılık ---
   TENANT_CONTEXT_MISSING: 'TENANT_CONTEXT_MISSING',
+  /** Klinik hesabı platform tarafından askıya alındı. */
+  TENANT_SUSPENDED: 'TENANT_SUSPENDED',
+
+  // --- Plan limitleri ---
+  /** Planın şube sınırına ulaşıldı (`extra: { limit, used, planKey }`). */
+  PLAN_BRANCH_LIMIT_REACHED: 'PLAN_BRANCH_LIMIT_REACHED',
+  /** Planın hekim/uygulayıcı sınırına ulaşıldı (`extra: { limit, used, planKey }`). */
+  PLAN_PRACTITIONER_LIMIT_REACHED: 'PLAN_PRACTITIONER_LIMIT_REACHED',
   CONFLICT: 'CONFLICT',
 } as const;
 

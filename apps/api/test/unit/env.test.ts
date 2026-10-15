@@ -115,6 +115,8 @@ describe('üretime özgü kurallar', () => {
     CORS_ORIGINS: 'https://app.klinara.app',
     APP_BASE_URL: 'https://app.klinara.app',
     WEBAUTHN_ORIGINS: 'https://app.klinara.app',
+    RESEND_API_KEY: 're_test',
+    MAIL_FROM: 'Klinara <bildirim@klinara.app>',
   };
 
   it('geçerli üretim yapılandırması kabul edilir', () => {
@@ -138,6 +140,17 @@ describe('üretime özgü kurallar', () => {
   it('üretimde APP_BASE_URL https olmalı', () => {
     expect(() => validateEnv({ ...PROD, APP_BASE_URL: 'http://app.klinara.app' })).toThrow(
       /APP_BASE_URL/,
+    );
+  });
+
+  it('üretimde e-posta göndericisi zorunludur', () => {
+    expect(() => validateEnv({ ...PROD, RESEND_API_KEY: '' })).toThrow(/RESEND_API_KEY/);
+    expect(() => validateEnv({ ...PROD, RESEND_API_KEY: '', SMTP_HOST: 'smtp.example.com' })).not.toThrow();
+  });
+
+  it('üretimde .local gönderen adresi reddedilir', () => {
+    expect(() => validateEnv({ ...PROD, MAIL_FROM: 'Klinara <bildirim@klinara.local>' })).toThrow(
+      /MAIL_FROM/,
     );
   });
   // --- Batch 10.3 ---

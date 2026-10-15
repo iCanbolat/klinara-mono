@@ -468,7 +468,7 @@ final class AuthFlowModel {
     private func routeToBranchOrFinish(_ me: MeResponse) async throws {
         let all = try await auth.branches()
         // Kiracı kapsamlı rol tüm şubeleri görür; değilse yalnız üyesi olduğu şubeler.
-        let visible = me.tenantWide ? all : all.filter { me.branchIds.contains($0.id) }
+        let visible = all.filter { me.canAccessBranch($0.id) }
         branches = visible
 
         if visible.count > 1, tokens.branchId == nil {

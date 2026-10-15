@@ -1,7 +1,32 @@
-import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
-import { ApiBearerAuth, ApiCreatedResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { PlatformAdminOnly } from '../../common/decorators/auth.decorators';
-import { CreateTenantDto, CreateTenantResponseDto } from './dto/tenant.dto';
+import {
+  CreateTenantDto,
+  CreateTenantResponseDto,
+  PlatformOwnerInvitationResendDto,
+  PlatformTenantDetailDto,
+  PlatformTenantListDto,
+  TenantOwnerInvitationDto,
+  UpdatePlatformTenantDto,
+} from './dto/tenant.dto';
+import { PlatformTenantsService } from './platform-tenants.service';
 import { TenancyService } from './tenancy.service';
 
 @ApiTags('tenancy')
@@ -12,7 +37,17 @@ import { TenancyService } from './tenancy.service';
 // dolayısıyla yetkisiz çağıran doğrulama hatalarından şemayı keşfedemez.
 @PlatformAdminOnly()
 export class PlatformTenantsController {
-  constructor(private readonly tenancy: TenancyService) {}
+  constructor(
+    private readonly tenancy: TenancyService,
+    private readonly platform: PlatformTenantsService,
+  ) {}
+
+  @Get()
+  @ApiOperation({ summary: 'Kiracı listesi (plan, kullanım, sahip daveti durumu)' })
+  @ApiOkResponse({ type: PlatformTenantListDto })
+  async list(): Promise<PlatformTenantListDto> {
+    return { data: await this.platform.list() };
+  }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -24,5 +59,36 @@ export class PlatformTenantsController {
   @ApiCreatedResponse({ type: CreateTenantResponseDto })
   create(@Body() body: CreateTenantDto): Promise<CreateTenantResponseDto> {
     return this.tenancy.createTenant(body);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Kiracı detayı: şubeler ve kurulum kontrol listesi' })
+  @ApiOkResponse({ type: PlatformTenantDetailDto })
+  get(@Param('id', ParseUUIDPipe) id: string): Promise<PlatformTenantDetailDto> {
+    return this.platform.get(id);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Plan, durum ve limit override’larını güncelle' })
+  @ApiOkResponse({ type: PlatformTenantDetailDto })
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: UpdatePlatformTenantDto,
+  ): Promise<PlatformTenantDetailDto> {
+    return this.platform.update(id, body);
+  }
+
+  @Post(':id/owner-invitation')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'İşletme sahibi davetini yeniden gönder',
+    description: 'Bekleyen sahip davetleri iptal edilir, yenisi açılır ve e-postayla gönderilir.',
+  })
+  @ApiCreatedResponse({ type: TenantOwnerInvitationDto })
+  resendOwnerInvitation(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: PlatformOwnerInvitationResendDto,
+  ): Promise<TenantOwnerInvitationDto> {
+    return this.platform.resendOwnerInvitation(id, body.email);
   }
 }

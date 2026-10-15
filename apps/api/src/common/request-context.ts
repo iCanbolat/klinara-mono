@@ -134,6 +134,23 @@ export class RequestContextService {
     ctx.isPublicBooking = true;
   }
 
+  /**
+   * Platform yöneticisinin TEK bir kiracı adına iş yapması (elden kurulum).
+   *
+   * `fn`, yalnız o kiracıya daraltılmış bir ALT bağlamda koşar: kiracı
+   * servisleri (`TenantTxService.run`, `tenantId`) değişmeden çalışır ve
+   * RLS normal kiracı politikasını uygular. Alt bağlamda platform bayrağı
+   * KAPALI: platform yetkisi `tenants` tablosu dışında hiçbir şey açmasın.
+   * Çağrının kendisi `PlatformAdminGuard` tarafından zaten kayda yazılmıştır.
+   */
+  runAsPlatformForTenant<T>(tenantId: string, fn: () => Promise<T>): Promise<T> {
+    const ctx = this.requirePlatformAdmin();
+    return storage.run(
+      { ...ctx, tenantId, userId: null, branchId: null, sessionId: null, isPlatformAdmin: false },
+      fn,
+    );
+  }
+
   requirePlatformAdmin(): RequestContext {
     const ctx = this.get();
     if (ctx === undefined || !ctx.isPlatformAdmin) {

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Plus } from 'lucide-react';
 import { PERMISSIONS, type Service, type StaffProfile } from '@klinara/shared';
 import { t } from '@/i18n/tr';
+import { isOwnScope } from '@/lib/permissions';
 import { api } from '@/lib/api/client';
 import { useBranch } from '@/components/session/branch-provider';
 import { useSession } from '@/components/session/session-provider';
@@ -108,9 +109,7 @@ export function CalendarPage(): ReactNode {
   const timezone = state.data?.timezone ?? 'Europe/Istanbul';
 
   // Bkz. dosya başlığı: sunucu `scope` döndürmediği için çıkarım.
-  const ownOnly =
-    !permissions.includes(PERMISSIONS.APPOINTMENT_READ_ALL) &&
-    permissions.includes(PERMISSIONS.APPOINTMENT_READ_OWN);
+  const ownOnly = isOwnScope(permissions);
   const canWrite = permissions.includes(PERMISSIONS.APPOINTMENT_WRITE);
 
   // Katalog ve personel BİR KEZ okunuyor: ikisi de sayfalanmıyor ve randevu

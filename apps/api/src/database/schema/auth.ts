@@ -2,6 +2,7 @@ import {
   bigserial,
   boolean,
   index,
+  jsonb,
   pgEnum,
   pgTable,
   text,
@@ -79,6 +80,13 @@ export const loginAttempts = pgTable(
   (table) => [index('login_attempts_identifier_idx').on(table.identifier)],
 );
 
+/** `invitations.staff_profile` taslağı; kabulde `staff_profiles` satırına dönüşür. */
+export interface InvitationStaffProfile {
+  title?: string;
+  isVisibleOnline: boolean;
+  serviceIds: string[];
+}
+
 export const invitations = pgTable(
   'invitations',
   {
@@ -92,6 +100,8 @@ export const invitations = pgTable(
       .references(() => roles.key),
     email: citext('email').notNull(),
     fullName: text('full_name'),
+    /** Uygulayıcı daveti: kabulde açılacak profil taslağı (0061). */
+    staffProfile: jsonb('staff_profile').$type<InvitationStaffProfile>(),
     tokenHash: text('token_hash').notNull().unique(),
     invitedByUserId: uuid('invited_by_user_id').references(() => users.id, {
       onDelete: 'set null',

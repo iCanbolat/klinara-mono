@@ -18,12 +18,16 @@ import {
 } from '@nestjs/swagger';
 import { PERMISSIONS } from '@klinara/shared';
 import { RequirePermission } from '../../common/decorators/auth.decorators';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import type { Principal } from '../identity/principal';
 import {
   BranchListResponseDto,
   BranchResponseDto,
   CreateBranchDto,
   TenantResponseDto,
   TenantSettingsResponseDto,
+  TenantPlanResponseDto,
+  TenantSetupStatusDto,
   UpdateBranchDto,
   UpdateTenantDto,
   UpdateTenantSettingsDto,
@@ -52,6 +56,24 @@ export class TenancyController {
     return this.tenancy.updateTenant(body);
   }
 
+  @Get('tenant/plan')
+  @RequirePermission(PERMISSIONS.TENANT_READ)
+  @ApiOperation({ summary: 'Abonelik planı, limitler ve kullanım' })
+  @ApiOkResponse({ type: TenantPlanResponseDto })
+  getPlan(): Promise<TenantPlanResponseDto> {
+    return this.tenancy.getPlan();
+  }
+
+  @Get('tenant/setup-status')
+  @RequirePermission(PERMISSIONS.TENANT_READ)
+  @ApiOperation({
+    summary: 'Kurulum kontrol listesi (şube, saatler, hizmet, hekim, WhatsApp, sayfa)',
+  })
+  @ApiOkResponse({ type: TenantSetupStatusDto })
+  getSetupStatus(): Promise<TenantSetupStatusDto> {
+    return this.tenancy.getSetupStatus();
+  }
+
   @Get('tenant/settings')
   @RequirePermission(PERMISSIONS.TENANT_READ)
   @ApiOperation({ summary: 'Kiracı ayarları' })
@@ -70,10 +92,13 @@ export class TenancyController {
 
   @Get('branches')
   @RequirePermission(PERMISSIONS.BRANCH_READ)
-  @ApiOperation({ summary: 'Kiracının şubeleri' })
+  @ApiOperation({
+    summary: 'Kullanıcının erişebildiği şubeler',
+    description: 'İşletme sahibi tüm şubeleri, şube kapsamlı roller yalnız üyesi oldukları şubeleri görür.',
+  })
   @ApiOkResponse({ type: BranchListResponseDto })
-  async listBranches(): Promise<BranchListResponseDto> {
-    return { data: await this.tenancy.listBranches() };
+  async listBranches(@CurrentUser() principal: Principal): Promise<BranchListResponseDto> {
+    return { data: await this.tenancy.listBranches(principal) };
   }
 
   @Post('branches')

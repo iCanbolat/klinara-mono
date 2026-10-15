@@ -47,12 +47,15 @@ export class PackageDefinitionsController {
   @RequirePermission(PERMISSIONS.PACKAGE_READ)
   @ApiOperation({ summary: 'Paket tanımları (cursor sayfalamalı)' })
   @ApiOkResponse({ type: PackageDefinitionPageDto })
-  list(@Query() query: ListPackageDefinitionsQueryDto): Promise<PackageDefinitionPageDto> {
-    return this.definitions.list(query);
+  list(
+    @CurrentUser() principal: Principal,
+    @Query() query: ListPackageDefinitionsQueryDto,
+  ): Promise<PackageDefinitionPageDto> {
+    return this.definitions.list(principal, query);
   }
 
   @Post()
-  @RequirePermission(PERMISSIONS.PACKAGE_WRITE)
+  @RequirePermission(PERMISSIONS.PACKAGE_DEFINITION_WRITE)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Paket tanımı oluştur' })
   @ApiCreatedResponse({ type: PackageDefinitionResponseDto })
@@ -80,7 +83,7 @@ export class PackageDefinitionsController {
   }
 
   @Patch(':id')
-  @RequirePermission(PERMISSIONS.PACKAGE_WRITE)
+  @RequirePermission(PERMISSIONS.PACKAGE_DEFINITION_WRITE)
   @ApiOperation({
     summary: 'Paket tanımını güncelle',
     description:
@@ -89,18 +92,19 @@ export class PackageDefinitionsController {
   @ApiHeader({ name: 'If-Match', required: true, example: 'W/"3"' })
   @ApiOkResponse({ type: PackageDefinitionResponseDto })
   async update(
+    @CurrentUser() principal: Principal,
     @Param('id', new ParseUUIDPipe()) id: string,
     @Headers('if-match') ifMatch: string | undefined,
     @Body() body: UpdatePackageDefinitionDto,
     @Res({ passthrough: true }) response: Response,
   ): Promise<PackageDefinitionResponseDto> {
-    const definition = await this.definitions.update(id, requireIfMatch(ifMatch), body);
+    const definition = await this.definitions.update(principal, id, requireIfMatch(ifMatch), body);
     response.setHeader('ETag', weakETag(definition.version));
     return definition;
   }
 
   @Delete(':id')
-  @RequirePermission(PERMISSIONS.PACKAGE_WRITE)
+  @RequirePermission(PERMISSIONS.PACKAGE_DEFINITION_WRITE)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Paket tanımını emekliye ayır',
@@ -110,9 +114,10 @@ export class PackageDefinitionsController {
   @ApiHeader({ name: 'If-Match', required: true, example: 'W/"3"' })
   @ApiNoContentResponse()
   async remove(
+    @CurrentUser() principal: Principal,
     @Param('id', new ParseUUIDPipe()) id: string,
     @Headers('if-match') ifMatch: string | undefined,
   ): Promise<void> {
-    await this.definitions.remove(id, requireIfMatch(ifMatch));
+    await this.definitions.remove(principal, id, requireIfMatch(ifMatch));
   }
 }

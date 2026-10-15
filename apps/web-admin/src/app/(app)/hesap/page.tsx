@@ -11,6 +11,7 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Field } from '@/components/ui/field';
+import { PlanUsageCard } from '@/components/plan/plan-usage-card';
 
 export default function AccountPage(): ReactNode {
   const { me } = useSession();
@@ -57,6 +58,8 @@ export default function AccountPage(): ReactNode {
           <dd>{me?.roles.join(', ') ?? ''}</dd>
         </dl>
       </Card>
+
+      <PlanUsageCard />
 
       <Card>
         <CardTitle>{t('account.changePassword')}</CardTitle>

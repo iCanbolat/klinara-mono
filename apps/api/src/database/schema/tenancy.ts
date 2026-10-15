@@ -20,6 +20,11 @@ export const tenants = pgTable('tenants', {
   status: tenantStatus('status').notNull().default('trial'),
   timezone: text('timezone').notNull().default('Europe/Istanbul'),
   currency: char('currency', { length: 3 }).notNull().default('TRY'),
+  /** Abonelik planı (`packages/shared/src/plans.ts`); 0059. */
+  planKey: text('plan_key').notNull().default('klinik'),
+  maxBranchesOverride: integer('max_branches_override'),
+  maxPractitionersOverride: integer('max_practitioners_override'),
+  planNote: text('plan_note'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),

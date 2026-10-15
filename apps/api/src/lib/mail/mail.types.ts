@@ -7,6 +7,12 @@ export interface MailMessage {
   html?: string;
 }
 
+/** Göndericinin raporladığı sonuç; bildirim kaydına sağlayıcı ve id olarak yazılır. */
+export interface MailSendResult {
+  provider: 'resend' | 'smtp' | 'log';
+  messageId: string | null;
+}
+
 /**
  * E-posta gönderim arayüzü.
  *
@@ -16,7 +22,7 @@ export interface MailMessage {
  * Çağıran hangisinin koştuğunu bilmez.
  */
 export interface MailSender {
-  send(message: MailMessage): Promise<void>;
+  send(message: MailMessage): Promise<MailSendResult>;
 }
 
 export const MAIL_SENDER = Symbol('MAIL_SENDER');

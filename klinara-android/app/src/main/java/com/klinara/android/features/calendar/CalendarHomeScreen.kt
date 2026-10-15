@@ -127,7 +127,15 @@ fun CalendarHomeScreen(
         verticalSpacing = KlinaraMetrics.md,
         trailing = trailing,
     ) {
-        CalendarHeader(clock = clock, state = state, viewModel = viewModel, now = now)
+        CalendarHeader(
+            clock = clock,
+            state = state,
+            viewModel = viewModel,
+            now = now,
+            // Uygulayıcı yalnız kendi randevularını görür: personel süzgeci anlamsız.
+            showsStaffFilter = !session.isOwnScope,
+            branchId = session.activeBranchId,
+        )
 
         when (val calendar = state.calendar) {
             // Düz "Takvim yükleniyor…" metni tek satırdı; veri gelince gövde bir
@@ -229,6 +237,8 @@ private fun CalendarHeader(
     state: CalendarUiState,
     viewModel: CalendarViewModel,
     now: Instant,
+    showsStaffFilter: Boolean,
+    branchId: String?,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(KlinaraMetrics.sm)) {
         // Mod seçici ilk satırda: altındaki gezinme satırının ne kaydırdığı (gün mü
@@ -297,16 +307,20 @@ private fun CalendarHeader(
             )
         }
 
-        StaffFilterRow(state = state, onToggle = viewModel::toggleStaffFilter)
+        if (showsStaffFilter) {
+            StaffFilterRow(state = state, branchId = branchId, onToggle = viewModel::toggleStaffFilter)
+        }
     }
 }
 
 @Composable
 private fun StaffFilterRow(
     state: CalendarUiState,
+    branchId: String?,
     onToggle: (String?) -> Unit,
 ) {
-    val staff = state.activeStaff
+    // Yalnız seçili şubenin personeli — başka şubenin hekimi bu takvimde zaten görünmez.
+    val staff = state.activeStaff.filter { branchId == null || it.worksIn(branchId) }
     if (staff.isEmpty()) {
         // Personel listesi gelene kadar şeridin YERİ tutulur: şerit sonradan
         // belirdiğinde başlık uzuyor ve takvim gövdesi aşağı kayıyordu.

@@ -10,6 +10,7 @@ import com.klinara.android.services.booking.BookingService
 import com.klinara.android.services.booking.CalendarDayQuery
 import com.klinara.android.services.booking.CalendarEntry
 import com.klinara.android.services.formatting.BranchClock
+import com.klinara.android.services.contracts.ApiErrorCode
 import com.klinara.android.services.networking.ApiError
 import com.klinara.android.services.networking.Page
 import com.klinara.android.services.reports.NoShowGrouping
@@ -35,6 +36,8 @@ data class DashboardData(
     val summaries: List<BranchDashboardSummary>,
     /** Tüm şubelerde tarihi en yakın randevular — bugünle sınırlı değil. */
     val upcoming: List<UpcomingItem>,
+    /** Bugünün TÜM randevuları (tamamlananlar dahil), saate göre — "Bugünüm" akışı. */
+    val today: List<UpcomingItem> = emptyList(),
     /** Listenin ötesinde de bekleyen randevu var; "Tümünü takvimde gör". */
     val upcomingHasMore: Boolean,
     /** Verinin çekildiği an; "Bugün/Yarın" etiketleri buna göre. */
@@ -139,7 +142,12 @@ class DashboardViewModel(
                 (dayResults + upcomingResults).firstNotNullOfOrNull { it.exceptionOrNull() }?.let(::message)
 
             val reportResults = listOf(occupancy.await(), noShow.await(), revenue.await(), staff.await())
-            val reportsError = reportResults.firstNotNullOfOrNull { it.exceptionOrNull() }?.let(::message)
+            // 403 = bu kişi için o rapor yok (ör. personel profili açılmamış uygulayıcı).
+            // Bölüm boş kalır; "alınamadı" uyarısı yanıltıcı olurdu.
+            val reportsError =
+                reportResults
+                    .firstNotNullOfOrNull { it.exceptionOrNull()?.takeUnless(::isForbidden) }
+                    ?.let(::message)
 
             val occupancyReport = occupancy.await().getOrNull()
             val noShowReport = noShow.await().getOrNull()
@@ -151,6 +159,14 @@ class DashboardViewModel(
             DashboardData(
                 summaries = summaries,
                 upcoming = upcoming,
+                today =
+                    active
+                        .flatMap { branch ->
+                            val day = dayMap[branch.id]
+                            day?.first.orEmpty().map {
+                                UpcomingItem(it, branch.name, day?.second ?: branch.timezone)
+                            }
+                        }.sortedBy { it.entry.startsAt },
                 upcomingHasMore =
                     upcomingMap.values.any { it.pageInfo.hasMore } ||
                         upcomingMap.values.sumOf { it.data.size } > upcoming.size,
@@ -193,6 +209,11 @@ class DashboardViewModel(
         allowed: Boolean,
         block: suspend () -> T,
     ): Result<T?> = if (allowed) attempt(block) else Result.success(null)
+
+    private fun isForbidden(error: Throwable): Boolean {
+        val code = (error as? ApiError.Problem)?.problem?.code ?: return false
+        return code == ApiErrorCode.FORBIDDEN || code == ApiErrorCode.BRANCH_FORBIDDEN
+    }
 
     private fun message(error: Throwable): String = (error as? ApiError)?.displayMessage ?: "Beklenmeyen hata"
 

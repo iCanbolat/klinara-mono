@@ -77,10 +77,21 @@ describe('yönetim proxy beyaz listesi', () => {
     }
   });
 
+  it('plan ve kurulum durumu yalnız OKUNUR', () => {
+    expect(isAllowedProxyPath('tenant/plan', 'GET')).toBe(true);
+    expect(isAllowedProxyPath('tenant/setup-status', 'GET')).toBe(true);
+    expect(isAllowedProxyPath('tenant/plan', 'PATCH')).toBe(false);
+    expect(isAllowedProxyPath('tenant/plan', 'PUT')).toBe(false);
+    expect(isAllowedProxyPath('tenant/plans', 'GET')).toBe(false);
+    expect(isAllowedProxyPath('tenant', 'PATCH')).toBe(false);
+  });
+
   it('iç, platform ve public yüzeyler geçmiyor', () => {
     for (const path of [
       'internal/booking-domains/authorize',
       'platform/tenants',
+      `platform/tenants/${UUID}`,
+      `platform/tenants/${UUID}/owner-invitation`,
       'webhooks/whatsapp',
       'metrics',
       'healthz',

@@ -89,12 +89,24 @@ export const NAV_ITEMS: readonly NavItem[] = [
   // `ConversationsController` ile aynı: okuyup cevaplayamayan rolün (uygulayıcı)
   // burada işi yok.
   { path: '/mesajlar', labelKey: 'nav.messages', requires: [PERMISSIONS.NOTIFICATION_SEND] },
-  { path: '/katalog', labelKey: 'nav.catalog', requires: [PERMISSIONS.SERVICE_READ] },
-  // "Şube ve Personel". Kapı `staff:read`: `branch:read` HER rolde var ve
-  // kapı olsaydı personel izni olmayan bir rol yalnız şube listesinden ibaret
-  // bir ekran görürdü.
+  // Hizmet ve paket kataloğu operasyon ekibinin (sahip, yönetici, resepsiyon)
+  // ekranı. Uygulayıcı hizmet listesini randevu formunda API'den okuyor ama
+  // katalog yönetimi menüsü onun işi değil — kapı `appointment:read.all`.
+  {
+    path: '/katalog',
+    labelKey: 'nav.catalog',
+    requires: [PERMISSIONS.SERVICE_READ, PERMISSIONS.APPOINTMENT_READ_ALL],
+  },
+  // "Şube ve Personel" — ekip yönetimi. `staff:read` tek başına yetmez: her rol
+  // onu randevu formundaki personel seçicisi için taşıyor. Ekibi görmek
+  // kullanıcıları okumak (`user:read`) ya da personeli düzenlemek demek.
   // Sekmeler kendi içinde ayrıca süzülüyor (`branch:write`, `user:invite`).
-  { path: '/personel', labelKey: 'nav.staff', requires: [PERMISSIONS.STAFF_READ] },
+  {
+    path: '/personel',
+    labelKey: 'nav.staff',
+    requires: [PERMISSIONS.STAFF_READ],
+    requiresAny: [PERMISSIONS.USER_READ, PERMISSIONS.STAFF_WRITE],
+  },
   {
     path: '/calisma-saatleri',
     labelKey: 'nav.schedule',
@@ -105,7 +117,10 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { path: '/icerik', labelKey: 'nav.content', requires: [PERMISSIONS.BOOKING_PAGE_READ] },
   // Onam metni randevu sayfasının ALTINDA ama ayrı: sayfa ayarı değil,
   // sürümlü ve yayınlandıktan sonra değişmeyen bir belge (Faz 7).
-  { path: '/onam', labelKey: 'nav.consent', requires: [PERMISSIONS.CONSENT_READ] },
+  //
+  // Kapı `consent:manage`: `consent:read` imza toplayan her rolde (uygulayıcı
+  // dahil) var; metni okumak randevu içindeki imza akışında yeterli.
+  { path: '/onam', labelKey: 'nav.consent', requires: [PERMISSIONS.CONSENT_MANAGE] },
   {
     path: '/raporlar',
     labelKey: 'nav.reports',
@@ -116,9 +131,9 @@ export const NAV_ITEMS: readonly NavItem[] = [
       PERMISSIONS.REPORT_PERFORMANCE_READ_OWN,
     ],
   },
-  // Müşteriye giden mesajların metni ve gönderim anahtarı. Okumak `notification:read`;
-  // sayfa içindeki anahtar ve konum alanı kendi izinlerine ayrıca bakıyor.
-  { path: '/sablonlar', labelKey: 'nav.templates', requires: [PERMISSIONS.NOTIFICATION_READ] },
+  // Müşteriye giden mesajların metni ve gönderim anahtarı. `notification:read`
+  // her rolde (zil için) var; şablon ekranı yönetenlerin işi.
+  { path: '/sablonlar', labelKey: 'nav.templates', requires: [PERMISSIONS.NOTIFICATION_MANAGE] },
   // WhatsApp kurulumu: kiracının TÜM müşterilerine giden kanalı değiştiriyor,
   // bu yüzden `notification:manage` (sahip, şube yöneticisi).
   { path: '/whatsapp', labelKey: 'nav.whatsapp', requires: [PERMISSIONS.NOTIFICATION_MANAGE] },
@@ -140,6 +155,17 @@ function allows(permissions: readonly string[], item: NavItem): boolean {
   if (!can(permissions, ...item.requires)) return false;
   if (item.requiresAny === undefined) return true;
   return canAny(permissions, ...item.requiresAny);
+}
+
+/**
+ * Uygulayıcı kapsamı: tüm takvimi değil yalnız KENDİ randevularını görür.
+ * Sunucu bu ayrımı izinden yapıyor; panel de aynı izinden çıkarıyor.
+ */
+export function isOwnScope(permissions: readonly string[]): boolean {
+  return (
+    !permissions.includes(PERMISSIONS.APPOINTMENT_READ_ALL) &&
+    permissions.includes(PERMISSIONS.APPOINTMENT_READ_OWN)
+  );
 }
 
 /** Bir rota bu izinlerle açılabilir mi (doğrudan URL kontrolü). */

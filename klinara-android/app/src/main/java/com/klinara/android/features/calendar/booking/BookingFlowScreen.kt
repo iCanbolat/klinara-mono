@@ -68,6 +68,7 @@ import com.klinara.android.services.contracts.Permissions
 import com.klinara.android.services.formatting.BranchClock
 import com.klinara.android.services.formatting.DurationFormat
 import com.klinara.android.services.formatting.Money
+import com.klinara.android.services.staff.StaffProfile
 import com.klinara.android.services.networking.Loadable
 import java.time.Instant
 
@@ -143,7 +144,14 @@ fun BookingFlowScreen(
             // Bölümler ilerledikçe açılır: hizmet seçilmeden personel ve slot sormak,
             // cevaplanamayacak sorular sormaktır.
             if (state.draft.canQueryAvailability) {
-                StaffSection(state, viewModel)
+                // Uygulayıcı yalnız KENDİ adına randevu açar; diğer rollerde şubenin personeli.
+                StaffSection(
+                    state = state,
+                    viewModel = viewModel,
+                    allows = { profile ->
+                        if (session.isOwnScope) profile.userId == session.profile.user.id else profile.worksIn(branchId)
+                    },
+                )
                 SlotSection(state, viewModel, clock)
                 SummarySection(state, clock)
             }
@@ -339,8 +347,9 @@ private fun LockedLineupNote(state: BookingUiState) {
 private fun StaffSection(
     state: BookingUiState,
     viewModel: BookingFlowViewModel,
+    allows: (StaffProfile) -> Boolean,
 ) {
-    val eligible = state.eligibleStaff
+    val eligible = state.eligibleStaff.filter(allows)
     KlinaraCard(
         title = "Personel",
         footnote =

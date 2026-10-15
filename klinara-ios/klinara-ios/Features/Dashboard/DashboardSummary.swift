@@ -154,6 +154,22 @@ nonisolated enum DashboardSummaries {
         )
     }
 
+    /// Bugünün TÜM randevuları (tamamlananlar dahil), saate göre — uygulayıcının
+    /// "Bugünüm" akışı. Web `use-dashboard.ts` `today` paritesi.
+    static func todayItems(
+        branches: [BranchSummary],
+        days: [String: (entries: [CalendarEntry], timezone: String)]
+    ) -> [UpcomingItem] {
+        branches
+            .flatMap { branch in
+                let day = days[branch.id]
+                return (day?.entries ?? []).map {
+                    UpcomingItem(entry: $0, branchName: branch.name, timezone: day?.timezone ?? branch.timezone)
+                }
+            }
+            .sorted { $0.entry.startsAt < $1.entry.startsAt }
+    }
+
     /// Satırın gün etiketi: "Bugün", "Yarın", yoksa "28 Eyl". Gün ŞUBENİN saat
     /// diliminde.
     static func upcomingDayLabel(_ date: Date, timezone: String, now: Date) -> String {

@@ -21,6 +21,8 @@ final class DashboardStore {
         let summaries: [BranchDashboardSummary]
         /// Tüm şubelerde tarihi en yakın randevular — bugünle sınırlı değil.
         let upcoming: [UpcomingItem]
+        /// Bugünün tüm randevuları — "Bugünüm" akışı.
+        let today: [UpcomingItem]
         /// Listenin ötesinde de bekleyen randevu var; "Tümünü takvimde gör".
         let upcomingHasMore: Bool
         /// Verinin çekildiği an; "Bugün/Yarın" etiketleri buna göre.
@@ -185,6 +187,7 @@ final class DashboardStore {
         snapshot = Snapshot(
             summaries: summaries,
             upcoming: upcoming,
+            today: DashboardSummaries.todayItems(branches: active, days: days),
             upcomingHasMore: upcomingHasMore || upcomingTotal > upcoming.count,
             fetchedAt: at,
             totals: DashboardSummaries.totals(
@@ -211,7 +214,14 @@ final class DashboardStore {
         do {
             return Outcome(value: try await fetch(), error: nil)
         } catch {
-            return Outcome(value: nil, error: error as? APIError ?? .network)
+            let apiError = error as? APIError ?? .network
+            // 403 = bu kişi için o rapor yok (ör. personel profili açılmamış
+            // uygulayıcı). Bölüm boş kalır; "alınamadı" uyarısı yanıltıcı olurdu.
+            if case .problem(let problem) = apiError,
+               problem.code == .forbidden || problem.code == .branchForbidden {
+                return Outcome(value: nil, error: nil)
+            }
+            return Outcome(value: nil, error: apiError)
         }
     }
 

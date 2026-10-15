@@ -5,7 +5,8 @@ import { QUEUES } from '../../lib/queue/queue.constants';
 import { QueueService } from '../../lib/queue/queue.service';
 import { RealtimeBusService } from '../../lib/realtime/realtime-bus.service';
 import type { Tx } from '../../database/tenant-tx';
-import type { Principal } from '../identity/principal';
+import { PERMISSIONS } from '@klinara/shared';
+import { hasPermission, type Principal } from '../identity/principal';
 import { formatAppointmentTime } from './appointment-notifier.service';
 import * as reminderRepo from './reminders.repository';
 import * as repo from './staff-notifications.repository';
@@ -98,8 +99,9 @@ export class StaffNotificationsService {
     const before = query.before === undefined ? undefined : new Date(query.before);
 
     return this.tx.run(async (tx) => {
+      const viewer = viewerOf(principal);
       const rows = await repo.list(tx, {
-        userId: principal.userId,
+        viewer,
         limit,
         ...(before === undefined ? {} : { before }),
       });
@@ -113,7 +115,7 @@ export class StaffNotificationsService {
           createdAt: row.createdAt.toISOString(),
           readAt: row.readAt?.toISOString() ?? null,
         })),
-        unreadCount: await repo.unreadCount(tx, principal.userId),
+        unreadCount: await repo.unreadCount(tx, viewer),
       };
     });
   }
@@ -122,9 +124,19 @@ export class StaffNotificationsService {
     await this.tx.run((tx) =>
       repo.markRead(tx, {
         tenantId: this.tx.tenantId,
-        userId: principal.userId,
+        viewer: viewerOf(principal),
         ...(input.ids === undefined ? {} : { ids: input.ids }),
       }),
     );
   }
+}
+
+function viewerOf(principal: Principal): repo.NotificationViewer {
+  return {
+    userId: principal.userId,
+    tenantWide: principal.tenantWide,
+    branchIds: principal.branchIds,
+    canMessage: hasPermission(principal, PERMISSIONS.NOTIFICATION_SEND),
+    readsAllAppointments: hasPermission(principal, PERMISSIONS.APPOINTMENT_READ_ALL),
+  };
 }

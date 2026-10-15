@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { ERROR_CODES } from '@klinara/shared';
 import { AppError } from '../../common/errors/app-error';
 import { generateOpaqueToken, sha256 } from '../../common/crypto/tokens';
@@ -13,6 +14,12 @@ import * as invitationsRepo from './invitations.repository';
 import { AuthService, type RequestMeta } from './auth.service';
 import { PrincipalService } from './principal.service';
 import type { AuthTokensDto } from './dto/auth-response.dto';
+import { passwordResetMail } from '../../lib/mail/mail-templates';
+
+/** Web panelindeki sıfırlama sayfası: `app/(auth)/parola/sifirla`, token sorgu parametresinde. */
+export function passwordResetLink(appBaseUrl: string, token: string): string {
+  return `${appBaseUrl.replace(/\/+$/, '')}/parola/sifirla?token=${encodeURIComponent(token)}`;
+}
 
 /**
  * Parola sıfırlama ve değiştirme.
@@ -33,6 +40,7 @@ export class PasswordFlowService {
     private readonly auth: AuthService,
     private readonly principals: PrincipalService,
     @Inject(MAIL_SENDER) private readonly mail: MailSender,
+    @InjectPinoLogger(PasswordFlowService.name) private readonly logger: PinoLogger,
     config: ConfigService<EnvironmentVariables, true>,
   ) {
     this.ttlMinutes = config.get('PASSWORD_RESET_TTL_MINUTES', { infer: true });
@@ -63,12 +71,15 @@ export class PasswordFlowService {
       }),
     );
 
-    const link = `${this.appBaseUrl}/parola-sifirla/${token}`;
-    await this.mail.send({
-      to: email,
-      subject: 'Klinara parola sıfırlama',
-      body: `Parolanızı sıfırlamak için: ${link}\nBağlantı ${this.ttlMinutes} dakika geçerlidir.`,
-    });
+    const link = passwordResetLink(this.appBaseUrl, token);
+    // Gönderim hatası YUTULUR: hata kayıtlı kullanıcıya özgü bir 500 olarak
+    // dönseydi, uç "bu e-posta kayıtlı mı?" sorusunu yine cevaplamış olurdu.
+    // Kullanıcı birkaç dakika sonra isteği tekrarlayabilir.
+    await this.mail
+      .send({ to: email, ...passwordResetMail({ link, ttlMinutes: this.ttlMinutes }) })
+      .catch((error: unknown) => {
+        this.logger.error({ err: error }, 'Parola sıfırlama e-postası gönderilemedi');
+      });
 
     return this.exposeToken ? { token } : {};
   }

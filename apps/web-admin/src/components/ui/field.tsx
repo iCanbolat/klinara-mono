@@ -1,6 +1,7 @@
 'use client';
 
 import { useId, type ComponentProps, type ReactNode } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -112,7 +113,13 @@ export function FieldDate({ label, hint, error, className, ...props }: FieldDate
   return (
     <div className="flex flex-col gap-1.5">
       <Label htmlFor={id}>{label}</Label>
-      <DatePicker id={id} className={className} aria-invalid={invalid} {...describedBy} {...props} />
+      <DatePicker
+        id={id}
+        className={className}
+        aria-invalid={invalid}
+        {...describedBy}
+        {...props}
+      />
       {hint !== undefined ? <Hint id={id} hint={hint} /> : null}
       {error !== undefined ? <ErrorText id={id} error={error} /> : null}
     </div>
@@ -134,7 +141,7 @@ export function FieldTextarea({
       <Label htmlFor={id}>{label}</Label>
       <Textarea
         id={id}
-        className={cn('bg-card ',className)}
+        className={cn('bg-card ', className)}
         aria-invalid={invalid}
         {...describedBy}
         {...props}
@@ -167,20 +174,26 @@ export function FieldSelect({
   return (
     <div className="flex flex-col gap-1.5">
       <Label htmlFor={id}>{label}</Label>
-      <select
-        id={id}
-        aria-invalid={invalid}
-        className={cn(
-          'h-11 w-full rounded-lg border border-input bg-card px-3 text-sm text-foreground',
-          'disabled:cursor-not-allowed disabled:opacity-50',
-          'aria-invalid:border-destructive',
-          className,
-        )}
-        {...describedBy}
-        {...props}
-      >
-        {children}
-      </select>
+      <div className="relative">
+        <select
+          id={id}
+          aria-invalid={invalid}
+          className={cn(
+            'h-11 w-full appearance-none rounded-lg border border-input bg-card py-0 pl-3 pr-10 text-sm text-foreground',
+            'disabled:cursor-not-allowed disabled:opacity-50',
+            'aria-invalid:border-destructive',
+            className,
+          )}
+          {...describedBy}
+          {...props}
+        >
+          {children}
+        </select>
+        <ChevronDown
+          aria-hidden
+          className="pointer-events-none absolute right-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+        />
+      </div>
       {hint !== undefined ? <Hint id={id} hint={hint} /> : null}
       {error !== undefined ? <ErrorText id={id} error={error} /> : null}
     </div>

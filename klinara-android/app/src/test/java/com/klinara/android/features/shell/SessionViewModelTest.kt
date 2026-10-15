@@ -154,10 +154,11 @@ class SessionViewModelTest {
             advanceUntilIdle()
 
             val session = model.session.value
-            assertEquals(3, session.branches.size)
+            // Üye olunmayan şube (İzmir) listeye girmez — aksi hâlde seçilince 403.
+            assertEquals(listOf(ShellSessions.nisantasi.id, ShellSessions.bodrum.id), session.branches.map { it.id })
             assertEquals(ShellSessions.bodrum.id, session.activeBranchId)
             assertEquals(ShellSessions.bodrum.id, tokens.branchId())
-            // Pasif şube menüde yok; iki aktif şube kaldığı için menü açılır.
-            assertEquals(listOf(ShellSessions.bodrum.id, "b-izmir"), session.switchableBranches.map { it.id })
+            // Pasif şube menüde yok.
+            assertEquals(listOf(ShellSessions.bodrum.id), session.switchableBranches.map { it.id })
         }
 }

@@ -39,6 +39,11 @@ nonisolated enum APIErrorCode: String, Decodable, Sendable {
     /// Kendinden geniş yetkili bir rolü atama denemesi.
     case roleEscalation = "ROLE_ESCALATION"
     case tenantContextMissing = "TENANT_CONTEXT_MISSING"
+    /// Klinik hesabı platform tarafından askıya alındı.
+    case tenantSuspended = "TENANT_SUSPENDED"
+    /// Plan kapasitesi: şube / hekim-uygulayıcı sınırı (`packages/shared/src/plans.ts`).
+    case planBranchLimitReached = "PLAN_BRANCH_LIMIT_REACHED"
+    case planPractitionerLimitReached = "PLAN_PRACTITIONER_LIMIT_REACHED"
 
     // Takvim
     case slotConflict = "SLOT_CONFLICT"
@@ -284,6 +289,12 @@ extension APIError {
                 return "Müşteriyle 24 saatlik yanıt penceresi kapandı. Yalnız onaylı bir şablon gönderilebilir."
             case .whatsappRateLimited:
                 return "WhatsApp gönderim kotası doldu. Bir süre sonra tekrar deneyin."
+            case .planBranchLimitReached:
+                return "Planınızın şube sınırına ulaşıldı. Yükseltmek için Klinara ile iletişime geçin."
+            case .planPractitionerLimitReached:
+                return "Planınızın hekim/uygulayıcı sınırına ulaşıldı. Bir profili pasife alın ya da planınızı yükseltmek için Klinara ile iletişime geçin."
+            case .tenantSuspended:
+                return "Klinik hesabınız askıya alındı. Bilgi için Klinara destek ile iletişime geçin."
             default:
                 return "Bir sorun oluştu. Lütfen tekrar deneyin."
             }

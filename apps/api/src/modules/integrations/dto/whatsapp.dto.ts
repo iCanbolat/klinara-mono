@@ -171,3 +171,12 @@ export class WhatsAppStatusQueryDto {
   @IsIn(WHATSAPP_STATUSES)
   status?: WhatsAppStatusLiteral;
 }
+
+/** Platform ekranı: hesap (yoksa `null`) ve şablon yansıması tek yanıtta. */
+export class PlatformWhatsAppDto {
+  @ApiProperty({ type: WhatsAppAccountResponseDto, nullable: true })
+  account: WhatsAppAccountResponseDto | null;
+
+  @ApiProperty({ type: [WhatsAppTemplateResponseDto] })
+  templates: WhatsAppTemplateResponseDto[];
+}

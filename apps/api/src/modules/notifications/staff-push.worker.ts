@@ -53,7 +53,7 @@ export class StaffPushWorker implements OnModuleInit {
     const target = await this.tx.runForTenant(job.tenantId, async (tx) => {
       const notification = await repo.findForPush(tx, job.notificationId);
       if (notification === undefined) return undefined;
-      const devices = await pushRepo.recipients(tx, notification.branchId);
+      const devices = await pushRepo.recipients(tx, notification);
       return { notification, devices };
     });
     if (target === undefined || target.devices.length === 0) return;

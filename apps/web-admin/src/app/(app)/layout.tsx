@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { BranchProvider } from '@/components/session/branch-provider';
+import { RouteGuard } from '@/components/session/route-guard';
 import { SessionProvider } from '@/components/session/session-provider';
 import { PageCrumbProvider } from '@/components/shell/page-crumb';
 import { Sidebar } from '@/components/shell/sidebar';
@@ -36,7 +37,7 @@ export default function AppLayout({ children }: { children: ReactNode }): ReactN
               iOS `screenInset` (24) ile aynı.
             */}
               <main id="main" className="mx-auto w-full max-w-6xl flex-1 p-6 md:p-8">
-                {children}
+                <RouteGuard>{children}</RouteGuard>
               </main>
             </SidebarInset>
           </PageCrumbProvider>

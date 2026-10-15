@@ -51,12 +51,12 @@ export class ChannelRegistryService {
   async send(message: OutboundMessage): Promise<SendOutcome> {
     switch (message.channel) {
       case 'email': {
-        await this.mail.send({
+        const sent = await this.mail.send({
           to: message.to,
           subject: message.subject ?? '',
           body: message.body,
         });
-        return { provider: 'smtp', providerMessageId: null };
+        return { provider: sent.provider, providerMessageId: sent.messageId };
       }
       case 'whatsapp': {
         const result = await this.whatsapp.send(message.tenantId, {

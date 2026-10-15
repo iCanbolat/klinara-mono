@@ -203,7 +203,10 @@ struct CalendarHomeView: View {
 
             // Personel listesi gelene kadar şeridin YERİ tutulur: şerit sonradan
             // belirdiğinde başlık uzuyor ve takvim gövdesi aşağı kayıyordu.
-            if !session.staffStore.profiles.isEmpty {
+            // Uygulayıcı yalnız kendi randevularını görür: personel süzgeci anlamsız.
+            if session.isOwnScope {
+                EmptyView()
+            } else if !session.staffStore.profiles.isEmpty {
                 staffFilterRow
             } else if session.staffStore.state.isLoading {
                 KlinaraSkeletonPills()
@@ -241,7 +244,11 @@ struct CalendarHomeView: View {
                 KlinaraFilterPill(title: "Tümü", isSelected: store.staffFilter == nil) {
                     store.filter(staffProfileId: nil)
                 }
-                ForEach(session.staffStore.profiles.filter(\.isActive)) { profile in
+                // Yalnız seçili şubenin personeli — başka şubenin hekimi bu
+                // takvimde zaten görünmez.
+                ForEach(session.staffStore.profiles.filter {
+                    $0.isActive && (session.selectedBranchId.map($0.worksIn(branchId:)) ?? true)
+                }) { profile in
                     KlinaraFilterPill(
                         title: profile.userFullName,
                         isSelected: store.staffFilter == profile.id,

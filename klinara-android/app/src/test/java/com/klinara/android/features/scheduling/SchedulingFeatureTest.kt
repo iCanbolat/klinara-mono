@@ -304,7 +304,9 @@ class SchedulingFeatureTest {
             roles.filter { role ->
                 managementSections(ShellSessions.forRole(role)).any { it.title == "Takvim kurulumu" }
             }
-        assertEquals(listOf("owner", "manager", "receptionist", "practitioner"), sees)
+        assertEquals(listOf("owner", "manager", "receptionist"), sees)
+        // Uygulayıcı ekibin planını değil kendi programını görür.
+        assertTrue(managementSections(ShellSessions.forRole("practitioner")).any { it.title == "Çalışma saatleri" })
 
         val footnote =
             managementSections(ShellSessions.forRole("manager")).first { it.title == "Takvim kurulumu" }.footnote

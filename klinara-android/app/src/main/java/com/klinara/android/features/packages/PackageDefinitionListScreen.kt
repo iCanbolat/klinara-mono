@@ -84,7 +84,7 @@ fun PackageDefinitionListScreen(
     val viewModel: PackageDefinitionListViewModel =
         viewModel(key = "package-definitions", factory = PackageDefinitionListViewModel.factory(container))
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val canWrite = session.can(Permissions.PACKAGE_WRITE)
+    val canWrite = session.can(Permissions.PACKAGE_DEFINITION_WRITE)
 
     // Varsayılan KAPALI: tanım ekranı bir yönetim ekranı ve çoğu paket şube kısıtı taşımıyor.
     var scopedToBranch by rememberSaveable { mutableStateOf(false) }
@@ -239,7 +239,9 @@ private fun DefinitionList(
             DefinitionRow(
                 definition = definition,
                 session = session,
-                canRetire = canWrite && !definition.isArchived && definition.isActive,
+                canRetire =
+                    canWrite && !definition.isArchived && definition.isActive &&
+                        (session.tenantWide || definition.branchId != null),
                 onClick = { onOpen(definition) },
                 onRetire = { onRetire(definition) },
             )

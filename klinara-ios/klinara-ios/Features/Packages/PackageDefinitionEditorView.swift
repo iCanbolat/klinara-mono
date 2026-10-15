@@ -34,13 +34,24 @@ struct PackageDefinitionEditorView: View {
     @State private var isPickingService = false
 
     private var store: PackageDefinitionStore { session.packageDefinitionStore }
-    private var isReadOnly: Bool { !session.can(Permissions.packageWrite) }
+    /// Tanım yazmak `package_definition:write` (sahip, şube yöneticisi); şube
+    /// yöneticisi tüm şubeleri kapsayan (sahibin) tanımı değiştiremez.
+    private var isReadOnly: Bool {
+        guard session.can(Permissions.packageDefinitionWrite) else { return true }
+        if let existing = target.existing, existing.branchId == nil, !session.tenantWide { return true }
+        return false
+    }
     private var fieldErrors: [String: String] { error?.fieldErrors ?? [:] }
 
     init(session: AppSession, target: Target) {
         self.session = session
         self.target = target
-        _form = State(initialValue: PackageDefinitionForm(existing: target.existing))
+        var initial = PackageDefinitionForm(existing: target.existing)
+        // Şube yöneticisi "tüm şubeler" tanımı açamaz: varsayılan seçili şubesi.
+        if target.existing == nil, !session.tenantWide {
+            initial.branchId = session.selectedBranchId
+        }
+        _form = State(initialValue: initial)
     }
 
     var body: some View {
@@ -201,12 +212,15 @@ struct PackageDefinitionEditorView: View {
         if session.canSwitchBranch {
             KlinaraFormSection(
                 title: "Kapsam",
-                footnote: "Şube seçilirse paket yalnız o şubede satılabilir. "
-                    + "Boş bırakılırsa tüm şubelerde satışa açıktır."
+                footnote: session.tenantWide
+                    ? "Şube seçilirse paket yalnız o şubede satılabilir. "
+                        + "Boş bırakılırsa tüm şubelerde satışa açıktır."
+                    : "Paket yalnız seçilen şubede satılabilir."
             ) {
                 KlinaraPickerField(
                     label: "Şube",
-                    options: [nil] + session.branches.map { Optional($0.id) },
+                    options: (session.tenantWide ? [nil] : [])
+                        + session.switchableBranches.map { Optional($0.id) },
                     selection: $form.branchId,
                     title: { id in id.flatMap { id in session.branches.first { $0.id == id }?.name } ?? "Tüm şubeler" }
                 )

@@ -109,6 +109,11 @@ export const MESSAGES = {
   'error.whatsappTemplateNotApproved': 'Şablon Meta’da onaylı değil ya da parametreleri uyuşmuyor.',
   'error.whatsappInvalidRecipient': 'Bu numara WhatsApp kullanmıyor ya da mesaj teslim edilemiyor.',
   'error.whatsappRateLimited': 'WhatsApp gönderim sınırına ulaşıldı. Biraz sonra tekrar deneyin.',
+  'error.planBranchLimit':
+    'Planınızın şube sınırına ulaşıldı. Yeni şube için planınızı yükseltmek üzere Klinara ile iletişime geçin.',
+  'error.planPractitionerLimit':
+    'Planınızın hekim/uygulayıcı sınırına ulaşıldı. Bir profili pasife alın ya da planınızı yükseltmek için Klinara ile iletişime geçin.',
+  'error.tenantSuspended': 'Klinik hesabınız askıya alındı. Bilgi için Klinara destek ile iletişime geçin.',
   'error.network': 'Sunucuya ulaşılamadı. Bağlantınızı kontrol edip tekrar deneyin.',
   'error.rateLimited': 'Çok fazla deneme yaptınız. {seconds} saniye sonra tekrar deneyin.',
   'error.invalidCredentials': 'E-posta veya parola hatalı.',
@@ -263,6 +268,11 @@ export const MESSAGES = {
 
   // --- Hesap ---
   'account.title': 'Hesabım',
+  'plan.title': 'Plan: {name}',
+  'plan.hint': 'Aktif şube ve aktif hekim/uygulayıcı profilleri sayılır. Plan değişikliği için Klinara ile iletişime geçin.',
+  'plan.branches': 'Şube',
+  'plan.practitioners': 'Hekim ve uygulayıcı',
+  'plan.branchLimitReached': 'Plan şube sınırı dolu ({used}/{limit}).',
   'account.security': 'Güvenlik',
   'account.changePassword': 'Parolayı değiştir',
   'account.currentPassword': 'Mevcut parola',
@@ -339,6 +349,14 @@ export const MESSAGES = {
   // Panel kartlarının açıklamaları — menü etiketleri tek başına ne yapıldığını anlatmıyor.
   'home.greeting': 'Merhaba, {name}',
   'home.subtitle': 'Kliniğinizin ve şubelerinizin bugünkü durumu ile bu ayın özeti.',
+  'setup.title': 'Kurulum',
+  'setup.progress': '{done}/{total} adım tamam. Eksik adımları tamamladığınızda bu kart kaybolur.',
+  'setup.branch': 'En az bir aktif şube',
+  'setup.hours': 'Şube çalışma saatleri',
+  'setup.services': 'Hizmet kataloğu',
+  'setup.practitioners': 'Hizmet atanmış hekim/uygulayıcı',
+  'setup.whatsapp': 'WhatsApp bağlantısı',
+  'setup.bookingPage': 'Online randevu sayfasını yayınla',
 
   // --- Karşılama sayfası (/dashboard) ---
   'dashboard.kpis': 'Özet göstergeler',
@@ -372,6 +390,16 @@ export const MESSAGES = {
   'dashboard.staffServices': '{count} işlem',
   'dashboard.calendarError': 'Bazı şubelerin bugünkü takvimi alınamadı.',
   'dashboard.reportsError': 'Aylık özetler alınamadı.',
+  'today.title': 'Bugünüm, {name}',
+  'today.subtitle': 'Bugünkü randevularınız ve bu ayki performansınız.',
+  'today.kpi.appointments': 'Bugünkü randevularım',
+  'today.kpi.appointmentsHint': '{completed} tamamlandı',
+  'today.kpi.next': 'Sıradaki',
+  'today.kpi.monthServices': 'Bu ay işlem',
+  'today.kpi.monthRevenue': 'Bu ay cirom',
+  'today.schedule': 'Bugünün akışı',
+  'today.scheduleEmpty': 'Bugün için randevunuz yok.',
+  'today.next': 'Sıradaki hasta',
   // --- Katalog / personel / plan (Faz 12.4) ---
   'catalog.title': 'Hizmetler',
   'catalog.newService': 'Yeni hizmet',
@@ -379,6 +407,7 @@ export const MESSAGES = {
   'catalog.categories': 'Kategoriler',
   'catalog.name': 'Ad',
   'catalog.slug': 'Kısa ad (slug)',
+  'catalog.slugHint': 'Addan otomatik oluşturulur; değiştirilemez.',
   'catalog.category': 'Kategori',
   'catalog.duration': 'Süre (dk)',
   'catalog.bufferBefore': 'Hazırlık (dk)',
@@ -470,8 +499,8 @@ export const MESSAGES = {
 
   'staff.title': 'Personel',
   'staff.new': 'Yeni personel',
-  'staff.user': 'Kullanıcı',
-  'staff.userHint': 'Personel profili MEVCUT bir kullanıcıya bağlanır; önce davet gönderin.',
+  'staff.noServices': 'Henüz hizmet yok. Önce Katalog’dan hizmet ekleyin.',
+  'staff.planFull': 'Plan hekim sınırı dolu ({used}/{limit}).',
   'staff.role': 'Rol',
   'staff.jobTitle': 'Unvan',
   'staff.branch': 'Birincil şube',
@@ -568,8 +597,12 @@ export const MESSAGES = {
   'invites.empty': 'Bekleyen davet yok.',
   'invites.expired': 'Süresi doldu',
   'invites.pending': 'Bekliyor',
+  'invites.profileHint':
+    'Kişi daveti kabul edince bu bilgilerle personel profili otomatik açılır ve takvimde randevu alabilir.',
   'invites.hint': 'Davet edilen kişi e-postadaki bağlantıyla parolasını belirleyip katılır.',
   'invites.devLink': 'Geliştirme bağlantısı',
+  'invites.mailFailed':
+    'Davet oluşturuldu ama e-posta gönderilemedi. Daveti iptal edip birkaç dakika sonra yeniden gönderin.',
 
   'schedule.title': 'Çalışma saatleri',
   'schedule.description': 'Şubenin açık olduğu saatler, personelin haftalık planı, izinler ve tatiller.',

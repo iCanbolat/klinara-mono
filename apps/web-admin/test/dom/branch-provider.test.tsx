@@ -65,7 +65,7 @@ describe('şube sağlayıcısı', () => {
   });
 
   it('şube kapsamlı kullanıcıda ilk şube seçili geliyor', async () => {
-    session.me = { id: 'u1', tenantWide: false };
+    session.me = { id: 'u1', tenantWide: false, branchIds: BRANCHES.map((branch) => branch.id) };
     get.mockResolvedValue({ data: BRANCHES });
     render(
       <BranchProvider>
@@ -76,6 +76,21 @@ describe('şube sağlayıcısı', () => {
     await waitFor(() => {
       expect(screen.getByTestId('branches')).toHaveAttribute('data-selected', BRANCHES[0]!.id);
     });
+  });
+
+  it('üye olunmayan şube listede yer almıyor ve seçilmiyor', async () => {
+    session.me = { id: 'u1', tenantWide: false, branchIds: [BRANCHES[1]!.id] };
+    get.mockResolvedValue({ data: BRANCHES });
+    render(
+      <BranchProvider>
+        <Probe />
+      </BranchProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('branches')).toHaveAttribute('data-selected', BRANCHES[1]!.id);
+    });
+    expect(screen.queryByText(BRANCHES[0]!.name)).not.toBeInTheDocument();
   });
 
   it('liste alınamazsa boş dizi kalıyor — süzgeç çökmüyor', async () => {

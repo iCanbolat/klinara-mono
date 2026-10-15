@@ -192,6 +192,14 @@ sealed class ApiError(
                     "Müşteriyle 24 saatlik yanıt penceresi kapandı. Yalnız onaylı bir şablon gönderilebilir.",
                 ApiErrorCode.WHATSAPP_RATE_LIMITED to
                     "WhatsApp gönderim kotası doldu. Bir süre sonra tekrar deneyin.",
+                // Plan kapasitesi ve askı — iOS `APIError.swift` metinleriyle birebir.
+                ApiErrorCode.PLAN_BRANCH_LIMIT_REACHED to
+                    "Planınızın şube sınırına ulaşıldı. Yükseltmek için Klinara ile iletişime geçin.",
+                ApiErrorCode.PLAN_PRACTITIONER_LIMIT_REACHED to
+                    "Planınızın hekim/uygulayıcı sınırına ulaşıldı. Bir profili pasife alın ya da " +
+                    "planınızı yükseltmek için Klinara ile iletişime geçin.",
+                ApiErrorCode.TENANT_SUSPENDED to
+                    "Klinik hesabınız askıya alındı. Bilgi için Klinara destek ile iletişime geçin.",
             )
     }
 }

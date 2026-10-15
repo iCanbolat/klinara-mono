@@ -76,17 +76,15 @@ class ShellTabTest {
     }
 
     @Test
-    @DisplayName("Yönetim koşulu yedi iznin HERHANGİ birine bakar")
-    fun managementOpensForAnySingleAdminPermission() {
-        ShellTab.MANAGEMENT_PERMISSIONS.forEach { permission ->
-            val session = ShellSessions.forRole("owner").let { base ->
-                base.copy(profile = base.profile.copy(permissions = listOf(permission)))
-            }
-            assertTrue(
-                ShellTab.Management.isVisible(session),
-                "Tek başına $permission Yönetim sekmesini açmalı",
-            )
+    @DisplayName("Yönetim sekmesi en az bir kart görünüyorsa açılır (ManagementAccess)")
+    fun managementFollowsItsCards() {
+        listOf("owner", "manager", "receptionist", "practitioner").forEach { role ->
+            assertTrue(ShellTab.Management.isVisible(ShellSessions.forRole(role)), role)
         }
+        val none = ShellSessions.forRole("owner").let { base ->
+            base.copy(profile = base.profile.copy(permissions = emptyList()))
+        }
+        assertFalse(ShellTab.Management.isVisible(none))
     }
 
     @Test

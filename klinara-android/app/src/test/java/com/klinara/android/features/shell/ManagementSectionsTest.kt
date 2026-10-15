@@ -16,11 +16,23 @@ class ManagementSectionsTest {
     private fun titles(role: String) = managementSections(ShellSessions.forRole(role)).map { it.title }
 
     @Test
-    @DisplayName("Katalog kartı `service:read` ile: yönetici, resepsiyon ve uygulayıcı görür")
+    @DisplayName("Katalog kartı operasyon ekibinde (`service:read` + `appointment:read.all`); uygulayıcıda yok")
     fun catalogCard() {
-        listOf("owner", "manager", "receptionist", "practitioner").forEach { role ->
+        listOf("owner", "manager", "receptionist").forEach { role ->
             assertEquals(true, "Katalog" in titles(role), role)
         }
+        assertFalse("Katalog" in titles("practitioner"))
+    }
+
+    @Test
+    @DisplayName("Uygulayıcı yalnız kendi programını ve performansını görür")
+    fun practitionerHub() {
+        assertEquals(listOf("Çalışma saatleri", "Raporlar"), titles("practitioner"))
+        val rows = managementSections(ShellSessions.forRole("practitioner")).flatMap { it.rows }.map { it.destination }
+        assertEquals(
+            listOf(ManagementDestination.MySchedule, ManagementDestination.BranchHours, ManagementDestination.Reports),
+            rows,
+        )
     }
 
     @Test
@@ -51,20 +63,28 @@ class ManagementSectionsTest {
     }
 
     @Test
-    @DisplayName("İletişim kartı `notification:read` ile: uygulayıcı da görür (A8.1)")
+    @DisplayName("İletişim kartı: şablon ve hatırlatma yönetenlerde; resepsiyon yalnız sohbet ve günlük; uygulayıcı yok")
     fun communicationCard() {
-        listOf("owner", "manager", "receptionist", "practitioner").forEach { role ->
-            val card = managementSections(ShellSessions.forRole(role)).firstOrNull { it.title == "İletişim" }
+        fun rows(role: String) =
+            managementSections(ShellSessions.forRole(role))
+                .firstOrNull { it.title == "İletişim" }
+                ?.rows
+                ?.map { it.destination }
+        listOf("owner", "manager").forEach { role ->
             assertEquals(
                 listOf(
+                    ManagementDestination.Conversations,
                     ManagementDestination.MessageLog,
                     ManagementDestination.ReminderSettings,
                     ManagementDestination.NotificationTemplates,
+                    ManagementDestination.WhatsApp,
                 ),
-                card?.rows?.map { it.destination }?.filterNot { it == ManagementDestination.Conversations }?.take(3),
+                rows(role),
                 role,
             )
         }
+        assertEquals(listOf(ManagementDestination.Conversations, ManagementDestination.MessageLog), rows("receptionist"))
+        assertEquals(null, rows("practitioner"))
     }
 
     @Test
@@ -103,7 +123,8 @@ class ManagementSectionsTest {
             listOf(ManagementDestination.Staff, ManagementDestination.Branches, ManagementDestination.Invitations),
             rows("manager"),
         )
-        assertEquals(listOf(ManagementDestination.Staff, ManagementDestination.Branches), rows("receptionist"))
-        assertEquals(listOf(ManagementDestination.Staff, ManagementDestination.Branches), rows("practitioner"))
+        // Ekip yönetimi `user:read` ya da `staff:write` ister: resepsiyon ve uygulayıcıda kart yok.
+        assertEquals(null, rows("receptionist"))
+        assertEquals(null, rows("practitioner"))
     }
 }

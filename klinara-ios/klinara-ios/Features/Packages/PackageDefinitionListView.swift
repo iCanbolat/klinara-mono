@@ -18,7 +18,7 @@ struct PackageDefinitionListView: View {
     @State private var scopedToBranch = false
 
     private var store: PackageDefinitionStore { session.packageDefinitionStore }
-    private var canWrite: Bool { session.can(Permissions.packageWrite) }
+    private var canWrite: Bool { session.can(Permissions.packageDefinitionWrite) }
 
     /// Sunucuya gidecek kapsam. `nil` **tüm şubeler**.
     private var scope: String? { scopedToBranch ? session.selectedBranchId : nil }
@@ -226,7 +226,7 @@ struct PackageDefinitionListView: View {
         }
         .buttonStyle(.plain)
         .swipeActions(edge: .trailing) {
-            if canWrite, !definition.isArchived {
+            if canWrite, !definition.isArchived, session.tenantWide || definition.branchId != nil {
                 Button(role: .destructive) {
                     pendingRetirement = definition
                 } label: {
@@ -237,7 +237,7 @@ struct PackageDefinitionListView: View {
         // Kaydırma jesti VoiceOver kullanıcısına hiç görünmüyor; aynı eylem
         // bağlam menüsünde de duruyor (Android'de satır menüsü).
         .contextMenu {
-            if canWrite, !definition.isArchived {
+            if canWrite, !definition.isArchived, session.tenantWide || definition.branchId != nil {
                 Button(role: .destructive) {
                     pendingRetirement = definition
                 } label: {

@@ -79,7 +79,9 @@ struct DashboardView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: KlinaraMetrics.xs) {
-            Text("Merhaba, \(session.user.fullName)")
+            Text(session.isOwnScope
+                 ? "Bugünüm, \(session.user.fullName.split(separator: " ").first.map(String.init) ?? "")"
+                 : "Merhaba, \(session.user.fullName)")
                 .klinaraText(.displayM)
                 .foregroundStyle(KlinaraColor.charcoal)
             Text(Self.todayLabel(clock: session.clock))
@@ -99,7 +101,11 @@ struct DashboardView: View {
 
     @ViewBuilder
     private func content(_ store: DashboardStore) -> some View {
-        if store.access.isEmpty {
+        if session.isOwnScope {
+            // Uygulayıcı yönetici panosunu (şubeler, doluluk, personel cirosu)
+            // değil kendi gününü görür — web `today-page.tsx` paritesi.
+            todayContent(store)
+        } else if store.access.isEmpty {
             EmptyStateView(
                 icon: "chart.bar",
                 title: "Özet erişiminiz yok",
@@ -121,7 +127,9 @@ struct DashboardView: View {
             if store.access.staff {
                 staffCard(snapshot)
             }
-            branchCard(snapshot)
+            if store.access.occupancy {
+                branchCard(snapshot)
+            }
         } else {
             // İlk yüklemede şerit yer tutucularla duruyor: içerik gelince sayfa zıplamasın.
             // Şerit ETİKETLERİNİ koruyor — hangi sayıların geleceğini söylemek,
@@ -132,6 +140,110 @@ struct DashboardView: View {
                 KlinaraSkeletonBody(style: .rowsShort)
             }
             KlinaraSkeletonBody(style: .chart)
+        }
+    }
+
+    // MARK: Bugünüm (uygulayıcı)
+
+    @ViewBuilder
+    private func todayContent(_ store: DashboardStore) -> some View {
+        let snapshot = store.snapshot
+        KlinaraStatStrip(stats: Self.todayStats(snapshot, access: store.access), isLoading: snapshot == nil)
+        if let snapshot {
+            if let error = snapshot.calendarError {
+                Text(error.displayMessage)
+                    .klinaraText(.bodyM)
+                    .foregroundStyle(KlinaraColor.danger)
+            }
+            nextCard(snapshot)
+            dayCard(snapshot)
+        } else {
+            KlinaraSkeletonBody(style: .rowsShort)
+        }
+    }
+
+    static func todayStats(_ snapshot: DashboardStore.Snapshot?, access: DashboardAccess) -> [KlinaraStat] {
+        let today = snapshot?.today ?? []
+        let active = today.filter { $0.entry.status != .cancelled && $0.entry.status != .noShow }
+        let completed = today.filter { $0.entry.status == .completed }.count
+        let next = snapshot?.upcoming.first
+        let own = snapshot?.staffPerformance?.data.first
+        let currency = snapshot?.staffPerformance?.currency ?? "TRY"
+        var stats = [
+            KlinaraStat(
+                label: "Bugünkü randevularım",
+                value: snapshot.map { _ in String(active.count) },
+                icon: "calendar",
+                hint: snapshot.map { _ in "\(completed) tamamlandı" }
+            ),
+            KlinaraStat(
+                label: "Sıradaki",
+                value: snapshot.map { _ in
+                    next.map { BranchClock(timeZoneIdentifier: $0.timezone).formatTime($0.entry.startsAt) } ?? "—"
+                },
+                icon: "clock",
+                hint: next?.entry.customerName
+            ),
+        ]
+        if access.staff {
+            stats.append(KlinaraStat(
+                label: "Bu ay işlem",
+                value: snapshot.map { _ in own.map { String($0.completedServices) } ?? "—" },
+                icon: "checkmark.circle"
+            ))
+            stats.append(KlinaraStat(
+                label: "Bu ay cirom",
+                value: snapshot.map { _ in
+                    own.map { Money.format(minor: $0.revenueMinor, currency: currency) } ?? "—"
+                },
+                icon: "banknote"
+            ))
+        }
+        return stats
+    }
+
+    private func nextCard(_ snapshot: DashboardStore.Snapshot) -> some View {
+        KlinaraCard(title: "Sıradaki hasta") {
+            if let next = snapshot.upcoming.first {
+                Button {
+                    selectedAppointment = next
+                } label: {
+                    UpcomingRow(item: next, showsBranch: false, now: snapshot.fetchedAt)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Randevu ayrıntılarını açar")
+            } else {
+                KlinaraRow(label: "Yaklaşan randevunuz yok.")
+            }
+        }
+    }
+
+    private func dayCard(_ snapshot: DashboardStore.Snapshot) -> some View {
+        let multiBranch = Set(snapshot.today.map(\.branchName)).count > 1
+        return KlinaraCard(title: "Bugünün akışı") {
+            if snapshot.today.isEmpty {
+                KlinaraRow(label: "Bugün için randevunuz yok.")
+            }
+            ForEach(Array(snapshot.today.enumerated()), id: \.element.id) { index, item in
+                if index > 0 { KlinaraDivider() }
+                Button {
+                    selectedAppointment = item
+                } label: {
+                    UpcomingRow(item: item, showsBranch: multiBranch, now: snapshot.fetchedAt)
+                        .opacity(item.entry.endsAt < snapshot.fetchedAt ? 0.6 : 1)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Randevu ayrıntılarını açar")
+            }
+            if !snapshot.today.isEmpty {
+                KlinaraDivider()
+                Button(action: onOpenCalendar) {
+                    SeeAllRow(label: "Takvimde aç", count: nil)
+                }
+                .buttonStyle(.plain)
+            }
         }
     }
 

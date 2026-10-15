@@ -79,6 +79,9 @@ export class CalendarService {
     const rows = await this.tx.run((tx) =>
       repo.listCalendar(tx, {
         branchId: query.branchId,
+        // Şube verilmediyse şube kapsamlı kullanıcı yalnız kendi şubelerini görür.
+        branchIds:
+          query.branchId === undefined && !principal.tenantWide ? principal.branchIds : undefined,
         from,
         to,
         customerId: query.customerId,

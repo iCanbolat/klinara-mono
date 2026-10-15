@@ -14,6 +14,7 @@ import { cn } from '@/lib/cn';
 import { useBranch } from '@/components/session/branch-provider';
 import { useSession } from '@/components/session/session-provider';
 import { toMessage } from '@/lib/reports/errors';
+import { isOwnScope } from '@/lib/permissions';
 import { fromEntries, toBranchHours, type DayDraft } from '@/lib/schedule/entries';
 import { Alert } from '@/components/ui/alert';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -67,12 +68,15 @@ type TabValue = 'branch' | 'staff' | 'exceptions' | 'holidays';
 const FALLBACK_TIMEZONE = 'Europe/Istanbul';
 
 export function WorkingHoursPage(): ReactNode {
-  const { permissions } = useSession();
+  const { me, permissions } = useSession();
   const { branchId, branches, canSelectAll, setBranchId } = useBranch();
   const canWrite = permissions.includes(PERMISSIONS.SCHEDULE_WRITE);
+  // Uygulayıcı ekibin planını değil YALNIZ kendi programını görür.
+  const ownOnly = isOwnScope(permissions);
+  const myUserId = me?.user.id ?? null;
   const timeZone = branches.find((branch) => branch.id === branchId)?.timezone ?? FALLBACK_TIMEZONE;
 
-  const [tab, setTab] = useState<TabValue>('branch');
+  const [tab, setTab] = useState<TabValue>(ownOnly ? 'staff' : 'branch');
   const [staff, setStaff] = useState<StaffProfile[] | null>(null);
   const [staffProfileId, setStaffProfileId] = useState<string | null>(null);
   const [savedBranchDays, setSavedBranchDays] = useState<DayDraft[] | null>(null);
@@ -128,11 +132,18 @@ export function WorkingHoursPage(): ReactNode {
         const days = fromEntries(hours.entries);
         loadBranch(days);
         setSavedBranchDays(days);
-        const active = staffList.data.filter((profile) => profile.isActive);
+        const active = staffList.data.filter(
+          (profile) => profile.isActive && (!ownOnly || profile.userId === myUserId),
+        );
         setStaff(active);
         // Önceki şubede seçilen personel bu şubede yoksa seçim düşüyor.
+        // Uygulayıcıda tek seçenek kendisi: doğrudan seçili gelir.
         setStaffProfileId((current) =>
-          current !== null && active.some((profile) => profile.id === current) ? current : null,
+          ownOnly
+            ? (active[0]?.id ?? null)
+            : current !== null && active.some((profile) => profile.id === current)
+              ? current
+              : null,
         );
       } catch (caught) {
         if (controller.signal.aborted) return;
@@ -140,7 +151,7 @@ export function WorkingHoursPage(): ReactNode {
       }
     })();
     return () => controller.abort();
-  }, [branchId, nonce, loadBranch]);
+  }, [branchId, nonce, loadBranch, ownOnly, myUserId]);
 
   // Seçili personelin planı — sekme unmount olsa da taslak kaybolmasın diye burada.
   useEffect(() => {
@@ -254,8 +265,12 @@ export function WorkingHoursPage(): ReactNode {
             <Trigger value="staff" dirty={staffWeek.dirty}>
               {t('schedule.staffSchedule')}
             </Trigger>
-            <Trigger value="exceptions">{t('schedule.exceptions')}</Trigger>
-            <Trigger value="holidays">{t('schedule.holidays')}</Trigger>
+            {ownOnly ? null : (
+              <>
+                <Trigger value="exceptions">{t('schedule.exceptions')}</Trigger>
+                <Trigger value="holidays">{t('schedule.holidays')}</Trigger>
+              </>
+            )}
           </TabsList>
         </div>
 

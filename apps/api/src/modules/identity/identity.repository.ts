@@ -149,6 +149,26 @@ export async function listTenantUsers(tx: Tx): Promise<UserRow[]> {
   return rows.map((row) => row.user).sort((a, b) => a.fullName.localeCompare(b.fullName, 'tr'));
 }
 
+/** Kullanıcıların bu kiracıdaki aktif üyelikleri — kullanıcı listesinde rol/şube gösterir. */
+export async function listMembershipsForUsersInTenant(
+  tx: Tx,
+  userIds: string[],
+  tenantId: string,
+): Promise<MembershipRow[]> {
+  if (userIds.length === 0) return [];
+  return tx
+    .select()
+    .from(memberships)
+    .where(
+      and(
+        inArray(memberships.userId, userIds),
+        eq(memberships.tenantId, tenantId),
+        eq(memberships.isActive, true),
+        isNull(memberships.deletedAt),
+      ),
+    );
+}
+
 /** Kiracı adı — davet önizlemesinde gösterilir (context o kiracıya daraltılmış olarak). */
 export async function findTenantName(tx: Tx, tenantId: string): Promise<string | undefined> {
   const [row] = await tx
@@ -157,6 +177,16 @@ export async function findTenantName(tx: Tx, tenantId: string): Promise<string |
     .where(and(eq(tenants.id, tenantId), isNull(tenants.deletedAt)))
     .limit(1);
   return row?.name;
+}
+
+/** Kiracı durumu — askıya alınmış kiracıda oturumlar çalışmaz (`PrincipalService`). */
+export async function findTenantStatus(tx: Tx, tenantId: string): Promise<string | undefined> {
+  const [row] = await tx
+    .select({ status: tenants.status })
+    .from(tenants)
+    .where(and(eq(tenants.id, tenantId), isNull(tenants.deletedAt)))
+    .limit(1);
+  return row?.status;
 }
 
 // ---------------------------------------------------------------------------

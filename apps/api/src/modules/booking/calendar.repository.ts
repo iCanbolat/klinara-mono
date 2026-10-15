@@ -35,6 +35,8 @@ export interface CalendarRow extends Record<string, unknown> {
 
 export interface CalendarFilters {
   branchId?: string | undefined;
+  /** Verilirse sonuç bu şubelerle sınırlanır (boş dizi = hiçbir şube). */
+  branchIds?: readonly string[] | undefined;
   from: Date;
   to: Date;
   staffProfileId?: string | undefined;
@@ -85,6 +87,7 @@ export async function listCalendar(tx: Tx, filters: CalendarFilters): Promise<Ca
        and a.starts_at >= ${filters.from.toISOString()}::timestamptz
        and a.starts_at <  ${filters.to.toISOString()}::timestamptz
        and (${filters.branchId ?? null}::uuid is null or a.branch_id = ${filters.branchId ?? null}::uuid)
+       and (${filters.branchIds === undefined}::boolean or a.branch_id = any(${`{${(filters.branchIds ?? []).join(',')}}`}::uuid[]))
        and (${filters.customerId ?? null}::uuid is null
             or a.customer_id = ${filters.customerId ?? null}::uuid)
        and (${statuses}::text is null

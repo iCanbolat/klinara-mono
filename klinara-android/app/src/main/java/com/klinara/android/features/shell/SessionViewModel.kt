@@ -125,7 +125,8 @@ class SessionViewModel(
         viewModelScope.launch {
             val fresh =
                 try {
-                    branches.list().map { it.toSummary() }
+                    // Login'deki kural: üye olunmayan şube menüde görünmez (aksi hâlde 403).
+                    branches.list().map { it.toSummary() }.filter { _session.value.canAccessBranch(it.id) }
                 } catch (_: ApiError) {
                     return@launch
                 }

@@ -1,5 +1,11 @@
 import { and, eq, exists, inArray, isNotNull, isNull, or } from 'drizzle-orm';
-import { memberships, staffProfiles, staffServices, users } from '../../database/schema';
+import {
+  memberships,
+  services,
+  staffProfiles,
+  staffServices,
+  users,
+} from '../../database/schema';
 import type { Tx } from '../../database/tenant-tx';
 import { definedValues, hasUpdates, type Updatable } from '../../database/updates';
 import type { StaffServiceInputDto } from './dto/staff.dto';
@@ -221,4 +227,27 @@ export async function replaceStaffServices(
       isActive: input.isActive ?? true,
     })),
   );
+}
+
+/** Kullanıcının bu kiracıdaki (silinmemiş) profili — pasif olsa da var sayılır. */
+export async function findStaffProfileIdByUser(
+  tx: Tx,
+  userId: string,
+): Promise<string | undefined> {
+  const [row] = await tx
+    .select({ id: staffProfiles.id })
+    .from(staffProfiles)
+    .where(and(eq(staffProfiles.userId, userId), isNull(staffProfiles.deletedAt)))
+    .limit(1);
+  return row?.id;
+}
+
+/** Verilenlerden bu kiracıda AKTİF olanların kimlikleri (pasif/silinmiş/yabancı elenir). */
+export async function filterActiveServiceIds(tx: Tx, ids: string[]): Promise<string[]> {
+  if (ids.length === 0) return [];
+  const rows = await tx
+    .select({ id: services.id })
+    .from(services)
+    .where(and(inArray(services.id, ids), eq(services.isActive, true), isNull(services.deletedAt)));
+  return rows.map((row) => row.id);
 }
