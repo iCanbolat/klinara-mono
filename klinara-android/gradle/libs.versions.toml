@@ -19,6 +19,7 @@ junit5 = "5.14.0"
 junitPlatform = "1.14.0"
 turbine = "1.2.1"
 camerax = "1.5.0"
+firebaseMessaging = "25.0.1"
 ktlint = "13.1.0"
 detekt = "1.23.8"
 
@@ -57,6 +58,11 @@ androidx-camera-core = { module = "androidx.camera:camera-core", version.ref = "
 androidx-camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "camerax" }
 androidx-camera-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "camerax" }
 androidx-camera-view = { module = "androidx.camera:camera-view", version.ref = "camerax" }
+
+# --- Push (FCM) ---
+# Yalnız messaging; Analytics/Crashlytics YOK. `google-services` eklentisi de yok:
+# Firebase `local.properties`'teki değerlerle elle kuruluyor (PushRegistrar).
+firebase-messaging = { module = "com.google.firebase:firebase-messaging", version.ref = "firebaseMessaging" }
 
 # --- java.time (API 26) ---
 desugar-jdk-libs = { module = "com.android.tools:desugar_jdk_libs", version.ref = "desugar" }

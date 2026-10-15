@@ -16,6 +16,7 @@ import com.klinara.android.services.networking.ApiError
 import com.klinara.android.services.passkey.PasskeyOutcome
 import com.klinara.android.services.passkey.PasskeyService
 import com.klinara.android.services.passkey.UnavailablePasskeyService
+import com.klinara.android.services.push.PushRegistrar
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -448,6 +449,8 @@ class AuthFlowViewModel(
 
     private fun logout() {
         viewModelScope.launch {
+            // Push kaydı ÖNCE silinir: istek hâlâ geçerli oturumla gitmeli.
+            PushRegistrar.deactivate()
             runCatching { container.auth.logout() }
             forceLogout()
         }

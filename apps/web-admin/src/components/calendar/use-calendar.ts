@@ -1,12 +1,17 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { CalendarResponse } from '@klinara/shared';
 import { useBranch } from '@/components/session/branch-provider';
 import { api } from '@/lib/api/client';
 import { toMessage } from '@/lib/reports/errors';
 import { nextPollDelay } from '@/lib/domains/poll';
 import { addDays, weekStart, type DayKey } from '@/lib/calendar/date';
+import {
+  isRealtimeConnected,
+  onRealtimeStatus,
+  subscribeRealtime,
+} from '@/lib/realtime/realtime-client';
 
 /**
  * Takvim verisi — `use-report.ts` kalıbı, iki eklemeyle.
@@ -28,12 +33,19 @@ import { addDays, weekStart, type DayKey } from '@/lib/calendar/date';
  * EKLEME 2 — CANLI TAZELEME
  * ---------------------------------------------------------------------------
  * Takvim paylaşılan bir ekran: resepsiyon randevu yazarken uygulayıcı aynı
- * günü açık tutuyor. `lib/domains/poll.ts` yeniden kullanılıyor (5s → 15s →
- * 30s, beş dakika sonra dur, sekme gizliyken atla).
+ * günü açık tutuyor. Asıl yol anlık olay soketi (`realtime-client`): sunucu
+ * bir randevu satırı değişince "şu şubenin şu günleri" der, ekranda o
+ * günlerden biri açıksa veri yeniden okunur. Soket içerik taşımıyor; veri
+ * yine yetkili REST ucundan geliyor.
  *
- * Yoklama her MUTASYONDAN sonra sıfırlanıyor (`reload`): kullanıcı bir şey
- * yaptıysa ekranın canlı kalması gereken pencere yeniden başlar.
+ * Soket kopukken yoklamaya düşülüyor — `lib/domains/poll.ts` (5s → 15s →
+ * 30s, beş dakika sonra dur, sekme gizliyken atla). Yoklama her MUTASYONDAN
+ * sonra sıfırlanıyor (`reload`): kullanıcı bir şey yaptıysa ekranın canlı
+ * kalması gereken pencere yeniden başlar.
  */
+
+/** Art arda gelen olaylar (durum + not aynı anda) tek yeniden okumaya insin. */
+const REALTIME_DEBOUNCE_MS = 250;
 
 export type CalendarView = 'day' | 'week';
 
@@ -109,9 +121,38 @@ export function useCalendar({ view, day, staffProfileId }: Options): CalendarSta
     return () => controller.abort();
   }, [view, anchor, staffProfileId, branchId, branchLoading, nonce]);
 
-  // Yoklama. Veri gelmeden başlamıyor — ilk yükleme zaten yolda.
+  // Anlık tazeleme: açık olan gün/hafta etkilendiyse sessizce yeniden oku.
+  const live = useSyncExternalStore(onRealtimeStatus, isRealtimeConnected, () => false);
   useEffect(() => {
-    if (data === null || pollStopped || branchId === null) return;
+    if (branchLoading || branchId === null) return;
+    const visible = new Set(
+      Array.from({ length: view === 'week' ? 7 : 1 }, (_, index) => addDays(anchor, index)),
+    );
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const unsubscribe = subscribeRealtime((message) => {
+      if (message.type === 'staff_notification') return;
+      if (
+        message.type === 'calendar_changed' &&
+        (message.branchId !== branchId || !message.days.some((day) => visible.has(day)))
+      )
+        return;
+      // `resync`: bağlantı yeniden kuruldu, arada kaçan olay bilinemez.
+      if (timer !== null) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = null;
+        setNonce((value) => value + 1);
+      }, REALTIME_DEBOUNCE_MS);
+    });
+    return () => {
+      unsubscribe();
+      if (timer !== null) clearTimeout(timer);
+    };
+  }, [view, anchor, branchId, branchLoading]);
+
+  // Yoklama — yalnız soket kopukken. Veri gelmeden başlamıyor; ilk yükleme
+  // zaten yolda.
+  useEffect(() => {
+    if (live || data === null || pollStopped || branchId === null) return;
 
     pollStartedAt.current ??= Date.now();
     const delay = nextPollDelay(pollAttempt.current, Date.now() - (pollStartedAt.current ?? 0));
@@ -132,14 +173,15 @@ export function useCalendar({ view, day, staffProfileId }: Options): CalendarSta
     }, delay);
 
     return () => clearTimeout(timer);
-  }, [data, pollStopped, branchId, nonce]);
+  }, [live, data, pollStopped, branchId, nonce]);
 
   return {
     data,
     error,
     loading: data === null && error === null && !needsBranch,
     needsBranch,
-    pollStopped,
+    // Soket bağlıyken yoklama zaten durmuş sayılmaz: ekran canlı.
+    pollStopped: pollStopped && !live,
     branchId,
     reload,
   };

@@ -1,11 +1,13 @@
 package com.klinara.android.app
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.klinara.android.designsystem.KlinaraTheme
+import com.klinara.android.services.push.PushRouter
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -20,11 +22,19 @@ class MainActivity : ComponentActivity() {
 
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        // Kapalı uygulama bildirime dokunularak açıldı.
+        if (savedInstanceState == null) PushRouter.handle(intent)
 
         setContent {
             KlinaraTheme {
                 RootContent(onSessionResolved = { resolvingSession = false })
             }
         }
+    }
+
+    /** Açık uygulamada bildirime dokunuldu (`FLAG_ACTIVITY_SINGLE_TOP`). */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        PushRouter.handle(intent)
     }
 }

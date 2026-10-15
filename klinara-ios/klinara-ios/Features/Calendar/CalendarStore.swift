@@ -105,6 +105,16 @@ final class CalendarStore {
         }
     }
 
+    /// Soketten gelen "şu günler değişti" sinyali ekranda açık olanı etkiliyor mu.
+    func covers(days: [String], clock: BranchClock) -> Bool {
+        let visible: [Date] = switch mode {
+        case .week: clock.weekDays(of: selectedDate)
+        case .agenda, .grid: [selectedDate]
+        }
+        let keys = Set(visible.map(clock.localDateString))
+        return days.contains(where: keys.contains)
+    }
+
     // MARK: Gezinme
 
     func select(_ date: Date) { selectedDate = date }

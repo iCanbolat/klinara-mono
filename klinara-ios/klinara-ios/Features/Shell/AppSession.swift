@@ -37,6 +37,20 @@ final class AppSession {
 
     private let tokens: TokenStore
 
+    // MARK: Anlık tazeleme
+
+    /// Takvimin yeniden okunması gerektiğinde artar — `.task(id:)` anahtarı.
+    ///
+    /// Soket "şu şubenin şu günleri değişti" der; sayaç yalnız ekranda açık
+    /// olan şube ve günler etkilendiyse artar. Kişinin kendi işlemi de bir
+    /// sinyal üretir; o durumda yeniden okuma zararsız bir tekrar.
+    private(set) var calendarSignal = 0
+
+    /// Bildirimden açılacak randevu — takvim sekmesi bunu sayfa olarak açar.
+    var linkedAppointment: AppointmentLink?
+
+    @ObservationIgnored private let realtime: RealtimeConnection?
+
     init(
         profile: MeResponse,
         branches: [BranchSummary],
@@ -55,6 +69,40 @@ final class AppSession {
         let store = tokens ?? .shared
         self.tokens = store
         self.selectedBranchId = store.branchId ?? branches.first?.id
+        self.realtime = services.realtime.map(RealtimeConnection.init(service:))
+        realtime?.onEvent = { [weak self] event in self?.handle(event) }
+    }
+
+    /// Uygulama öne geldi ya da oturum açıldı.
+    ///
+    /// Öne dönüşte takvim de bir kez tazelenir: arka plandayken soket kapalıydı
+    /// ve o arada olan biten bilinmiyor. Açılışta tazeleme gereksiz — ekran
+    /// zaten ilk yüklemesini yapıyor.
+    func becameActive(refresh: Bool) {
+        let wasRunning = realtime?.isRunning ?? false
+        realtime?.start()
+        if refresh, !wasRunning { calendarSignal += 1 }
+    }
+
+    /// Arka plana geçerken ve çıkışta. Arka planda soket tutmak pil yer ve
+    /// iOS onu zaten askıya alıyor.
+    func resignedActive() {
+        realtime?.stop()
+    }
+
+    private func handle(_ event: RealtimeEvent) {
+        switch event {
+        case .calendarChanged(let branchId, let days):
+            guard branchId == selectedBranchId,
+                  calendarStore.covers(days: days, clock: clock)
+            else { return }
+            calendarSignal += 1
+        case .resync:
+            calendarSignal += 1
+        case .staffNotification:
+            // Mobilde zil akışı yok; personel bildirimi push ile geliyor.
+            break
+        }
     }
 
     // MARK: Yetki
@@ -125,6 +173,11 @@ final class AppSession {
         guard let refreshed = try? await services.auth.me() else { return }
         profile = refreshed
     }
+}
+
+/// Bildirimden açılan randevu — `.sheet(item:)` için kimlik sarmalayıcı.
+struct AppointmentLink: Identifiable, Hashable {
+    let id: String
 }
 
 // MARK: - Ortam anahtarı

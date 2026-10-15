@@ -15,13 +15,26 @@ const RECONNECT_MAX_MS = 30_000;
  * oldu" der; istemci asıl veriyi yetkili REST ucundan okur. Böylece yetki ve
  * şube süzgeci tek bir yerde (REST) kalıyor, yayın katmanı veri sızdıramıyor.
  */
-export interface RealtimeEvent {
-  tenantId: string;
-  /** `null`: klinik geneli — şubeden bağımsız herkese gider. */
-  branchId: string | null;
-  type: 'staff_notification';
-  kind: string;
-}
+export type RealtimeEvent =
+  | {
+      tenantId: string;
+      /** `null`: klinik geneli — şubeden bağımsız herkese gider. */
+      branchId: string | null;
+      type: 'staff_notification';
+      kind: string;
+    }
+  | {
+      tenantId: string;
+      branchId: string;
+      /**
+       * Randevu satırı değişti. `publish` ile DEĞİL, `appointments` tablosundaki
+       * trigger'dan yayınlanır (migration 0053) — randevuya dokunan her yol
+       * kendiliğinden kapsanır.
+       */
+      type: 'calendar_changed';
+      /** Etkilenen yerel günler (`YYYY-MM-DD`, şube saat diliminde). */
+      days: string[];
+    };
 
 type EventListener = (event: RealtimeEvent) => void;
 type ResyncListener = () => void;
@@ -143,6 +156,11 @@ export class RealtimeBusService implements OnApplicationBootstrap, OnModuleDestr
       return;
     }
     if (typeof event.tenantId !== 'string' || typeof event.type !== 'string') return;
+    if (
+      event.type === 'calendar_changed' &&
+      (typeof event.branchId !== 'string' || !Array.isArray(event.days))
+    )
+      return;
     for (const listener of this.eventListeners) listener(event);
   }
 }

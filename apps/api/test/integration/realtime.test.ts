@@ -7,7 +7,7 @@ import { StaffNotificationsService } from '../../src/modules/notifications/staff
 import { createTestApp } from '../helpers/app';
 import { startTestDatabase, type TestDatabase } from '../helpers/database';
 import { auth, http, PLATFORM_TOKEN } from '../helpers/identity';
-import { setupClinic, type ClinicFixture } from '../helpers/clinic';
+import { branchHeader, setupClinic, type ClinicFixture } from '../helpers/clinic';
 
 /** Soketten gelen mesajları sıraya alır; `next()` bir sonrakini bekler. */
 class Probe {
@@ -150,6 +150,60 @@ describe('anlık olay soketi', () => {
     const probe = await open();
     probe.socket.send('merhaba');
     expect(await probe.closed).toBe(4401);
+  });
+
+  describe('takvim olayı', () => {
+    const book = (startsAt: string) =>
+      http(app)
+        .post('/api/v1/appointments')
+        .set(auth(clinic.owner.tokens))
+        .set(branchHeader(clinic.branch.id))
+        .send({
+          branchId: clinic.branch.id,
+          customerId: clinic.customer.id,
+          startsAt,
+          services: [
+            { serviceId: clinic.quickService.id, staffProfileId: clinic.practitioner.staffProfileId },
+          ],
+        });
+
+    it('randevu yazılınca şube ve YEREL gün düşer; içerik taşımaz', async () => {
+      const probe = await connect();
+      const res = await book('2026-09-07T09:00:00+03:00');
+      expect(res.status).toBe(201);
+      expect(await probe.next()).toEqual({
+        type: 'calendar_changed',
+        branchId: clinic.branch.id,
+        days: ['2026-09-07'],
+      });
+    });
+
+    it('erteleme hem eski hem yeni günü bildirir', async () => {
+      const created = await book('2026-09-07T09:00:00+03:00');
+      expect(created.status).toBe(201);
+      const probe = await connect();
+      const body = created.body as { id: string; version: number };
+      const res = await http(app)
+        .post(`/api/v1/appointments/${body.id}/reschedule`)
+        .set(auth(clinic.owner.tokens))
+        .set(branchHeader(clinic.branch.id))
+        .set({ 'if-match': `W/"${body.version}"` })
+        .send({ startsAt: '2026-09-08T10:00:00+03:00' });
+      expect(res.status).toBe(200);
+      expect(await probe.next()).toEqual({
+        type: 'calendar_changed',
+        branchId: clinic.branch.id,
+        days: ['2026-09-07', '2026-09-08'],
+      });
+    });
+
+    it('takvim olayı bildirim akışını tetiklemez (tür ayrı)', async () => {
+      const probe = await connect();
+      await book('2026-09-07T11:00:00+03:00');
+      const message = (await probe.next()) as { type: string };
+      expect(message.type).toBe('calendar_changed');
+      await expect(probe.next(300)).rejects.toThrow();
+    });
   });
 
   it('başka yola yükseltme reddedilir', async () => {

@@ -110,3 +110,29 @@ export async function markRead(
     on conflict (notification_id, user_id) do nothing
   `);
 }
+
+/** Push işi için: yalnız yönlendirme alanları — başlık/gövde (kişisel veri) okunmaz. */
+export async function findForPush(
+  tx: Tx,
+  id: string,
+): Promise<
+  | {
+      kind: StaffNotificationKind;
+      branchId: string | null;
+      appointmentId: string | null;
+      conversationId: string | null;
+    }
+  | undefined
+> {
+  const [row] = await tx
+    .select({
+      kind: staffNotifications.kind,
+      branchId: staffNotifications.branchId,
+      appointmentId: staffNotifications.appointmentId,
+      conversationId: staffNotifications.conversationId,
+    })
+    .from(staffNotifications)
+    .where(eq(staffNotifications.id, id))
+    .limit(1);
+  return row;
+}

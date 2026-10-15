@@ -1,10 +1,10 @@
 import { Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
-import { PERMISSIONS } from '@klinara/shared';
-import { RequirePermission } from '../../common/decorators/auth.decorators';
+import { RequireAnyPermission } from '../../common/decorators/auth.decorators';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { Principal } from '../identity/principal';
 import { REALTIME_TICKET_TTL_SECONDS, TokenService } from '../identity/token.service';
+import { REALTIME_PERMISSIONS } from './realtime.gateway';
 
 export class RealtimeTicketDto {
   @ApiProperty({ description: 'Soket açıldıktan sonra ilk mesajda gönderilir' })
@@ -18,7 +18,7 @@ export class RealtimeTicketDto {
 @ApiTags('notifications')
 @ApiBearerAuth('bearerAuth')
 @Controller('realtime')
-@RequirePermission(PERMISSIONS.NOTIFICATION_READ)
+@RequireAnyPermission(...REALTIME_PERMISSIONS)
 export class RealtimeController {
   constructor(private readonly tokens: TokenService) {}
 

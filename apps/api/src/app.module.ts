@@ -20,6 +20,7 @@ import { IdempotencyModule } from './common/idempotency/idempotency.module';
 import { MailModule } from './lib/mail/mail.module';
 import { QueueModule } from './lib/queue/queue.module';
 import { RealtimeBusModule } from './lib/realtime/realtime.module';
+import { PushModule } from './lib/push/push.module';
 import { SmsModule } from './lib/sms/sms.module';
 import { StorageModule } from './lib/storage/storage.module';
 import { WhatsAppModule } from './lib/whatsapp/whatsapp.module';
@@ -89,6 +90,7 @@ import { MetricsModule } from './observability/metrics.module';
     BranchAccessModule,
     IdempotencyModule,
     SmsModule,
+    PushModule,
     StorageModule,
     QueueModule,
     RealtimeBusModule,

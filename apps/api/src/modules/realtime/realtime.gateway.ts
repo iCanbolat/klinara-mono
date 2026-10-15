@@ -29,6 +29,32 @@ const MAX_PAYLOAD_BYTES = 4 * 1024;
 const CLOSE_UNAUTHENTICATED = 4401;
 const CLOSE_FORBIDDEN = 4403;
 
+const CALENDAR_PERMISSIONS = [
+  PERMISSIONS.APPOINTMENT_READ_ALL,
+  PERMISSIONS.APPOINTMENT_READ_OWN,
+] as const;
+
+/** Sokete bağlanabilmek için bu izinlerden biri yeter. */
+export const REALTIME_PERMISSIONS = [PERMISSIONS.NOTIFICATION_READ, ...CALENDAR_PERMISSIONS];
+
+function canListen(principal: Principal): boolean {
+  return REALTIME_PERMISSIONS.some((permission) => hasPermission(principal, permission));
+}
+
+/** Olay bu kullanıcıya gidebilir mi; giderse soketten çıkan yük ne. */
+function messageFor(principal: Principal, event: RealtimeEvent): object | null {
+  if (event.branchId !== null && !canAccessBranch(principal, event.branchId)) return null;
+  switch (event.type) {
+    case 'staff_notification':
+      if (!hasPermission(principal, PERMISSIONS.NOTIFICATION_READ)) return null;
+      return { type: event.type, kind: event.kind };
+    case 'calendar_changed':
+      if (!CALENDAR_PERMISSIONS.some((permission) => hasPermission(principal, permission)))
+        return null;
+      return { type: event.type, branchId: event.branchId, days: event.days };
+  }
+}
+
 function textOf(data: RawData): string {
   if (Array.isArray(data)) return Buffer.concat(data).toString('utf8');
   return Buffer.from(data as ArrayBuffer).toString('utf8');
@@ -44,9 +70,14 @@ interface Connection {
 /**
  * Panelin anlık olay kanalı.
  *
- * TEK YÖNLÜ ve İÇERİKSİZ: sunucu "yeni bildirim var" der, istemci veriyi
- * yetkili REST ucundan (`GET staff-notifications`) okur. Soketten veri
- * taşınmadığı için yetki denetimi iki yerde tekrarlanmıyor.
+ * TEK YÖNLÜ ve İÇERİKSİZ: sunucu "yeni bildirim var" ya da "şu şubenin şu
+ * günü değişti" der, istemci veriyi yetkili REST ucundan (`GET
+ * staff-notifications`, `GET calendar/*`) okur. Soketten veri taşınmadığı
+ * için yetki denetimi iki yerde tekrarlanmıyor.
+ *
+ * Panel ve mobil uygulamalar AYNI kanalı kullanır. Olay türü başına izin
+ * süzgeci: bildirim olayı `notification:read`, takvim olayı randevu okuma
+ * izni ister. Bağlanmak için ikisinden biri yeter.
  *
  * KİMLİK: el sıkışmada cookie ya da `Authorization` okunmaz. İstemci önce
  * `POST realtime/ticket` ile kısa ömürlü bir bilet alır ve bağlandıktan sonra
@@ -157,7 +188,7 @@ export class RealtimeGateway implements OnApplicationBootstrap, BeforeApplicatio
         sessionId: claims.sid,
         tokenVersion: claims.tv,
       });
-      if (!hasPermission(principal, PERMISSIONS.NOTIFICATION_READ)) {
+      if (!canListen(principal)) {
         connection.socket.close(CLOSE_FORBIDDEN);
         return;
       }
@@ -201,8 +232,8 @@ export class RealtimeGateway implements OnApplicationBootstrap, BeforeApplicatio
     for (const connection of tenant) {
       const principal = connection.principal;
       if (principal === null) continue;
-      if (event.branchId !== null && !canAccessBranch(principal, event.branchId)) continue;
-      this.send(connection, { type: event.type, kind: event.kind });
+      const message = messageFor(principal, event);
+      if (message !== null) this.send(connection, message);
     }
   }
 
@@ -238,7 +269,7 @@ export class RealtimeGateway implements OnApplicationBootstrap, BeforeApplicatio
   private async revalidate(connection: Connection, current: Principal): Promise<void> {
     try {
       const principal = await this.resolve(current);
-      if (!hasPermission(principal, PERMISSIONS.NOTIFICATION_READ)) {
+      if (!canListen(principal)) {
         connection.socket.close(CLOSE_FORBIDDEN);
         return;
       }

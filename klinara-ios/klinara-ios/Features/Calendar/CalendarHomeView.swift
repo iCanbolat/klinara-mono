@@ -96,8 +96,20 @@ struct CalendarHomeView: View {
                 _ = await (calendar, catalog, staff, customers)
                 store.cacheCustomers(session.customerStore.customers)
             }
+            // Başka biri (ya da müşteri) randevuyu değiştirdi: açık gün sessizce
+            // yeniden okunur. Kısa bekleme, art arda gelen sinyalleri (durum +
+            // not) tek isteğe indiriyor — yeni sinyal bekleyen görevi iptal eder.
+            .task(id: session.calendarSignal) {
+                guard session.calendarSignal > 0 else { return }
+                try? await Task.sleep(for: .milliseconds(250))
+                guard !Task.isCancelled else { return }
+                await store.load(branchId: session.selectedBranchId, clock: clock)
+            }
             .sheet(item: $selected) { entry in
                 AppointmentDetailView(session: session, entryId: entry.id)
+            }
+            .sheet(item: Bindable(session).linkedAppointment) { link in
+                AppointmentDetailView(session: session, entryId: link.id)
             }
             .sheet(isPresented: $isBooking) {
                 BookingFlowView(session: session, startingAt: nil)

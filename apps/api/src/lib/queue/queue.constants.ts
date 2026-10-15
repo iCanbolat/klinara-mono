@@ -20,6 +20,10 @@ export const QUEUES = {
   // Hatırlatma. İş randevuyla AYNI transaction'da yazılır (8.4): randevu
   // rollback olursa hatırlatma da olmaz.
   REMINDER_SEND: 'reminder.send',
+  // Personel bildiriminin mobil push'u. İş bildirimle AYNI transaction'da
+  // yazılır ve yalnız kimliği taşır; alıcılar gönderim anında çözülür (o an
+  // yetkisi ve oturumu olanlar).
+  STAFF_PUSH_SEND: 'staff-notification.push',
   // Alan adı doğrulaması. Aynı iki adımlı bölünme: cron kiracıları listeler,
   // DNS sorgusu kiracı başına ayrı işte koşar — yavaş bir çözümleyici
   // diğer kiracıları bekletmesin.

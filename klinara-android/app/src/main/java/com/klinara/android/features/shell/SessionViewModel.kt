@@ -10,6 +10,11 @@ import com.klinara.android.services.auth.BranchSummary
 import com.klinara.android.services.auth.TokenStore
 import com.klinara.android.services.branches.BranchesService
 import com.klinara.android.services.networking.ApiError
+import com.klinara.android.services.realtime.RealtimeClient
+import com.klinara.android.services.realtime.RealtimeEvent
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -37,6 +42,7 @@ class SessionViewModel(
     private val auth: AuthService,
     private val tokens: TokenStore,
     private val branches: BranchesService,
+    private val realtime: RealtimeClient? = null,
 ) : ViewModel() {
     private val _session = MutableStateFlow(initial)
     val session: StateFlow<AppSession> = _session.asStateFlow()
@@ -50,6 +56,50 @@ class SessionViewModel(
      */
     private val _branchGeneration = MutableStateFlow(0)
     val branchGeneration: StateFlow<Int> = _branchGeneration.asStateFlow()
+
+    /**
+     * Takvimi ilgilendiren anlık sinyaller — yalnız AKTİF şubeninkiler.
+     *
+     * Hangi günün ekranda açık olduğunu takvim ekranı biliyor; süzgecin ikinci yarısı
+     * orada (`CalendarViewModel.onRealtime`). [RealtimeEvent.Resync] her zaman geçer.
+     */
+    private val _calendarEvents = MutableSharedFlow<RealtimeEvent>(extraBufferCapacity = 16)
+    val calendarEvents: SharedFlow<RealtimeEvent> = _calendarEvents.asSharedFlow()
+
+    init {
+        realtime?.let { client ->
+            viewModelScope.launch {
+                client.events.collect { event ->
+                    when (event) {
+                        is RealtimeEvent.CalendarChanged ->
+                            if (event.branchId == _session.value.activeBranchId) _calendarEvents.tryEmit(event)
+                        RealtimeEvent.Resync -> _calendarEvents.tryEmit(event)
+                        // Mobilde zil akışı yok; personel bildirimi push ile geliyor.
+                        is RealtimeEvent.StaffNotification -> Unit
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Uygulama öne geldi. Arka plandayken soket kapalıydı ve o arada olan biten
+     * bilinmiyor: [refresh] ise takvime bir kez "baştan oku" denir. İlk açılışta
+     * gereksiz — ekran zaten ilk yüklemesini yapıyor.
+     */
+    fun becameActive(refresh: Boolean) {
+        realtime?.start()
+        if (refresh) _calendarEvents.tryEmit(RealtimeEvent.Resync)
+    }
+
+    /** Arka plan ve çıkış: soket arka planda tutulmaz (pil, ve sistem zaten keser). */
+    fun resignedActive() {
+        realtime?.stop()
+    }
+
+    override fun onCleared() {
+        realtime?.stop()
+    }
 
     /**
      * Aktif şubeyi değiştirir.
@@ -120,7 +170,13 @@ class SessionViewModel(
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                    SessionViewModel(initial, container.auth, container.tokens, container.branches) as T
+                    SessionViewModel(
+                        initial,
+                        container.auth,
+                        container.tokens,
+                        container.branches,
+                        container.realtime,
+                    ) as T
             }
     }
 }

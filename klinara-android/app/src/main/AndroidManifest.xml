@@ -3,6 +3,8 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Personel push bildirimleri (Android 13+ çalışma zamanında sorulur). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!--
       Klinik fotoğrafı çoğu kez O AN çekiliyor (A4.4). Galeri için izin YOK ve
@@ -28,6 +30,24 @@
         android:roundIcon="@mipmap/ic_launcher"
         android:supportsRtl="false"
         android:theme="@style/Theme.Klinara.Starting">
+
+        <!--
+          FCM. Uygulama arka plandayken bildirimi sistem çizer; ikon ve kanal buradan.
+          Kanal kimliği sunucudaki ANDROID_CHANNEL_ID ile aynı.
+        -->
+        <service
+            android:name=".services.push.KlinaraMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_klinara_bell" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="staff_notifications" />
 
         <activity
             android:name=".app.MainActivity"

@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import com.klinara.android.services.ServiceContainer
 import com.klinara.android.services.mock.MockDataScenario
 import com.klinara.android.services.mock.MockScenario
+import com.klinara.android.services.push.PushRegistrar
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -42,6 +43,8 @@ class KlinaraApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // Bildirim kanalı ve (yapılandırıldıysa) Firebase — container'dan bağımsız.
+        PushRegistrar.initialize(this)
         backing = ServiceContainer.live(sessionDataStore, appScope)
         // İnterceptor bloklayıcı okuduğu için cache bir kez ısıtılır; soğuk kalırsa
         // ilk istek Authorization'sız gider ve 401'e düşer (test edilmiş düşüş yolu).

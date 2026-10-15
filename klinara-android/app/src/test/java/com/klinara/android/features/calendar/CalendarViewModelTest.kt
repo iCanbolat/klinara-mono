@@ -14,6 +14,7 @@ import com.klinara.android.services.mock.MockDataScenario
 import com.klinara.android.services.networking.ApiError
 import com.klinara.android.services.networking.Loadable
 import com.klinara.android.services.networking.Page
+import com.klinara.android.services.realtime.RealtimeEvent
 import com.klinara.android.services.staff.MockStaffService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -120,6 +121,39 @@ class CalendarViewModelTest {
 
     private fun viewModel(service: BookingService) =
         CalendarViewModel(service, MockStaffService(latencyEnabled = false), clock, today)
+
+    @Test
+    @DisplayName("Soket sinyali yalnız AÇIK günü etkiliyorsa sessizce yeniden okur")
+    fun realtimeReloadsOnlyVisibleDay() =
+        runTest(dispatcher) {
+            val service = booking()
+            val model = viewModel(service)
+            model.load(BRANCH)
+            advanceUntilIdle()
+            assertEquals(1, service.dayCalls)
+
+            // Başka gün: istek yok.
+            model.onRealtime(RealtimeEvent.CalendarChanged(BRANCH, listOf("2026-09-10")), BRANCH)
+            advanceUntilIdle()
+            assertEquals(1, service.dayCalls)
+
+            // Başka şube: istek yok.
+            model.onRealtime(RealtimeEvent.CalendarChanged("diger-sube", listOf("2026-09-09")), BRANCH)
+            advanceUntilIdle()
+            assertEquals(1, service.dayCalls)
+
+            // Açık gün: art arda iki sinyal TEK isteğe iner, gövde soluklaşmaz.
+            model.onRealtime(RealtimeEvent.CalendarChanged(BRANCH, listOf("2026-09-09")), BRANCH)
+            model.onRealtime(RealtimeEvent.CalendarChanged(BRANCH, listOf("2026-09-09")), BRANCH)
+            assertEquals(false, model.state.value.isRefreshing)
+            advanceUntilIdle()
+            assertEquals(2, service.dayCalls)
+
+            // Resync her zaman yeniden okur.
+            model.onRealtime(RealtimeEvent.Resync, BRANCH)
+            advanceUntilIdle()
+            assertEquals(3, service.dayCalls)
+        }
 
     @Test
     @DisplayName("Ajanda ile gün arasında geçiş YENİDEN İSTEK ATMAZ — ikisi aynı günü ister")

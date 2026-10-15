@@ -1,5 +1,10 @@
 package com.klinara.android.features.shell
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -24,6 +29,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -41,6 +49,11 @@ import com.klinara.android.designsystem.components.KlinaraScreen
 import com.klinara.android.designsystem.components.KlinaraCard
 import com.klinara.android.designsystem.components.KlinaraNavigationRow
 import com.klinara.android.features.auth.AppSession
+import com.klinara.android.services.push.PushRegistrar
+import com.klinara.android.services.push.PushRouter
+import kotlinx.coroutines.flow.Flow
+import com.klinara.android.services.realtime.RealtimeEvent
+import java.util.concurrent.atomic.AtomicBoolean
 import com.klinara.android.features.auth.AuthEvent
 import com.klinara.android.features.calendar.AppointmentDetailScreen
 import com.klinara.android.features.calendar.AppointmentHistoryScreen
@@ -139,6 +152,45 @@ fun AppShell(
             selectedName = ShellTab.Customers.name
         }.takeIf { ShellTab.Customers in tabs }
 
+    // Anlık olay soketi yalnız öndeyken açık. İlk başlangıçta takvim zaten yükleniyor;
+    // sonraki her öne dönüşte bir kez "baştan oku" (arka planda kaçan olaylar için).
+    val startedOnce = remember { AtomicBoolean(false) }
+    LifecycleStartEffect(sessionViewModel) {
+        sessionViewModel.becameActive(refresh = startedOnce.getAndSet(true))
+        onStopOrDispose { sessionViewModel.resignedActive() }
+    }
+
+    // Push: izin ve kayıt oturum açıldıktan sonra. Personel bildirimi görme izni yoksa
+    // push'un da anlamı yok (sunucu kaydı zaten reddeder).
+    val context = LocalContext.current
+    val canNotify = session.can(Permissions.NOTIFICATION_READ)
+    val notificationPermission =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    LaunchedEffect(canNotify) {
+        if (!canNotify) return@LaunchedEffect
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        // İzin verilmese de anahtar kaydedilir: kullanıcı izni sonradan ayarlardan açarsa
+        // bildirimler başka bir adım gerekmeden gelmeye başlar.
+        PushRegistrar.activate(container.push)
+    }
+
+    // Bildirime dokunuldu: takvim sekmesine geç, randevuyu orada aç.
+    val pushedAppointmentId by PushRouter.pendingAppointmentId.collectAsStateWithLifecycle()
+    var pendingAppointmentId by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(pushedAppointmentId) {
+        val id = pushedAppointmentId ?: return@LaunchedEffect
+        PushRouter.consume()
+        if (ShellTab.canSeeCalendar(session)) {
+            pendingAppointmentId = id
+            selectedName = ShellTab.Calendar.name
+        }
+    }
+
     val dashboardNav = rememberNavController()
     val todayNav = rememberNavController()
     val customersNav = rememberNavController()
@@ -169,7 +221,17 @@ fun AppShell(
                     DashboardTab(dashboardNav, session, container, branchMenu) {
                         selectedName = ShellTab.Calendar.name
                     }
-                ShellTab.Calendar -> TodayTab(todayNav, session, container, branchGeneration, branchMenu)
+                ShellTab.Calendar ->
+                    TodayTab(
+                        navController = todayNav,
+                        session = session,
+                        container = container,
+                        branchGeneration = branchGeneration,
+                        trailing = branchMenu,
+                        calendarEvents = sessionViewModel.calendarEvents,
+                        pendingAppointmentId = pendingAppointmentId,
+                        onAppointmentOpened = { pendingAppointmentId = null },
+                    )
                 ShellTab.Customers ->
                     CustomersTab(customersNav, session, container, branchMenu, pendingCustomerId) {
                         pendingCustomerId = null
@@ -246,6 +308,9 @@ private fun TodayTab(
     container: ServiceContainer,
     branchGeneration: Int,
     trailing: @Composable RowScope.() -> Unit,
+    calendarEvents: Flow<RealtimeEvent>,
+    pendingAppointmentId: String?,
+    onAppointmentOpened: () -> Unit,
 ) {
     NavHost(navController = navController, startDestination = ShellRoutes.TodayHome) {
         composable<ShellRoutes.TodayHome> {
@@ -254,6 +319,7 @@ private fun TodayTab(
                     session = session,
                     container = container,
                     branchGeneration = branchGeneration,
+                    calendarEvents = calendarEvents,
                     onSelectAppointment = { navController.navigate(ShellRoutes.AppointmentDetail(it)) },
                     // Giriş noktası izne bağlı (§7.4): `appointment:write` yoksa
                     // "+" düğmesi HİÇ çizilmez, 403 ile karşılaşılmaz.
@@ -280,6 +346,12 @@ private fun TodayTab(
         }
 
         appointmentDestinations(navController, session, container)
+    }
+    // NavHost'tan SONRA: grafik kurulmadan `navigate` çağrısı düşer.
+    LaunchedEffect(pendingAppointmentId) {
+        val id = pendingAppointmentId ?: return@LaunchedEffect
+        navController.navigate(ShellRoutes.AppointmentDetail(id))
+        onAppointmentOpened()
     }
 }
 

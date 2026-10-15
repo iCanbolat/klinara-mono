@@ -96,6 +96,8 @@ export function useStaffNotifications(
   useEffect(() => {
     if (!enabled) return;
     return subscribeRealtime((message) => {
+      // Takvim olayları zil akışını ilgilendirmiyor (`use-calendar` dinliyor).
+      if (message.type === 'calendar_changed') return;
       // Sohbet ekranı zil akışını beklemeden tazelensin.
       if (
         message.type === 'staff_notification' &&

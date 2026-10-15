@@ -41,6 +41,13 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // FCM — Firebase konsolundaki Android uygulamasının değerleri (`google-services.json`
+        // içindekilerle aynı). Boşsa push kapalı kalır, derleme kırılmaz (PushRegistrar).
+        buildConfigField("String", "KLINARA_FIREBASE_APP_ID", "\"${localProp("klinara.firebase.appId", "")}\"")
+        buildConfigField("String", "KLINARA_FIREBASE_API_KEY", "\"${localProp("klinara.firebase.apiKey", "")}\"")
+        buildConfigField("String", "KLINARA_FIREBASE_PROJECT_ID", "\"${localProp("klinara.firebase.projectId", "")}\"")
+        buildConfigField("String", "KLINARA_FIREBASE_SENDER_ID", "\"${localProp("klinara.firebase.senderId", "")}\"")
     }
 
     // AGP 9'da ikisi de varsayılan KAPALI.
@@ -178,6 +185,9 @@ dependencies {
 
     // Kabuk içi gezinme (A2.1). Giriş akışı kullanmaz — o bir durum makinesi (§5.3).
     implementation(libs.androidx.navigation.compose)
+
+    // Personel push bildirimleri (FCM). Bkz. services/push/PushRegistrar.
+    implementation(libs.firebase.messaging)
 
     // Klinik fotoğrafı o an çekiliyor (A4.4).
     implementation(libs.androidx.camera.core)

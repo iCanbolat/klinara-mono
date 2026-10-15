@@ -58,6 +58,9 @@ import com.klinara.android.services.booking.CalendarEntry
 import com.klinara.android.services.formatting.BranchClock
 import com.klinara.android.services.networking.Loadable
 import androidx.compose.runtime.LaunchedEffect
+import com.klinara.android.services.realtime.RealtimeEvent
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import java.time.Instant
 
 /**
@@ -75,6 +78,8 @@ fun CalendarHomeScreen(
     branchGeneration: Int,
     onSelectAppointment: (String) -> Unit,
     modifier: Modifier = Modifier,
+    /** Soketten gelen takvim sinyalleri (aktif şubeye süzülmüş) — bkz. `SessionViewModel`. */
+    calendarEvents: Flow<RealtimeEvent> = emptyFlow(),
     /** null ise kullanıcının `appointment:write` izni yok: düğme HİÇ çizilmez. */
     onCreate: (() -> Unit)? = null,
     trailing: @Composable (RowScope.() -> Unit)? = null,
@@ -95,6 +100,10 @@ fun CalendarHomeScreen(
     // içindeki gün değişimi ISTEK ATMAZ (anahtarın `scope` alanı değişmiyor).
     LaunchedEffect(loadKey) { viewModel.load(branchId) }
     LaunchedEffect(Unit) { viewModel.loadStaff() }
+    // Başkası (ya da müşteri) randevuyu değiştirdi: açık gün sessizce yeniden okunur.
+    LaunchedEffect(viewModel, branchId) {
+        calendarEvents.collect { viewModel.onRealtime(it, branchId) }
+    }
 
     val title =
         when (state.mode) {

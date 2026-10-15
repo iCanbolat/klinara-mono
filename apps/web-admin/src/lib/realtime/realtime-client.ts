@@ -21,6 +21,8 @@ import { api, SessionExpiredError } from '@/lib/api/client';
 
 export type RealtimeMessage =
   | { type: 'staff_notification'; kind: string }
+  /** Şubenin bu yerel günlerinde (`YYYY-MM-DD`) bir randevu değişti. */
+  | { type: 'calendar_changed'; branchId: string; days: string[] }
   /** Bağlantı (yeniden) kuruldu ya da sunucu olay kaçırmış olabilir: baştan oku. */
   | { type: 'resync' };
 
@@ -84,9 +86,9 @@ async function connect(): Promise<void> {
   socket = ws;
   ws.onopen = () => ws.send(JSON.stringify({ type: 'auth', ticket }));
   ws.onmessage = (event) => {
-    let message: { type?: string; kind?: string };
+    let message: { type?: string; kind?: string; branchId?: string; days?: unknown };
     try {
-      message = JSON.parse(String(event.data)) as { type?: string; kind?: string };
+      message = JSON.parse(String(event.data)) as typeof message;
     } catch {
       return;
     }
@@ -101,6 +103,14 @@ async function connect(): Promise<void> {
       for (const listener of listeners) listener({ type: 'resync' });
     } else if (message.type === 'staff_notification' && typeof message.kind === 'string') {
       for (const listener of listeners) listener({ type: 'staff_notification', kind: message.kind });
+    } else if (
+      message.type === 'calendar_changed' &&
+      typeof message.branchId === 'string' &&
+      Array.isArray(message.days)
+    ) {
+      const days = message.days.filter((day): day is string => typeof day === 'string');
+      for (const listener of listeners)
+        listener({ type: 'calendar_changed', branchId: message.branchId, days });
     }
   };
   ws.onclose = () => {

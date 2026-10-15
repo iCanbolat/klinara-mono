@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  HENÜZ PROJEYE BAĞLI DEĞİL (CODE_SIGN_ENTITLEMENTS boş).
+
+	  Kişisel geliştirici takımı Push Notifications yeteneğini desteklemiyor;
+	  bu dosya bağlanırsa cihaz derlemesi imzada düşer. Apple Developer
+	  hesabı açılıp App ID'de Push Notifications etkinleştirilince:
+	    Build Settings → Code Signing Entitlements = klinara-ios.entitlements
+	  (ya da Signing & Capabilities → + Push Notifications; Xcode aynı anahtarı yazar).
+
+	  `development` Xcode'dan kurulan derlemeler içindir; Archive/TestFlight
+	  imzası bunu otomatik olarak `production` yapar.
+	-->
+	<key>aps-environment</key>
+	<string>development</string>
+</dict>
+</plist>

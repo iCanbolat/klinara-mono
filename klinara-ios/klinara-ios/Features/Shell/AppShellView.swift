@@ -19,6 +19,8 @@ struct AppShellView: View {
     let session: AppSession
 
     @State private var selection = Tabs.dashboard
+    @Environment(\.scenePhase) private var scenePhase
+    private var push: PushCoordinator { PushCoordinator.shared }
 
     private enum Tabs: Hashable {
         case dashboard, calendar, customers, management, profile
@@ -87,6 +89,39 @@ struct AppShellView: View {
         }
         .tint(KlinaraColor.sage)
         .environment(\.appSession, session)
+        .task {
+            session.becameActive(refresh: false)
+            // Push izni ve kaydı oturum açıldıktan sonra; personel bildirimi
+            // görme izni yoksa push'un da anlamı yok (sunucu da reddeder).
+            if session.can(Permissions.notificationRead) {
+                await push.activate(service: session.services.push)
+            }
+        }
+        .onDisappear { session.resignedActive() }
+        .onChange(of: scenePhase) { _, phase in
+            switch phase {
+            case .active: session.becameActive(refresh: true)
+            case .background: session.resignedActive()
+            default: break
+            }
+        }
+        // Bildirime dokunuldu (uygulama kapalıyken de: rota açılışta bekliyor).
+        .onChange(of: push.pendingRoute, initial: true) { _, route in
+            guard let route else { return }
+            push.pendingRoute = nil
+            open(route)
+        }
+    }
+
+    private func open(_ route: PushRoute) {
+        switch route {
+        case .appointment(let id):
+            guard canSeeCalendar else { return }
+            selection = .calendar
+            session.linkedAppointment = AppointmentLink(id: id)
+        case .home:
+            break
+        }
     }
 }
 

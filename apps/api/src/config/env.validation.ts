@@ -591,6 +591,42 @@ export class EnvironmentVariables {
   @MinLength(16)
   WHATSAPP_WEBHOOK_VERIFY_TOKEN?: string;
 
+  // --- Mobil push (personel bildirimleri) ---
+  /**
+   * APNs `.p8` anahtarı ve kimlikleri. Dördü birden tanımlı değilse iOS push
+   * GÖNDERİLMEZ, yalnız loga yazılır. Anahtar düz PEM (`\n` kaçışlı) ya da
+   * base64 olabilir; tek anahtar hem sandbox hem canlı ortamda geçer.
+   */
+  @Expose()
+  @IsOptional()
+  @IsString()
+  APNS_KEY_ID?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  APNS_TEAM_ID?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  APNS_PRIVATE_KEY?: string;
+
+  /** iOS uygulamasının bundle kimliği (`apns-topic`). */
+  @Expose()
+  @IsOptional()
+  @IsString()
+  APNS_BUNDLE_ID?: string;
+
+  /**
+   * Firebase servis hesabı JSON'u (düz ya da base64). Tanımsızsa Android push
+   * GÖNDERİLMEZ, yalnız loga yazılır.
+   */
+  @Expose()
+  @IsOptional()
+  @IsString()
+  FCM_SERVICE_ACCOUNT?: string;
+
   /** Onayla/İptal buton token'ının ömrü. Randevudan uzun yaşamasının anlamı yok. */
   @Expose()
   @Type(() => Number)

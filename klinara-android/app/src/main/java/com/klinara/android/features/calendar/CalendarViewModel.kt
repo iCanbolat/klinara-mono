@@ -15,8 +15,11 @@ import com.klinara.android.services.contracts.ApiErrorCode
 import com.klinara.android.services.formatting.BranchClock
 import com.klinara.android.services.networking.Loadable
 import com.klinara.android.services.networking.ProblemDetails
+import com.klinara.android.services.realtime.RealtimeEvent
 import com.klinara.android.services.staff.StaffProfile
 import com.klinara.android.services.staff.StaffService
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -148,7 +151,45 @@ class CalendarViewModel(
         return LoadKey(branchId, scope, current.staffFilter, branchGeneration)
     }
 
-    fun load(branchId: String?) {
+    /**
+     * Soketten gelen sinyal: açık olan gün/hafta etkilendiyse SESSİZCE yeniden okunur.
+     *
+     * Sessiz = gövde soluklaşmaz ([CalendarUiState.isRefreshing] kalkmaz): başkasının
+     * yaptığı bir değişiklik, kullanıcının o an baktığı ekranı söndürüp yakmamalı. Kısa
+     * bekleme art arda gelen sinyalleri (durum + not) tek isteğe indiriyor.
+     */
+    fun onRealtime(
+        event: RealtimeEvent,
+        branchId: String?,
+    ) {
+        if (branchId == null) return
+        if (event is RealtimeEvent.CalendarChanged) {
+            if (event.branchId != branchId || event.days.none { it in visibleDays() }) return
+        }
+        realtimeReload?.cancel()
+        realtimeReload =
+            viewModelScope.launch {
+                delay(REALTIME_DEBOUNCE_MS)
+                load(branchId, silent = true)
+            }
+    }
+
+    private var realtimeReload: Job? = null
+
+    private fun visibleDays(): Set<String> {
+        val current = _state.value
+        val days =
+            when (current.mode) {
+                CalendarMode.Week -> clock.weekDays(current.selectedDate)
+                CalendarMode.Agenda, CalendarMode.Day -> listOf(current.selectedDate)
+            }
+        return days.mapTo(mutableSetOf(), clock::localDateString)
+    }
+
+    fun load(
+        branchId: String?,
+        silent: Boolean = false,
+    ) {
         if (branchId == null) {
             // Şube seçilmeden takvim ÇAĞRILMAZ: sunucu 400 verirdi ve kullanıcı
             // "bir şeyler ters gitti" görürdü. Neyin eksik olduğunu söylemek daha dürüst.
@@ -159,7 +200,10 @@ class CalendarViewModel(
         // metniyle değiştirmek her dokunuşta ekranı söndürüp yakıyordu. Yalnız ilk
         // yüklemede (ya da hatadan sonra) Loading gösterilir.
         _state.update {
-            if (it.calendar is Loadable.Loaded) it.copy(isRefreshing = true) else it.copy(calendar = Loadable.Loading)
+            when {
+                it.calendar is Loadable.Loaded -> if (silent) it else it.copy(isRefreshing = true)
+                else -> it.copy(calendar = Loadable.Loading)
+            }
         }
         viewModelScope.launch {
             val current = _state.value
@@ -185,6 +229,9 @@ class CalendarViewModel(
                             )
                     }
                 }
+            // Sessiz tazelemenin hatası ekrandaki takvimi SİLMEZ: geçici bir ağ hatası
+            // başkasının değişikliği yüzünden kullanıcının gününü kırmızı banta çevirmemeli.
+            if (silent && next is Loadable.Failed && _state.value.calendar is Loadable.Loaded) return@launch
             _state.update { it.copy(calendar = next, isRefreshing = false) }
         }
     }
@@ -235,6 +282,7 @@ class CalendarViewModel(
             )
 
         private const val HTTP_BAD_REQUEST = 400
+        private const val REALTIME_DEBOUNCE_MS = 250L
 
         fun factory(
             container: ServiceContainer,

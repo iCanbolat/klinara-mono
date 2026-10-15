@@ -23,6 +23,10 @@ final class ServiceContainer {
     let whatsapp: any WhatsAppService
     let conversations: any ConversationsService
     let reports: any ReportsService
+    let push: any PushService
+    /// Anlık olay soketi. Mock kurulumda `nil`: soket açılmaz, ekranlar
+    /// yalnız kendi yüklemeleriyle çalışır.
+    let realtime: (any RealtimeService)?
 
     /// Mock kullanılıyorsa geliştirici senaryo menüsü açılır.
     let mockAuth: MockAuthService?
@@ -46,6 +50,8 @@ final class ServiceContainer {
         whatsapp: any WhatsAppService,
         conversations: any ConversationsService,
         reports: any ReportsService,
+        push: any PushService,
+        realtime: (any RealtimeService)?,
         mockAuth: MockAuthService?,
         mockDataScenario: MockDataScenario? = nil
     ) {
@@ -65,6 +71,8 @@ final class ServiceContainer {
         self.whatsapp = whatsapp
         self.conversations = conversations
         self.reports = reports
+        self.push = push
+        self.realtime = realtime
         self.mockAuth = mockAuth
         self.mockDataScenario = mockDataScenario
     }
@@ -89,6 +97,8 @@ final class ServiceContainer {
             whatsapp: LiveWhatsAppService(client: client),
             conversations: LiveConversationsService(client: client),
             reports: LiveReportsService(client: client),
+            push: LivePushService(client: client),
+            realtime: LiveRealtimeService(client: client),
             mockAuth: nil
         )
     }
@@ -143,6 +153,8 @@ final class ServiceContainer {
             whatsapp: whatsapp,
             conversations: MockConversationsService(),
             reports: MockReportsService(),
+            push: MockPushService(),
+            realtime: nil,
             mockAuth: mockAuth,
             mockDataScenario: data
         )

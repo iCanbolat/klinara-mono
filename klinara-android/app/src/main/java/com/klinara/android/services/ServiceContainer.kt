@@ -47,6 +47,10 @@ import com.klinara.android.services.notifications.NotificationsService
 import com.klinara.android.services.packages.LivePackagesService
 import com.klinara.android.services.packages.MockPackagesService
 import com.klinara.android.services.packages.PackagesService
+import com.klinara.android.services.push.LivePushService
+import com.klinara.android.services.push.MockPushService
+import com.klinara.android.services.push.PushService
+import com.klinara.android.services.realtime.RealtimeClient
 import com.klinara.android.services.reports.LiveReportsService
 import com.klinara.android.services.reports.MockReportsService
 import com.klinara.android.services.reports.ReportsService
@@ -124,6 +128,9 @@ class ServiceContainer private constructor(
     val catalog: CatalogService,
     val packages: PackagesService,
     val reports: ReportsService,
+    val push: PushService,
+    /** Anlık olay soketi. Mock kurulumda `null`: soket açılmaz. */
+    val realtime: RealtimeClient?,
     val tokens: TokenStore,
     val sessionExpired: SharedFlow<Unit>,
     /** Yalnız mock modda dolu — geliştirici senaryo menüsü bunu kullanır. */
@@ -183,6 +190,14 @@ class ServiceContainer private constructor(
                 catalog = LiveCatalogService(client),
                 packages = LivePackagesService(client),
                 reports = LiveReportsService(client),
+                push = LivePushService(client),
+                realtime =
+                    RealtimeClient(
+                        api = client,
+                        bareHttp = clients.bare,
+                        socketUrl = RealtimeClient.socketUrl(ApiEnvironment.baseUrl),
+                        scope = scope,
+                    ),
                 tokens = tokens,
                 sessionExpired = client.sessionExpired,
                 mockAuth = null,
@@ -275,6 +290,8 @@ class ServiceContainer private constructor(
                 catalog = mockCatalog,
                 packages = mockPackages,
                 reports = mockReports,
+                push = MockPushService(),
+                realtime = null,
                 tokens = tokens,
                 sessionExpired = MutableSharedFlow(extraBufferCapacity = 1),
                 mockAuth = mockAuth,
@@ -328,6 +345,8 @@ class ServiceContainer private constructor(
             catalog = catalog,
             packages = packages,
             reports = reports,
+            push = MockPushService(),
+            realtime = null,
             tokens = tokens,
             sessionExpired = sessionExpired,
             mockAuth = mockAuth,

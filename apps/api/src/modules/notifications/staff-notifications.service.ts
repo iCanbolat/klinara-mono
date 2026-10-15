@@ -1,12 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import { TenantTxService } from '../../database/tenant-tx.service';
+import { QUEUES } from '../../lib/queue/queue.constants';
+import { QueueService } from '../../lib/queue/queue.service';
 import { RealtimeBusService } from '../../lib/realtime/realtime-bus.service';
 import type { Tx } from '../../database/tenant-tx';
 import type { Principal } from '../identity/principal';
 import { formatAppointmentTime } from './appointment-notifier.service';
 import * as reminderRepo from './reminders.repository';
 import * as repo from './staff-notifications.repository';
+import type { StaffPushJob } from './staff-push.worker';
 import type {
   MarkStaffNotificationsReadDto,
   StaffNotificationFeedDto,
@@ -36,11 +39,12 @@ export class StaffNotificationsService {
     private readonly tx: TenantTxService,
     private readonly logger: PinoLogger,
     private readonly realtime: RealtimeBusService,
+    private readonly queue: QueueService,
   ) {}
 
   async emit(tx: Tx, input: repo.InsertStaffNotification): Promise<void> {
     try {
-      await repo.insert(tx, input);
+      const { id } = await repo.insert(tx, input);
       // Açık paneller anında haberdar olur. Aynı transaction: commit olmazsa
       // yayın da olmaz.
       await this.realtime.publish(tx, {
@@ -49,6 +53,10 @@ export class StaffNotificationsService {
         type: 'staff_notification',
         kind: input.kind,
       });
+      // Uygulaması kapalı olan personelin telefonuna push (yine aynı
+      // transaction: rollback olan randevunun push'u da yazılmaz).
+      const job: StaffPushJob = { tenantId: input.tenantId, notificationId: id };
+      await this.queue.send(tx, QUEUES.STAFF_PUSH_SEND, job);
     } catch (error: unknown) {
       // Bildirim yan üründür: yazılamaması randevuyu ya da gelen mesajı
       // düşürmemeli.

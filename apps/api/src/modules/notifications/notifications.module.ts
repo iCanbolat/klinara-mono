@@ -8,12 +8,14 @@ import { NotificationDispatcherService } from './notification-dispatcher.service
 import { NotificationSenderWorker } from './notification-sender.worker';
 import { NotificationSettingsController } from './notification-settings.controller';
 import { NotificationSettingsService } from './notification-settings.service';
+import { PushDevicesController } from './push-devices.controller';
 import { ReminderSchedulerService } from './reminder-scheduler.service';
 import { ReminderWorker } from './reminder.worker';
 import { RemindersController } from './reminders.controller';
 import { RemindersService } from './reminders.service';
 import { StaffNotificationsController } from './staff-notifications.controller';
 import { StaffNotificationsService } from './staff-notifications.service';
+import { StaffPushWorker } from './staff-push.worker';
 
 /**
  * Bildirim çekirdeği.
@@ -29,6 +31,7 @@ import { StaffNotificationsService } from './staff-notifications.service';
     MessagesController,
     RemindersController,
     StaffNotificationsController,
+    PushDevicesController,
   ],
   providers: [
     NotificationSettingsService,
@@ -41,6 +44,7 @@ import { StaffNotificationsService } from './staff-notifications.service';
     ReminderWorker,
     AppointmentNotifierService,
     StaffNotificationsService,
+    StaffPushWorker,
   ],
   exports: [
     NotificationDispatcherService,

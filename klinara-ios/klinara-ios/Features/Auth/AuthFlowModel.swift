@@ -354,6 +354,8 @@ final class AuthFlowModel {
     // MARK: - Çıkış
 
     func logout() async {
+        // Push kaydı ÖNCE silinir: istek hâlâ geçerli oturumla gitmeli.
+        await PushCoordinator.shared.deactivate()
         try? await auth.logout()
         tokens.clear()
         resetInputs()
